@@ -30,3 +30,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #
 .chat-input { display: flex; padding: 10px; gap: 10px; background: #16213e; border-top: 1px solid #0f3460; }
 .chat-input input { flex: 1; padding: 10px 14px; border-radius: 20px; border: none; background: #0f3460; color: #eee; font-size: 16px; outline: none; }
 .chat-input button { padding: 10px 20px; border-radius: 20px; border: none; background: #e94560; color: #fff; font-size: 16px; cursor: pointer; }
+
+/* File messages */
+.msg-image { max-width: 240px; max-height: 240px; border-radius: 8px; cursor: pointer; display: block; }
+.msg-file-link { color: #e94560; text-decoration: none; word-break: break-all; font-size: 13px; }
+.msg-file-link:hover { text-decoration: underline; }
+
+/* Drop overlay */
+.drop-overlay { position: fixed; inset: 0; background: rgba(233,69,96,0.15); border: 3px dashed #e94560; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #e94560; z-index: 999; pointer-events: none; }
+.upload-toast { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); background: #0f3460; color: #fff; padding: 8px 20px; border-radius: 20px; font-size: 14px; z-index: 1000; }

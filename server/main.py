@@ -165,13 +165,15 @@ async def send_message_rest(request: Request):
     user = get_user(data.get("token"))
     if not user:
         return JSONResponse({"error": "unauthorized"}, 401)
-    content = data.get("content", "").strip()[:500]
+    content = data.get("content", "").strip()[:2000]
+    msg_type = data.get("msg_type", "text")
     if not content:
         return JSONResponse({"error": "empty message"}, 400)
     room_id = data.get("room_id", 1)
     display_name = user.get("bot_name", user["username"])
     msg = await room_manager.send_message(
-        room_id, user["user_id"], display_name, content, is_bot=user.get("is_bot", False)
+        room_id, user["user_id"], display_name, content,
+        msg_type=msg_type, is_bot=user.get("is_bot", False)
     )
     return msg
 
@@ -261,11 +263,12 @@ async def ws_endpoint(ws: WebSocket, room_id: int):
             if msg.get("type") == "ping":
                 await ws.send_json({"type": "pong"})
             elif msg.get("type") == "message":
-                content = msg.get("content", "").strip()[:500]
+                content = msg.get("content", "").strip()[:2000]
+                msg_type = msg.get("msg_type", "text")
                 if content:
                     await room_manager.send_message(
                         room_id, user["user_id"], display_name, content,
-                        is_bot=is_bot,
+                        msg_type=msg_type, is_bot=is_bot,
                     )
     except (asyncio.TimeoutError, WebSocketDisconnect, Exception):
         pass

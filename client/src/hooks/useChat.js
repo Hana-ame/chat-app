@@ -151,18 +151,46 @@ export default function useChat() {
     if (data.messages) addMessages(data.messages);
   };
 
-  const sendMessage = async (content) => {
-    if (!content.trim()) return;
+  const sendPayload = useCallback(async (payload) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'message', content }));
+      wsRef.current.send(JSON.stringify({ type: 'message', ...payload }));
     } else {
       await fetch('/api/msg', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: user.token, room_id: 1, content })
+        body: JSON.stringify({ token: user.token, room_id: 1, ...payload })
       });
     }
-  };
+  }, [user]);
+
+  const sendMessage = useCallback(async (content) => {
+    if (!content.trim()) return;
+    await sendPayload({ content, msg_type: 'text' });
+  }, [sendPayload]);
+
+  const uploadFile = useCallback(async (file) => {
+    const resp = await fetch('https://upload.moonchan.xyz/api/upload', {
+      method: 'PUT',
+      body: file,
+    });
+    if (!resp.ok) throw new Error(`Upload failed: ${resp.statusText}`);
+    const data = await resp.json();
+    return {
+      url: `https://upload.moonchan.xyz/api/${data.id}/${encodeURIComponent(file.name)}`,
+      name: file.name,
+      size: file.size,
+      mime: file.type,
+    };
+  }, []);
+
+  const sendFile = useCallback(async (file) => {
+    const fileData = await uploadFile(file);
+    await sendPayload({
+      content: JSON.stringify(fileData),
+      msg_type: 'file'
+    });
+    return fileData;
+  }, [uploadFile, sendPayload]);
 
   // 初始化：登录后加载历史并连接 WS
   useEffect(() => {
@@ -173,5 +201,5 @@ export default function useChat() {
     return () => { wsRef.current?.close(); stopHeartbeat(); stopPolling(); };
   }, [user]);
 
-  return { user, messages, connStatus, onlineCount, login, logout, sendMessage };
+  return { user, messages, connStatus, onlineCount, login, logout, sendMessage, sendFile };
 }

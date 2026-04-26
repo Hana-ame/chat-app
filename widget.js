@@ -39,6 +39,12 @@
     ".cw-login input{width:80%;padding:10px 14px;border-radius:20px;border:none;background:#0f3460;color:#eee;font-size:14px;outline:none;text-align:center}",
     ".cw-login button{padding:10px 30px;border-radius:20px;border:none;background:#e94560;color:#fff;font-size:15px;font-weight:bold;cursor:pointer}",
     ".cw-load{text-align:center;color:#666;font-size:12px;padding:4px}",
+    ".cw-img{max-width:200px;max-height:200px;border-radius:8px;cursor:pointer;display:block}",
+    ".cw-flnk{color:#e94560;text-decoration:none;font-size:13px;word-break:break-all}",
+    ".cw-flnk:hover{text-decoration:underline}",
+    ".cw-drop{position:absolute;inset:0;background:rgba(233,69,96,.12);border:2px dashed #e94560;display:flex;align-items:center;justify-content:center;color:#e94560;font-size:16px;z-index:10;pointer-events:none;border-radius:12px}",
+    ".cw-upld{position:absolute;top:40px;left:50%;transform:translateX(-50%);background:#0f3460;color:#fff;padding:6px 16px;border-radius:20px;font-size:12px;z-index:11}",
+    ".cw-fbtn{background:none;border:none;color:#aaa;cursor:pointer;font-size:18px;padding:0 4px}",
   ].join("\n");
   document.head.appendChild(css);
 
@@ -85,8 +91,10 @@
     var chatBox = h("div", "", { style: { flex: "1", display: "none", flexDirection: "column" } }, [
       h("div", "cw-msgs"),
       h("div", "cw-inp", {}, [
+        h("input", "", { type: "file", id: "cw-file-inp", style: { display: "none" }, multiple: "", onchange: function () { handleFiles(this.files); this.value = ""; } }),
+        h("button", "cw-fbtn", { title: "Send file", onclick: function () { document.getElementById("cw-file-inp").click(); } }, ["\uD83D\uDCCE"]),
         h("input", "", { placeholder: "Type...", onkeydown: function (e) { if (e.key === "Enter") doSend(this.value, this); } }),
-        h("button", "", { onclick: function () { var inp = this.parentNode.querySelector("input"); doSend(inp.value, inp); } }, ["Send"]),
+        h("button", "", { onclick: function () { var inp = this.parentNode.querySelector("input:not([type=file])"); doSend(inp.value, inp); } }, ["Send"]),
       ]),
     ]);
 
@@ -165,6 +173,13 @@
 
   function ts(d) { return d ? new Date(d).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""; }
 
+  function fmtSize(bytes) {
+    if (!bytes) return "";
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / 1048576).toFixed(1) + " MB";
+  }
+
   function addMsgs(arr, prepend) {
     var fresh = arr.filter(function (m) { return !msgIds[m.id]; });
     if (!fresh.length) return;
@@ -177,6 +192,29 @@
           h("div", "cw-b cw-by", {}, [m.content]),
           prepend ? msgsEl.firstChild : null
         );
+        return;
+      }
+      if (m.msg_type === "file") {
+        var fd = null;
+        try { fd = JSON.parse(m.content); } catch (e) {}
+        var isSelf = m.username === username;
+        var t = ts(m.created_at);
+        if (fd && fd.url) {
+          var isImg = fd.mime && fd.mime.indexOf("image/") === 0;
+          var el = h("div", "cw-b " + (isSelf ? "cw-bs" : "cw-bo"), {}, [
+            h("div", "", {},
+              !isSelf ? [h("span", "cw-aut", { style: { color: m.avatar_color || "#aaa" } }, [(m.is_bot ? "[Bot] " : "") + (m.username || "")])] : []
+            ),
+            h("div", "", {},
+              isImg
+                ? [h("a", "", { href: fd.url, target: "_blank" }, [h("img", "cw-img", { src: fd.url, alt: fd.name })])]
+                : [h("a", "cw-flnk", { href: fd.url, target: "_blank" }, ["\uD83D\uDCCE " + fd.name + " (" + fmtSize(fd.size) + ")"])],
+            ),
+            h("span", "cw-tm", { style: { textAlign: "right", display: "block" } }, [t]),
+          ]);
+          msgsEl[prepend ? "insertBefore" : "appendChild"](el, prepend ? msgsEl.firstChild : null);
+          lastId = m.id;
+        }
         return;
       }
       var isSelf = m.username === username;
@@ -212,6 +250,44 @@
     api("/api/msg", { method: "POST", body: { token: token, room_id: ROOM, content: text } }).then(function (d) {
       if (d.id) addMsgs([d]);
     });
+  }
+
+  function sendPayload(payload) {
+    return api("/api/msg", { method: "POST", body: Object.assign({ token: token, room_id: ROOM }, payload) }).then(function (d) {
+      if (d.id) addMsgs([d]);
+    });
+  }
+
+  function uploadFile(file) {
+    return fetch("https://upload.moonchan.xyz/api/upload", { method: "PUT", body: file }).then(function (r) {
+      if (!r.ok) throw new Error("Upload failed: " + r.statusText);
+      return r.json();
+    }).then(function (d) {
+      return {
+        url: "https://upload.moonchan.xyz/api/" + d.id + "/" + encodeURIComponent(file.name),
+        name: file.name,
+        size: file.size,
+        mime: file.type,
+      };
+    });
+  }
+
+  function doSendFile(file) {
+    var w = buildWin();
+    var toast = h("div", "cw-upld", {}, ["Uploading..."]);
+    w.appendChild(toast);
+    return uploadFile(file).then(function (fd) {
+      return sendPayload({ content: JSON.stringify(fd), msg_type: "file" });
+    }).finally(function () {
+      try { toast.remove(); } catch (e) {}
+    });
+  }
+
+  function handleFiles(files) {
+    if (!files || !files.length) return;
+    for (var i = 0; i < files.length; i++) {
+      doSendFile(files[i]).catch(function (e) { console.error("Upload failed:", e); });
+    }
   }
 
   /* ── Drag ────────────────────────────────────────────────────────── */
@@ -272,8 +348,52 @@
     if (moved) { moved = false; return; }
   });
 
+  /* ── File paste / drop ─────────────────────────────────────────────── */
+  var dropOverlay = null;
+  var dragCounter = 0;
+
+  document.addEventListener("paste", function (e) {
+    if (!token) return;
+    var items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    var files = [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].kind === "file") files.push(items[i].getAsFile());
+    }
+    if (files.length) handleFiles(files);
+  });
+
+  function showDropOverlay(w) {
+    if (!dropOverlay) dropOverlay = h("div", "cw-drop", {}, ["Drop files here"]);
+    if (!dropOverlay.parentNode) w.appendChild(dropOverlay);
+  }
+
+  function hideDropOverlay() {
+    if (dropOverlay && dropOverlay.parentNode) dropOverlay.parentNode.removeChild(dropOverlay);
+  }
+
+  function onWinDragOver(e) {
+    e.preventDefault(); e.stopPropagation();
+    var w = buildWin();
+    showDropOverlay(w);
+  }
+
+  function onWinDrop(e) {
+    e.preventDefault(); e.stopPropagation();
+    hideDropOverlay();
+    handleFiles(e.dataTransfer.files);
+  }
+
+  function bindFileDrop() {
+    var w = buildWin();
+    w.addEventListener("dragover", onWinDragOver);
+    w.addEventListener("dragleave", function (e) { hideDropOverlay(); });
+    w.addEventListener("drop", onWinDrop);
+  }
+
   /* ── Init ────────────────────────────────────────────────────────── */
   document.body.appendChild(ball);
+  bindFileDrop();
   if (token && username) {
     // pre-warm: build window hidden, ready to open
     buildWin();
