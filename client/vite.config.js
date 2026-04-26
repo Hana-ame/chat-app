@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    sourcemap: true,
+  },
   server: {
     // 开发时代理到 Python 后端
     proxy: {

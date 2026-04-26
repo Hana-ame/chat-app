@@ -44,7 +44,7 @@ export default function useChat() {
       while (pollRef.current) {
         try {
           const res = await fetch(`/api/poll?room_id=1&token=${user.token}&after_id=${lastMsgIdRef.current}&timeout=30`);
-          if (res.status === 401) { logout(); return; }
+          if (res.status === 401) { pollRef.current = false; logout(); return; }
           const data = await res.json();
           if (data.messages && data.messages.length > 0) addMessages(data.messages);
         } catch (e) {
@@ -145,7 +145,8 @@ export default function useChat() {
   };
 
   const loadHistory = async () => {
-    const res = await fetch(`/api/history/1?after_id=0&limit=50`);
+    if (!user) return;
+    const res = await fetch(`/api/history/1?token=${user.token}&after_id=0&limit=50`);
     const data = await res.json();
     if (data.messages) addMessages(data.messages);
   };
