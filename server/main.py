@@ -3,10 +3,12 @@ import uuid
 import time
 import socket
 import random
+from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Query
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 
 from db import db
 from room_manager import room_manager
@@ -45,6 +47,13 @@ async def _cleanup_task():
             active_tokens.pop(t, None)
 
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 STATIC_DIR = "../client/dist"
 import os as _os
@@ -287,11 +296,30 @@ async def long_poll(room_id: int, token: str, after_id: int = 0, timeout: int = 
     finally:
         room_manager.poll_unregister(room_id, client_id)
 
+# ── Inline Widget ────────────────────────────────────────────────────────
+
+_WIDGET_DIR = Path(__file__).parent / "static"
+
+
+@app.get("/static/loader.js")
+async def serve_loader():
+    return FileResponse(_WIDGET_DIR / "loader.js",
+                        media_type="application/javascript")
+
+
+@app.get("/static/widget.jsx")
+async def serve_widget():
+    return FileResponse(_WIDGET_DIR / "widget.jsx",
+                        media_type="text/plain")
+
+
 # ── SPA fallback ───────────────────────────────────────────────────────
+
 
 @app.get("/")
 async def serve_index():
     return FileResponse(f"{STATIC_DIR}/index.html")
+
 
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):

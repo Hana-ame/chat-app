@@ -9,10 +9,14 @@ Inspired by QQ / Line / WeChat / Discord — room-based chat, real-time messagin
 ```
 chat-app/
 ├── server/                  # Python backend
-│   ├── main.py              # FastAPI app, routes
+│   ├── main.py              # FastAPI app, routes, CORS
 │   ├── db.py                # Async SQLite (aiosqlite), write batching
 │   ├── room_manager.py      # WebSocket + Long-Poll room manager
 │   ├── schema.sql           # Database schema + seed data
+│   ├── static/              # Inline widget files
+│   │   ├── loader.js        #   Widget bootstrap (CDN loader)
+│   │   ├── widget.jsx       #   Chat widget component
+│   │   └── test.html        #   Test page
 │   ├── run.sh               # Start script
 │   ├── requirements.txt
 │   └── test_server.py       # Pytest tests
@@ -25,6 +29,7 @@ chat-app/
 │   └── vite.config.js
 ├── build_client.sh          # npm install && npm run build
 ├── guide.md                 # Bot development guide
+├── ARCHITECTURE.md          # Technical documentation
 └── README.md
 ```
 
@@ -56,8 +61,21 @@ Open **http://localhost:8000** in your browser.
 - **WebSocket** — real-time messaging with auto-reconnect and TCP keepalive
 - **Long-poll fallback** — keeps working through proxies and restrictive networks
 - **Bot API** — permanent API tokens for building chat bots (see [guide.md](guide.md))
+- **Inline widget** — embed chat into any webpage with one `<script>` tag
 - **Simple auth** — username + password, first login auto-registers
 - **SPA** — React frontend served from the same process
+
+## Inline Widget
+
+Embed a chat room into any HTML page with one line:
+
+```html
+<script src="http://your-server:8000/static/loader.js"></script>
+```
+
+A floating blue ball appears. Click to open the chat window, drag to reposition. Works cross-origin (CORS enabled), mobile-responsive.
+
+Test page: open `http://localhost:8000/static/test.html` after starting the server.
 
 ## Testing
 
