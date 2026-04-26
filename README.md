@@ -13,21 +13,11 @@ chat-app/
 │   ├── db.py                # Async SQLite (aiosqlite), write batching
 │   ├── room_manager.py      # WebSocket + Long-Poll room manager
 │   ├── schema.sql           # Database schema + seed data
-│   ├── static/              # Inline widget files
-│   │   ├── loader.js        #   Widget bootstrap (CDN loader)
-│   │   ├── widget.jsx       #   Chat widget component
-│   │   └── test.html        #   Test page
-│   ├── run.sh               # Start script
-│   ├── requirements.txt
+│   ├── run.sh, requirements.txt
 │   └── test_server.py       # Pytest tests
 ├── client/                  # React SPA (Vite)
-│   ├── src/
-│   │   ├── components/      # Login, Chat, MessageItem
-│   │   ├── hooks/           # useChat — WS + polling hybrid
-│   │   └── index.css
-│   ├── package.json
-│   └── vite.config.js
-├── build_client.sh          # npm install && npm run build
+├── widget.html              # Standalone inline chat (CDN)
+├── build_client.sh
 ├── guide.md                 # Bot development guide
 ├── ARCHITECTURE.md          # Technical documentation
 └── README.md
@@ -61,21 +51,15 @@ Open **http://localhost:8000** in your browser.
 - **WebSocket** — real-time messaging with auto-reconnect and TCP keepalive
 - **Long-poll fallback** — keeps working through proxies and restrictive networks
 - **Bot API** — permanent API tokens for building chat bots (see [guide.md](guide.md))
-- **Inline widget** — embed chat into any webpage with one `<script>` tag
-- **Simple auth** — username + password, first login auto-registers
-- **SPA** — React frontend served from the same process
+- **Inline widget** — standalone HTML, accessible via CDN
 
 ## Inline Widget
 
-Embed a chat room into any HTML page with one line:
-
-```html
-<script src="https://wsl-8000.moonchan.xyz/static/loader.js"></script>
+```
+https://cdn.jsdelivr.net/gh/Hana-ame/chat-app@main/widget.html
 ```
 
-A floating blue ball appears. Click to open the chat window, drag to reposition. Works cross-origin (CORS enabled), mobile-responsive.
-
-Test page: `https://wsl-8000.moonchan.xyz/static/test.html`
+Open directly or embed via `<iframe>`. Self-contained — login, chat, polling all in one HTML file. Cross-origin via CORS.
 
 ## Testing
 

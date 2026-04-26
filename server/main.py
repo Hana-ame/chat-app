@@ -3,10 +3,9 @@ import uuid
 import time
 import socket
 import random
-from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Query
-from fastapi.responses import JSONResponse, FileResponse, Response
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -295,23 +294,6 @@ async def long_poll(room_id: int, token: str, after_id: int = 0, timeout: int = 
         return {"messages": [], "last_id": after_id}
     finally:
         room_manager.poll_unregister(room_id, client_id)
-
-# ── Inline Widget ────────────────────────────────────────────────────────
-
-_WIDGET_DIR = Path(__file__).parent / "static"
-
-
-@app.get("/static/loader.js")
-async def serve_loader():
-    return FileResponse(_WIDGET_DIR / "loader.js",
-                        media_type="application/javascript")
-
-
-@app.get("/static/widget.jsx")
-async def serve_widget():
-    return FileResponse(_WIDGET_DIR / "widget.jsx",
-                        media_type="text/plain")
-
 
 # ── SPA fallback ───────────────────────────────────────────────────────
 

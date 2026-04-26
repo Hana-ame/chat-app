@@ -164,34 +164,13 @@ Key properties:
 
 Reference: https://github.com/Hana-ame/inline-chat-room
 
-The widget lets any website add a chat room with one `<script>` tag:
-
-```html
-<script src="https://wsl-8000.moonchan.xyz/static/loader.js"></script>
-```
-
-**How it works:**
+`widget.html` at repo root — a standalone, self-contained HTML file served via CDN:
 
 ```
-1. Browser loads <script src=".../loader.js">
-2. loader.js extracts its own origin → API_HOST
-3. Loads React + ReactDOM + Babel from unpkg CDN
-4. Fetches widget.jsx from API_HOST/static/widget.jsx
-5. Babel transforms JSX → JS in-browser
-6. Renders floating bubble + chat window as React
-7. Widget uses API_HOST for all REST/poll requests
+https://cdn.jsdelivr.net/gh/Hana-ame/chat-app@main/widget.html
 ```
 
-**Widget features:**
-- Draggable floating ball (click to open/close)
-- Login with username (auto-register), token stored in localStorage
-- Default room: "大厅" (Lobby)
-- Messages polled every 2s via `/api/poll`
-- Bot detection (robot emoji)
-- Mobile-responsive (full-screen mode)
-- Load history on scroll-to-top
-
-**CORS requirement**: All `/api/*` endpoints must return `Access-Control-Allow-Origin: *` for the widget to work cross-origin. Added via middleware.
+Can be opened directly or embedded via `<iframe>`. Contains inline CSS + JS, no build step, no external dependencies. Communicates with the Python backend via `wsl-8000.moonchan.xyz` (hardcoded API host). CORS middleware allows cross-origin requests from CDN-hosted pages.
 
 ## API Reference
 

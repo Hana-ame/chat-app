@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<!--
+  Chat Widget - Standalone
+  Embed: <iframe src="https://cdn.jsdelivr.net/gh/Hana-ame/chat-app@main/widget.html">
+  Or open directly: https://cdn.jsdelivr.net/gh/Hana-ame/chat-app@main/widget.html
+-->
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Chat</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#1a1a2e;color:#eee;height:100vh;display:flex;flex-direction:column}
+#header{padding:10px 14px;background:#16213e;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #0f3460;min-height:44px}
+#header span{font-weight:bold;font-size:15px}
+#header button{background:none;border:none;color:#e74c3c;cursor:pointer;font-size:13px}
+#msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:6px}
+.bubble{padding:8px 12px;border-radius:12px;max-width:82%;word-break:break-word;font-size:14px;line-height:1.4;position:relative}
+.bubble.self{align-self:flex-end;background:#0f3460;color:#eee;border-bottom-right-radius:3px}
+.bubble.other{align-self:flex-start;background:#16213e;color:#ddd;border-bottom-left-radius:3px}
+.bubble.sys{align-self:center;background:transparent;color:#666;font-size:12px;padding:4px 8px}
+.author{font-size:11px;color:#aaa;margin-bottom:2px;margin-left:4px}
+.time{font-size:10px;color:#666;float:right;margin-left:8px;margin-top:2px}
+#input-row{padding:10px;border-top:1px solid #0f3460;display:flex;gap:8px;background:#16213e}
+#input-row input{flex:1;padding:10px 14px;border-radius:20px;border:none;background:#0f3460;color:#eee;font-size:14px;outline:none}
+#input-row button{padding:0 20px;border-radius:20px;border:none;background:#e94560;color:#fff;font-size:14px;font-weight:bold;cursor:pointer}
+.login{height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;padding:20px}
+.login h3{font-size:18px;color:#eee}
+.login p{color:#999;font-size:13px}
+.login input{width:80%;padding:10px 14px;border-radius:20px;border:none;background:#0f3460;color:#eee;font-size:14px;outline:none;text-align:center}
+.login button{padding:10px 30px;border-radius:20px;border:none;background:#e94560;color:#fff;font-size:15px;font-weight:bold;cursor:pointer}
+.loading{text-align:center;color:#666;font-size:12px;padding:4px}
+</style>
+</head>
+<body>
+<div id="header"><span>Chat Room</span><button id="logout-btn" style="display:none" onclick="logout()">Exit</button></div>
+<div id="login-box" class="login">
+  <h3>Chat Room</h3>
+  <p>Enter nickname</p>
+  <input id="name-inp" placeholder="User">
+  <button onclick="login()">Enter</button>
+</div>
+<div id="chat-box" style="display:none;flex:1;display:none;flex-direction:column">
+  <div id="msgs"></div>
+  <div id="input-row">
+    <input id="msg-inp" placeholder="Type...">
+    <button onclick="send()">Send</button>
+  </div>
+</div>
+
+<script>
+var API = 'https://wsl-8000.moonchan.xyz';
+var ROOM = 1;
+var token = '';
+var username = '';
+var lastId = 0;
+var pollTimer = null;
+
+try { token = localStorage.getItem('chat_xtoken'); username = localStorage.getItem('chat_xuser'); } catch(e) {}
+
+function $id(id) { return document.getElementById(id); }
+function ts(d) { return d ? new Date(d).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : ''; }
+
+function api(path, opts) {
+  opts = opts || {};
+  opts.headers = opts.headers || {};
+  if (opts.body && typeof opts.body === 'object') {
+    opts.body = JSON.stringify(opts.body);
+    opts.headers['Content-Type'] = 'application/json';
+  }
+  if (!opts.method) opts.method = 'GET';
+  return fetch(API + path, opts).then(function(r){ return r.json(); });
+}
+
+function login() {
+  var name = $id('name-inp').value.trim() || 'User' + Math.random().toString(36).substring(2,6);
+  api('/api/login', { method:'POST', body:{ username:name, password:'' } }).then(function(d){
+    if (d.error) return alert(d.error);
+    token = d.token; username = d.username;
+    try { localStorage.setItem('chat_xtoken', token); localStorage.setItem('chat_xuser', username); } catch(e) {}
+    showChat();
+  });
+}
+
+function logout() {
+  token = ''; username = ''; lastId = 0;
+  try { localStorage.removeItem('chat_xtoken'); localStorage.removeItem('chat_xuser'); } catch(e) {}
+  clearInterval(pollTimer);
+  $id('msgs').innerHTML = '';
+  $id('chat-box').style.display = 'none';
+  $id('login-box').style.display = 'flex';
+  $id('logout-btn').style.display = 'none';
+  $id('name-inp').value = '';
+}
+
+function showChat() {
+  $id('login-box').style.display = 'none';
+  $id('chat-box').style.display = 'flex';
+  $id('logout-btn').style.display = 'inline';
+  loadHistory();
+  startPoll();
+}
+
+function loadHistory() {
+  api('/api/history/' + ROOM + '?token=' + token + '&limit=50').then(function(d){
+    if (d.messages) addMsgs(d.messages);
+  });
+}
+
+function loadMore() {
+  var msgs = $id('msgs');
+  if (msgs.querySelector('.loading')) return;
+  var div = document.createElement('div');
+  div.className = 'loading';
+  div.textContent = 'Loading...';
+  msgs.insertBefore(div, msgs.firstChild);
+  var afterId = Math.max(0, lastId - 50);
+  api('/api/history/' + ROOM + '?token=' + token + '&after_id=' + afterId + '&limit=50').then(function(d){
+    try { div.remove(); } catch(e) {}
+    if (d.messages && d.messages.length) addMsgs(d.messages, true);
+  });
+}
+
+var msgIds = {};
+function addMsgs(arr, prepend) {
+  var fresh = arr.filter(function(m){ return !msgIds[m.id]; });
+  if (!fresh.length) return;
+  fresh.forEach(function(m){ msgIds[m.id] = true; });
+  fresh.sort(function(a,b){ return a.id - b.id; });
+  fresh.forEach(function(m){
+    var div = document.createElement('div');
+    if (m.msg_type === 'system' || m.type === 'system') {
+      div.className = 'bubble sys';
+      div.textContent = m.content;
+    } else {
+      var isSelf = m.username === username;
+      div.className = 'bubble ' + (isSelf ? 'self' : 'other');
+      var t = ts(m.created_at);
+      var h = '';
+      if (!isSelf) {
+        var name = (m.is_bot ? '[Bot] ' : '') + (m.username || '');
+        h = '<div class="author" style="color:' + (m.avatar_color||'#aaa') + '">' + name + '</div>';
+      }
+      div.innerHTML = h + '<div>' + (m.content||'') + '<span class="time">' + t + '</span></div>';
+    }
+    if (prepend) {
+      $id('msgs').insertBefore(div, $id('msgs').firstChild);
+    } else {
+      $id('msgs').appendChild(div);
+    }
+    lastId = m.id;
+  });
+  if (!prepend) $id('msgs').scrollTop = $id('msgs').scrollHeight;
+}
+
+$id('msgs').addEventListener('scroll', function(){
+  if ($id('msgs').scrollTop === 0) loadMore();
+});
+
+function startPoll() {
+  clearInterval(pollTimer);
+  pollTimer = setInterval(function(){
+    api('/api/poll?room_id=' + ROOM + '&token=' + token + '&after_id=' + lastId + '&timeout=3').then(function(d){
+      if (d.messages && d.messages.length) addMsgs(d.messages);
+    });
+  }, 2000);
+}
+
+function send() {
+  var inp = $id('msg-inp');
+  var text = inp.value.trim();
+  if (!text) return;
+  inp.value = '';
+  api('/api/msg', { method:'POST', body:{ token:token, room_id:ROOM, content:text } }).then(function(d){
+    if (d.id) addMsgs([d]);
+  });
+}
+
+$id('msg-inp').addEventListener('keydown', function(e){
+  if (e.key === 'Enter') { e.preventDefault(); send(); }
+});
+$id('name-inp').addEventListener('keydown', function(e){
+  if (e.key === 'Enter') { e.preventDefault(); login(); }
+});
+
+if (token && username) { showChat(); $id('name-inp').value = username; }
+</script>
+</body>
+</html>
