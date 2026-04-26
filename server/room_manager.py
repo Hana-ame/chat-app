@@ -105,6 +105,7 @@ class RoomManager:
         msg = {
             "type": "system",
             "content": text,
+            "online_count": room.online_count,
             "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         }
         data = json_mod.dumps(msg)

@@ -35,8 +35,7 @@ export default function useChat() {
   // 处理服务端消息
   const handleMessage = useCallback((msg) => {
     if (msg.type === 'pong') return;
-    if (msg.type === 'online_count') { setOnlineCount(msg.count); return; }
-    if (msg.type === 'system') { addMessages([{ ...msg, id: Date.now() }]); return; }
+    if (msg.type === 'system') { if (msg.online_count != null) setOnlineCount(msg.online_count); addMessages([{ ...msg, id: Date.now() }]); return; }
     addMessages([msg]);
   }, [addMessages]);
 
