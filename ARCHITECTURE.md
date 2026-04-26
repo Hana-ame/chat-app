@@ -167,7 +167,7 @@ Reference: https://github.com/Hana-ame/inline-chat-room
 The widget lets any website add a chat room with one `<script>` tag:
 
 ```html
-<script src="http://your-server:8000/static/loader.js"></script>
+<script src="https://wsl-8000.moonchan.xyz/static/loader.js"></script>
 ```
 
 **How it works:**

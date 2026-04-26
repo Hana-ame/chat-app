@@ -70,12 +70,12 @@ Open **http://localhost:8000** in your browser.
 Embed a chat room into any HTML page with one line:
 
 ```html
-<script src="http://your-server:8000/static/loader.js"></script>
+<script src="https://wsl-8000.moonchan.xyz/static/loader.js"></script>
 ```
 
 A floating blue ball appears. Click to open the chat window, drag to reposition. Works cross-origin (CORS enabled), mobile-responsive.
 
-Test page: open `http://localhost:8000/static/test.html` after starting the server.
+Test page: `https://wsl-8000.moonchan.xyz/static/test.html`
 
 ## Testing
 
