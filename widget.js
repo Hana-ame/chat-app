@@ -46,10 +46,10 @@
     ".cw-upld{position:absolute;top:40px;left:50%;transform:translateX(-50%);background:#0f3460;color:#fff;padding:6px 16px;border-radius:20px;font-size:12px;z-index:11}",
     ".cw-fbtn{background:none;border:none;color:#aaa;cursor:pointer;font-size:18px;padding:0 4px}",
     ".cw-msgs::-webkit-scrollbar{width:8px}",
-    ".cw-msgs::-webkit-scrollbar-track{background:#f0f2f6;border-radius:12px}",
-    ".cw-msgs::-webkit-scrollbar-thumb{background:#b9c4d4;border-radius:12px}",
-    ".cw-msgs::-webkit-scrollbar-thumb:hover{background:#8f9eb3}",
-    ".cw-msgs{scrollbar-width:thin;scrollbar-color:#b9c4d4 #f0f2f6}",
+    ".cw-msgs::-webkit-scrollbar-track{background:#16213e;border-radius:12px}",
+    ".cw-msgs::-webkit-scrollbar-thumb{background:#0f3460;border-radius:12px}",
+    ".cw-msgs::-webkit-scrollbar-thumb:hover{background:#3a3a5c}",
+    ".cw-msgs{scrollbar-width:thin;scrollbar-color:#0f3460 #16213e}",
   ].join("\n");
   document.head.appendChild(css);
 
@@ -335,6 +335,7 @@
     var s = 50;
     ball.style.left = Math.max(0, Math.min(initPos.x + dx, window.innerWidth - s)) + "px";
     ball.style.top = Math.max(0, Math.min(initPos.y + dy, window.innerHeight - s)) + "px";
+    if (open) repositionWin();
   }
 
   function onEnd() {
@@ -353,9 +354,26 @@
   document.addEventListener("touchend", onEnd);
 
   /* ── Toggle ──────────────────────────────────────────────────────── */
+  function repositionWin() {
+    var w = winEl;
+    if (!w) return;
+    var s = 50, gap = 15, ww = 360, wh = 520;
+    var l = ball.offsetLeft - ww + s, t = ball.offsetTop - wh - gap;
+    if (l < 0) l = ball.offsetLeft;
+    if (t < 0) t = ball.offsetTop + s + gap;
+    w.style.left = l + "px";
+    w.style.top = t + "px";
+  }
+
   function toggleWin() {
     open = !open;
     var w = buildWin();
+    if (open) {
+      repositionWin();
+      ball.style.zIndex = "2147483645";
+    } else {
+      ball.style.zIndex = "2147483647";
+    }
     w.style.display = open ? "flex" : "none";
     ball.innerHTML = open ? closeSvg : chatSvg;
     if (open && token && username) showChat();
