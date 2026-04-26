@@ -1,0 +1,5 @@
+client/dist/
+server/chat.db*
+.vscode/
+__pycache__/
+.pytest_cache/
