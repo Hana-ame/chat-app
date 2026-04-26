@@ -1,46 +1,42 @@
-# Architecture & Technical Documentation
+# 架构与技术文档
 
-## Overview
+## 概述
 
-Chat App is an IM-style chat server — room-based, real-time, with a bot API. Two frontends share the same backend:
+Chat App 是一个类 IM（QQ / Line / WeChat / Discord）的聊天服务端。基于房间的实时消息 + Bot API。两套前端共享同一后端：
 
-| Frontend | Entry | Tech |
-|----------|-------|------|
-| SPA (standalone) | `/` | React + Vite |
-| Inline widget | `<script src=".../static/loader.js">` | Preact + CDN Babel |
+| 前端 | 入口 | 技术 |
+|------|------|------|
+| SPA（独立页面） | `/` | React + Vite |
+| 内联 Widget | `<script src=".../widget.js">` | 纯 JS，无依赖 |
 
-Backend: **FastAPI** + **aiosqlite** (async SQLite with write batching). One Python process handles REST, WebSocket, and serves static files — no nginx required for dev.
+后端：**FastAPI** + **aiosqlite**（异步 SQLite + 写攒批）。单进程同时处理 REST、WebSocket、静态文件——开发环境无需 nginx。
 
-## Directory Structure
+## 目录结构
 
 ```
 chat-app/
 ├── server/
-│   ├── main.py           # FastAPI app, all routes, auth
-│   ├── db.py             # Database layer (aiosqlite, write batching)
-│   ├── room_manager.py   # WebSocket room & long-poll manager
-│   ├── schema.sql        # DDL + seed data
-│   ├── run.sh            # Start script
+│   ├── main.py           # FastAPI 应用，全部路由，鉴权
+│   ├── db.py             # 数据库层（aiosqlite，写攒批）
+│   ├── room_manager.py   # WebSocket 房间管理 + 长轮询
+│   ├── schema.sql        # DDL + 种子数据
+│   ├── run.sh            # 启动脚本
 │   ├── requirements.txt
-│   ├── test_server.py    # Pytest tests (17 cases)
-│   ├── static/           # ⬅ NEW: inline widget files
-│   │   ├── loader.js     #   Widget bootstrap (CDN loader + JSX transform)
-│   │   └── widget.jsx    #   Chat widget React component
-│   └── chat.db           # SQLite database (gitignored)
+│   └── test_server.py    # Pytest 测试（17 个用例）
 ├── client/               # React SPA
 │   ├── src/
-│   │   ├── App.jsx
 │   │   ├── components/   # Login.jsx, Chat.jsx, MessageItem.jsx
-│   │   └── hooks/        # useChat.js (WS + polling hybrid)
-│   ├── dist/             # Vite build output
-│   └── vite.config.js    # Dev proxy to :8000
+│   │   └── hooks/        # useChat.js（WS + 轮询混合）
+│   ├── dist/             # Vite 构建产物
+│   └── vite.config.js    # 开发代理到 :8000
+├── widget.js             # 内联聊天 Widget（CDN 直接访问）
 ├── build_client.sh
-├── guide.md              # Bot development guide
-├── README.md
-└── ARCHITECTURE.md       # This file
+├── guide.md              # Bot 开发指南
+├── ARCHITECTURE.md       # 本文件
+└── README.md
 ```
 
-## Database (SQLite)
+## 数据库（SQLite）
 
 ```
 users        ─── id, username, password, avatar_color, created_at
@@ -49,193 +45,209 @@ messages     ─── id, room_id→rooms, user_id→users, content, msg_type, 
 bot_tokens   ─── id, user_id→users, name, token, created_at
 ```
 
-Key design choices:
-- **WAL mode** — high-concurrency reads (multiple readers, one writer)
-- **Write batching** — `INSERT` statements are queued and flushed every 200ms in batches of up to 50, giving ~5000 writes/sec
-- **Foreign keys** — enforced, rooms/messages/users linked
-- **Seed data** — room "大厅" (Lobby) and user "系统通知" (System) created at first start
+设计要点：
+- **WAL 模式** — 读写并发
+- **写攒批** — INSERT 排队，每 200ms 批量提交（最多 50 条/批），~5000 写/秒
+- **外键** — 强制引用完整性
+- **种子数据** — 房间"大厅"和用户"系统通知"首次启动自动创建
 
-## Backend Architecture
+## 后端架构
 
-### 1. Server Lifecycle (`lifespan`)
+### 1. 服务生命周期 (`lifespan`)
 
 ```
-STARTUP:
-  db.init()           → open SQLite, run schema.sql, start flush loop
-  load_bot_cache()    → load all bot tokens into memory
-  _cleanup_task()     → background task: delete expired sessions every 10 min
+启动:
+  db.init()           → 打开 SQLite, 执行 schema.sql, 启动攒批循环
+  load_bot_cache()    → 将所有 bot token 加载到内存
+  _cleanup_task()     → 后台任务: 每 10 分钟清理过期 session
 
-SHUTDOWN:
+关闭:
   _cleanup_task.cancel()
-  db.close()          → drain write queue, commit, close
+  db.close()          → 排空写队列, 提交, 关闭连接
 ```
 
-### 2. Authentication
+### 2. 鉴权
 
-**Regular users**: `POST /api/login` → returns `token` (UUID hex). Stored in `active_tokens` dict with 24h TTL.
+**普通用户**: `POST /api/login` → 返回 `token`（UUID hex）。存入 `active_tokens` 字典，24 小时过期。
 
-**Bots**: `POST /api/bot/create` → returns `token` prefixed with `bot_`. Stored in `bot_tokens_cache` dict (loaded from DB at startup).
+**Bot**: `POST /api/bot/create` → 返回带 `bot_` 前缀的 token。存入 `bot_tokens_cache` 字典（启动时从 DB 加载到内存，创建时即时添加）。
 
-`get_user(token)` checks both dictionaries:
+`get_user(token)` 同时检查两个字典：
 ```python
 def get_user(token):
     u = active_tokens.get(token)        # session token
     if u: return {**u, "is_bot": False}
     b = bot_tokens_cache.get(token)     # bot token
-    if b: return b                      # has is_bot=True
+    if b: return b                      # 自带 is_bot=True
     return None
 ```
 
-### 3. Message Flow
+### 3. 消息流
 
 ```
-Client sends message:
+客户端发消息:
   ┌─ REST  → POST /api/msg       → room_manager.send_message()
   └─ WS    → {"type":"message"}  → room_manager.send_message()
                                     │
                                     ├─ db.save_message() → SQLite INSERT
                                     │
                                     └─ room._broadcast()
-                                       ├─ all WS clients    → send_bytes()
-                                       └─ all poll clients  → event.set()
+                                       ├─ 所有 WS 客户端    → send_bytes()
+                                       └─ 所有 poll 客户端  → event.set()
 ```
 
-### 4. Connection Modes
+### 4. 连接模式
 
-**WebSocket** (primary):
-- Connect: `ws://host:8000/ws/{room_id}?token=...`
-- TCP keepalive: idle=60s, interval=10s, probes=3
-- 5-minute inactivity timeout → disconnect
-- Heartbeat: client sends `{"type":"ping"}`, server replies `{"type":"pong"}`
+**WebSocket**（主要）：
+- 连接：`ws://host:8000/ws/{room_id}?token=...`
+- TCP keepalive：空闲 60s，间隔 10s，探测 3 次
+- 5 分钟无活动自动断开
+- 心跳：客户端发 `{"type":"ping"}`，服务端回 `{"type":"pong"}`
 
-**Long Poll** (fallback):
+**长轮询**（降级）：
 - `GET /api/poll?room_id=&token=&after_id=&timeout=30`
-- Blocks up to 30s waiting for new messages
-- Uses `asyncio.Event` for instant wake on new messages
-- Returns empty list on timeout
+- 最多阻塞 30 秒等待新消息
+- 使用 `asyncio.Event` 实现有新消息时即时唤醒
+- 超时返回空数组
 
-### 5. Room Manager
+### 5. 房间管理器
 
 ```
 RoomManager
   ├── rooms: dict[int, Room]
   │
-  └── Room (per room_id)
+  └── Room (每个 room_id)
       ├── ws_connections: dict[WebSocket, WSConnection]
       ├── poll_clients: dict[str, PollClient]
       ├── last_msg_id: int
       └── online_count: len(ws) + len(poll)
 ```
 
-- `ws_join()` / `ws_leave()` — broadcast system messages (join/leave), update online count
-- `send_message()` — save to DB, set `last_msg_id`, broadcast to all peers
-- Dead WebSocket connections are cleaned up lazily during broadcast
+- `ws_join()` / `ws_leave()` — 广播进出系统消息
+- `send_message()` — 存 DB，设 `last_msg_id`，广播给所有对端
+- 断开的 WebSocket 在广播时惰性清理
 
-### 6. Bot System
+### 6. Bot 系统
 
-Bots are API keys tied to user accounts:
+Bot 本质是绑定到用户账号的 API key：
 
 ```python
-# Create
-POST /api/bot/create  {"token": "<user_token>", "name": "MyBot"}
+# 创建
+POST /api/bot/create  {"token": "<用户token>", "name": "MyBot"}
 → {"id": 1, "name": "MyBot", "token": "bot_<hex>"}
 
-# List
-GET /api/bot/list?token=<user_token>
+# 列出
+GET /api/bot/list?token=<用户token>
 → {"bots": [...]}
 
-# Delete
-DELETE /api/bot/{id}?token=<user_token>
+# 删除
+DELETE /api/bot/{id}?token=<用户token>
 → {"ok": true}
 
-# Use (send message)
+# 使用（发消息）
 POST /api/msg {"token": "bot_<hex>", "content": "hello"}
 → {..., "is_bot": true, "username": "MyBot"}
 ```
 
-Key properties:
-- Bot tokens are **permanent** (persisted in DB, cached in memory)
-- Bots display with robot emoji (SPA) or `[Bot]` prefix (system messages)
-- Bots share the user's `avatar_color`
-- Bots **cannot** create sub-bots (recursive prevention)
-- Deleted bot tokens are removed from cache immediately
+关键特性：
+- Bot token **永久有效**（存在 DB，缓存在内存）
+- 前端显示机器人图标
+- Bot 共享所属用户的 `avatar_color`
+- Bot **不能**创建子 bot（防止递归）
+- 删除 bot 后内存缓存即时清理
 
-### 7. Inline Widget
+### 7. 内联 Widget
 
-`widget.js` at repo root — a single JS file injected via `<script>`:
+`widget.js` 在仓库根目录 — 单个 JS 文件，通过 `<script>` 注入：
 
 ```html
 <script src="https://cdn.jsdelivr.net/gh/Hana-ame/chat-app@main/widget.js"></script>
 ```
 
-Pure JavaScript (no React/Babel/CDN deps). On load:
-1. Injects CSS styles into `<head>`
-2. Creates floating ball + chat window as DOM elements
-3. Handles login, polling, message rendering, drag-to-move
+纯 JavaScript（无 React/Babel/CDN 依赖）。加载后：
+1. 将 CSS 注入 `<head>`
+2. 创建浮动球 + 聊天窗口作为 DOM 元素
+3. 处理登录、轮询、消息渲染、拖拽移动
 
-API host `wsl-8000.moonchan.xyz` hardcoded. CORS middleware on the Python backend allows cross-origin API calls from any page that embeds the widget.
+API 地址 `wsl-8000.moonchan.xyz` 硬编码在文件中。后端 CORS 中间件允许 Widget 从任何页面跨域请求。
 
-## API Reference
-
-All endpoints require `token` (except `/api/login`). `token` can be passed as query param or JSON body field.
-
-| Method | Path | Auth | Body/Params | Response |
-|--------|------|------|-------------|----------|
-| POST | `/api/login` | — | `{username, password}` | `{token, user_id, username, avatar_color}` |
-| GET | `/api/rooms` | token | `?token=` | `{rooms: [{id, name, description}]}` |
-| POST | `/api/rooms` | token | `{token, name, description?}` | `{id, name, description}` |
-| GET | `/api/history/{room_id}` | token | `?token=&after_id=&limit=` | `{messages: [...]}` |
-| POST | `/api/msg` | token | `{token, room_id?, content}` | `{id, room_id, user_id, username, content, is_bot, created_at}` |
-| GET | `/api/poll` | token | `?room_id=&token=&after_id=&timeout=` | `{messages, last_id}` |
-| WS | `/ws/{room_id}` | token | `?token=` | Real-time message stream |
-| POST | `/api/bot/create` | token | `{token, name}` | `{id, name, token}` |
-| GET | `/api/bot/list` | token | `?token=` | `{bots: [{id, name, token, created_at}]}` |
-| DELETE | `/api/bot/{id}` | token | `?token=` | `{ok: true}` |
-
-## Testing
+## 如何运行
 
 ```bash
-pytest server/test_server.py -v    # 17 tests
+# 1. 安装依赖
+pip install -r server/requirements.txt
+
+# 2. 构建前端
+bash build_client.sh
+
+# 3. 启动
+bash server/run.sh
+# → http://localhost:8000
+
+# 4. 测试
+pytest server/test_server.py -v
 ```
 
-Test infrastructure:
-- **TestClient** from Starlette (sync, handles lifespan)
-- **Session-scoped fixture** — one DB init for all tests
-- **CHAT_DB_PATH** env var → temp file (isolation from production DB)
-- Coverage: login/register, auth errors, rooms CRUD, message send/history, bot CRUD, bot auth, bot send, bot delete+cache eviction, long poll timeout
+## API 参考
 
-## Deployment
+所有端点需要 `token`（除 `/api/login`），支持 query 参数或 JSON body。
 
-### Development
+| 方法 | 路径 | 鉴权 | 说明 |
+|------|------|------|------|
+| POST | `/api/login` | — | 登录 / 自动注册 |
+| GET | `/api/rooms` | token | 列出房间 |
+| POST | `/api/rooms` | token | 创建房间 |
+| GET | `/api/history/{room_id}` | token | 消息历史 |
+| POST | `/api/msg` | token | 发消息 |
+| GET | `/api/poll` | token | 长轮询新消息 |
+| WS | `/ws/{room_id}` | token | WebSocket 实时 |
+| POST | `/api/bot/create` | token | 创建 bot |
+| GET | `/api/bot/list` | token | 列出 bot |
+| DELETE | `/api/bot/{id}` | token | 删除 bot |
+
+## 测试
+
+```bash
+pytest server/test_server.py -v    # 17 个测试
+```
+
+测试架构：
+- **Starlette TestClient**（同步，自动处理 lifespan）
+- **Session 级 fixture** — 所有测试共享一次 DB 初始化
+- **CHAT_DB_PATH** 环境变量 → 临时文件（隔离生产数据）
+- 覆盖：登录/注册、鉴权错误、房间增删、消息发送/历史、bot 增删、bot 发消息、bot 鉴权、bot 删除+缓存清理、长轮询超时
+
+## 部署
+
+### 开发
 ```bash
 pip install -r server/requirements.txt
 bash build_client.sh
 bash server/run.sh          # → http://0.0.0.0:8000
 ```
 
-### Production
+### 生产
 
 ```bash
-# Build frontend
+# 构建前端
 bash build_client.sh
 
-# Run behind nginx or Cloudflare Tunnel
-# The server serves client/dist/ as static files
-# Set environment:
-#   CHAT_DB_PATH=/data/chat.db   (default: server/chat.db)
+# 放 nginx 后面或者 Cloudflare Tunnel
+# 服务端直接 serve client/dist/
+# 环境变量:
+#   CHAT_DB_PATH=/data/chat.db   (默认: server/chat.db)
 ```
 
-### Cloudflare Pages Deployment
+### Cloudflare Pages 部署
 
-`其他设置.txt` mentions: push to deploy at `https://chat-app-fastapi.pages.dev/`
+根据 `其他设置.txt`：push 即部署到 `https://chat-app-fastapi.pages.dev/`
 
-The SPA is served from `client/dist/`. Cloudflare Pages auto-deploys on push.
-The Python backend runs separately (not on Pages — only static files).
+SPA 静态文件在 `client/dist/`，Cloudflare Pages 自动部署。Python 后端需单独运行（Pages 不支持 Python）。
 
-### Reverse Proxy
+### 反向代理
 
 ```nginx
-# Example nginx config for wsl-8000.moonchan.xyz
+# nginx 配置示例（用于 wsl-8000.moonchan.xyz）
 server {
     location / {
         proxy_pass http://127.0.0.1:8000;
@@ -246,4 +258,4 @@ server {
 }
 ```
 
-The `Upgrade` + `Connection` headers enable WebSocket passthrough.
+`Upgrade` + `Connection` 头实现 WebSocket 穿透。
