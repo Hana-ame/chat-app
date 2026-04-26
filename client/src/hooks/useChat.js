@@ -2,10 +2,14 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 
 const WS_RECONNECT_DELAYS = [2000, 5000, 10000, 30000, 60000];
 
+const isPages = typeof window !== 'undefined' && window.location.hostname.endsWith('pages.dev');
+const API_BASE = isPages ? 'https://wsl-8000.moonchan.xyz' : '';
+const WS_BASE = isPages ? 'wss://wsl-8000.moonchan.xyz/ws/1' : null;
+
 export default function useChat() {
   const [user, setUser] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [connStatus, setConnStatus] = useState('offline'); // ws | poll | offline
+  const [connStatus, setConnStatus] = useState('offline');
   const [onlineCount, setOnlineCount] = useState(0);
   
   const wsRef = useRef(null);
@@ -43,7 +47,7 @@ export default function useChat() {
     const pollLoop = async () => {
       while (pollRef.current) {
         try {
-          const res = await fetch(`/api/poll?room_id=1&token=${user.token}&after_id=${lastMsgIdRef.current}&timeout=30`);
+          const res = await fetch(`${API_BASE}/api/poll?room_id=1&token=${user.token}&after_id=${lastMsgIdRef.current}&timeout=30`);
           if (res.status === 401) { pollRef.current = false; logout(); return; }
           const data = await res.json();
           if (data.messages && data.messages.length > 0) addMessages(data.messages);
@@ -63,8 +67,9 @@ export default function useChat() {
   const connectWS = useCallback(() => {
     if (!user || wsRef.current) return;
     
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/1?token=${user.token}`;
+    const wsUrl = WS_BASE
+      ? `${WS_BASE}?token=${user.token}`
+      : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/1?token=${user.token}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -124,7 +129,7 @@ export default function useChat() {
 
   // ---- API 动作 ----
   const login = async (username, password) => {
-    const res = await fetch('/api/login', {
+    const res = await fetch(`${API_BASE}/api/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
@@ -146,7 +151,7 @@ export default function useChat() {
 
   const loadHistory = async () => {
     if (!user) return;
-    const res = await fetch(`/api/history/1?token=${user.token}&after_id=0&limit=50`);
+    const res = await fetch(`${API_BASE}/api/history/1?token=${user.token}&after_id=0&limit=50`);
     const data = await res.json();
     if (data.messages) addMessages(data.messages);
   };
@@ -155,7 +160,7 @@ export default function useChat() {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'message', ...payload }));
     } else {
-      await fetch('/api/msg', {
+      await fetch(`${API_BASE}/api/msg`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: user.token, room_id: 1, ...payload })
