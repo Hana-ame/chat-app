@@ -8,5 +8,6 @@ export default function App() {
   if (!chat.user) return <Login onLogin={chat.login} />;
   return <Chat user={chat.user} messages={chat.messages} connStatus={chat.connStatus}
                onlineCount={chat.onlineCount} onSend={chat.sendMessage}
-               onSendFile={chat.sendFile} onLogout={chat.logout} />;
+               onSendFile={chat.sendFile} onLoadMore={chat.loadMoreHistory}
+               onLogout={chat.logout} />;
 }

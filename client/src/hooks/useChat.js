@@ -15,6 +15,7 @@ export default function useChat() {
   const wsRef = useRef(null);
   const pollRef = useRef(false);
   const lastMsgIdRef = useRef(0);
+  const minMsgIdRef = useRef(Infinity);
   const retryIdxRef = useRef(0);
   const heartbeatRef = useRef(null);
 
@@ -26,6 +27,7 @@ export default function useChat() {
       if (newMsgs.length === 0) return prev;
       const combined = [...prev, ...newMsgs].sort((a, b) => a.id - b.id);
       lastMsgIdRef.current = combined[combined.length - 1].id;
+      minMsgIdRef.current = combined[0].id;
       return combined;
     });
   }, []);
@@ -156,6 +158,14 @@ export default function useChat() {
     if (data.messages) addMessages(data.messages);
   };
 
+  const loadMoreHistory = useCallback(async () => {
+    if (!user) return;
+    const afterId = Math.max(0, minMsgIdRef.current - 51);
+    const res = await fetch(`${API_BASE}/api/history/1?token=${user.token}&after_id=${afterId}&limit=50`);
+    const data = await res.json();
+    if (data.messages && data.messages.length) addMessages(data.messages);
+  }, [user, addMessages]);
+
   const sendPayload = useCallback(async (payload) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'message', ...payload }));
@@ -206,5 +216,5 @@ export default function useChat() {
     return () => { wsRef.current?.close(); stopHeartbeat(); stopPolling(); };
   }, [user]);
 
-  return { user, messages, connStatus, onlineCount, login, logout, sendMessage, sendFile };
+  return { user, messages, connStatus, onlineCount, login, logout, sendMessage, sendFile, loadMoreHistory };
 }

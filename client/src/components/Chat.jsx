@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import MessageItem from './MessageItem'
 
-export default function Chat({ user, messages, connStatus, onlineCount, onSend, onSendFile, onLogout }) {
+export default function Chat({ user, messages, connStatus, onlineCount, onSend, onSendFile, onLoadMore, onLogout }) {
   const listRef = useRef(null);
   const inputRef = useRef(null);
   const fileRef = useRef(null);
@@ -10,10 +10,17 @@ export default function Chat({ user, messages, connStatus, onlineCount, onSend, 
   const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
-    if (listRef.current) {
-      listRef.current.scrollTop = listRef.current.scrollHeight;
-    }
+    const el = listRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+    if (atBottom) el.scrollTop = el.scrollHeight;
   }, [messages]);
+
+  const handleScroll = useCallback(() => {
+    if (listRef.current && listRef.current.scrollTop === 0) {
+      onLoadMore && onLoadMore();
+    }
+  }, [onLoadMore]);
 
   const handleSend = () => {
     if (inputRef.current?.value.trim()) {
@@ -75,7 +82,7 @@ export default function Chat({ user, messages, connStatus, onlineCount, onSend, 
         <button onClick={onLogout} style={{background:'none', border:'none', color:'#e74c3c', cursor:'pointer'}}>退出</button>
       </div>
 
-      <div className="message-list" ref={listRef}>
+      <div className="message-list" ref={listRef} onScroll={handleScroll}>
         {messages.map(msg => <MessageItem key={msg.id} msg={msg} currentUser={user} />)}
       </div>
 
