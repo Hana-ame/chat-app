@@ -234,7 +234,7 @@ async def ws_endpoint(ws: WebSocket, room_id: int):
 
     await ws.accept()
 
-    transport = ws.transport
+    transport = getattr(ws, 'transport', None)
     if transport:
         sock = transport.get_extra_info("socket")
         if sock:
