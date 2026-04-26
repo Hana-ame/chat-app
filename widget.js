@@ -62,10 +62,16 @@
     return el;
   }
 
-  var ball = h("div", "cw-ball", { style: { left: window.innerWidth - 65 + "px", top: window.innerHeight - 120 + "px" } }, [
-    h("svg", "", { innerHTML: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>', style: { width: "20px", height: "20px" }, setAttribute: function () { this.setAttribute("viewBox", "0 0 24 24"); this.setAttribute("fill", "none"); this.setAttribute("stroke", "currentColor"); this.setAttribute("stroke-width", "2"); } }),
-  ]);
-  ball.firstChild.setAttribute("viewBox", "0 0 24 24");
+  var ballSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  ballSvg.setAttribute("viewBox", "0 0 24 24");
+  ballSvg.setAttribute("fill", "none");
+  ballSvg.setAttribute("stroke", "currentColor");
+  ballSvg.setAttribute("stroke-width", "2");
+  ballSvg.setAttribute("width", "20");
+  ballSvg.setAttribute("height", "20");
+  ballSvg.innerHTML = '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>';
+
+  var ball = h("div", "cw-ball", { style: { left: window.innerWidth - 65 + "px", top: window.innerHeight - 120 + "px" } }, [ballSvg]);
 
   var closeSvg = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
   var chatSvg = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
