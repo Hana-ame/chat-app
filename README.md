@@ -16,7 +16,7 @@ chat-app/
 │   ├── run.sh, requirements.txt
 │   └── test_server.py       # Pytest tests
 ├── client/                  # React SPA (Vite)
-├── widget.html              # Standalone inline chat (CDN)
+├── widget.js               # Inline chat widget (CDN)
 ├── build_client.sh
 ├── guide.md                 # Bot development guide
 ├── ARCHITECTURE.md          # Technical documentation
@@ -55,11 +55,11 @@ Open **http://localhost:8000** in your browser.
 
 ## Inline Widget
 
-```
-https://cdn.jsdelivr.net/gh/Hana-ame/chat-app@main/widget.html
+```html
+<script src="https://cdn.jsdelivr.net/gh/Hana-ame/chat-app@main/widget.js"></script>
 ```
 
-Open directly or embed via `<iframe>`. Self-contained — login, chat, polling all in one HTML file. Cross-origin via CORS.
+One `<script>` tag → floating chat ball appears on any page. Click to open, drag to move. Pure JS, no dependencies.
 
 ## Testing
 

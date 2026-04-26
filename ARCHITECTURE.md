@@ -160,17 +160,20 @@ Key properties:
 - Bots **cannot** create sub-bots (recursive prevention)
 - Deleted bot tokens are removed from cache immediately
 
-### 7. Inline Widget System
+### 7. Inline Widget
 
-Reference: https://github.com/Hana-ame/inline-chat-room
+`widget.js` at repo root — a single JS file injected via `<script>`:
 
-`widget.html` at repo root — a standalone, self-contained HTML file served via CDN:
-
-```
-https://cdn.jsdelivr.net/gh/Hana-ame/chat-app@main/widget.html
+```html
+<script src="https://cdn.jsdelivr.net/gh/Hana-ame/chat-app@main/widget.js"></script>
 ```
 
-Can be opened directly or embedded via `<iframe>`. Contains inline CSS + JS, no build step, no external dependencies. Communicates with the Python backend via `wsl-8000.moonchan.xyz` (hardcoded API host). CORS middleware allows cross-origin requests from CDN-hosted pages.
+Pure JavaScript (no React/Babel/CDN deps). On load:
+1. Injects CSS styles into `<head>`
+2. Creates floating ball + chat window as DOM elements
+3. Handles login, polling, message rendering, drag-to-move
+
+API host `wsl-8000.moonchan.xyz` hardcoded. CORS middleware on the Python backend allows cross-origin API calls from any page that embeds the widget.
 
 ## API Reference
 
