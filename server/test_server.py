@@ -177,3 +177,66 @@ def test_long_poll_timeout(client):
     })
     assert r2.status_code == 200
     assert "messages" in r2.json()
+
+
+# ── CORS tests ──────────────────────────────────────────────────────────────
+
+def _assert_cors(response):
+    """Every response must include Access-Control-Allow-Origin: *"""
+    assert response.headers.get("access-control-allow-origin") == "*"
+
+def test_cors_login_preflight(client):
+    r = client.options("/api/login", headers={
+        "origin": "https://example.com",
+        "access-control-request-method": "POST",
+    })
+    assert r.status_code == 200
+    assert r.headers["access-control-allow-origin"] == "*"
+    assert r.headers["access-control-allow-methods"] is not None
+
+def test_cors_login_normal(client):
+    r = client.post("/api/login", json={"username": "corser1", "password": "x"},
+                    headers={"origin": "https://evil.com"})
+    assert r.status_code == 200
+    _assert_cors(r)
+
+def test_cors_rooms(client):
+    r = client.post("/api/login", json={"username": "corser2", "password": "x"},
+                    headers={"origin": "https://other.com"})
+    token = r.json()["token"]
+    r2 = client.get("/api/rooms", params={"token": token},
+                    headers={"origin": "https://other.com"})
+    _assert_cors(r2)
+
+def test_cors_bot(client):
+    r = client.post("/api/login", json={"username": "corser3", "password": "x"})
+    token = r.json()["token"]
+    r2 = client.post("/api/bot/create", json={"token": token, "name": "CorsBot"},
+                     headers={"origin": "https://cross.example"})
+    _assert_cors(r2)
+
+def test_cors_msg(client):
+    r = client.post("/api/login", json={"username": "corser4", "password": "x"})
+    token = r.json()["token"]
+    r2 = client.post("/api/msg", json={"token": token, "room_id": 1, "content": "cors!"},
+                     headers={"origin": "https://abc.com"})
+    _assert_cors(r2)
+
+def test_cors_history(client):
+    r = client.post("/api/login", json={"username": "corser5", "password": "x"})
+    token = r.json()["token"]
+    r2 = client.get("/api/history/1", params={"token": token},
+                    headers={"origin": "https://foo.bar"})
+    _assert_cors(r2)
+
+def test_cors_poll(client):
+    r = client.post("/api/login", json={"username": "corser6", "password": "x"})
+    token = r.json()["token"]
+    r2 = client.get("/api/poll", params={"room_id": 1, "token": token, "timeout": 1},
+                    headers={"origin": "https://poll.cors"})
+    _assert_cors(r2)
+
+def test_cors_unauthorized(client):
+    r = client.get("/api/rooms", params={"token": "bad"},
+                   headers={"origin": "https://attacker.com"})
+    _assert_cors(r)  # 即使 401 也要有 CORS 头
