@@ -45,11 +45,11 @@
     ".cw-drop{position:absolute;inset:0;background:rgba(233,69,96,.12);border:2px dashed #e94560;display:flex;align-items:center;justify-content:center;color:#e94560;font-size:16px;z-index:10;pointer-events:none;border-radius:12px}",
     ".cw-upld{position:absolute;top:40px;left:50%;transform:translateX(-50%);background:#0f3460;color:#fff;padding:6px 16px;border-radius:20px;font-size:12px;z-index:11}",
     ".cw-fbtn{background:none;border:none;color:#aaa;cursor:pointer;font-size:18px;padding:0 4px}",
-    ".cw-msgs::-webkit-scrollbar{width:6px}",
-    ".cw-msgs::-webkit-scrollbar-track{background:transparent}",
-    ".cw-msgs::-webkit-scrollbar-thumb{background:#3a3a5c;border-radius:8px}",
-    ".cw-msgs::-webkit-scrollbar-thumb:hover{background:#5a5a8c}",
-    ".cw-msgs{scrollbar-width:thin;scrollbar-color:#3a3a5c transparent}",
+    ".cw-msgs::-webkit-scrollbar{width:8px}",
+    ".cw-msgs::-webkit-scrollbar-track{background:#f0f2f6;border-radius:12px}",
+    ".cw-msgs::-webkit-scrollbar-thumb{background:#b9c4d4;border-radius:12px}",
+    ".cw-msgs::-webkit-scrollbar-thumb:hover{background:#8f9eb3}",
+    ".cw-msgs{scrollbar-width:thin;scrollbar-color:#b9c4d4 #f0f2f6}",
   ].join("\n");
   document.head.appendChild(css);
 
