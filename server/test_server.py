@@ -179,6 +179,81 @@ def test_long_poll_timeout(client):
     assert "messages" in r2.json()
 
 
+# ── WebSocket integration ────────────────────────────────────────────────────
+
+def test_ws_send_receive(client):
+    r = client.post("/api/login", json={"username": "wx1", "password": "x"})
+    token = r.json()["token"]
+
+    with client.websocket_connect(f"/ws/1?token={token}") as ws:
+        # 收到进房系统消息
+        data = ws.receive_json()
+        assert data["type"] == "system"
+
+        # 发送消息
+        ws.send_json({"type": "message", "content": "hello ws"})
+
+        # 收到自己发的那条消息（广播回环）
+        data = ws.receive_json()
+        assert data["content"] == "hello ws"
+        assert data["username"] == "wx1"
+
+def test_ws_binary_not_sent(client):
+    """确认服务端发的是文本帧而非二进制帧"""
+    r = client.post("/api/login", json={"username": "wx2", "password": "x"})
+    token = r.json()["token"]
+
+    with client.websocket_connect(f"/ws/1?token={token}") as ws:
+        ws.receive_json()  # 系统消息
+
+        ws.send_json({"type": "message", "content": "text only"})
+
+        # receive_json 内部只接受 text 帧，如果是 binary 会 TypeError
+        data = ws.receive_json()
+        assert data["content"] == "text only"
+
+def test_ws_ping_pong(client):
+    r = client.post("/api/login", json={"username": "wx3", "password": "x"})
+    token = r.json()["token"]
+
+    with client.websocket_connect(f"/ws/1?token={token}") as ws:
+        ws.receive_json()  # 系统消息
+
+        ws.send_json({"type": "ping"})
+        data = ws.receive_json()
+        assert data["type"] == "pong"
+
+def test_ws_multiple(client):
+    """两个连接互相收发消息"""
+    r1 = client.post("/api/login", json={"username": "wx4", "password": "x"})
+    t1 = r1.json()["token"]
+    r2 = client.post("/api/login", json={"username": "wx5", "password": "x"})
+    t2 = r2.json()["token"]
+
+    with client.websocket_connect(f"/ws/1?token={t1}") as ws1:
+        assert ws1.receive_json()["type"] == "system"  # wx4 joined
+
+        with client.websocket_connect(f"/ws/1?token={t2}") as ws2:
+            assert ws2.receive_json()["type"] == "system"  # wx5 joined
+            assert ws1.receive_json()["type"] == "system"  # wx1 sees wx5 joined
+
+            # wx5 发消息，双方都会收到（广播回环）
+            ws2.send_json({"type": "message", "content": "from wx5"})
+            # ws1 收到
+            data = ws1.receive_json()
+            assert data["content"] == "from wx5"
+            assert data["username"] == "wx5"
+            # ws2 也收到自己的（自环广播）
+            echo = ws2.receive_json()
+            assert echo["content"] == "from wx5"
+
+            # wx4 发消息
+            ws1.send_json({"type": "message", "content": "from wx4"})
+            data = ws2.receive_json()
+            assert data["content"] == "from wx4"
+            assert data["username"] == "wx4"
+
+
 # ── CORS tests ──────────────────────────────────────────────────────────────
 
 def _assert_cors(response):

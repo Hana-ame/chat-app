@@ -92,9 +92,9 @@ class RoomManager:
         return msg
 
     async def _broadcast(self, room: Room, msg: dict):
-        data = json_mod.dumps(msg) if hasattr(json_mod, 'dumps') else json_mod.dumps(msg)
-        if isinstance(data, str):
-            data = data.encode()
+        data = json_mod.dumps(msg)
+        if isinstance(data, bytes):
+            data = data.decode()
         dead_ws = [ws for ws in room.ws_connections if not self._safe_send(ws, data)]
         for ws in dead_ws:
             room.ws_connections.pop(ws, None)
@@ -107,18 +107,18 @@ class RoomManager:
             "content": text,
             "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         }
-        data = json_mod.dumps(msg) if hasattr(json_mod, 'dumps') else json_mod.dumps(msg)
-        if isinstance(data, str):
-            data = data.encode()
+        data = json_mod.dumps(msg)
+        if isinstance(data, bytes):
+            data = data.decode()
         dead_ws = [ws for ws in room.ws_connections if not self._safe_send(ws, data)]
         for ws in dead_ws:
             room.ws_connections.pop(ws, None)
         for client in room.poll_clients.values():
             client.event.set()
 
-    def _safe_send(self, ws: WebSocket, data: bytes) -> bool:
+    def _safe_send(self, ws: WebSocket, data: str) -> bool:
         try:
-            asyncio.create_task(ws.send_bytes(data))
+            asyncio.create_task(ws.send_text(data))
             return True
         except Exception:
             return False
