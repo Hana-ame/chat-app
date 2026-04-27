@@ -99,7 +99,7 @@
       h("button", "", { onclick: function () { doLogin(this.parentNode.querySelector("input").value); } }, ["Enter"]),
     ]);
 
-    var chatBox = h("div", "", { style: { flex: "1", display: "none", flexDirection: "column" } }, [
+    var chatBox = h("div", "", { style: { flex: "1", display: "none", flexDirection: "column", minHeight: "0" } }, [
       h("div", "cw-msgs"),
       h("div", "cw-inp", {}, [
         h("input", "", { type: "file", id: "cw-file-inp", style: { display: "none" }, multiple: "", onchange: function () { handleFiles(this.files); this.value = ""; } }),
