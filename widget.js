@@ -177,18 +177,24 @@
   }
 
   function showChat() {
-    var w = buildWin();
-    w.querySelector(".cw-login").style.display = "none";
-    w.querySelector(".cw-login").nextElementSibling.style.display = "flex";
-    w.querySelector(".cw-hdr button").style.display = "inline";
-    loadHistory();
-    startPoll();
+    if (!token) return;
+    // Wait for history to load before showing chat UI.
+    // If token is bad, authApi triggers logout and login form stays visible.
+    loadHistory().then(function (ok) {
+      if (!ok || !token) return;
+      var w = buildWin();
+      w.querySelector(".cw-login").style.display = "none";
+      w.querySelector(".cw-login").nextElementSibling.style.display = "flex";
+      w.querySelector(".cw-hdr button").style.display = "inline";
+      startPoll();
+    });
   }
 
   function loadHistory() {
-    authApi("/api/history/" + ROOM + "?token=" + token + "&limit=50").then(function (res) {
+    return authApi("/api/history/" + ROOM + "?token=" + token + "&limit=50").then(function (res) {
       var d = res.data;
       if (d.messages) addMsgs(d.messages);
+      return res._status === 200;
     });
   }
 
