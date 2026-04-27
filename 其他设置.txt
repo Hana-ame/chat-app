@@ -1,0 +1,10 @@
+如果使用curl测试，请绕过系统代理设置。否则访问不到
+请监听0.0.0.0：8000
+公网 wsl-8000.moonchan.xyz可以访问到本地8000端口的内容。
+只要push就能部署到https://chat-app-fastapi.pages.dev/
+
+不必参考之前的任何实现。只当从零开始就行。
+
+
+https://gh-proxy.com/https://raw.githubusercontent.com/hana-ame/peerdrive/feat/remove-auth-and-refactor/ANON_COLLECTION_LAYER.md
+这样子能做到github代理访问，也加到提示里

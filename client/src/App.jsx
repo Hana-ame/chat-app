@@ -47,7 +47,7 @@ export default function App() {
         onLoadMore={() => chat.loadMoreHistory(activeRoom)}
         roomName={rooms.find(r => r.id === activeRoom)?.name || '大厅'}
       />
-      <MemberList onlineCount={chat.onlineCount} />
+      <MemberList onlineCount={chat.onlineCount} onlineUsers={chat.onlineUsers} />
     </div>
   );
 }

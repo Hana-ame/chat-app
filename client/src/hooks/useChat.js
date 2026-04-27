@@ -11,7 +11,8 @@ export default function useChat() {
   const [messages, setMessages] = useState([]);
   const [connStatus, setConnStatus] = useState('offline');
   const [onlineCount, setOnlineCount] = useState(0);
-  
+  const [onlineUsers, setOnlineUsers] = useState([]);
+
   const wsRef = useRef(null);
   const pollRef = useRef(false);
   const lastMsgIdRef = useRef(0);
@@ -35,7 +36,21 @@ export default function useChat() {
   // 处理服务端消息
   const handleMessage = useCallback((msg) => {
     if (msg.type === 'pong') return;
-    if (msg.type === 'system') { if (msg.online_count != null) setOnlineCount(msg.online_count); addMessages([{ ...msg, id: Date.now() }]); return; }
+    if (msg.type === 'system') {
+      if (msg.online_count != null) setOnlineCount(msg.online_count);
+      // Track online users from join/leave messages
+      const content = msg.content || '';
+      const joinMatch = content.match(/^\[Bot\]\s*(.+)\s+joined|^(.+)\s+joined/);
+      const leaveMatch = content.match(/^\[Bot\]\s*(.+)\s+left|^(.+)\s+left/);
+      if (joinMatch) {
+        const name = joinMatch[1] || joinMatch[2];
+        if (name && name !== '系统通知') setOnlineUsers(prev => { const s = new Set(prev); s.add(name); return [...s]; });
+      } else if (leaveMatch) {
+        const name = leaveMatch[1] || leaveMatch[2];
+        if (name) setOnlineUsers(prev => prev.filter(u => u !== name));
+      }
+      addMessages([{ ...msg, id: Date.now() }]); return;
+    }
     addMessages([msg]);
   }, [addMessages]);
 
@@ -227,5 +242,5 @@ export default function useChat() {
     throw new Error(data.error || '创建失败');
   }, [user]);
 
-  return { user, messages, connStatus, onlineCount, login, logout, sendMessage, sendFile, loadMoreHistory, createRoom };
+  return { user, messages, connStatus, onlineCount, onlineUsers, login, logout, sendMessage, sendFile, loadMoreHistory, createRoom };
 }
