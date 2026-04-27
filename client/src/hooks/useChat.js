@@ -40,7 +40,7 @@ export default function useChat() {
     if (msg.type === 'pong') return;
     if (msg.type === 'system') {
       if (msg.online_count != null) setOnlineCount(msg.online_count);
-      // Track online users from join/leave messages
+      // Track online users from join/leave messages, but don't show in chat
       const content = msg.content || '';
       const joinMatch = content.match(/^\[Bot\]\s*(.+)\s+joined|^(.+)\s+joined/);
       const leaveMatch = content.match(/^\[Bot\]\s*(.+)\s+left|^(.+)\s+left/);
@@ -51,7 +51,7 @@ export default function useChat() {
         const name = leaveMatch[1] || leaveMatch[2];
         if (name) setOnlineUsers(prev => prev.filter(u => u !== name));
       }
-      addMessages([{ ...msg, id: Date.now() }]); return;
+      return;
     }
     addMessages([msg]);
   }, [addMessages]);
