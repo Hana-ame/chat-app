@@ -7,21 +7,23 @@ export default function Login({ onLogin }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-      await onLogin(username, password);
-    } catch (err) {
-      setError(err.message);
-    }
+    setError('');
+    try { await onLogin(username, password); }
+    catch (err) { setError(err.message); }
   };
 
   return (
     <div className="login-container">
-      <h1>💬 极简聊天</h1>
-      <form onSubmit={handleSubmit}>
-        <input value={username} onChange={e => setUsername(e.target.value)} placeholder="用户名" required />
-        <input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="密码 (首次即注册)" required />
-        {error && <div style={{color: '#e74c3c', fontSize: '14px'}}>{error}</div>}
-        <button type="submit">进入聊天室</button>
+      <form className="login-box" onSubmit={handleSubmit}>
+        <h1>Chat Room</h1>
+        <label>用户名</label>
+        <input value={username} onChange={e => setUsername(e.target.value)}
+               placeholder="输入用户名" autoFocus />
+        <label>密码（首次自动注册）</label>
+        <input value={password} onChange={e => setPassword(e.target.value)}
+               type="password" placeholder="输入密码" />
+        {error && <div className="login-err">{error}</div>}
+        <button type="submit">登录</button>
       </form>
     </div>
   );

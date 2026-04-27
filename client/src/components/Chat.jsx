@@ -1,32 +1,35 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import MessageItem from './MessageItem'
 
-export default function Chat({ user, messages, connStatus, onlineCount, onSend, onSendFile, onLoadMore, onLogout }) {
+export default function Chat({ user, messages, connStatus, onlineCount, onSend, onSendFile, onLoadMore, roomName }) {
   const listRef = useRef(null);
   const inputRef = useRef(null);
   const fileRef = useRef(null);
   const dropRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const scrolledUp = useRef(false);
 
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
-    if (atBottom) el.scrollTop = el.scrollHeight;
+    if (!scrolledUp.current) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
   const handleScroll = useCallback(() => {
-    if (listRef.current && listRef.current.scrollTop === 0) {
-      onLoadMore && onLoadMore();
-    }
+    const el = listRef.current;
+    if (!el) return;
+    scrolledUp.current = el.scrollHeight - el.scrollTop - el.clientHeight > 60;
+    if (el.scrollTop < 200) onLoadMore && onLoadMore();
   }, [onLoadMore]);
 
   const handleSend = () => {
-    if (inputRef.current?.value.trim()) {
-      onSend(inputRef.current.value);
-      inputRef.current.value = '';
-    }
+    const text = inputRef.current?.value.trim();
+    if (text) { onSend(text); inputRef.current.value = ''; inputRef.current.style.height = 'auto'; }
+  };
+
+  const handleKey = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
   const handleFiles = useCallback(async (files) => {
@@ -55,43 +58,54 @@ export default function Chat({ user, messages, connStatus, onlineCount, onSend, 
   useEffect(() => {
     const el = dropRef.current;
     if (!el) return;
-    const onDragOver = (e) => { e.preventDefault(); e.stopPropagation(); setDragOver(true); };
-    const onDragLeave = (e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false); };
-    const onDrop = (e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false); handleFiles(e.dataTransfer.files); };
-    el.addEventListener('dragover', onDragOver);
-    el.addEventListener('dragleave', onDragLeave);
-    el.addEventListener('drop', onDrop);
-    return () => {
-      el.removeEventListener('dragover', onDragOver);
-      el.removeEventListener('dragleave', onDragLeave);
-      el.removeEventListener('drop', onDrop);
-    };
+    const ops = [
+      ['dragover', (e) => { e.preventDefault(); setDragOver(true); }],
+      ['dragleave', (e) => { e.preventDefault(); setDragOver(false); }],
+      ['drop', (e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }],
+    ];
+    ops.forEach(([ev, fn]) => el.addEventListener(ev, fn));
+    return () => ops.forEach(([ev, fn]) => el.removeEventListener(ev, fn));
   }, [handleFiles]);
 
-  const statusMap = { ws: ['WS', 'status-ws'], poll: ['轮询', 'status-poll'], offline: ['离线', 'status-offline'] };
-  const [statusText, statusClass] = statusMap[connStatus] || ['--', ''];
+  const statusMap = { ws: ['在线', 'ch-badge-ws'], poll: ['轮询', 'ch-badge-poll'], offline: ['离线', 'ch-badge-offline'] };
+  const [st, sc] = statusMap[connStatus] || ['--', ''];
 
   return (
-    <div className="chat-container" ref={dropRef}>
+    <div className="chat-area" ref={dropRef}>
       {dragOver && <div className="drop-overlay">释放以发送文件</div>}
-      {uploading && <div className="upload-toast">上传中...</div>}
+      {uploading && <div className="upload-toast">上传中…</div>}
+
       <div className="chat-header">
-        <span>💬 大厅</span>
-        <span style={{fontSize: '12px', color: '#aaa'}}>{onlineCount} 人在线</span>
-        <span className={`status-badge ${statusClass}`}>{statusText}</span>
-        <button onClick={onLogout} style={{background:'none', border:'none', color:'#e74c3c', cursor:'pointer'}}>退出</button>
+        <span className="ch-hash">#</span>
+        {roomName || '大厅'}
+        <span className="ch-count">{onlineCount} 人在线</span>
+        <span className={`ch-badge ${sc}`}>{st}</span>
       </div>
 
       <div className="message-list" ref={listRef} onScroll={handleScroll}>
-        {messages.map(msg => <MessageItem key={msg.id} msg={msg} currentUser={user} />)}
+        {messages.map((msg, i) => (
+          <MessageItem
+            key={msg.id}
+            msg={msg}
+            currentUser={user}
+            showAvatar={i === 0 || messages[i-1]?.user_id !== msg.user_id || messages[i-1]?.type === 'system'}
+          />
+        ))}
       </div>
 
       <div className="chat-input">
-        <input type="file" ref={fileRef} style={{display:'none'}} multiple onChange={e => { handleFiles(e.target.files); e.target.value = ''; }} />
-        <button onClick={() => fileRef.current?.click()} title="发送文件" style={{padding:'10px 12px', background:'none', border:'none', color:'#aaa', cursor:'pointer', fontSize:'18px'}}>📎</button>
-        <input ref={inputRef} placeholder="输入消息..."
-               onKeyUp={e => e.key === 'Enter' && handleSend()} />
-        <button onClick={handleSend}>发送</button>
+        <div className="chat-input-box">
+          <input type="file" ref={fileRef} style={{display:'none'}} multiple
+                 onChange={e => { handleFiles(e.target.files); e.target.value = ''; }} />
+          <button title="上传文件" onClick={() => fileRef.current?.click()}>📎</button>
+          <textarea
+            ref={inputRef}
+            placeholder={`发送消息到 #${roomName || '大厅'}`}
+            onKeyDown={handleKey}
+            rows={1}
+          />
+          <button className="send-btn" onClick={handleSend}>➤</button>
+        </div>
       </div>
     </div>
   );

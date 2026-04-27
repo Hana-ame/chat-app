@@ -150,36 +150,36 @@ export default function useChat() {
     setConnStatus('offline');
   };
 
-  const loadHistory = async () => {
+  const loadHistory = async (roomId = 1) => {
     if (!user) return;
-    const res = await fetch(`${API_BASE}/api/history/1?token=${user.token}&after_id=0&limit=50`);
+    const res = await fetch(`${API_BASE}/api/history/${roomId}?token=${user.token}&after_id=0&limit=50`);
     const data = await res.json();
     if (data.messages) addMessages(data.messages);
   };
 
-  const loadMoreHistory = useCallback(async () => {
+  const loadMoreHistory = useCallback(async (roomId = 1) => {
     if (!user) return;
     const afterId = Math.max(0, minMsgIdRef.current - 51);
-    const res = await fetch(`${API_BASE}/api/history/1?token=${user.token}&after_id=${afterId}&limit=50`);
+    const res = await fetch(`${API_BASE}/api/history/${roomId}?token=${user.token}&after_id=${afterId}&limit=50`);
     const data = await res.json();
     if (data.messages && data.messages.length) addMessages(data.messages);
   }, [user, addMessages]);
 
-  const sendPayload = useCallback(async (payload) => {
+  const sendPayload = useCallback(async (payload, roomId = 1) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'message', ...payload }));
+      wsRef.current.send(JSON.stringify({ type: 'message', room_id: roomId, ...payload }));
     } else {
       await fetch(`${API_BASE}/api/msg`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: user.token, room_id: 1, ...payload })
+        body: JSON.stringify({ token: user.token, room_id: roomId, ...payload })
       });
     }
   }, [user]);
 
-  const sendMessage = useCallback(async (content) => {
+  const sendMessage = useCallback(async (content, roomId = 1) => {
     if (!content.trim()) return;
-    await sendPayload({ content, msg_type: 'text' });
+    await sendPayload({ content, msg_type: 'text' }, roomId);
   }, [sendPayload]);
 
   const uploadFile = useCallback(async (file) => {
@@ -197,12 +197,12 @@ export default function useChat() {
     };
   }, []);
 
-  const sendFile = useCallback(async (file) => {
+  const sendFile = useCallback(async (file, roomId = 1) => {
     const fileData = await uploadFile(file);
     await sendPayload({
       content: JSON.stringify(fileData),
       msg_type: 'file'
-    });
+    }, roomId);
     return fileData;
   }, [uploadFile, sendPayload]);
 
