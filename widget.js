@@ -359,6 +359,7 @@
   }
 
   function onEnd() {
+    if (!dragging) return;
     dragging = false;
     if (!moved) {
       var now = Date.now();
