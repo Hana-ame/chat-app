@@ -4,7 +4,7 @@ const WS_RECONNECT_DELAYS = [2000, 5000, 10000, 30000, 60000];
 
 const isPages = typeof window !== 'undefined' && window.location.hostname.endsWith('pages.dev');
 const API_BASE = isPages ? 'https://wsl-8000.moonchan.xyz' : '';
-const WS_BASE = isPages ? 'wss://wsl-8000.moonchan.xyz/ws/1' : null;
+const WS_BASE = isPages ? 'wss://wsl-8000.moonchan.xyz/ws' : null;
 
 export default function useChat() {
   const [user, setUser] = useState(null);
@@ -12,6 +12,7 @@ export default function useChat() {
   const [connStatus, setConnStatus] = useState('offline');
   const [onlineCount, setOnlineCount] = useState(0);
   const [onlineUsers, setOnlineUsers] = useState([]);
+  const [activeRoom, setActiveRoom] = useState(1);
 
   const wsRef = useRef(null);
   const pollRef = useRef(false);
@@ -19,6 +20,7 @@ export default function useChat() {
   const minMsgIdRef = useRef(Infinity);
   const retryIdxRef = useRef(0);
   const heartbeatRef = useRef(null);
+  const roomRef = useRef(1);
 
   const addMessages = useCallback((msgs) => {
     if (!msgs || msgs.length === 0) return;
@@ -63,7 +65,7 @@ export default function useChat() {
     const pollLoop = async () => {
       while (pollRef.current) {
         try {
-          const res = await fetch(`${API_BASE}/api/poll?room_id=1&token=${user.token}&after_id=${lastMsgIdRef.current}&timeout=30`);
+          const res = await fetch(`${API_BASE}/api/poll?room_id=${roomRef.current}&token=${user.token}&after_id=${lastMsgIdRef.current}&timeout=30`);
           if (res.status === 401) { pollRef.current = false; logout(); return; }
           const data = await res.json();
           if (data.messages && data.messages.length > 0) addMessages(data.messages);
@@ -84,8 +86,8 @@ export default function useChat() {
     if (!user || wsRef.current) return;
     
     const wsUrl = WS_BASE
-      ? `${WS_BASE}?token=${user.token}`
-      : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/1?token=${user.token}`;
+      ? `${WS_BASE}/${roomRef.current}?token=${user.token}`
+      : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/${roomRef.current}?token=${user.token}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -224,11 +226,25 @@ export default function useChat() {
   // 初始化：登录后加载历史并连接 WS
   useEffect(() => {
     if (user) {
-      loadHistory();
+      loadHistory(activeRoom);
+      roomRef.current = activeRoom;
       connectWS();
     }
     return () => { wsRef.current?.close(); stopHeartbeat(); stopPolling(); };
   }, [user]);
+
+  // 切换房间：加载新房间历史
+  const switchRoom = useCallback((roomId) => {
+    setActiveRoom(roomId);
+    roomRef.current = roomId;
+    loadHistory(roomId);
+    // Reconnect WS to new room
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+      setTimeout(() => connectWS(), 300);
+    }
+  }, [user, connectWS]);
 
   const createRoom = useCallback(async (name) => {
     if (!user) return;
@@ -242,5 +258,5 @@ export default function useChat() {
     throw new Error(data.error || '创建失败');
   }, [user]);
 
-  return { user, messages, connStatus, onlineCount, onlineUsers, login, logout, sendMessage, sendFile, loadMoreHistory, createRoom };
+  return { user, messages, connStatus, onlineCount, onlineUsers, activeRoom, switchRoom, login, logout, sendMessage, sendFile, loadMoreHistory, createRoom };
 }

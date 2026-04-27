@@ -7,7 +7,6 @@ import MemberList from './components/MemberList'
 
 export default function App() {
   const chat = useChat();
-  const [activeRoom, setActiveRoom] = useState(1);
   const [rooms, setRooms] = useState([]);
 
   useEffect(() => {
@@ -23,17 +22,18 @@ export default function App() {
 
   if (!chat.user) return <Login onLogin={chat.login} />;
 
+  const activeRoom = chat.activeRoom;
   return (
     <div className="app-shell">
       <Sidebar
         user={chat.user}
         rooms={rooms}
         activeRoom={activeRoom}
-        onRoomSelect={(id) => setActiveRoom(id)}
+        onRoomSelect={(id) => chat.switchRoom(id)}
         onLogout={chat.logout}
         onCreateRoom={async (name) => {
           const room = await chat.createRoom(name);
-          if (room) { setRooms(prev => [...prev, room]); setActiveRoom(room.id); }
+          if (room) { setRooms(prev => [...prev, room]); chat.switchRoom(room.id); }
           return room;
         }}
       />
