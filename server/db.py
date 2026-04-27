@@ -63,7 +63,7 @@ class Database:
 
     async def get_messages(self, room_id: int, after_id: int = 0, limit: int = 50) -> list[dict]:
         return await self.fetch_all(
-            "SELECT m.id, m.user_id, m.content, m.msg_type, m.created_at, u.username, u.avatar_color "
+            "SELECT m.id, m.user_id, m.room_id, m.content, m.msg_type, m.created_at, u.username, u.avatar_color "
             "FROM messages m JOIN users u ON m.user_id = u.id "
             "WHERE m.room_id = ? AND m.id > ? ORDER BY m.id ASC LIMIT ?",
             (room_id, after_id, limit)

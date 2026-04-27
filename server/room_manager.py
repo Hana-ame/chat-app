@@ -104,6 +104,7 @@ class RoomManager:
     async def _broadcast_system(self, room: Room, text: str):
         msg = {
             "type": "system",
+            "room_id": room.room_id,
             "content": text,
             "online_count": room.online_count,
             "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
