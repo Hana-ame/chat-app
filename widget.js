@@ -81,8 +81,9 @@
     var loadEl = h("div", "cw-load", {}, ["Loading..."]);
     msgsEl.insertBefore(loadEl, msgsEl.firstChild);
     var afterId = Math.max(0, lastId - 50);
-    api("/api/history/" + ROOM + "?token=" + token + "&after_id=" + afterId + "&limit=50").then(function (d) {
+    authApi("/api/history/" + ROOM + "?token=" + token + "&after_id=" + afterId + "&limit=50").then(function (res) {
       try { loadEl.remove(); } catch (e) { }
+      var d = res.data;
       if (d.messages && d.messages.length) addMsgs(d.messages, true);
     });
   }
@@ -141,12 +142,21 @@
       opts.body = JSON.stringify(opts.body);
       headers["Content-Type"] = "application/json";
     }
-    return fetch(API + path, { method: opts.method || "GET", headers: headers, body: opts.body }).then(function (r) { return r.json(); });
+    return fetch(API + path, { method: opts.method || "GET", headers: headers, body: opts.body })
+      .then(function (r) { return r.json().then(function (d) { return { _status: r.status, data: d }; }); });
+  }
+
+  function authApi(path, opts) {
+    return api(path, opts).then(function (res) {
+      if (res._status === 401) { logout(); return { _status: 401, data: {} }; }
+      return res;
+    });
   }
 
   function doLogin(name) {
     name = name.trim() || "User" + Math.random().toString(36).substring(2, 6);
-    api("/api/login", { method: "POST", body: { username: name, password: "" } }).then(function (d) {
+    api("/api/login", { method: "POST", body: { username: name, password: "" } }).then(function (res) {
+      var d = res.data;
       if (d.error) return alert(d.error);
       token = d.token; username = d.username;
       try { localStorage.setItem("chat_xtoken", token); localStorage.setItem("chat_xuser", username); } catch (e) { }
@@ -176,7 +186,8 @@
   }
 
   function loadHistory() {
-    api("/api/history/" + ROOM + "?token=" + token + "&limit=50").then(function (d) {
+    authApi("/api/history/" + ROOM + "?token=" + token + "&limit=50").then(function (res) {
+      var d = res.data;
       if (d.messages) addMsgs(d.messages);
     });
   }
@@ -252,8 +263,10 @@
 
   function startPoll() {
     clearInterval(pollTimer);
+    if (!token) return;
     pollTimer = setInterval(function () {
-      api("/api/poll?room_id=" + ROOM + "&token=" + token + "&after_id=" + lastId + "&timeout=3").then(function (d) {
+      authApi("/api/poll?room_id=" + ROOM + "&token=" + token + "&after_id=" + lastId + "&timeout=3").then(function (res) {
+        var d = res.data;
         if (d.messages && d.messages.length) addMsgs(d.messages);
       });
     }, 2000);
@@ -263,13 +276,15 @@
     text = text.trim();
     if (!text) return;
     inp.value = "";
-    api("/api/msg", { method: "POST", body: { token: token, room_id: ROOM, content: text } }).then(function (d) {
+    authApi("/api/msg", { method: "POST", body: { token: token, room_id: ROOM, content: text } }).then(function (res) {
+      var d = res.data;
       if (d.id) addMsgs([d]);
     });
   }
 
   function sendPayload(payload) {
-    return api("/api/msg", { method: "POST", body: Object.assign({ token: token, room_id: ROOM }, payload) }).then(function (d) {
+    return authApi("/api/msg", { method: "POST", body: Object.assign({ token: token, room_id: ROOM }, payload) }).then(function (res) {
+      var d = res.data;
       if (d.id) addMsgs([d]);
     });
   }
