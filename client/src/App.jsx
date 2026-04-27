@@ -31,6 +31,9 @@ export default function App() {
         activeRoom={activeRoom}
         onRoomSelect={(id) => chat.switchRoom(id)}
         onLogout={chat.logout}
+        onDeleteRoom={async (id) => {
+          try { await chat.deleteRoom(id); setRooms(prev => prev.filter(r => r.id !== id)); chat.switchRoom(1); } catch (e) { alert(e.message); }
+        }}
         onCreateRoom={async (name) => {
           const room = await chat.createRoom(name);
           if (room) { setRooms(prev => [...prev, room]); chat.switchRoom(room.id); }

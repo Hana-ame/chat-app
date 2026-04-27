@@ -61,6 +61,9 @@ body {
 .room-item.active { background: #404249; color: #f2f3f5; }
 .room-hash { font-size: 16px; color: #6d6f78; margin-right: 2px; }
 .room-item.active .room-hash { color: #dbdee1; }
+.room-delete { display: none; margin-left: auto; background: none; border: none; color: #80848e; cursor: pointer; font-size: 16px; padding: 0 4px; line-height: 1; }
+.room-item:hover .room-delete { display: inline; }
+.room-delete:hover { color: #e74c3c; }
 .create-room { color: #3ba55c; }
 .create-room:hover { background: #3ba55c1a; color: #3ba55c; }
 .create-room .room-hash { color: #3ba55c; font-weight: bold; }

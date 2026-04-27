@@ -145,6 +145,18 @@ async def create_room(request: Request):
     except Exception:
         return JSONResponse({"error": "room already exists"}, 409)
 
+@app.delete("/api/rooms/{room_id}")
+async def delete_room(room_id: int, token: str = Query(...)):
+    user = get_user(token)
+    if not user:
+        return JSONResponse({"error": "unauthorized"}, 401)
+    if room_id == 1:
+        return JSONResponse({"error": "cannot delete lobby"}, 403)
+    ok = await db.delete_room(room_id)
+    if not ok:
+        return JSONResponse({"error": "room not found"}, 404)
+    return {"ok": True}
+
 # ── Messages ───────────────────────────────────────────────────────────
 
 @app.get("/api/history/{room_id}")

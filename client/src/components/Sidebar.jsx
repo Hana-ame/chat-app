@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 
-export default function Sidebar({ user, rooms, activeRoom, onRoomSelect, onLogout, onCreateRoom }) {
+export default function Sidebar({ user, rooms, activeRoom, onRoomSelect, onLogout, onCreateRoom, onDeleteRoom }) {
   const [creating, setCreating] = useState(false);
   const [roomName, setRoomName] = useState('');
 
@@ -26,6 +26,10 @@ export default function Sidebar({ user, rooms, activeRoom, onRoomSelect, onLogou
           >
             <span className="room-hash">#</span>
             {r.name}
+            {r.id !== 1 && onDeleteRoom && (
+              <button className="room-delete" onClick={e => { e.stopPropagation(); onDeleteRoom(r.id); }}
+                      title="删除房间">×</button>
+            )}
           </div>
         ))}
         {creating ? (

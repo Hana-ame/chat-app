@@ -246,6 +246,14 @@ export default function useChat() {
     }
   }, [user, connectWS]);
 
+  const deleteRoom = useCallback(async (roomId) => {
+    if (!user) return;
+    const res = await fetch(`${API_BASE}/api/rooms/${roomId}?token=${user.token}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.ok) return true;
+    throw new Error(data.error || '删除失败');
+  }, [user]);
+
   const createRoom = useCallback(async (name) => {
     if (!user) return;
     const res = await fetch(`${API_BASE}/api/rooms`, {
@@ -258,5 +266,5 @@ export default function useChat() {
     throw new Error(data.error || '创建失败');
   }, [user]);
 
-  return { user, messages, connStatus, onlineCount, onlineUsers, activeRoom, switchRoom, login, logout, sendMessage, sendFile, loadMoreHistory, createRoom };
+  return { user, messages, connStatus, onlineCount, onlineUsers, activeRoom, switchRoom, login, logout, sendMessage, sendFile, loadMoreHistory, createRoom, deleteRoom };
 }

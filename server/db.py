@@ -120,6 +120,15 @@ class Database:
         )
         return await future
 
+    async def delete_room(self, room_id: int) -> bool:
+        if room_id == 1: return False  # protect lobby
+        await self._db.execute("DELETE FROM messages WHERE room_id = ?", (room_id,))
+        future = await self.execute_write("DELETE FROM rooms WHERE id = ?", (room_id,))
+        await future
+        cursor = await self._db.execute("SELECT changes()")
+        row = await cursor.fetchone()
+        return row[0] > 0
+
     async def _flush_loop(self):
         while True:
             try:
