@@ -3,3 +3,7 @@ server/chat.db*
 .vscode/
 __pycache__/
 .pytest_cache/
+opencode.sh
+history.md
+test-widget.html
+*.txt
