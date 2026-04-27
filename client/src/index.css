@@ -61,6 +61,14 @@ body {
 .room-item.active { background: #404249; color: #f2f3f5; }
 .room-hash { font-size: 16px; color: #6d6f78; margin-right: 2px; }
 .room-item.active .room-hash { color: #dbdee1; }
+.create-room { color: #3ba55c; }
+.create-room:hover { background: #3ba55c1a; color: #3ba55c; }
+.create-room .room-hash { color: #3ba55c; font-weight: bold; }
+.create-room-form { display: flex; gap: 4px; padding: 4px 8px; }
+.create-room-form input { flex: 1; padding: 6px 8px; border-radius: 4px; border: 1px solid #3ba55c; background: #1e1f22; color: #dbdee1; font-size: 13px; outline: none; }
+.create-room-form button { padding: 4px 10px; border-radius: 4px; border: none; cursor: pointer; font-size: 16px; }
+.create-room-form button[type="submit"] { background: #3ba55c; color: #fff; }
+.create-room-form button[type="button"] { background: #404249; color: #b5bac1; }
 
 .sidebar-footer {
   padding: 8px; border-top: 1px solid #1f2124; background: #232428;

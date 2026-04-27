@@ -29,8 +29,13 @@ export default function App() {
         user={chat.user}
         rooms={rooms}
         activeRoom={activeRoom}
-        onRoomSelect={setActiveRoom}
+        onRoomSelect={(id) => setActiveRoom(id)}
         onLogout={chat.logout}
+        onCreateRoom={async (name) => {
+          const room = await chat.createRoom(name);
+          if (room) { setRooms(prev => [...prev, room]); setActiveRoom(room.id); }
+          return room;
+        }}
       />
       <Chat
         user={chat.user}

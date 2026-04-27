@@ -215,5 +215,17 @@ export default function useChat() {
     return () => { wsRef.current?.close(); stopHeartbeat(); stopPolling(); };
   }, [user]);
 
-  return { user, messages, connStatus, onlineCount, login, logout, sendMessage, sendFile, loadMoreHistory };
+  const createRoom = useCallback(async (name) => {
+    if (!user) return;
+    const res = await fetch(`${API_BASE}/api/rooms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: user.token, name })
+    });
+    const data = await res.json();
+    if (data.id) return data;
+    throw new Error(data.error || '创建失败');
+  }, [user]);
+
+  return { user, messages, connStatus, onlineCount, login, logout, sendMessage, sendFile, loadMoreHistory, createRoom };
 }
