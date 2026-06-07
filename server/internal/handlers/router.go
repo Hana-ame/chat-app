@@ -20,10 +20,11 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 	r.Use(chimid.Recoverer)
 	r.Use(chimid.Timeout(30 * time.Second))
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   s.Cfg.AllowOrigins,
+		AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
 		AllowedMethods:   []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"*"},
-		AllowCredentials: false,
+		ExposedHeaders:   []string{"*"},
+		AllowCredentials: true,
 		MaxAge:           300,
 	}))
 
