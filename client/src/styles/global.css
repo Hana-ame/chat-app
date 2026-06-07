@@ -92,7 +92,8 @@ button { cursor: pointer; border: none; }
 .msg-content { line-height: 1.45; word-break: break-word; color: var(--text-primary); }
 .msg-content p { margin: 0; }
 .msg-content code { background: var(--bg-tertiary); padding: 1px 4px; border-radius: 3px; font-size: 13px; }
-.msg-actions { display:flex; gap:4px; margin-top: 4px; }
+.msg-actions { display:none; gap:4px; margin-top: 4px; }
+.msg-group:hover .msg-actions { display:flex; }
 .msg-btn {
   background: var(--bg-hover); color: var(--text-secondary); border-radius: 4px;
   padding: 2px 8px; font-size: 12px; cursor: pointer;
