@@ -1,0 +1,63 @@
+import { useEffect, useState } from 'react';
+import { useAuthStore } from '../store/auth';
+import { useChatStore } from '../store/chat';
+import ChatList from '../components/ChatList';
+import ChatView from '../components/ChatView';
+import MemberPanel from '../components/MemberPanel';
+
+export default function ChatPage() {
+  const { user, accessToken, logout } = useAuthStore();
+  const { setActiveChat, activeChatId, ws, wsReady, connectWS, disconnect, loadChats, loadMessages } = useChatStore();
+  const [mobileView, setMobileView] = useState('list');
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    if (accessToken) {
+      connectWS(accessToken);
+      loadChats(accessToken);
+    }
+    return () => disconnect();
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (activeChatId && accessToken) {
+      const { messages } = useChatStore.getState();
+      if (messages.length === 0) loadMessages(accessToken, activeChatId);
+    }
+  }, [activeChatId, accessToken]);
+
+  const handleSelectChat = (id) => {
+    setActiveChat(id);
+    if (isMobile) setMobileView('chat');
+  };
+
+  const handleBack = () => {
+    setActiveChat(null);
+    setMobileView('list');
+  };
+
+  const appClass = 'shell' + (isMobile ? (activeChatId && mobileView === 'chat' ? ' mobile-chat' : ' mobile-list') : '');
+
+  return (
+    <div className={appClass}>
+      <ChatList onSelectChat={handleSelectChat} activeId={activeChatId} onLogout={logout} />
+      {activeChatId ? (
+        <ChatView
+          chatId={activeChatId}
+          onBack={isMobile ? handleBack : null}
+        />
+      ) : isMobile ? null : (
+        <div className="main" style={{alignItems:'center',justifyContent:'center',color:'var(--text-muted)'}}>
+          Select a conversation
+        </div>
+      )}
+      {!isMobile && activeChatId && <MemberPanel chatId={activeChatId} />}
+    </div>
+  );
+}

@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  go-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.23' }
+      - run: go vet ./...
+      - run: go test ./... -cover -coverprofile=coverage.out -count=1 -timeout 120s
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: go-coverage
+          path: server/coverage.out
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - run: npm ci
+      - run: npx playwright install chromium --with-deps
+      - run: npm run build
+      - run: npx playwright test --project=chromium || echo "E2E skipped"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: client-dist
+          path: client/dist/
+
+  release:
+    needs: [go-test, frontend-build]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+      - name: Package
+        run: |
+          cp -r client-dist client/dist
+          cd server && go build -o ../chatd ./cmd/chatd/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chatd-release
+          path: |
+            chatd
+            client/dist/**

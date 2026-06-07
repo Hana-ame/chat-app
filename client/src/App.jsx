@@ -1,56 +1,16 @@
-import React, { useState, useEffect } from 'react'
-import useChat from './hooks/useChat'
-import Login from './components/Login'
-import Sidebar from './components/Sidebar'
-import Chat from './components/Chat'
-import MemberList from './components/MemberList'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { useAuthStore } from './store/auth'
+import LoginPage from './routes/LoginPage'
+import RegisterPage from './routes/RegisterPage'
+import ChatPage from './routes/ChatPage'
 
 export default function App() {
-  const chat = useChat();
-  const [rooms, setRooms] = useState([]);
-
-  useEffect(() => {
-    if (chat.user) {
-      const API = window.location.hostname.endsWith('pages.dev')
-        ? 'https://wsl-8000.moonchan.xyz' : '';
-      fetch(`${API}/api/rooms?token=${chat.user.token}`)
-        .then(r => r.json())
-        .then(d => { if (d.rooms) setRooms(d.rooms); })
-        .catch(() => {});
-    }
-  }, [chat.user]);
-
-  if (!chat.user) return <Login onLogin={chat.login} />;
-
-  const activeRoom = chat.activeRoom;
+  const token = useAuthStore((s) => s.accessToken)
   return (
-    <div className="app-shell">
-      <Sidebar
-        user={chat.user}
-        rooms={rooms}
-        activeRoom={activeRoom}
-        onRoomSelect={(id) => chat.switchRoom(id)}
-        onLogout={chat.logout}
-        onDeleteRoom={async (id) => {
-          try { await chat.deleteRoom(id); setRooms(prev => prev.filter(r => r.id !== id)); chat.switchRoom(1); } catch (e) {}
-        }}
-        onCreateRoom={async (name) => {
-          const room = await chat.createRoom(name);
-          if (room) { setRooms(prev => [...prev, room]); chat.switchRoom(room.id); }
-          return room;
-        }}
-      />
-      <Chat
-        user={chat.user}
-        messages={chat.messages.filter(m => m.room_id === activeRoom || m.type === 'system' || !m.room_id)}
-        connStatus={chat.connStatus}
-        onlineCount={chat.onlineCount}
-        onSend={(text) => chat.sendMessage(text, activeRoom)}
-        onSendFile={(file) => chat.sendFile(file, activeRoom)}
-        onLoadMore={() => chat.loadMoreHistory(activeRoom)}
-        roomName={rooms.find(r => r.id === activeRoom)?.name || '大厅'}
-      />
-      <MemberList onlineCount={chat.onlineCount} onlineUsers={chat.onlineUsers} />
-    </div>
-  );
+    <Routes>
+      <Route path="/login" element={token ? <Navigate to="/" /> : <LoginPage />} />
+      <Route path="/register" element={token ? <Navigate to="/" /> : <RegisterPage />} />
+      <Route path="/*" element={token ? <ChatPage /> : <Navigate to="/login" />} />
+    </Routes>
+  )
 }

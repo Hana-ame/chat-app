@@ -1,9 +1,9 @@
+node_modules/
 client/dist/
-server/chat.db*
-.vscode/
-__pycache__/
-.pytest_cache/
-opencode.sh
-history.md
-test-widget.html
-*.txt
+*.db
+*.db-shm
+*.db-wal
+uploads/*
+!uploads/.gitkeep
+.env
+*.log
