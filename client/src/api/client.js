@@ -11,6 +11,9 @@ async function request(method, path, token, body) {
   }
   const res = await fetch(API_BASE + path, opts);
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+  }
   if (!res.ok) throw { status: res.status, ...data };
   return data;
 }

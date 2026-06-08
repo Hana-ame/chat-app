@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { useAuthStore } from './store/auth'
 import LoginPage from './routes/LoginPage'
 import RegisterPage from './routes/RegisterPage'
@@ -6,6 +7,18 @@ import ChatPage from './routes/ChatPage'
 
 export default function App() {
   const token = useAuthStore((s) => s.accessToken)
+  const logout = useAuthStore((s) => s.logout)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const onUnauth = () => {
+      logout()
+      navigate('/login', { replace: true })
+    }
+    window.addEventListener('auth:unauthorized', onUnauth)
+    return () => window.removeEventListener('auth:unauthorized', onUnauth)
+  }, [logout, navigate])
+
   return (
     <Routes>
       <Route path="/login" element={token ? <Navigate to="/" /> : <LoginPage />} />
