@@ -130,18 +130,10 @@ button { cursor: pointer; border: none; }
 .btn-ghost:hover { color: var(--text-primary); }
 .btn-ghost.active-mode { color: var(--accent); background: var(--bg-active); }
 
-.chat-item.pinned { background: rgba(88,101,242,0.08); }
-.chat-item.pinned:hover { background: rgba(88,101,242,0.12); }
-.chat-item.pinned.active { background: var(--bg-active); }
-
-.pin-btn { opacity: 0; transition: opacity .15s; }
-.chat-item:hover .pin-btn { opacity: 1; }
-
-.public-badge {
-  font-size: 10px; background: var(--accent); color: #fff;
-  border-radius: 4px; padding: 0 4px; margin-left: 4px;
-  vertical-align: middle; font-weight: 500;
-}
+.chat-item.pinned { border-left: 3px solid var(--accent); border-radius: 0 4px 4px 0; }
+.chat-item.public { background: rgba(35,165,89,0.08); }
+.chat-item.public:hover { background: rgba(35,165,89,0.12); }
+.chat-item.public.active { background: var(--bg-active); }
 
 .input-field {
   width:100%; background: var(--bg-tertiary); color: var(--text-primary);

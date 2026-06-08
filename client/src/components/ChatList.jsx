@@ -176,16 +176,13 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
           const avatar = c.type === 'dm' ? (c.members?.find(m => m.id !== user.id)?.avatar_color || c.icon_color) : c.icon_color;
           const unread = c.unread_count || 0;
           return (
-            <div key={c.id} className={'chat-item' + (c.id === activeId ? ' active' : '') + (c.pinned ? ' pinned' : '')}
+            <div key={c.id} className={'chat-item' + (c.id === activeId ? ' active' : '') + (c.pinned ? ' pinned' : '') + (c.visibility === 'public' ? ' public' : '')}
               onClick={() => onSelectChat(c.id)}>
               <div className="chat-item-avatar" style={{background:avatar}}>
                 {name ? name[0].toUpperCase() : '?'}
               </div>
               <div className="chat-item-info">
-                <div className="chat-item-name">
-                  {name || getDMName(c, user.id)}
-                  {c.visibility === 'public' && <span className="public-badge">public</span>}
-                </div>
+                <div className="chat-item-name">{name || getDMName(c, user.id)}</div>
                 <div className="chat-item-preview">
                   {c.last_message ? (c.last_message.deleted ? '(message deleted)' : c.last_message.author?.username + ': ' + c.last_message.content) : ''}
                 </div>
