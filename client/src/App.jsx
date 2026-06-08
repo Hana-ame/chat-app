@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { useAuthStore } from './store/auth'
 import LoginPage from './routes/LoginPage'
@@ -9,11 +9,15 @@ export default function App() {
   const token = useAuthStore((s) => s.accessToken)
   const logout = useAuthStore((s) => s.logout)
   const navigate = useNavigate()
+  const loggingOut = useRef(false)
 
   useEffect(() => {
     const onUnauth = () => {
+      if (loggingOut.current) return
+      loggingOut.current = true
       logout()
       navigate('/login', { replace: true })
+      setTimeout(() => { loggingOut.current = false }, 500)
     }
     window.addEventListener('auth:unauthorized', onUnauth)
     return () => window.removeEventListener('auth:unauthorized', onUnauth)

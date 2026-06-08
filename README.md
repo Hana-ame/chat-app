@@ -9,12 +9,12 @@ chat-app/
 │   ├── internal/
 │   │   ├── auth/              # bcrypt + JWT
 │   │   ├── db/                # SQLite DAO (users/chats/messages/reactions)
+│   │   ├── db/migrations/     # 嵌入式SQL DDL
 │   │   ├── handlers/          # HTTP路由 + 中间件
-│   │   ├── ws/                # WebSocket gateway (Hub + Client)
+│   │   ├── ws/                # WebSocket/SSE gateway (Hub + Client)
 │   │   ├── models/            # 数据模型
 │   │   ├── config/            # 环境变量配置
 │   │   └── testutil/          # 测试夹具
-│   └── migrations/            # DDL
 ├── client/                    # React 19 + Vite + Zustand
 │   ├── src/
 │   │   ├── routes/            # LoginPage/RegisterPage/ChatPage
@@ -36,7 +36,7 @@ cd client && npm install
 cd server && go mod tidy
 
 # Dev (two terminals or use Makefile)
-cd server && go run ./cmd/chatd
+cd server && CHAT_JWT_SECRET=your-secret go run ./cmd/chatd
 cd client && npm run dev
 
 # Open http://localhost:5173 (Vite proxies /api to :8080)
@@ -47,8 +47,6 @@ cd client && npm run dev
 ```bash
 # Go 全套测试 (auth/db/handlers/ws)
 cd server && go test ./... -cover -count=1 -timeout 120s
-
-# 覆盖率: auth 88.5% / db 79% / handlers 67.7% / ws 62.1%
 ```
 
 ## API
@@ -62,8 +60,9 @@ cd server && go test ./... -cover -count=1 -timeout 120s
 | GET | `/api/users/me` | Bearer | Current user |
 | PATCH | `/api/users/me` | Bearer | Update profile |
 | GET | `/api/users?q=` | Bearer | Search users |
-| GET | `/api/chats` | Bearer | List my chats |
-| POST | `/api/chats` | Bearer | Create group |
+| GET | `/api/chats` | Bearer | List my chats (sorted: pinned first) |
+| GET | `/api/chats/public` | Bearer | List all public groups (any user can see) |
+| POST | `/api/chats` | Bearer | Create group (visibility: public/private) |
 | POST | `/api/dms` | Bearer | Get-or-create DM |
 | GET | `/api/chats/:id` | Bearer | Chat detail |
 | PATCH | `/api/chats/:id` | Bearer | Rename (owner) |
@@ -71,6 +70,9 @@ cd server && go test ./... -cover -count=1 -timeout 120s
 | GET | `/api/chats/:id/members` | Bearer | Members |
 | POST | `/api/chats/:id/members` | Bearer | Add member |
 | DELETE | `/api/chats/:id/members/:uid` | Bearer | Kick/Leave |
+| POST | `/api/chats/:id/join` | Bearer | Join a public chat |
+| POST | `/api/chats/:id/pin` | Bearer | Pin to top |
+| POST | `/api/chats/:id/unpin` | Bearer | Unpin |
 | GET | `/api/chats/:id/messages` | Bearer | History (before,limit) |
 | POST | `/api/chats/:id/messages` | Bearer | Send message |
 | PATCH | `/api/chats/:id/messages/:mid` | Bearer | Edit |
@@ -79,6 +81,15 @@ cd server && go test ./... -cover -count=1 -timeout 120s
 | DELETE | `/api/chats/:id/messages/:mid/reactions/:emoji` | Bearer | Remove |
 | POST | `/api/uploads` | Bearer | File upload (multipart) |
 | GET | `/ws?access_token=` | - | WebSocket gateway |
+| GET | `/api/events?access_token=` | - | SSE event stream |
+
+## WS / SSE / Polling
+
+前端支持三种实时模式，可在侧边栏切换：
+
+- **WS**: WebSocket, `GET /ws?access_token=token`
+- **SSE**: Server-Sent Events, `GET /api/events?access_token=token`
+- **Polling**: HTTP轮询 `/api/chats` + `/api/messages`, 2s 间隔
 
 ## WS Protocol
 
@@ -92,24 +103,6 @@ Server → Client:  {op:"pong"} / {op:"ready",payload:{user,chats,online_user_id
                   {op:"typing","chat_id","user_id"}
 ```
 
-## Dev Log & Pitfalls
-
-### Architecture decisions
-- **chats 表统一 `dm | group`**: 不做 Discord 的 guild → channel 两层,用户说"群聊+私聊放一个list就行"
-- **modernc.org/sqlite**: pure Go, no CGO → CI/CD 零依赖交叉编译,但首次编译慢(生成大量Go代码)
-- **chi router**: 比 gin 更轻量更 Go 原生
-- **JWT + refresh token**: access 15min, refresh 30d, SHA256 hash 存库
-
-### Pitfalls (踩坑记录)
-1. **LSP 先写文件顺序**: handler 引用 ws.Hub,必须先给 ws 包建 stub,否则 LSP 报错但不影响 build
-2. **Privoxy 代理**: dev 环境中 curl localhost 被 privoxy 拦截 → 必须加 `-x ""` 绕过
-3. **struct literal `_: value`**: Go 不允许下划线作字段名 → 改用 `_ = exp` 占位
-4. **WS close race**: `close(c.send)` 时若其他 goroutine 还在 `c.send <- env` → panic → 用 `sync.Once` + 不关闭channel修复
-5. **WS ready vs presence 顺序**: register 后 `go broadcastPresence` 会异步写 presence → ready 必须先于 presence → 调换 register 顺序(先 queue ready 再 register)
-6. **UnreadCount 时间精度**: SQLite ms 精度,两个消息同毫秒则 (created_at,id) 比较不可靠 → 测试加 10ms sleep
-7. **WS typing test**: 两个 WS 连接时 presence 广播 + TCP buffer 导致消息乱序 → 简化 test 只验证代码路径
-8. **Go binary build hang**: `modernc.org/sqlite` 首次 full link 极慢(~5min+) → CI 用缓存,开发用 `go run`
-
 ## Env
 
 | Variable | Default | Description |
@@ -117,8 +110,56 @@ Server → Client:  {op:"pong"} / {op:"ready",payload:{user,chats,online_user_id
 | CHAT_ADDR | :8080 | Listen address |
 | CHAT_DB_PATH | chat.db | SQLite file |
 | CHAT_UPLOAD_DIR | uploads | File upload directory |
-| CHAT_JWT_SECRET | random | JWT signing secret |
-| CHAT_ACCESS_TTL | 15m | Access token TTL |
+| CHAT_JWT_SECRET | random | **生产必须设! 不设每次重启token全失效** |
+| CHAT_ACCESS_TTL | 87600h (10yr) | Access token TTL |
 | CHAT_REFRESH_TTL | 720h | Refresh token TTL |
 | CHAT_MAX_UPLOAD | 20971520 | Max upload size (bytes) |
 | CHAT_STATIC_DIR | ../client/dist | Frontend static files |
+
+## Deploy
+
+```
+# Backend: wsl-8080.moonchan.xyz
+# Frontend: chat-app-fastapi.pages.dev (Cloudflare Pages, auto-deploy on push)
+
+# 后端: 启动时必设 CHAT_JWT_SECRET
+cd server && CHAT_JWT_SECRET=your-fixed-secret nohup go run ./cmd/chatd &
+
+# 首次编译 modernc.org/sqlite 需 3-5min
+# 用 go run 而非 go build: go build 首次也会卡在 link
+```
+
+## Dev Log & Pitfalls
+
+### Architecture decisions
+- **chats 表统一 `dm | group`**: 不做 Discord 的 guild → channel 两层,用户说"群聊+私聊放一个list就行"
+- **modernc.org/sqlite**: pure Go, no CGO → CI/CD 零依赖交叉编译,但首次编译慢(生成大量Go代码)
+- **chi router**: 比 gin 更轻量更 Go 原生
+- **JWT 10yr**: access token 10年有效期,无 refresh 刷新机制
+- **外链文件上传**: 客户端走 `PUT upload.moonchan.xyz/api/upload` 上传,下载 URL `https://upload.moonchan.xyz/api/{id}/{filename}`
+
+### Pitfalls (踩坑记录)
+
+1. **JWT secret 随机化**: 若不设 `CHAT_JWT_SECRET` 环境变量,每次重启随机生成 secret,所有 token 失效 → 生产必须设置固定值
+
+2. **Timeout 中间件杀 SSE**: chi `Timeout(30s)` 全局使用会掐断 SSE 长连接 → 改为只在 `/api/*` 路由组内生效,WS 和 SSE 不应用
+
+3. **401 多触发**: 旧 token 失效时,多个 API 同时 401 → 多次 `navigate('/login')` 冲突 → 用 useRef 防重入
+
+4. **LSP 先写文件顺序**: handler 引用 ws.Hub,必须先给 ws 包建 stub,否则 LSP 报错但不影响 build
+
+5. **Privoxy 代理**: dev 环境中 curl localhost 被 privoxy 拦截 → 必须加 `--noproxy '*'` 绕过
+
+6. **WS close race**: `close(c.send)` 时若其他 goroutine 还在 `c.send <- env` → panic → 用 `sync.Once` + 不关闭channel修复
+
+7. **WS ready vs presence 顺序**: register 后 `go broadcastPresence` 会异步写 presence → ready 必须先于 presence → 调换 register 顺序(先 queue ready 再 register)
+
+8. **sed 损毁文件**: `sed -i` 删掉了不该删的代码 → `.go` 文件只能用 Edit 工具改,别用 sed
+
+9. **Go binary build hang**: `modernc.org/sqlite` 首次 full link 极慢(~5min+) → CI 用缓存,开发用 `go run`
+
+10. **DB 迁移幂等**: `ALTER TABLE ADD COLUMN IF NOT EXISTS` SQLite 3.37+ 支持,但 safer: Go 层面 catch `duplicate column name` error 并忽略
+
+11. **DisallowUnknownFields**: `json.Decoder` 设置了 `DisallowUnknownFields()` → 新字段(`visibility`)发送到旧 server 报错 → 更新 server 重启即可
+
+12. **测试 CreateChat 签名变更**: 加 `visibility` 参数后 → 所有测试 `CreateChat()` 调用需加 `""` → 用 perl regex 批量替换

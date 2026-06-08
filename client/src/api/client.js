@@ -1,6 +1,6 @@
 const IS_PAGES = typeof window !== 'undefined' && window.location.hostname.endsWith('pages.dev');
 const API_BASE = IS_PAGES ? 'https://wsl-8080.moonchan.xyz' : '';
-const UPLOAD_BASE = API_BASE;
+const UPLOAD_BASE = 'https://upload.moonchan.xyz';
 
 async function request(method, path, token, body) {
   const opts = { method, headers: {} };
@@ -67,17 +67,17 @@ export const api = {
   upload: async (file) => {
     const form = new FormData();
     form.append('file', file);
-    const res = await fetch(API_BASE + '/api/uploads', {
-      method: 'POST',
+    const res = await fetch(UPLOAD_BASE + '/api/upload', {
+      method: 'PUT',
       body: form,
     });
     if (!res.ok) throw { status: res.status, message: 'Upload failed' };
     const data = await res.json();
     return {
-      filename: data.filename,
-      mime_type: data.mime_type,
-      size: data.size,
-      url: API_BASE + data.url,
+      filename: file.name,
+      mime_type: file.type || 'application/octet-stream',
+      size: file.size,
+      url: UPLOAD_BASE + '/api/' + data.id + '/' + encodeURIComponent(file.name),
     };
   },
 

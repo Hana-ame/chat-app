@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
@@ -37,6 +37,14 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const [showProfile, setShowProfile] = useState(false);
   const [showPublic, setShowPublic] = useState(false);
   const [publicChats, setPublicChats] = useState([]);
+  const [contextMenu, setContextMenu] = useState(null);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [contextMenu]);
 
   const handleCreate = async () => {
     if (!newChatName.trim()) return;
@@ -94,6 +102,21 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       if (pinned) await unpinChat(accessToken, chatId);
       else await pinChat(accessToken, chatId);
     } catch {}
+    setContextMenu(null);
+  };
+
+  const handleContextMenu = (e, chatId) => {
+    e.stopPropagation();
+    setContextMenu(chatId === contextMenu ? null : chatId);
+  };
+
+  const handleDeleteChat = async (e, chatId) => {
+    e.stopPropagation();
+    if (!confirm('Delete this chat?')) return;
+    try {
+      await api.deleteChat(accessToken, chatId);
+    } catch {}
+    setContextMenu(null);
   };
 
   const isOnline = (uid) => onlineUserIds.includes(uid);
@@ -187,14 +210,23 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
                   {c.last_message ? (c.last_message.deleted ? '(message deleted)' : c.last_message.author?.username + ': ' + c.last_message.content) : ''}
                 </div>
               </div>
-              <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:2}}>
+              <div className="chat-item-meta">
                 <div className="chat-item-time">{timeAgo(c.last_message_at)}</div>
                 {unread > 0 && <div className="unread-badge">{unread}</div>}
-                <button className="btn-ghost pin-btn" title={c.pinned ? 'Unpin' : 'Pin'}
-                  onClick={(e) => handlePin(e, c.id, c.pinned)}
-                  style={{fontSize:12,color:'var(--text-muted)',padding:'0 4px'}}>
-                  {c.pinned ? '📌' : '📌'}
-                </button>
+                <div className="chat-item-menu-wrap">
+                  <button className="btn-ghost chat-item-menu-btn" title="More"
+                    onClick={(e) => handleContextMenu(e, c.id)}>⋮</button>
+                  {contextMenu === c.id && (
+                    <div className="context-menu">
+                      {c.pinned
+                        ? <button className="context-menu-item" onClick={(e) => handlePin(e, c.id, true)}>Unpin</button>
+                        : <button className="context-menu-item" onClick={(e) => handlePin(e, c.id, false)}>Pin</button>}
+                      {c.owner_id === user.id && (
+                        <button className="context-menu-item danger" onClick={(e) => handleDeleteChat(e, c.id)}>Delete</button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           );
