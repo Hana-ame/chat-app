@@ -18,7 +18,6 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 	r.Use(chimid.RealIP)
 	r.Use(chimid.RequestID)
 	r.Use(chimid.Recoverer)
-	r.Use(chimid.Timeout(30 * time.Second))
 	r.Use(cors.Handler(cors.Options{
 		AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
 		AllowedMethods:   []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
@@ -33,6 +32,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 	})
 
 	r.Route("/api", func(r chi.Router) {
+		r.Use(chimid.Timeout(30 * time.Second))
 		r.Post("/auth/register", s.Register)
 		r.Post("/auth/login", s.Login)
 		r.Post("/auth/refresh", s.Refresh)
