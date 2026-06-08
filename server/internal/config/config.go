@@ -79,7 +79,7 @@ func Load() *Config {
 		UploadDir:       uploadDir,
 		BaseURL:         getenv("CHAT_BASE_URL", ""),
 		JWTSecret:       []byte(secret),
-		AccessTokenTTL:  getenvDuration("CHAT_ACCESS_TTL", 15*time.Minute),
+		AccessTokenTTL:  getenvDuration("CHAT_ACCESS_TTL", 87600*time.Hour),
 		RefreshTokenTTL: getenvDuration("CHAT_REFRESH_TTL", 30*24*time.Hour),
 		MaxUploadBytes:  getenvInt64("CHAT_MAX_UPLOAD", 20<<20),
 		StaticDir:       getenv("CHAT_STATIC_DIR", "../client/dist"),
