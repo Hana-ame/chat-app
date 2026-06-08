@@ -86,8 +86,7 @@ button { cursor: pointer; border: none; }
 }
 .msg-row { display:flex; gap:12px; padding: 4px 0; position:relative; }
 .msg-continuation { padding-left: 52px; }
-.msg-actions { display:none; gap:4px; margin-top: 4px; position:absolute; bottom:-22px; left:52px; z-index:5; background:var(--bg-primary); padding:2px 6px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.3); }
-.msg-continuation .msg-actions { left:0; }
+.msg-actions { display:none; gap:4px; position:absolute; bottom:-22px; left:52px; z-index:5; background:var(--bg-primary); padding:2px 6px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.3); }
 .msg-group:hover .msg-actions { display:flex; }
 .msg-btn {
   background: var(--bg-hover); color: var(--text-secondary); border-radius: 4px;

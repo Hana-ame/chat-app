@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import ChatList from '../components/ChatList';
@@ -29,6 +30,10 @@ export default function ChatPage() {
     if (activeChatId && accessToken) {
       const { messages } = useChatStore.getState();
       if (messages.length === 0) loadMessages(accessToken, activeChatId);
+      const msgs = messages.filter(m => m.chat_id === activeChatId && !m.deleted);
+      if (msgs.length > 0) {
+        api.markRead(accessToken, activeChatId, msgs[msgs.length - 1].id).catch(()=>{});
+      }
     }
   }, [activeChatId, accessToken]);
 
