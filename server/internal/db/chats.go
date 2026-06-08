@@ -73,7 +73,7 @@ func (d *DB) PurgeExpiredTokens(ctx context.Context) (int64, error) {
 
 // ── Chats ────────────────────────────────────────────────────────────
 
-func (d *DB) CreateChat(ctx context.Context, typ, name, ownerID string, memberIDs []string) (*models.Chat, error) {
+func (d *DB) CreateChat(ctx context.Context, typ, name, visibility, ownerID string, memberIDs []string) (*models.Chat, error) {
 	if typ != "dm" && typ != "group" {
 		return nil, errors.New("invalid chat type")
 	}
@@ -112,9 +112,15 @@ func (d *DB) CreateChat(ctx context.Context, typ, name, ownerID string, memberID
 		nameVal = name
 	}
 
+	if visibility != "public" {
+		visibility = "private"
+	}
+	if typ == "dm" {
+		visibility = ""
+	}
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO chats (id, type, name, icon_color, owner_id) VALUES (?,?,?,?,?)`,
-		id, typ, nameVal, color, ownerVal,
+		`INSERT INTO chats (id, type, name, icon_color, owner_id, visibility) VALUES (?,?,?,?,?,?)`,
+		id, typ, nameVal, color, ownerVal, visibility,
 	)
 	if err != nil {
 		return nil, err
@@ -148,9 +154,9 @@ func (d *DB) GetChat(ctx context.Context, id string) (*models.Chat, error) {
 		lastMsgAt   sql.NullString
 	)
 	err := d.QueryRowContext(ctx,
-		`SELECT id, type, name, icon_color, owner_id, created_at, last_message_at FROM chats WHERE id = ?`,
+		`SELECT id, type, name, icon_color, visibility, owner_id, created_at, last_message_at FROM chats WHERE id = ?`,
 		id,
-	).Scan(&c.ID, &c.Type, &name, &c.IconColor, &owner, &createdAt, &lastMsgAt)
+	).Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.Visibility, &owner, &createdAt, &lastMsgAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -211,11 +217,11 @@ func (d *DB) IsChatMember(ctx context.Context, chatID, userID string) (bool, err
 
 func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, error) {
 	rows, err := d.QueryContext(ctx,
-		`SELECT c.id, c.type, c.name, c.icon_color, c.owner_id, c.created_at, c.last_message_at,
-		        cm.last_read_message_id
+		`SELECT c.id, c.type, c.name, c.icon_color, c.visibility, c.owner_id, c.created_at, c.last_message_at,
+		        cm.last_read_message_id, COALESCE(cm.pinned,0)
 		 FROM chat_members cm JOIN chats c ON c.id = cm.chat_id
 		 WHERE cm.user_id = ?
-		 ORDER BY COALESCE(c.last_message_at, c.created_at) DESC`,
+		 ORDER BY cm.pinned DESC, COALESCE(c.last_message_at, c.created_at) DESC`,
 		userID,
 	)
 	if err != nil {
@@ -232,11 +238,15 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 	for rows.Next() {
 		var c models.Chat
 		var name, owner, lastMsg, lastRead sql.NullString
+		var visibility sql.NullString
+		var pinned int
 		var created string
-		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &owner, &created, &lastMsg, &lastRead); err != nil {
+		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &visibility, &owner, &created, &lastMsg, &lastRead, &pinned); err != nil {
 			return nil, err
 		}
 		c.Name = name.String
+		c.Visibility = visibility.String
+		c.Pinned = pinned == 1
 		c.OwnerID = owner.String
 		c.CreatedAt = parseTime(created)
 		c.LastMessageAt = parseTimePtr(lastMsg)

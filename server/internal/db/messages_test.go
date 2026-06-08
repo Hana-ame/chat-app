@@ -12,7 +12,7 @@ import (
 func TestCreateGetMessage(t *testing.T) {
 	f := testutil.New(t)
 	a, _ := f.DB.CreateUser(f.Ctx(), "msg1@x.com", "MsgUser", "pw00000000")
-	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "General", a.ID, []string{a.ID})
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "General", "", a.ID, []string{a.ID})
 
 	msg, err := f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, "Hello World!", nil, nil)
 	if err != nil {
@@ -35,7 +35,7 @@ func TestCreateGetMessage(t *testing.T) {
 func TestGetMessagesWithPagination(t *testing.T) {
 	f := testutil.New(t)
 	a, _ := f.DB.CreateUser(f.Ctx(), "page@x.com", "Pager", "pw00000000")
-	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "Pagination", a.ID, []string{a.ID})
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "Pagination", "", a.ID, []string{a.ID})
 
 	ids := make([]string, 0, 5)
 	for i := 0; i < 5; i++ {
@@ -66,7 +66,7 @@ func TestUpdateMessage(t *testing.T) {
 	f := testutil.New(t)
 	a, _ := f.DB.CreateUser(f.Ctx(), "edit@x.com", "Editor", "pw00000000")
 	b, _ := f.DB.CreateUser(f.Ctx(), "other@x.com", "Other", "pw00000000")
-	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "EditTest", a.ID, []string{a.ID, b.ID})
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "EditTest", "", a.ID, []string{a.ID, b.ID})
 	msg, _ := f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, "original", nil, nil)
 
 	updated, err := f.DB.UpdateMessage(f.Ctx(), msg.ID, a.ID, "edited")
@@ -89,7 +89,7 @@ func TestDeleteMessage(t *testing.T) {
 	f := testutil.New(t)
 	a, _ := f.DB.CreateUser(f.Ctx(), "delmsg@x.com", "DelMsg", "pw00000000")
 	b, _ := f.DB.CreateUser(f.Ctx(), "delother@x.com", "DelOther", "pw00000000")
-	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "DelTest", a.ID, []string{a.ID, b.ID})
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "DelTest", "", a.ID, []string{a.ID, b.ID})
 	msg, _ := f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, "delete me", nil, nil)
 
 	if err := f.DB.DeleteMessage(f.Ctx(), msg.ID, a.ID, false); err != nil {
@@ -118,7 +118,7 @@ func TestReactionsAddRemove(t *testing.T) {
 	f := testutil.New(t)
 	a, _ := f.DB.CreateUser(f.Ctx(), "rxn1@x.com", "RxnUser", "pw00000000")
 	b, _ := f.DB.CreateUser(f.Ctx(), "rxn2@x.com", "RxnOther", "pw00000000")
-	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "RxnTest", a.ID, []string{a.ID, b.ID})
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "RxnTest", "", a.ID, []string{a.ID, b.ID})
 	msg, _ := f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, "reaction test", nil, nil)
 
 	if err := f.DB.AddReaction(f.Ctx(), msg.ID, a.ID, "👍"); err != nil {
@@ -164,7 +164,7 @@ func TestMessageWithMentions(t *testing.T) {
 	f := testutil.New(t)
 	a, _ := f.DB.CreateUser(f.Ctx(), "ment1@x.com", "MentA", "pw00000000")
 	b, _ := f.DB.CreateUser(f.Ctx(), "ment2@x.com", "MentB", "pw00000000")
-	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "MentionTest", a.ID, []string{a.ID, b.ID})
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "MentionTest", "", a.ID, []string{a.ID, b.ID})
 	msg, _ := f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, "Hey <@there>", []string{b.ID}, nil)
 	if len(msg.Mentions) != 1 || msg.Mentions[0] != b.ID {
 		t.Fatalf("mentions: %v", msg.Mentions)
@@ -174,7 +174,7 @@ func TestMessageWithMentions(t *testing.T) {
 func TestMessageWithAttachments(t *testing.T) {
 	f := testutil.New(t)
 	a, _ := f.DB.CreateUser(f.Ctx(), "att@x.com", "AttUser", "pw00000000")
-	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "AttTest", a.ID, []string{a.ID})
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "AttTest", "", a.ID, []string{a.ID})
 	atts := []models.Attachment{
 		{Filename: "foo.png", MimeType: "image/png", Size: 1024, URL: "/uploads/foo.png"},
 	}
@@ -193,7 +193,7 @@ func TestMessageWithAttachments(t *testing.T) {
 func TestUnreadCount(t *testing.T) {
 	f := testutil.New(t)
 	a, _ := f.DB.CreateUser(f.Ctx(), "unread@x.com", "UnreadUser", "pw00000000")
-	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "UnreadTest", a.ID, []string{a.ID})
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "UnreadTest", "", a.ID, []string{a.ID})
 	msg, _ := f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, "msg1", nil, nil)
 	n, _ := f.DB.UnreadCount(f.Ctx(), chat.ID, "")
 	if n == 0 {
@@ -278,7 +278,7 @@ func TestRefreshTokenCRUD(t *testing.T) {
 func TestEmptyMessageRejected(t *testing.T) {
 	f := testutil.New(t)
 	a, _ := f.DB.CreateUser(f.Ctx(), "emptymsg@x.com", "Empty", "pw00000000")
-	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "EmptyTest", a.ID, []string{a.ID})
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "EmptyTest", "", a.ID, []string{a.ID})
 	_, err := f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, "", nil, nil)
 	if err == nil {
 		t.Fatal("empty message should fail")
@@ -288,7 +288,7 @@ func TestEmptyMessageRejected(t *testing.T) {
 func TestMessageWithAttachmentOnlyAllowed(t *testing.T) {
 	f := testutil.New(t)
 	a, _ := f.DB.CreateUser(f.Ctx(), "attonly@x.com", "AttOnly", "pw00000000")
-	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "AttOnlyTest", a.ID, []string{a.ID})
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "AttOnlyTest", "", a.ID, []string{a.ID})
 	atts := []models.Attachment{
 		{Filename: "doc.pdf", MimeType: "application/pdf", Size: 100, URL: "/uploads/doc.pdf"},
 	}

@@ -10,9 +10,10 @@ import (
 )
 
 type createChatReq struct {
-	Type      string   `json:"type"`
-	Name      string   `json:"name"`
-	MemberIDs []string `json:"member_ids"`
+	Type       string   `json:"type"`
+	Name       string   `json:"name"`
+	Visibility string   `json:"visibility"`
+	MemberIDs  []string `json:"member_ids"`
 }
 
 type createDMReq struct {
@@ -71,7 +72,7 @@ func (s *Server) CreateChat(w http.ResponseWriter, r *http.Request) {
 	if !hasMe {
 		members = append(members, u.ID)
 	}
-	chat, err := s.DB.CreateChat(r.Context(), "group", req.Name, u.ID, members)
+	chat, err := s.DB.CreateChat(r.Context(), "group", req.Name, req.Visibility, u.ID, members)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
@@ -102,7 +103,7 @@ func (s *Server) CreateOrGetDM(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, dm)
 		return
 	}
-	chat, err := s.DB.CreateChat(r.Context(), "dm", "", "", []string{u.ID, other.ID})
+	chat, err := s.DB.CreateChat(r.Context(), "dm", "", "", "", []string{u.ID, other.ID})
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return

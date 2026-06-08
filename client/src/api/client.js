@@ -29,8 +29,8 @@ export const api = {
   searchUsers: (token, q) => request('GET', '/api/users?q=' + encodeURIComponent(q), token),
 
   listChats: (token) => request('GET', '/api/chats', token),
-  createChat: (token, name, memberIds) =>
-    request('POST', '/api/chats', token, { type: 'group', name, member_ids: memberIds }),
+  createChat: (token, name, memberIds, visibility) =>
+    request('POST', '/api/chats', token, { type: 'group', name, member_ids: memberIds, visibility: visibility || 'private' }),
   getChat: (token, id) => request('GET', '/api/chats/' + id, token),
   deleteChat: (token, id) => request('DELETE', '/api/chats/' + id, token),
   renameChat: (token, id, name) =>
@@ -77,4 +77,10 @@ export const api = {
       url: UPLOAD_BASE + '/api/' + data.id + '/' + encodeURIComponent(file.name),
     };
   },
+
+  listPublicChats: (token) => request('GET', '/api/chats/public', token),
+  joinChat: (token, chatId) => request('POST', '/api/chats/' + chatId + '/join', token),
+  pinChat: (token, chatId) => request('POST', '/api/chats/' + chatId + '/pin', token),
+  unpinChat: (token, chatId) => request('POST', '/api/chats/' + chatId + '/unpin', token),
+  sseUrl: (token) => API_BASE + '/api/events?access_token=' + encodeURIComponent(token),
 };

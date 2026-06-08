@@ -45,6 +45,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 			r.Get("/users", s.SearchUsers)
 
 			r.Get("/chats", s.ListChats)
+			r.Get("/chats/public", s.ListPublicChats)
 			r.Post("/chats", s.CreateChat)
 			r.Post("/dms", s.CreateOrGetDM)
 			r.Route("/chats/{chatID}", func(r chi.Router) {
@@ -61,6 +62,9 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 				r.Delete("/messages/{messageID}", s.DeleteMessage)
 				r.Put("/messages/{messageID}/reactions/{emoji}", s.AddReaction)
 				r.Delete("/messages/{messageID}/reactions/{emoji}", s.RemoveReaction)
+				r.Post("/join", s.JoinChat)
+				r.Post("/pin", s.PinChat)
+				r.Post("/unpin", s.UnpinChat)
 			})
 
 			r.Post("/uploads", s.Upload)
@@ -70,6 +74,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 	if gateway != nil {
 		r.Get("/ws", gateway.ServeHTTP)
 	}
+	r.Get("/api/events", s.SSE)
 
 	r.Get("/uploads/*", s.serveUpload)
 	if s.Cfg.StaticDir != "" {

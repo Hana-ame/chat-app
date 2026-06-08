@@ -16,11 +16,13 @@ type Chat struct {
 	Type          string     `json:"type"`
 	Name          string     `json:"name,omitempty"`
 	IconColor     string     `json:"icon_color,omitempty"`
+	Visibility    string     `json:"visibility,omitempty"`
 	OwnerID       string     `json:"owner_id,omitempty"`
 	CreatedAt     time.Time  `json:"created_at"`
 	LastMessageAt *time.Time `json:"last_message_at,omitempty"`
 	Members       []User     `json:"members,omitempty"`
 	UnreadCount   int        `json:"unread_count"`
+	Pinned        bool       `json:"pinned"`
 	LastMessage   *Message   `json:"last_message,omitempty"`
 }
 
@@ -29,6 +31,7 @@ type ChatMember struct {
 	UserID            string    `json:"user_id"`
 	JoinedAt          time.Time `json:"joined_at"`
 	LastReadMessageID string    `json:"last_read_message_id,omitempty"`
+	Pinned            bool      `json:"pinned"`
 }
 
 type Message struct {

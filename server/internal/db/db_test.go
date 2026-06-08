@@ -82,7 +82,7 @@ func TestCreateChatGroupAndDM(t *testing.T) {
 	b, _ := f.DB.CreateUser(f.Ctx(), "b@g.com", "Bob", "pw00000000")
 	c, _ := f.DB.CreateUser(f.Ctx(), "c@g.com", "Carol", "pw00000000")
 
-	chat, err := f.DB.CreateChat(f.Ctx(), "group", "TestGroup", a.ID, []string{a.ID, b.ID, c.ID})
+	chat, err := f.DB.CreateChat(f.Ctx(), "group", "TestGroup", "", a.ID, []string{a.ID, b.ID, c.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +98,7 @@ func TestCreateChatGroupAndDM(t *testing.T) {
 		}
 	}
 
-	dm, err := f.DB.CreateChat(f.Ctx(), "dm", "", "", []string{a.ID, b.ID})
+	dm, err := f.DB.CreateChat(f.Ctx(), "dm", "", "", "", []string{a.ID, b.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestFindDMBetween(t *testing.T) {
 	f := testutil.New(t)
 	a, _ := f.DB.CreateUser(f.Ctx(), "dma@x.com", "DMA", "pw00000000")
 	b, _ := f.DB.CreateUser(f.Ctx(), "dmb@x.com", "DMB", "pw00000000")
-	f.DB.CreateChat(f.Ctx(), "dm", "", "", []string{a.ID, b.ID})
+	f.DB.CreateChat(f.Ctx(), "dm", "", "", "", []string{a.ID, b.ID})
 
 	dm, err := f.DB.FindDMBetween(f.Ctx(), a.ID, b.ID)
 	if err != nil {
@@ -139,8 +139,8 @@ func TestListUserChats(t *testing.T) {
 	f := testutil.New(t)
 	a, _ := f.DB.CreateUser(f.Ctx(), "list1@x.com", "List1", "pw00000000")
 	b, _ := f.DB.CreateUser(f.Ctx(), "list2@x.com", "List2", "pw00000000")
-	f.DB.CreateChat(f.Ctx(), "group", "Chat1", a.ID, []string{a.ID, b.ID})
-	f.DB.CreateChat(f.Ctx(), "dm", "", "", []string{a.ID, b.ID})
+	f.DB.CreateChat(f.Ctx(), "group", "Chat1", "", a.ID, []string{a.ID, b.ID})
+	f.DB.CreateChat(f.Ctx(), "dm", "", "", "", []string{a.ID, b.ID})
 
 	chats, err := f.DB.ListUserChats(f.Ctx(), a.ID)
 	if err != nil {
@@ -169,7 +169,7 @@ func TestAddRemoveMember(t *testing.T) {
 	a, _ := f.DB.CreateUser(f.Ctx(), "mem1@x.com", "Mem1", "pw00000000")
 	b, _ := f.DB.CreateUser(f.Ctx(), "mem2@x.com", "Mem2", "pw00000000")
 	c, _ := f.DB.CreateUser(f.Ctx(), "mem3@x.com", "Mem3", "pw00000000")
-	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "MemTest", a.ID, []string{a.ID, b.ID})
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "MemTest", "", a.ID, []string{a.ID, b.ID})
 
 	if err := f.DB.AddChatMember(f.Ctx(), chat.ID, c.ID); err != nil {
 		t.Fatal(err)
@@ -193,7 +193,7 @@ func TestAddRemoveMember(t *testing.T) {
 func TestDeleteChat(t *testing.T) {
 	f := testutil.New(t)
 	a, _ := f.DB.CreateUser(f.Ctx(), "del1@x.com", "Del1", "pw00000000")
-	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "DeleteMe", a.ID, []string{a.ID})
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "DeleteMe", "", a.ID, []string{a.ID})
 	if err := f.DB.DeleteChat(f.Ctx(), chat.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func TestDeleteChat(t *testing.T) {
 func TestRenameChat(t *testing.T) {
 	f := testutil.New(t)
 	a, _ := f.DB.CreateUser(f.Ctx(), "r1@x.com", "Renamer", "pw00000000")
-	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "OldName", a.ID, []string{a.ID})
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "OldName", "", a.ID, []string{a.ID})
 	if err := f.DB.RenameChat(f.Ctx(), chat.ID, "NewName"); err != nil {
 		t.Fatal(err)
 	}

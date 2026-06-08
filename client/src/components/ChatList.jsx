@@ -19,22 +19,32 @@ function getDMName(chat, currentUserId) {
   return other ? other.username : 'Unknown';
 }
 
+const MODES = [
+  { key: 'ws', label: 'WS' },
+  { key: 'sse', label: 'SSE' },
+  { key: 'poll', label: 'Poll' },
+];
+
 export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const { user, accessToken } = useAuthStore();
-  const { chats, onlineUserIds } = useChatStore();
+  const { chats, onlineUserIds, mode, setMode, pinChat, unpinChat } = useChatStore();
   const [showCreate, setShowCreate] = useState(false);
   const [newChatName, setNewChatName] = useState('');
+  const [newChatPublic, setNewChatPublic] = useState(false);
   const [dmUserId, setDmUserId] = useState('');
   const [dmSearch, setDmSearch] = useState('');
   const [dmResults, setDmResults] = useState([]);
   const [showProfile, setShowProfile] = useState(false);
+  const [showPublic, setShowPublic] = useState(false);
+  const [publicChats, setPublicChats] = useState([]);
 
   const handleCreate = async () => {
     if (!newChatName.trim()) return;
     try {
-      const data = await api.createChat(accessToken, newChatName, []);
+      const data = await api.createChat(accessToken, newChatName, [], newChatPublic ? 'public' : 'private');
       setShowCreate(false);
       setNewChatName('');
+      setNewChatPublic(false);
       onSelectChat(data.id);
     } catch (e) { alert(e.message); }
   };
@@ -59,6 +69,33 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     } catch {}
   };
 
+  const loadPublic = async () => {
+    if (showPublic) { setShowPublic(false); return; }
+    try {
+      const data = await api.listPublicChats(accessToken);
+      setPublicChats(data.chats || []);
+      setShowPublic(true);
+    } catch (e) { alert(e.message); }
+  };
+
+  const handleJoinPublic = async (chatId) => {
+    try {
+      await api.joinChat(accessToken, chatId);
+      const data = await api.listChats(accessToken);
+      useChatStore.getState().setChats(data.chats || []);
+      onSelectChat(chatId);
+      setShowPublic(false);
+    } catch (e) { alert(e.message); }
+  };
+
+  const handlePin = async (e, chatId, pinned) => {
+    e.stopPropagation();
+    try {
+      if (pinned) await unpinChat(accessToken, chatId);
+      else await pinChat(accessToken, chatId);
+    } catch {}
+  };
+
   const isOnline = (uid) => onlineUserIds.includes(uid);
 
   return (
@@ -69,6 +106,14 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
           <button className="btn-ghost" title="Create Group" onClick={() => setShowCreate(true)}>+</button>
           <button className="btn-ghost" title="New DM" onClick={() => searchUser('')} style={{fontWeight:700}}>@</button>
         </div>
+      </div>
+
+      <div style={{display:'flex',gap:2,padding:'4px 8px',borderBottom:'1px solid var(--border)'}}>
+        {MODES.map(m => (
+          <button key={m.key} className={'btn-ghost' + (mode === m.key ? ' active-mode' : '')}
+            style={{flex:1,fontSize:11,padding:'2px 4px',borderRadius:4}}
+            onClick={() => setMode(m.key)}>{m.label}</button>
+        ))}
       </div>
 
       {dmSearch !== '' && (
@@ -93,6 +138,10 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
           <input className="input-field" placeholder="Group name..." value={newChatName}
             onChange={e => setNewChatName(e.target.value)} autoFocus
             onKeyDown={e => e.key === 'Enter' && handleCreate()} />
+          <label style={{display:'flex',alignItems:'center',gap:6,marginTop:6,fontSize:12,cursor:'pointer'}}>
+            <input type="checkbox" checked={newChatPublic} onChange={e => setNewChatPublic(e.target.checked)} />
+            Public group
+          </label>
           <div style={{display:'flex',gap:8,marginTop:8}}>
             <button className="btn btn-primary" style={{padding:'4px 12px',fontSize:13}} onClick={handleCreate}>Create</button>
             <button className="btn-ghost" style={{fontSize:13}} onClick={() => setShowCreate(false)}>Cancel</button>
@@ -101,18 +150,42 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       )}
 
       <div className="sidebar-body">
+        <div style={{padding:'4px 12px',cursor:'pointer',display:'flex',alignItems:'center',gap:4}}
+          onClick={loadPublic}>
+          <span style={{fontSize:12,color:'var(--text-muted)',flex:1}}>PUBLIC GROUPS</span>
+          <span style={{fontSize:14,color:'var(--text-muted)'}}>{showPublic ? '▾' : '▸'}</span>
+        </div>
+
+        {showPublic && publicChats.map(c => {
+          const memberCount = c.members?.length || 0;
+          return (
+            <div key={c.id} className="chat-item" onClick={() => handleJoinPublic(c.id)}>
+              <div className="chat-item-avatar" style={{background:c.icon_color}}>
+                {c.name ? c.name[0].toUpperCase() : '?'}
+              </div>
+              <div className="chat-item-info">
+                <div className="chat-item-name">{c.name}</div>
+                <div className="chat-item-preview">{memberCount} member{memberCount !== 1 ? 's' : ''}</div>
+              </div>
+            </div>
+          );
+        })}
+
         {chats.map(c => {
           const name = c.type === 'dm' ? getDMName(c, user.id) : c.name;
           const avatar = c.type === 'dm' ? (c.members?.find(m => m.id !== user.id)?.avatar_color || c.icon_color) : c.icon_color;
           const unread = c.unread_count || 0;
           return (
-            <div key={c.id} className={'chat-item' + (c.id === activeId ? ' active' : '')}
+            <div key={c.id} className={'chat-item' + (c.id === activeId ? ' active' : '') + (c.pinned ? ' pinned' : '')}
               onClick={() => onSelectChat(c.id)}>
               <div className="chat-item-avatar" style={{background:avatar}}>
                 {name ? name[0].toUpperCase() : '?'}
               </div>
               <div className="chat-item-info">
-                <div className="chat-item-name">{name || getDMName(c, user.id)}</div>
+                <div className="chat-item-name">
+                  {name || getDMName(c, user.id)}
+                  {c.visibility === 'public' && <span className="public-badge">public</span>}
+                </div>
                 <div className="chat-item-preview">
                   {c.last_message ? (c.last_message.deleted ? '(message deleted)' : c.last_message.author?.username + ': ' + c.last_message.content) : ''}
                 </div>
@@ -120,6 +193,11 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
               <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:2}}>
                 <div className="chat-item-time">{timeAgo(c.last_message_at)}</div>
                 {unread > 0 && <div className="unread-badge">{unread}</div>}
+                <button className="btn-ghost pin-btn" title={c.pinned ? 'Unpin' : 'Pin'}
+                  onClick={(e) => handlePin(e, c.id, c.pinned)}
+                  style={{fontSize:12,color:'var(--text-muted)',padding:'0 4px'}}>
+                  {c.pinned ? '📌' : '📌'}
+                </button>
               </div>
             </div>
           );

@@ -40,15 +40,17 @@ type Envelope struct {
 }
 
 type Hub struct {
-	mu      sync.RWMutex
-	clients map[string]map[*Client]struct{}
-	db      *db.DB
+	mu         sync.RWMutex
+	clients    map[string]map[*Client]struct{}
+	sseClients map[string][]chan []byte
+	db         *db.DB
 }
 
 func NewHub(database *db.DB) *Hub {
 	return &Hub{
-		clients: make(map[string]map[*Client]struct{}),
-		db:      database,
+		clients:    make(map[string]map[*Client]struct{}),
+		sseClients: make(map[string][]chan []byte),
+		db:         database,
 	}
 }
 
@@ -130,6 +132,8 @@ func (h *Hub) sendToUser(userID string, env Envelope) {
 	for _, c := range h.snapshotForUser(userID) {
 		c.queue(env)
 	}
+	b, _ := json.Marshal(env)
+	h.sseSend(userID, b)
 }
 
 func (h *Hub) sendToChat(chatID string, env Envelope, exceptUser string) {
@@ -141,17 +145,15 @@ func (h *Hub) sendToChat(chatID string, env Envelope, exceptUser string) {
 		log.Printf("ws: failed to load members for chat %s: %v", chatID, err)
 		return
 	}
+	b, _ := json.Marshal(env)
 	for _, m := range members {
 		if m.ID == exceptUser {
 			continue
 		}
 		for _, c := range h.snapshotForUser(m.ID) {
-			if c.subscribed(chatID) {
-				c.queue(env)
-			} else {
-				c.queue(env)
-			}
+			c.queue(env)
 		}
+		h.sseSend(m.ID, b)
 	}
 }
 
@@ -235,6 +237,20 @@ func (h *Hub) BroadcastUserUpdate(u *models.User) {
 	for _, c := range all {
 		c.queue(env)
 	}
+	b, _ := json.Marshal(env)
+	h.sendToAllSSE(b)
+}
+
+func (h *Hub) sendToAllSSE(b []byte) {
+	h.mu.RLock()
+	userIDs := make([]string, 0, len(h.sseClients))
+	for uid := range h.sseClients {
+		userIDs = append(userIDs, uid)
+	}
+	h.mu.RUnlock()
+	for _, uid := range userIDs {
+		h.sseSend(uid, b)
+	}
 }
 
 func (h *Hub) broadcastPresence(userID, status string) {
@@ -252,6 +268,8 @@ func (h *Hub) broadcastPresence(userID, status string) {
 	for _, c := range all {
 		c.queue(env)
 	}
+	b, _ := json.Marshal(env)
+	h.sendToAllSSE(b)
 }
 
 func (h *Hub) BroadcastTyping(chatID, userID string) {
@@ -260,4 +278,28 @@ func (h *Hub) BroadcastTyping(chatID, userID string) {
 		"user_id":   userID,
 		"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
 	}), userID)
+}
+
+func (h *Hub) SSERegister(userID string, ch chan []byte) {
+	h.mu.Lock()
+	h.sseClients[userID] = append(h.sseClients[userID], ch)
+	h.mu.Unlock()
+}
+
+func (h *Hub) SSEUnregister(userID string) {
+	h.mu.Lock()
+	delete(h.sseClients, userID)
+	h.mu.Unlock()
+}
+
+func (h *Hub) sseSend(userID string, data []byte) {
+	h.mu.RLock()
+	chs := h.sseClients[userID]
+	h.mu.RUnlock()
+	for _, ch := range chs {
+		select {
+		case ch <- data:
+		default:
+		}
+	}
 }

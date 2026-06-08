@@ -12,6 +12,10 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+func isDupColumnErr(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "duplicate column name")
+}
+
 //go:embed migrations/*.sql
 var migrationFS embed.FS
 
@@ -57,7 +61,9 @@ func (d *DB) Migrate() error {
 			return fmt.Errorf("read migration %s: %w", n, err)
 		}
 		if _, err := d.ExecContext(context.Background(), string(b)); err != nil {
-			return fmt.Errorf("apply migration %s: %w", n, err)
+			if !(strings.Contains(n, "0002") && isDupColumnErr(err)) {
+				return fmt.Errorf("apply migration %s: %w", n, err)
+			}
 		}
 	}
 	return nil
