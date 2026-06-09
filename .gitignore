@@ -8,3 +8,4 @@ uploads/*
 .env
 *.log
 opencode.sh
+.last_upload_url
