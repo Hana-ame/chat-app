@@ -61,5 +61,12 @@ export const useAuthStore = create((set, get) => {
       storage.clear();
       set({ user: null, accessToken: null, refreshToken: null });
     },
+
+    setUser: (user) => {
+      set({ user });
+      const s = storage.get();
+      s.user = user;
+      storage.set(s);
+    },
   };
 });

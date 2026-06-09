@@ -50,7 +50,9 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
     <div className="msg-group">
       <div className={'msg-row' + (sameAuthor ? ' msg-continuation' : '')}>
         {!sameAuthor && (
-          <div className="msg-avatar" style={{background:author.avatar_color}}>{initials}</div>
+          author.avatar_url
+            ? <img src={author.avatar_url} className="msg-avatar-img" alt={author.username} />
+            : <div className="msg-avatar" style={{background:author.avatar_color}}>{initials}</div>
         )}
         <div style={{flex:1,minWidth:0}}>
           {!sameAuthor && (

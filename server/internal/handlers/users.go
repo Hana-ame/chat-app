@@ -11,6 +11,7 @@ import (
 type updateProfileReq struct {
 	Username    string `json:"username"`
 	AvatarColor string `json:"avatar_color"`
+	AvatarURL   string `json:"avatar_url"`
 }
 
 func (s *Server) UpdateMe(w http.ResponseWriter, r *http.Request) {
@@ -35,10 +36,14 @@ func (s *Server) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	if req.AvatarColor == "" {
 		req.AvatarColor = u.AvatarColor
 	}
-	updated, err := s.DB.UpdateUserProfile(r.Context(), u.ID, name, req.AvatarColor)
+	updated, err := s.DB.UpdateUserProfile(r.Context(), u.ID, name, req.AvatarColor, req.AvatarURL)
 	if err != nil {
 		if errors.Is(err, db.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "not_found", "user disappeared")
+			return
+		}
+		if errors.Is(err, db.ErrConflict) {
+			writeError(w, http.StatusConflict, "username_taken", "username already taken")
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())

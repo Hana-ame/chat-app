@@ -177,7 +177,7 @@ func (d *DB) GetChat(ctx context.Context, id string) (*models.Chat, error) {
 
 func (d *DB) GetChatMembers(ctx context.Context, chatID string) ([]models.User, error) {
 	rows, err := d.QueryContext(ctx,
-		`SELECT u.id, u.username, u.avatar_color, u.status, u.created_at
+		`SELECT u.id, u.username, u.avatar_color, u.avatar_url, u.status, u.created_at
 		 FROM chat_members cm JOIN users u ON u.id = cm.user_id
 		 WHERE cm.chat_id = ?
 		 ORDER BY u.username`,
@@ -191,7 +191,7 @@ func (d *DB) GetChatMembers(ctx context.Context, chatID string) ([]models.User, 
 	for rows.Next() {
 		var u models.User
 		var created string
-		if err := rows.Scan(&u.ID, &u.Username, &u.AvatarColor, &u.Status, &created); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.AvatarColor, &u.AvatarURL, &u.Status, &created); err != nil {
 			return nil, err
 		}
 		u.CreatedAt = parseTime(created)

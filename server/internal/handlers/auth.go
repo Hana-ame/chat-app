@@ -54,7 +54,7 @@ func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
 	u, err := s.DB.CreateUser(r.Context(), email, username, hash)
 	if err != nil {
 		if errors.Is(err, db.ErrConflict) {
-			writeError(w, http.StatusConflict, "email_taken", "email already registered")
+			writeError(w, http.StatusConflict, "already_taken", "email or username already taken")
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())

@@ -162,6 +162,20 @@ button { cursor: pointer; border: none; }
 .context-menu-item.danger { color: var(--danger); }
 .context-menu-item.danger:hover { background: rgba(218,55,60,0.1); }
 
+.user-avatar-img {
+  width:32px; height:32px; border-radius:50%; object-fit:cover; flex-shrink:0;
+}
+.settings-avatar-img {
+  width:80px; height:80px; border-radius:50%; object-fit:cover;
+}
+.settings-avatar-placeholder {
+  width:80px; height:80px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-weight:700; color:#fff; font-size:32px; cursor:pointer;
+}
+.msg-avatar-img {
+  width:40px; height:40px; border-radius:50%; object-fit:cover; flex-shrink:0;
+}
+
 .input-field {
   width:100%; background: var(--bg-tertiary); color: var(--text-primary);
   border: 1px solid var(--border); border-radius: var(--radius);

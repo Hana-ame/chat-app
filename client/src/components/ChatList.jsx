@@ -38,6 +38,9 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const [showPublic, setShowPublic] = useState(false);
   const [publicChats, setPublicChats] = useState([]);
   const [contextMenu, setContextMenu] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsName, setSettingsName] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -119,6 +122,22 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     setContextMenu(null);
   };
 
+  const handleSaveSettings = async () => {
+    setSaving(true);
+    try {
+      const payload = { username: settingsName };
+      const file = document.getElementById('avatar-file-input')?.files?.[0];
+      if (file) {
+        const data = await api.uploadAvatar(accessToken, file);
+        payload.avatar_url = data.url;
+      }
+      const updated = await api.updateProfile(accessToken, payload);
+      useAuthStore.getState().setUser(updated);
+      setShowSettings(false);
+    } catch (e) { alert(e.message); }
+    setSaving(false);
+  };
+
   const isOnline = (uid) => onlineUserIds.includes(uid);
 
   return (
@@ -146,7 +165,10 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
           {dmResults.map(u => (
             <div key={u.id} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0',cursor:'pointer'}}
               onClick={() => { setDmUserId(u.id); handleDM(); }}>
-              <span className="msg-avatar" style={{width:32,height:32,fontSize:12,background:u.avatar_color}}>{u.username[0]}</span>
+              {u.avatar_url
+                ? <img src={u.avatar_url} style={{width:32,height:32,borderRadius:'50%',objectFit:'cover',flexShrink:0}} alt={u.username} />
+                : <span className="msg-avatar" style={{width:32,height:32,fontSize:12,background:u.avatar_color}}>{u.username[0]}</span>
+              }
               <span>{u.username}</span>
             </div>
           ))}
@@ -241,16 +263,51 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       <div className="sidebar-footer">
         <div style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}}
           onClick={() => setShowProfile(!showProfile)}>
-          <div className="chat-item-avatar" style={{width:32,height:32,fontSize:13,background:user.avatar_color}}>
-            {user.username[0].toUpperCase()}
-          </div>
+          {user.avatar_url
+            ? <img src={user.avatar_url} className="user-avatar-img" alt="" />
+            : <div className="chat-item-avatar" style={{width:32,height:32,fontSize:13,background:user.avatar_color}}>
+                {user.username[0].toUpperCase()}
+              </div>
+          }
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:14,fontWeight:600}}>{user.username}</div>
             <div style={{fontSize:11,color:'var(--text-muted)'}}>Online</div>
           </div>
+          <button className="btn-ghost" onClick={(e)=>{e.stopPropagation(); setShowSettings(true); setSettingsName(user.username);}} title="Settings">⚙</button>
           <button className="btn-ghost" onClick={(e)=>{e.stopPropagation();onLogout();}}>↪</button>
         </div>
       </div>
+
+      {showSettings && (
+        <div className="modal-overlay" onClick={() => setShowSettings(false)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 style={{fontSize:18}}>Settings</h3>
+              <button className="btn-ghost" onClick={() => setShowSettings(false)}>✕</button>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:12,marginBottom:16}}>
+              {user.avatar_url
+                ? <img src={user.avatar_url} className="settings-avatar-img" alt="" onClick={() => document.getElementById('avatar-file-input')?.click()} style={{cursor:'pointer'}} />
+                : <div className="settings-avatar-placeholder" style={{background:user.avatar_color}}
+                    onClick={() => document.getElementById('avatar-file-input')?.click()}>
+                    {user.username[0].toUpperCase()}
+                  </div>
+              }
+              <div style={{fontSize:12,color:'var(--text-muted)'}}>Click to upload</div>
+              <input id="avatar-file-input" type="file" accept="image/*" style={{display:'none'}} />
+            </div>
+            <label className="form-label">Display Name</label>
+            <input className="input-field" value={settingsName} onChange={e => setSettingsName(e.target.value)}
+              maxLength={32} autoFocus onKeyDown={e => e.key === 'Enter' && handleSaveSettings()} />
+            <div style={{display:'flex',gap:8,marginTop:16,justifyContent:'flex-end'}}>
+              <button className="btn-ghost" onClick={() => setShowSettings(false)}>Cancel</button>
+              <button className="btn btn-primary" style={{padding:'8px 16px',fontSize:13}} onClick={handleSaveSettings} disabled={saving || !settingsName.trim()}>
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

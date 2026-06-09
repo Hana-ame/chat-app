@@ -90,9 +90,9 @@ func (d *DB) GetUserByID(ctx context.Context, id string) (*models.User, error) {
 		createdAt string
 	)
 	err := d.QueryRowContext(ctx,
-		`SELECT id, email, username, avatar_color, status, created_at FROM users WHERE id = ?`,
+		`SELECT id, email, username, avatar_color, avatar_url, status, created_at FROM users WHERE id = ?`,
 		id,
-	).Scan(&u.ID, &u.Email, &u.Username, &u.AvatarColor, &u.Status, &createdAt)
+	).Scan(&u.ID, &u.Email, &u.Username, &u.AvatarColor, &u.AvatarURL, &u.Status, &createdAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -111,9 +111,9 @@ func (d *DB) GetUserByEmail(ctx context.Context, email string) (*models.User, st
 		createdAt string
 	)
 	err := d.QueryRowContext(ctx,
-		`SELECT id, email, username, avatar_color, status, created_at, password_hash FROM users WHERE email = ?`,
+		`SELECT id, email, username, avatar_color, avatar_url, status, created_at, password_hash FROM users WHERE email = ?`,
 		email,
-	).Scan(&u.ID, &u.Email, &u.Username, &u.AvatarColor, &u.Status, &createdAt, &pwHash)
+	).Scan(&u.ID, &u.Email, &u.Username, &u.AvatarColor, &u.AvatarURL, &u.Status, &createdAt, &pwHash)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, "", ErrNotFound
 	}
@@ -124,7 +124,7 @@ func (d *DB) GetUserByEmail(ctx context.Context, email string) (*models.User, st
 	return &u, pwHash, nil
 }
 
-func (d *DB) UpdateUserProfile(ctx context.Context, id, username, avatarColor string) (*models.User, error) {
+func (d *DB) UpdateUserProfile(ctx context.Context, id, username, avatarColor, avatarURL string) (*models.User, error) {
 	username = strings.TrimSpace(username)
 	if username == "" {
 		return nil, errors.New("username required")
@@ -133,10 +133,13 @@ func (d *DB) UpdateUserProfile(ctx context.Context, id, username, avatarColor st
 		avatarColor = PickColor(username)
 	}
 	_, err := d.ExecContext(ctx,
-		`UPDATE users SET username = ?, avatar_color = ? WHERE id = ?`,
-		username, avatarColor, id,
+		`UPDATE users SET username = ?, avatar_color = ?, avatar_url = ? WHERE id = ?`,
+		username, avatarColor, avatarURL, id,
 	)
 	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE") {
+			return nil, ErrConflict
+		}
 		return nil, err
 	}
 	return d.GetUserByID(ctx, id)
@@ -153,7 +156,7 @@ func (d *DB) SearchUsers(ctx context.Context, query string, limit int) ([]models
 	}
 	query = strings.TrimSpace(query)
 	rows, err := d.QueryContext(ctx,
-		`SELECT id, username, avatar_color, status, created_at FROM users
+		`SELECT id, username, avatar_color, avatar_url, status, created_at FROM users
 		 WHERE username LIKE ? OR email LIKE ?
 		 ORDER BY username LIMIT ?`,
 		"%"+query+"%", "%"+strings.ToLower(query)+"%", limit,
@@ -166,7 +169,7 @@ func (d *DB) SearchUsers(ctx context.Context, query string, limit int) ([]models
 	for rows.Next() {
 		var u models.User
 		var createdAt string
-		if err := rows.Scan(&u.ID, &u.Username, &u.AvatarColor, &u.Status, &createdAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.AvatarColor, &u.AvatarURL, &u.Status, &createdAt); err != nil {
 			return nil, err
 		}
 		u.CreatedAt = parseTime(createdAt)

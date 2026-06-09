@@ -62,10 +62,13 @@ export default function MemberPanel({ chatId }) {
           ))}
         </div>
       )}
-      {members.map(m => (
-        <div key={m.id} style={{display:'flex',alignItems:'center',gap:8,padding:'4px 0',fontSize:14}}>
-          <span className={'status-dot ' + (isOnline(m.id) ? 'online' : 'offline')} />
-          <div className="msg-avatar" style={{width:28,height:28,fontSize:11,background:m.avatar_color}}>{m.username[0]}</div>
+{members.map(m => (
+          <div key={m.id} style={{display:'flex',alignItems:'center',gap:8,padding:'4px 0',fontSize:14}}>
+            <span className={'status-dot ' + (isOnline(m.id) ? 'online' : 'offline')} />
+            {m.avatar_url
+              ? <img src={m.avatar_url} style={{width:28,height:28,borderRadius:'50%',objectFit:'cover',flexShrink:0}} alt={m.username} />
+              : <div className="msg-avatar" style={{width:28,height:28,fontSize:11,background:m.avatar_color}}>{m.username[0]}</div>
+            }
           <span style={{flex:1}}>{m.username}</span>
           {chat?.owner_id === user.id && m.id !== user.id && chat?.type !== 'dm' && (
             <button className="btn-ghost" style={{fontSize:12}} onClick={() => removeUser(m.id)}>×</button>

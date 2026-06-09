@@ -215,7 +215,7 @@ func TestUnreadCount(t *testing.T) {
 func TestUpdateUserProfile(t *testing.T) {
 	f := testutil.New(t)
 	a, _ := f.DB.CreateUser(f.Ctx(), "prof@x.com", "OldName", "pw00000000")
-	u, err := f.DB.UpdateUserProfile(f.Ctx(), a.ID, "NewName", "#FF0000")
+	u, err := f.DB.UpdateUserProfile(f.Ctx(), a.ID, "NewName", "#FF0000", "")
 	if err != nil {
 		t.Fatal(err)
 	}

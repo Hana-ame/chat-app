@@ -86,4 +86,17 @@ export const api = {
   pinChat: (token, chatId) => request('POST', '/api/chats/' + chatId + '/pin', token),
   unpinChat: (token, chatId) => request('POST', '/api/chats/' + chatId + '/unpin', token),
   sseUrl: (token) => API_BASE + '/api/events?access_token=' + encodeURIComponent(token),
+
+  uploadAvatar: async (token, file) => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(API_BASE + '/api/uploads', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: form,
+    });
+    if (!res.ok) throw { status: res.status, message: 'Upload failed' };
+    const data = await res.json();
+    return { url: API_BASE + data.url };
+  },
 };
