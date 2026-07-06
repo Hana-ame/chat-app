@@ -64,6 +64,8 @@ cd client && npx playwright test
 
 **每次改代码必须同步更新相关 README 文档。** 包括新增功能、改 API、修 bug、改结构等。
 
+**每次 docs/ 有增删改必须同步更新 `docs/README.md` 目录。**
+
 ## 搜索栏行为
 
 - 单输入框搜索

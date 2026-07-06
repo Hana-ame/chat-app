@@ -169,7 +169,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       <div className="sidebar-header">
         <h3 style={{fontSize:15,fontWeight:700}}>WebChat</h3>
         <div style={{display:'flex',gap:4}}>
-          <button className="btn-ghost" title="Create Group" onClick={() => setShowCreate(true)}>+</button>
+          <button className="btn-ghost" title="Create Group" onClick={() => setShowCreate(v => !v)}>+</button>
           <button className="btn-ghost" title="New DM" onClick={() => searchUser('')} style={{fontWeight:700}}>@</button>
         </div>
       </div>
