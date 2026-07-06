@@ -171,8 +171,8 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       <div className="sidebar-header">
         <h3 style={{fontSize:15,fontWeight:700}}>WebChat</h3>
         <div style={{display:'flex',gap:4,alignItems:'stretch'}}>
-          <button className={'btn-ghost' + (mode === 'ws' ? ' active-mode' : '')} style={{fontSize:10,fontWeight:600,minWidth:34,textAlign:'center'}}
-            onClick={() => setMode(MODES[(MODES.findIndex(m => m.key === mode) + 1) % MODES.length].key)} title={mode.toUpperCase()}>
+          <button className="btn-ghost active-mode" style={{fontSize:9,fontWeight:700,minWidth:34,textAlign:'center',padding:'4px 2px',lineHeight:1.2}}
+            onClick={() => setMode(MODES[(MODES.findIndex(m => m.key === mode) + 1) % MODES.length].key)} title={'Click to switch: ' + ['WS','SSE','Poll'][(['ws','sse','poll'].indexOf(mode)+1)%3]}>
             {mode.toUpperCase()}
           </button>
           <button className={'btn-ghost' + (showCreate ? ' active-mode' : '')} style={{minWidth:34}} title="Create Group" onClick={() => setShowCreate(v => !v)}>+</button>
