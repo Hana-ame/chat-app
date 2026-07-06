@@ -36,6 +36,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const [dmSearch, setDmSearch] = useState('');
   const [dmResults, setDmResults] = useState([]);
   const [showProfile, setShowProfile] = useState(false);
+  const [chatSearch, setChatSearch] = useState('');
   const [showPublic, setShowPublic] = useState(false);
   const [publicChats, setPublicChats] = useState([]);
   const [contextMenu, setContextMenu] = useState(null);
@@ -165,6 +166,12 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
         ))}
       </div>
 
+      <div style={{padding:'4px 8px',borderBottom:'1px solid var(--border)'}}>
+        <input className="input-field" placeholder="Search chats..." value={chatSearch}
+          onChange={e => setChatSearch(e.target.value)}
+          style={{fontSize:12,padding:'4px 8px'}} />
+      </div>
+
       {dmSearch !== '' && (
         <div style={{padding:'8px 12px',borderBottom:'1px solid var(--border)'}}>
           <input className="input-field" placeholder="Search users..." value={dmSearch}
@@ -223,7 +230,12 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
           );
         })}
 
-        {chats.map(c => {
+        {chats.filter(c => {
+          if (!chatSearch.trim()) return true;
+          const q = chatSearch.toLowerCase();
+          const name = c.type === 'dm' ? getDMName(c, user.id) : c.name || '';
+          return name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q);
+        }).map(c => {
           const name = c.type === 'dm' ? getDMName(c, user.id) : c.name;
           const avatar = c.type === 'dm' ? (c.members?.find(m => m.id !== user.id)?.avatar_color || c.icon_color) : c.icon_color;
           const unread = c.unread_count || 0;
