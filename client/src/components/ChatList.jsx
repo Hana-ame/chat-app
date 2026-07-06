@@ -188,15 +188,21 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
 
 
       <div style={{padding:'4px 8px',borderBottom:'1px solid var(--border)'}}>
-        <input className="input-field" placeholder="Search chats or public channels..." value={chatSearch}
+        <input className="input-field" placeholder="Search chats..." value={chatSearch}
           onChange={e => {
             const v = e.target.value;
             setChatSearch(v);
-            if (v.trim()) searchPublic(v);
-            else setPublicResults(null);
+            setPublicResults(null);
           }}
           style={{fontSize:14,padding:'8px 10px'}} />
-        {joinAction && (
+        {chatSearch.trim() && publicResults === null && (
+          <div style={{display:'flex',gap:6,marginTop:6}}>
+            <button className="btn" style={{flex:1,padding:'8px 12px',fontSize:14,background:'var(--accent)',color:'#fff',borderRadius:'var(--radius)'}}
+              onClick={() => searchPublic(chatSearch.trim())}>
+              🔍 Search &ldquo;{chatSearch.trim()}&rdquo; in public channels
+            </button>
+          </div>
+        )}
           <div style={{display:'flex',gap:6,marginTop:6}}>
             {joinAction === 'join' && (
               <button className="btn" style={{flex:1,padding:'8px 12px',fontSize:14,background:'var(--accent)',color:'#fff',borderRadius:'var(--radius)'}}

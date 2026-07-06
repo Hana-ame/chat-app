@@ -62,7 +62,11 @@ export default function MemberPanel({ chatId }) {
           ))}
         </div>
       )}
-{members.map(m => (
+      {[...members].sort((a, b) => {
+        const oa = onlineUserIds.includes(a.id) ? 0 : 1;
+        const ob = onlineUserIds.includes(b.id) ? 0 : 1;
+        return oa - ob;
+      }).map(m => (
           <div key={m.id} style={{display:'flex',alignItems:'center',gap:8,padding:'4px 0',fontSize:14}}>
             <span className={'status-dot ' + (isOnline(m.id) ? 'online' : 'offline')} />
             {m.avatar_url
