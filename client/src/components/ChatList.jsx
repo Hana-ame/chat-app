@@ -33,6 +33,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const [newChatName, setNewChatName] = useState('');
   const [newChatVisibility, setNewChatVisibility] = useState('private');
   const [dmUserId, setDmUserId] = useState('');
+  const [showDmSearch, setShowDmSearch] = useState(false);
   const [dmSearch, setDmSearch] = useState('');
   const [dmResults, setDmResults] = useState([]);
   const [showProfile, setShowProfile] = useState(false);
@@ -74,6 +75,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       setDmUserId('');
       setDmSearch('');
       setDmResults([]);
+      setShowDmSearch(false);
       onSelectChat(data.id);
     } catch (e) { alert(e.message); }
   };
@@ -169,8 +171,8 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       <div className="sidebar-header">
         <h3 style={{fontSize:15,fontWeight:700}}>WebChat</h3>
         <div style={{display:'flex',gap:4}}>
-          <button className="btn-ghost" title="Create Group" onClick={() => setShowCreate(v => !v)}>+</button>
-          <button className="btn-ghost" title="New DM" onClick={() => searchUser('')} style={{fontWeight:700}}>@</button>
+          <button className={'btn-ghost' + (showCreate ? ' active-mode' : '')} title="Create Group" onClick={() => setShowCreate(v => !v)}>+</button>
+          <button className={'btn-ghost' + (showDmSearch ? ' active-mode' : '')} title="New DM" onClick={() => { setShowDmSearch(v => !v); if (!showDmSearch) { setDmSearch(''); setDmResults([]); } }} style={{fontWeight:700}}>@</button>
         </div>
       </div>
 
@@ -209,7 +211,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
         )}
       </div>
 
-      {dmSearch !== '' && (
+      {showDmSearch && (
         <div style={{padding:'8px 12px',borderBottom:'1px solid var(--border)'}}>
           <input className="input-field" placeholder="Search users..." value={dmSearch}
             onChange={e => searchUser(e.target.value)} autoFocus />
