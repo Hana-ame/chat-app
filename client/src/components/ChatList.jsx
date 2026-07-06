@@ -177,11 +177,10 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       </div>
 
       <div style={{display:'flex',gap:2,padding:'4px 8px',borderBottom:'1px solid var(--border)'}}>
-        {MODES.map(m => (
-          <button key={m.key} className={'btn-ghost' + (mode === m.key ? ' active-mode' : '')}
-            style={{flex:1,fontSize:11,padding:'2px 4px',borderRadius:4}}
-            onClick={() => setMode(m.key)}>{m.label}</button>
-        ))}
+        <button className="btn-ghost active-mode" style={{flex:1,fontSize:11,padding:'2px 4px',borderRadius:4}}
+          onClick={() => setMode(MODES[(MODES.findIndex(m => m.key === mode) + 1) % MODES.length].key)}>
+          📡 {mode.toUpperCase()}
+        </button>
       </div>
 
       <div style={{padding:'4px 8px',borderBottom:'1px solid var(--border)'}}>
