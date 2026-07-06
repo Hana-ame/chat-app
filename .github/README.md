@@ -73,10 +73,28 @@ mv chatd-windows-amd64.exe release/chatd-windows-amd64.exe
 ## 最终成功
 
 ```
+## 4. `gh release create` 返回 403
+
+**现象**：`HTTP 403: Resource not accessible by integration`
+
+**原因**：默认 `GITHUB_TOKEN` 没有 `contents: write` 权限。
+
+**解决**：在 release job 上显式声明权限：
+
+```yaml
+release:
+  permissions:
+    contents: write
+```
+
+## 最终
+
+```
 go-test        ✅
 frontend-build ✅
 go-build (linux/amd64)   ✅
 go-build (linux/arm64)   ✅
 go-build (windows/amd64) ✅
-release        ✅
+release        ✅ → GitHub Release 自动创建，三个二进制已上传
+```
 ```
