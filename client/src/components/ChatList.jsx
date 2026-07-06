@@ -203,6 +203,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
             </button>
           </div>
         )}
+        {joinAction && (
           <div style={{display:'flex',gap:6,marginTop:6}}>
             {joinAction === 'join' && (
               <button className="btn" style={{flex:1,padding:'8px 12px',fontSize:14,background:'var(--accent)',color:'#fff',borderRadius:'var(--radius)'}}
@@ -218,7 +219,6 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
             )}
           </div>
         )}
-      </div>
 
       {showDmSearch && (
         <div style={{padding:'8px 12px',borderBottom:'1px solid var(--border)'}}>
@@ -326,7 +326,8 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
                         : <button className="context-menu-item" onClick={(e) => handlePin(e, c.id, false)}>Pin</button>}
                       {c.owner_id === user.id && (
                         <button className="context-menu-item danger" onClick={(e) => handleDeleteChat(e, c.id)}>Delete</button>
-                      )}
+        )}
+      </div>
                     </div>
                   )}
                 </div>
