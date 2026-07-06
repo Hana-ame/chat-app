@@ -348,5 +348,6 @@ export function generateDummyData({ chatCount = 10, msgPerChat = 100 } = {}) {
   }
 
   const activeChatId = chats[1]?.id;
-  return { chats, messages: allMessages, activeChatId };
+  const onlineUserIds = USERS.filter(u => u.id !== 'dev-self').map(u => u.id);
+  return { chats, messages: allMessages, activeChatId, onlineUserIds };
 }
