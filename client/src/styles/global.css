@@ -91,6 +91,9 @@ button { cursor: pointer; border: none; }
 .msg-content { line-height: 1.45; word-break: break-word; color: var(--text-primary); }
 .msg-content p { margin: 0; }
 .msg-content code { background: var(--bg-tertiary); padding: 1px 4px; border-radius: 3px; font-size: 13px; }
+.msg-content .msg-inline-img { max-width: 100%; border: none; outline: none; border-radius: 4px; }
+.stream-cursor { display: inline-block; width: 2px; height: 1em; background: var(--text-primary); margin-left: 1px; vertical-align: text-bottom; animation: blink 1s step-end infinite; }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 .msg-actions { display:none; gap:4px; position:absolute; bottom:-22px; left:52px; z-index:5; background:var(--bg-primary); padding:2px 6px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.3); }
 .msg-group:hover .msg-actions { display:flex; }
 .msg-btn {

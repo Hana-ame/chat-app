@@ -267,6 +267,29 @@ export const useChatStore = create((set, get) => ({
     await api.sendMessage(token, chatId, content, attachments);
   },
 
+  finishStreaming(msgId) {
+    set(s => ({
+      messages: s.messages.map(m => m.id === msgId ? { ...m, streaming: false } : m),
+    }));
+  },
+
+  startStreamingInChat(chatId, content) {
+    const msg = {
+      id: 'stream-' + Date.now(),
+      chat_id: chatId,
+      content,
+      user_id: 'ai',
+      author: { id: 'ai', username: 'AI Bot', avatar_color: '#10a37f' },
+      created_at: new Date().toISOString(),
+      streaming: true,
+      deleted: false,
+      attachments: [],
+      reactions: [],
+    };
+    set(s => ({ messages: [...s.messages, msg] }));
+    return msg.id;
+  },
+
   async sendTyping(chatId) {
     const ws = get().ws;
     if (ws && ws.readyState === WebSocket.OPEN) {

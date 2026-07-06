@@ -5,7 +5,7 @@ import { api } from '../api/client';
 
 export default function Composer({ chatId }) {
   const { accessToken } = useAuthStore();
-  const { sendMessage, sendTyping } = useChatStore();
+  const { sendMessage, sendTyping, startStreamingInChat } = useChatStore();
   const [text, setText] = useState('');
   const [uploading, setUploading] = useState(false);
   const [attachments, setAttachments] = useState([]);
@@ -71,6 +71,7 @@ export default function Composer({ chatId }) {
         <div style={{display:'flex',gap:4,marginTop:6,alignItems:'center'}}>
           <input type="file" ref={fileInput} onChange={handleFile} style={{display:'none'}} multiple />
           <button className="btn-ghost" style={{fontSize:18}} onClick={() => fileInput.current?.click()} title="Attach file">📎</button>
+          <button className="btn-ghost" style={{fontSize:18}} onClick={() => startStreamingInChat(chatId, text.trim() || 'Hello! This is a streaming message that types out slowly. You can see each character appearing one by one. ✨')} title="AI stream test">🤖</button>
           <button className="btn-ghost" style={{fontSize:13}} disabled={(!text.trim() && attachments.length === 0) || uploading}
             onClick={handleSend}>{uploading ? 'Uploading...' : 'Send'}</button>
         </div>

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const COMMON_EMOJI = ['👍','❤️','😂','🎉','😢','😡','👀','🔥','✅','❌'];
 
@@ -19,8 +20,29 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(msg.content);
 
+  const chatStore = useChatStore();
   const author = msg.author || { username: 'Unknown', avatar_color: '#5865F2', id: msg.user_id };
   const initials = author.username ? author.username[0].toUpperCase() : '?';
+  const [visibleLen, setVisibleLen] = useState(0);
+  const streamingRef = useRef(null);
+
+  useEffect(() => {
+    if (!msg.streaming) return;
+    setVisibleLen(0);
+    const speed = Math.max(20, Math.min(80, 4000 / msg.content.length));
+    streamingRef.current = setInterval(() => {
+      setVisibleLen(prev => {
+        if (prev >= msg.content.length) {
+          clearInterval(streamingRef.current);
+          streamingRef.current = null;
+          chatStore.finishStreaming(msg.id);
+          return msg.content.length;
+        }
+        return prev + 1;
+      });
+    }, speed);
+    return () => { if (streamingRef.current) clearInterval(streamingRef.current); };
+  }, [msg.streaming, msg.content, msg.id]);
 
   const handleReaction = async (emoji) => {
     const has = msg.reactions?.find(r => r.emoji === emoji && r.me);
@@ -71,9 +93,26 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
               <button className="btn btn-primary" style={{padding:'4px 12px',fontSize:12}} onClick={handleEdit}>Save</button>
               <button className="btn-ghost" style={{fontSize:12}} onClick={()=>setEditing(false)}>Cancel</button>
             </div>
+          ) : msg.streaming ? (
+            <div className="msg-content" style={{whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
+              {msg.content.slice(0, visibleLen)}
+              <span className="stream-cursor" />
+            </div>
           ) : (
             <div className="msg-content">
-              <ReactMarkdown>{msg.content}</ReactMarkdown>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  a: ({ href, children }) =>
+                    <a href={href} target="_blank" rel="noreferrer">{children}</a>,
+                  img: ({ src, alt }) =>
+                    <img src={src} alt={alt} className="msg-inline-img" loading="lazy" />,
+                  h1: 'p', h2: 'p', h3: 'p', h4: 'p', h5: 'p', h6: 'p',
+                  blockquote: 'p',
+                  table: ({ children }) => <>{children}</>,
+                  input: () => null,
+                }}
+              >{msg.content}</ReactMarkdown>
             </div>
           )}
           {msg.attachments?.map(a => (
