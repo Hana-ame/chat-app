@@ -140,7 +140,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   };
 
   const handleGenerateDummy = () => {
-    const data = generateDummyData({ chatCount: 5, msgPerChat: 40 });
+    const data = generateDummyData({ chatCount: 10, msgPerChat: 100 });
     useChatStore.setState(data);
     if (data.chats[0]) onSelectChat(data.chats[0].id);
   };

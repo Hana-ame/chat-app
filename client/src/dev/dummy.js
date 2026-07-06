@@ -1,8 +1,12 @@
 const ME = { id: 'dev-self', username: 'Alice', avatar_color: '#5865F2' };
-const BOB = { id: 'dev-bob', username: 'Bob', avatar_color: '#23a559' };
-const CAROL = { id: 'dev-carol', username: 'Carol', avatar_color: '#f0b232' };
-
-const USERS = [ME, BOB, CAROL];
+const USERS = [
+  ME,
+  { id: 'dev-bob', username: 'Bob', avatar_color: '#23a559' },
+  { id: 'dev-carol', username: 'Carol', avatar_color: '#f0b232' },
+  { id: 'dev-dave', username: 'Dave', avatar_color: '#ed4245' },
+  { id: 'dev-eve', username: 'Eve', avatar_color: '#9b59b6' },
+  { id: 'dev-frank', username: 'Frank', avatar_color: '#1abc9c' },
+];
 
 let seqId = Date.now();
 const id = (t) => `${t}-${seqId++}`;
@@ -11,24 +15,210 @@ function timeAgo(seconds) {
   return new Date(Date.now() - seconds * 1000).toISOString();
 }
 
-const MSG_CONTENTS = [
-  'Hey team! How is everyone doing today?',
-  'I just pushed a new feature, check it out 🚀',
-  'Can someone review my PR?',
-  'Sure, I\'ll take a look',
-  'Meeting at 3pm, don\'t be late!',
-  'LGTM 👍',
-  'Can we add dark mode support?',
-  'Already done, check settings',
-  'This is a very long message that goes on and on and should wrap to multiple lines to test text wrapping behavior in the chat view with long unbroken strings or many words repeated over and over again to fill the space.',
-  '# Heading\n\nSome **markdown** with `inline code` and a list:\n- item 1\n- item 2',
-  '```js\nconsole.log("hello world");\n```',
-  '> Blockquote test\n\nContinuing after quote',
-  'Just a simple text message',
-  '**bold** and *italic* and ~~strikethrough~~',
-  '😂😂😂',
-  'Message with an [external link](https://example.com)',
-];
+const GM = { id: 'dev-gm', username: 'System', avatar_color: '#4f545c' };
+
+const GROUP_TOPICS = {
+  General: [
+    ['Hey everyone! How was your weekend?', 'dev-eve'],
+    ['Pretty good, finished a new game', 'dev-bob'],
+    ['Nice! Which one?', 'dev-dave'],
+    ['Elden Ring, finally beat Malenia', 'dev-bob'],
+    ['Wow nice, I\'m still stuck on the fire giant', 'dev-carol'],
+    ['Has anyone tried the new update?', 'dev-frank'],
+    ['Yeah, the UI is much smoother now', 'ME'],
+    ['Can we add more emoji reactions?', 'dev-eve'],
+    ['I\'ll check with the team', 'dev-dave'],
+    ['Sounds great! We need more cat emojis 🐱', 'dev-carol'],
+    ['**bold** and *italic* test here', 'dev-frank'],
+    ['~~strikethrough test~~ works now', 'dev-bob'],
+    ['Here is a code snippet:\n```js\nconst x = 42;\nconsole.log(x);\n```', 'ME'],
+    ['Meeting at 3pm today to discuss the roadmap', 'dev-dave'],
+    ['I\'ll prepare the slides', 'dev-eve'],
+    ['Can someone share the design mockups?', 'dev-frank'],
+    ['Sure, I\'ll upload them', 'dev-carol'],
+    ['LGTM 👍', 'dev-bob'],
+    ['This is a very long message that goes on and on and should wrap to multiple lines to test text wrapping behavior in the chat view with long unbroken strings or many words repeated over and over again to fill up the space properly.', 'dev-eve'],
+    ['Check out this link: https://example.com', 'dev-frank'],
+  ],
+  Random: [
+    ['Did anyone watch the new movie?', 'dev-dave'],
+    ['Yeah it was amazing! The plot twist blew my mind', 'dev-carol'],
+    ['I preferred the original honestly', 'dev-bob'],
+    ['Hot take: the soundtrack carried the whole film', 'dev-frank'],
+    ['Anyone playing the new season?', 'dev-eve'],
+    ['I\'m grinding ranked, almost diamond', 'ME'],
+    ['Nice, add me: Bob#1234', 'dev-bob'],
+    ['I saw a funny meme about that', 'dev-carol'],
+    ['😂😂😂', 'dev-dave'],
+    ['Check this out: **super cool** announcement soon', 'dev-eve'],
+    ['When is the next patch dropping?', 'dev-frank'],
+    ['Probably next Tuesday', 'dev-bob'],
+    ['Another ~~terrible~~ take from Bob', 'dev-carol'],
+    ['How dare you 😂', 'dev-bob'],
+    ['```py\ndef hello():\n    print("hello")\n```', 'dev-dave'],
+    ['I made this, thoughts?', 'dev-frank'],
+    ['Looks clean! Maybe add more comments', 'ME'],
+    ['Will there be pizza at the next event?', 'dev-eve'],
+    ['Always pizza 🍕', 'dev-carol'],
+    ['This is a very long message that goes on and on and should wrap to multiple lines to test text wrapping behavior in the chat view with long unbroken strings or many words repeated over and over again to fill up the space properly.', 'dev-dave'],
+  ],
+  'Dev Team': [
+    ['PR is ready for review: `feat/add-dark-mode`', 'ME'],
+    ['I\'ll take a look after standup', 'dev-bob'],
+    ['Found a bug in the auth flow', 'dev-dave'],
+    ['Can you file an issue?', 'dev-eve'],
+    ['Already did, #142', 'dev-dave'],
+    ['The CI is failing on main', 'dev-frank'],
+    ['Looking into it now', 'dev-bob'],
+    ['It was a missing env var, fixed', 'dev-bob'],
+    ['Ship it 🚀', 'dev-carol'],
+    ['We need to refactor the message store', 'dev-eve'],
+    ['Agreed, it\'s getting bloated', 'ME'],
+    ['I\'ll draft a proposal', 'dev-frank'],
+    ['```go\nfunc main() {\n    fmt.Println("hello")\n}\n```', 'dev-dave'],
+    ['Coverage dropped by 2%, need more tests', 'dev-bob'],
+    ['On it', 'dev-carol'],
+    ['New endpoint: `GET /api/health`', 'dev-frank'],
+    ['Nice, that was on the roadmap', 'dev-eve'],
+    ['~~old approach is deprecated~~', 'dev-bob'],
+    ['Fixed the pagination bug finally', 'dev-dave'],
+    ['*applause*', 'ME'],
+  ],
+  Gaming: [
+    ['Anyone up for Valorant tonight?', 'dev-dave'],
+    ['I\'m in, what rank?', 'dev-bob'],
+    ['Plat 3', 'dev-dave'],
+    ['Nice, I\'m Diamond 1', 'dev-frank'],
+    ['Carry me 😂', 'dev-dave'],
+    ['New map looks sick', 'dev-eve'],
+    ['Have you tried the new agent?', 'dev-carol'],
+    ['Yeah, she\'s OP', 'dev-bob'],
+    ['Nerf incoming for sure', 'ME'],
+    ['GG last night team', 'dev-frank'],
+    ['That clutch round was insane', 'dev-dave'],
+    ['I panicked and somehow won 😂', 'dev-frank'],
+    ['```\nkda: 25/3/10\n```', 'dev-bob'],
+    ['Not bad!', 'dev-carol'],
+    ['When is the tournament?', 'dev-eve'],
+    ['Next Saturday 8pm', 'dev-dave'],
+    ['I\'ll bring snacks', 'dev-carol'],
+    ['**sign me up**', 'ME'],
+    ['~~bot Bob~~ just kidding', 'dev-dave'],
+    ['This is a very long message that goes on and on and should wrap to multiple lines to test text wrapping behavior in the chat view with long unbroken strings or many words repeated over and over again to fill up the space properly.', 'dev-frank'],
+  ],
+  'Music Club': [
+    ['New album dropped today!', 'dev-eve'],
+    ['Which one?', 'dev-carol'],
+    ['The one by that indie band, you know the one', 'dev-eve'],
+    ['Send the link', 'dev-frank'],
+    ['https://example.com/album', 'dev-eve'],
+    ['I\'m more into electronic lately', 'dev-bob'],
+    ['Check out this track: **banger** 🔥', 'dev-dave'],
+    ['Added to my playlist', 'ME'],
+    ['Anyone going to the concert Friday?', 'dev-carol'],
+    ['I have tickets! Section B', 'dev-frank'],
+    ['Lucky! Sold out in 5 minutes', 'dev-eve'],
+    ['I know, I was sweating', 'dev-frank'],
+    ['We should form a band', 'dev-dave'],
+    ['I call drums', 'dev-bob'],
+    ['I\'ll sing ~~badly~~', 'dev-carol'],
+    ['```guitar\nAm  G  C  F\n```', 'dev-dave'],
+    ['What genre?', 'dev-eve'],
+    ['Jazz fusion obviously', 'dev-frank'],
+    ['The new music video is wild', 'dev-bob'],
+    ['The cinematography is **gorgeous**', 'ME'],
+  ],
+  'Movie Night': [
+    ['Suggestions for this week?', 'dev-frank'],
+    ['I heard the new horror movie is good', 'dev-eve'],
+    ['Not a fan of horror', 'dev-carol'],
+    ['How about a classic?', 'dev-bob'],
+    ['We could do a Marvel marathon', 'dev-dave'],
+    ['That\'s 20 hours...', 'dev-carol'],
+    ['Pick the best 3', 'dev-frank'],
+    ['Winter Soldier, Infinity War, No Way Home', 'dev-bob'],
+    ['Good picks!', 'ME'],
+    ['I\'ll bring popcorn 🍿', 'dev-eve'],
+    ['What time Friday?', 'dev-dave'],
+    ['7pm works for me', 'dev-carol'],
+    ['Same', 'dev-bob'],
+    ['~~I can\'t make it~~ actually I can!', 'dev-frank'],
+    ['The ~~sequel was terrible~~', 'dev-eve'],
+    ['Controversial opinion: the original is overrated', 'dev-dave'],
+    ['*gasps*', 'dev-carol'],
+    ['Let\'s vote on the movie', 'ME'],
+    ['I\'ll set up a poll', 'dev-frank'],
+    ['This is a very long message that goes on and on and should wrap to multiple lines to test text wrapping behavior in the chat view with long unbroken strings or many words repeated over and over again to fill up the space properly.', 'dev-dave'],
+  ],
+  'Food & Cooking': [
+    ['Anyone know a good pasta recipe?', 'dev-carol'],
+    ['Carbonara is easy and delicious', 'dev-bob'],
+    ['Send recipe please!', 'dev-carol'],
+    ['```recipe\n- spaghetti 200g\n- eggs 3\n- pancetta 100g\n- pecorino 50g\n- black pepper\n```', 'dev-bob'],
+    ['Mouth is watering 🤤', 'dev-dave'],
+    ['I made ramen from scratch last weekend', 'dev-eve'],
+    ['That\'s impressive', 'dev-frank'],
+    ['Took 6 hours but worth it', 'dev-eve'],
+    ['**best** ramen I\'ve ever had', 'dev-frank'],
+    ['I\'ll stick to instant noodles 😂', 'ME'],
+    ['Nothing wrong with instant', 'dev-carol'],
+    ['Add an egg and some green onions, instant gourmet', 'dev-bob'],
+    ['Pro tip: sesame oil', 'dev-dave'],
+    ['Anyone tried the new Korean place downtown?', 'dev-frank'],
+    ['Yes! The bibimbap is amazing', 'dev-eve'],
+    ['I\'m going there tomorrow', 'dev-carol'],
+    ['Get the fried chicken too', 'dev-bob'],
+    ['~~skip the kimchi~~ EVERYONE GET THE KIMCHI', 'dev-dave'],
+    ['This is a very long message that goes on and on and should wrap to multiple lines to test text wrapping behavior in the chat view with long unbroken strings or many words repeated over and over again to fill up the space properly.', 'dev-frank'],
+    ['Let\'s do a potluck next week!', 'dev-carol'],
+  ],
+  'Travel Pics': [
+    ['Just got back from Japan 🇯🇵', 'dev-eve'],
+    ['Amazing! How was Tokyo?', 'ME'],
+    ['Incredible, the food, the culture, everything', 'dev-eve'],
+    ['Did you visit Kyoto?', 'dev-frank'],
+    ['Yeah, the bamboo forest was magical', 'dev-eve'],
+    ['I\'m planning a trip to Europe next summer', 'dev-dave'],
+    ['Highly recommend Barcelona', 'dev-carol'],
+    ['Paris is overrated tbh', 'dev-bob'],
+    ['**controversial** but true', 'dev-frank'],
+    ['Italy is where it\'s at', 'dev-eve'],
+    ['Rome, Florence, Venice - all stunning', 'dev-carol'],
+    ['I want to go to New Zealand', 'ME'],
+    ['Me too! The landscapes look unreal', 'dev-dave'],
+    ['~~travel is expensive~~ worth every penny', 'dev-bob'],
+    ['Anyone been to Iceland?', 'dev-frank'],
+    ['Yes! Northern lights are breathtaking', 'dev-eve'],
+    ['Adding to my bucket list', 'dev-carol'],
+    ['Let\'s plan a group trip!', 'dev-dave'],
+    ['That would be epic', 'ME'],
+    ['This is a very long message that goes on and on and should wrap to multiple lines to test text wrapping behavior in the chat view with long unbroken strings or many words repeated over and over again to fill up the space properly.', 'dev-frank'],
+  ],
+  'Pet Lovers': [
+    ['Look at my new puppy!', 'dev-carol'],
+    ['So cute! What breed?', 'dev-dave'],
+    ['Golden retriever', 'dev-carol'],
+    ['I have two cats, they\'re siblings', 'dev-eve'],
+    ['Cat tax please 🐱', 'ME'],
+    ['My dog learned a new trick today', 'dev-frank'],
+    ['What trick?', 'dev-bob'],
+    ['Roll over! He\'s so smart', 'dev-frank'],
+    ['~~~smart~~ treat-motivated', 'dev-bob'],
+    ['Aren\'t we all 😂', 'dev-frank'],
+    ['Pets make life better', 'dev-eve'],
+    ['**fact**', 'dev-carol'],
+    ['Anyone else have exotic pets?', 'dev-dave'],
+    ['I have a bearded dragon', 'dev-bob'],
+    ['No way! What\'s its name?', 'dev-dave'],
+    ['Spike', 'dev-bob'],
+    ['Perfect name', 'dev-frank'],
+    ['I\'m thinking of adopting from the shelter', 'ME'],
+    ['Do it! Rescue animals are the best', 'dev-carol'],
+    ['This is a very long message that goes on and on and should wrap to multiple lines to test text wrapping behavior in the chat view with long unbroken strings or many words repeated over and over again to fill up the space properly.', 'dev-eve'],
+  ],
+};
+
+const GROUP_NAMES = Object.keys(GROUP_TOPICS);
 
 const REACTION_EMOJIS = ['👍','❤️','😂','🎉','😢','😡','👀'];
 
@@ -36,38 +226,102 @@ function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-export function generateDummyData({ chatCount = 3, msgPerChat = 30 } = {}) {
+function expandMessages(topicMsgs) {
+  const result = [];
+  for (const [content, userId] of topicMsgs) {
+    const isSystem = userId === 'GM';
+    const replies = Math.random() > 0.7 ? Math.floor(Math.random() * 3) + 1 : 0;
+    result.push({ content, userId, isSystem });
+    for (let r = 0; r < replies; r++) {
+      const replyUser = pick(USERS.filter(u => u.id !== userId));
+      const replyContents = [
+        '+1', 'Agreed!', '😂', '👍', 'Interesting...',
+        'No way!', 'I knew it!', 'totally', '💯',
+        'Can you elaborate?', 'Hmm', 'Sure!', 'Not bad',
+      ];
+      result.push({ content: pick(replyContents), userId: replyUser.id, isSystem: false });
+    }
+  }
+  return result;
+}
+
+export function generateDummyData({ chatCount = 10, msgPerChat = 100 } = {}) {
   const chats = [];
   const allMessages = [];
 
-  const loginTime = Date.now();
+  // DM first
+  const dmChatId = id('chat');
+  const dmMembers = [ME, pick(USERS.filter(u => u.id !== ME.id))];
+  chats.push({
+    id: dmChatId,
+    name: null,
+    type: 'dm',
+    visibility: 'private',
+    pinned: true,
+    members: dmMembers,
+    owner_id: ME.id,
+    created_at: timeAgo(86400 * 10),
+    last_message_at: timeAgo(60),
+    unread_count: 2,
+    last_message: null,
+  });
+  for (let mi = 0; mi < msgPerChat; mi++) {
+    const author = pick(dmMembers);
+    const contents = [
+      'Hey! How are you?', 'Good, you?', 'Busy with work', 'Same here',
+      'Wanna grab lunch?', 'Sure!', 'Meet at 12?', 'Perfect',
+      'Did you see that movie?', 'Not yet', 'We should go', 'Definitely',
+      'I\'ll send you the link', 'Thanks!', '👍', 'Talk later!',
+    ];
+    const isDeleted = mi === 2;
+    const msg = {
+      id: id('msg'),
+      chat_id: dmChatId,
+      content: isDeleted ? '' : pick(contents),
+      user_id: author.id,
+      author: { ...author },
+      created_at: timeAgo((msgPerChat - mi) * 120 + 3600),
+      edited_at: mi === 5 ? timeAgo((msgPerChat - mi) * 120 + 3600) : null,
+      deleted: isDeleted,
+      attachments: [],
+      reactions: mi > 10 && mi % 5 === 0 ? (() => {
+        const set = new Set();
+        for (let i = 0; i < Math.floor(Math.random() * 2); i++) set.add(pick(REACTION_EMOJIS));
+        return [...set].map(e => ({ emoji: e, count: Math.floor(Math.random() * 2) + 1, me: Math.random() > 0.7 }));
+      })() : [],
+    };
+    allMessages.push(msg);
+    if (mi === msgPerChat - 1) chats[0].last_message = msg;
+  }
 
-  for (let ci = 0; ci < chatCount; ci++) {
+  // Group chats
+  for (let ci = 0; ci < chatCount - 1; ci++) {
     const chatId = id('chat');
-    const isDM = ci === 0;
-    const memberCount = isDM ? 2 : [3, 5][ci % 2];
-    const members = USERS.slice(0, Math.min(memberCount, USERS.length));
-    const chatName = isDM ? null : ['General', 'Random', 'Dev Team'][ci % 3];
+    const groupName = GROUP_NAMES[ci % GROUP_NAMES.length];
+    const topicMembers = GROUP_TOPICS[groupName].map(([, uid]) => USERS.find(u => u.id === uid)).filter(Boolean);
+    const members = [...new Map(topicMembers.map(m => [m.id, m])).values()].slice(0, Math.min(topicMembers.length, 6));
+
     const chat = {
       id: chatId,
-      name: chatName,
-      type: isDM ? 'dm' : 'group',
-      visibility: ci === 2 ? 'public' : 'private',
-      pinned: ci === 1,
+      name: groupName,
+      type: 'group',
+      visibility: ci < 3 ? 'private' : 'public',
+      pinned: ci === 0,
       members,
       owner_id: ME.id,
-      created_at: timeAgo(86400 * (ci + 1)),
+      created_at: timeAgo(86400 * (chatCount - ci)),
       last_message_at: timeAgo(60 * (ci + 1)),
-      unread_count: ci === 0 ? 3 : 0,
+      unread_count: ci < 3 ? (ci + 1) * 2 : 0,
       last_message: null,
     };
     chats.push(chat);
 
-    const msgs = [];
-    for (let mi = 0; mi < msgPerChat; mi++) {
-      const author = pick(members);
-      const content = pick(MSG_CONTENTS);
-      const createdAt = timeAgo((msgPerChat - mi) * 120 + ci * 3600);
+    const expandedTopics = expandMessages(GROUP_TOPICS[groupName]);
+    const msgCount = Math.min(expandedTopics.length, msgPerChat);
+    for (let mi = 0; mi < msgCount; mi++) {
+      const { content, userId, isSystem } = expandedTopics[mi];
+      const author = isSystem ? GM : USERS.find(u => u.id === userId) || pick(members);
+      const createdAt = timeAgo((msgCount - mi) * 180 + ci * 3600);
       const isDeleted = mi === 1;
       const msg = {
         id: id('msg'),
@@ -76,28 +330,23 @@ export function generateDummyData({ chatCount = 3, msgPerChat = 30 } = {}) {
         user_id: author.id,
         author: { ...author },
         created_at: createdAt,
-        edited_at: mi === 3 ? createdAt : null,
+        edited_at: !isDeleted && mi === 3 ? createdAt : null,
         deleted: isDeleted,
         attachments: mi === 4 ? [
           { id: id('att'), filename: 'photo.png', mime_type: 'image/png', size: 204800, url: 'https://upload.moonchan.xyz/api/test/photo.png' },
           { id: id('att'), filename: 'document.pdf', mime_type: 'application/pdf', size: 1024000, url: 'https://upload.moonchan.xyz/api/test/doc.pdf' },
         ] : [],
-        reactions: mi > 5 && mi % 3 === 0 ? (() => {
-          const count = Math.floor(Math.random() * 3);
+        reactions: !isDeleted && mi > 5 && mi % 3 === 0 ? (() => {
           const set = new Set();
-          for (let i = 0; i < count; i++) set.add(pick(REACTION_EMOJIS));
-          return [...set].map(emoji => ({
-            emoji,
-            count: Math.floor(Math.random() * 3) + 1,
-            me: Math.random() > 0.7,
-          }));
+          for (let i = 0; i < Math.floor(Math.random() * 3); i++) set.add(pick(REACTION_EMOJIS));
+          return [...set].map(e => ({ emoji: e, count: Math.floor(Math.random() * 2) + 1, me: Math.random() > 0.7 }));
         })() : [],
       };
-      msgs.push(msg);
+      allMessages.push(msg);
+      if (mi === msgCount - 1) chat.last_message = msg;
     }
-    chat.last_message = msgs[msgs.length - 1];
-    allMessages.push(...msgs);
   }
 
-  return { chats, messages: allMessages, activeChatId: chats[0]?.id };
+  const activeChatId = chats[1]?.id;
+  return { chats, messages: allMessages, activeChatId };
 }
