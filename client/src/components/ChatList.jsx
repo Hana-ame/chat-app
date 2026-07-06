@@ -190,17 +190,17 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
             if (v.trim()) searchPublic(v);
             else setPublicResults(null);
           }}
-          style={{fontSize:12,padding:'4px 8px'}} />
+          style={{fontSize:14,padding:'8px 10px'}} />
         {joinAction && (
-          <div style={{display:'flex',gap:4,marginTop:4}}>
+          <div style={{display:'flex',gap:6,marginTop:6}}>
             {joinAction === 'join' && (
-              <button className="btn-ghost" style={{fontSize:11,padding:'3px 6px',flex:1}}
+              <button className="btn" style={{flex:1,padding:'8px 12px',fontSize:14,background:'var(--accent)',color:'#fff',borderRadius:'var(--radius)'}}
                 onClick={async () => { try { await joinChatByID(chatSearch.trim()); setChatSearch(''); setPublicResults(null); } catch(e) { alert(e.message); } }}>
                 Join #{chatSearch.trim()}
               </button>
             )}
             {joinAction === 'create' && (
-              <button className="btn-ghost" style={{fontSize:11,padding:'3px 6px',flex:1}}
+              <button className="btn" style={{flex:1,padding:'8px 12px',fontSize:14,background:'var(--accent)',color:'#fff',borderRadius:'var(--radius)'}}
                 onClick={() => { setNewChatName(chatSearch.trim()); setShowCreate(true); }}>
                 Create &ldquo;{chatSearch.trim()}&rdquo;
               </button>
