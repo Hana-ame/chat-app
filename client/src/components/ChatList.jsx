@@ -304,7 +304,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
               </div>
               <div className="chat-item-meta">
                 <div className="chat-item-time">{timeAgo(c.last_message_at)}</div>
-                {unread > 0 && <div className="unread-badge">{unread}</div>}
+                {unread > 0 ? <div className="unread-badge">{unread}</div> : <div style={{height:18}} />}
                 <div className="chat-item-menu-wrap">
                   <button className="btn-ghost chat-item-menu-btn" title="More"
                     onClick={(e) => handleContextMenu(e, c.id)}>⋮</button>
