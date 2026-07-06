@@ -31,14 +31,15 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const { chats, onlineUserIds, mode, setMode, pinChat, unpinChat } = useChatStore();
   const [showCreate, setShowCreate] = useState(false);
   const [newChatName, setNewChatName] = useState('');
-  const [newChatPublic, setNewChatPublic] = useState(false);
+  const [newChatVisibility, setNewChatVisibility] = useState('private');
   const [dmUserId, setDmUserId] = useState('');
   const [dmSearch, setDmSearch] = useState('');
   const [dmResults, setDmResults] = useState([]);
   const [showProfile, setShowProfile] = useState(false);
   const [chatSearch, setChatSearch] = useState('');
-  const [showPublic, setShowPublic] = useState(false);
-  const [publicChats, setPublicChats] = useState([]);
+  const [searchMode, setSearchMode] = useState('local');
+  const [publicResults, setPublicResults] = useState(null);
+  const [joinById, setJoinById] = useState('');
   const [contextMenu, setContextMenu] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsName, setSettingsName] = useState('');
@@ -54,7 +55,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const handleCreate = async () => {
     if (!newChatName.trim()) return;
     try {
-      const data = await api.createChat(accessToken, newChatName, [], newChatPublic ? 'public' : 'private');
+      const data = await api.createChat(accessToken, newChatName, [], newChatVisibility);
       setShowCreate(false);
       setNewChatName('');
       setNewChatPublic(false);
@@ -82,12 +83,15 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     } catch {}
   };
 
-  const loadPublic = async () => {
-    if (showPublic) { setShowPublic(false); return; }
+  const searchPublic = async (q) => {
+    if (!q.trim()) { setPublicResults(null); return; }
     try {
       const data = await api.listPublicChats(accessToken);
-      setPublicChats(data.chats || []);
-      setShowPublic(true);
+      const all = data.chats || [];
+      const lower = q.toLowerCase();
+      const matched = all.filter(c => c.name?.toLowerCase().includes(lower) || c.id.toLowerCase().includes(lower));
+      setPublicResults(matched);
+      setSearchMode('public');
     } catch (e) { alert(e.message); }
   };
 
@@ -140,6 +144,13 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     setSaving(false);
   };
 
+  const joinChatByID = async (chatId) => {
+    await api.joinChat(accessToken, chatId);
+    setJoinById('');
+    const data = await api.listChats(accessToken);
+    useChatStore.getState().setChats(data.chats || []);
+  };
+
   const handleGenerateDummy = () => {
     const data = generateDummyData({ chatCount: 10, msgPerChat: 100 });
     useChatStore.setState(data);
@@ -167,9 +178,41 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       </div>
 
       <div style={{padding:'4px 8px',borderBottom:'1px solid var(--border)'}}>
-        <input className="input-field" placeholder="Search chats..." value={chatSearch}
-          onChange={e => setChatSearch(e.target.value)}
+        <div style={{display:'flex',gap:4,marginBottom:4}}>
+          <button className={'btn-ghost' + (searchMode === 'public' ? ' active-mode' : '')}
+            style={{flex:1,fontSize:11,padding:'2px 4px',borderRadius:4}}
+            onClick={() => { setSearchMode('public'); if (chatSearch.trim()) searchPublic(chatSearch); }}>
+            🌐 Public
+          </button>
+          <button className={'btn-ghost' + (searchMode === 'local' ? ' active-mode' : '')}
+            style={{flex:1,fontSize:11,padding:'2px 4px',borderRadius:4}}
+            onClick={() => setSearchMode('local')}>
+            📋 My Chats
+          </button>
+        </div>
+        <input className="input-field" placeholder={searchMode === 'public' ? 'Search public channels...' : 'Filter my chats...'} value={chatSearch}
+          onChange={e => {
+            const v = e.target.value;
+            setChatSearch(v);
+            if (searchMode === 'public') searchPublic(v);
+          }}
+          onKeyDown={e => { if (e.key === 'Enter' && searchMode === 'public' && chatSearch.trim()) searchPublic(chatSearch); }}
           style={{fontSize:12,padding:'4px 8px'}} />
+        <div style={{display:'flex',gap:4,marginTop:4}}>
+          <input className="input-field" placeholder="Join by chat ID..." value={joinById}
+            onChange={e => setJoinById(e.target.value)}
+            style={{fontSize:11,padding:'3px 6px',flex:1}}
+            onKeyDown={async e => {
+              if (e.key === 'Enter' && joinById.trim()) {
+                try { await joinChatByID(joinById.trim()); } catch (e) { alert(e.message); }
+              }
+            }} />
+          <button className="btn-ghost" style={{fontSize:11,padding:'3px 6px'}}
+            onClick={async () => {
+              if (!joinById.trim()) return;
+              try { await joinChatByID(joinById.trim()); } catch (e) { alert(e.message); }
+            }}>Join</button>
+        </div>
       </div>
 
       {dmSearch !== '' && (
@@ -197,10 +240,16 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
           <input className="input-field" placeholder="Group name..." value={newChatName}
             onChange={e => setNewChatName(e.target.value)} autoFocus
             onKeyDown={e => e.key === 'Enter' && handleCreate()} />
-          <label style={{display:'flex',alignItems:'center',gap:6,marginTop:6,fontSize:12,cursor:'pointer'}}>
-            <input type="checkbox" checked={newChatPublic} onChange={e => setNewChatPublic(e.target.checked)} />
-            Public group
-          </label>
+          <div style={{display:'flex',gap:6,marginTop:6,fontSize:12}}>
+            {['private','unlisted','public'].map(v => (
+              <label key={v} style={{display:'flex',alignItems:'center',gap:3,cursor:'pointer'}}>
+                <input type="radio" name="visibility" value={v}
+                  checked={newChatVisibility === v}
+                  onChange={() => setNewChatVisibility(v)} />
+                {v}
+              </label>
+            ))}
+          </div>
           <div style={{display:'flex',gap:8,marginTop:8}}>
             <button className="btn btn-primary" style={{padding:'4px 12px',fontSize:13}} onClick={handleCreate}>Create</button>
             <button className="btn-ghost" style={{fontSize:13}} onClick={() => setShowCreate(false)}>Cancel</button>
@@ -209,73 +258,82 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       )}
 
       <div className="sidebar-body">
-        <div style={{padding:'4px 12px',cursor:'pointer',display:'flex',alignItems:'center',gap:4}}
-          onClick={loadPublic}>
-          <span style={{fontSize:12,color:'var(--text-muted)',flex:1}}>PUBLIC GROUPS</span>
-          <span style={{fontSize:14,color:'var(--text-muted)'}}>{showPublic ? '▾' : '▸'}</span>
-        </div>
-
-        {showPublic && publicChats.map(c => {
-          const memberCount = c.members?.length || 0;
-          return (
-            <div key={c.id} className="chat-item" onClick={() => handleJoinPublic(c.id)}>
-              <div className="chat-item-avatar" style={{background:c.icon_color}}>
-                {c.name ? c.name[0].toUpperCase() : '?'}
+        {searchMode === 'public' && (
+          <>
+            {publicResults === null && (
+              <div style={{padding:24,textAlign:'center',color:'var(--text-muted)',fontSize:13}}>
+                Type a name or ID to search public channels
               </div>
-              <div className="chat-item-info">
-                <div className="chat-item-name">{c.name}</div>
-                <div className="chat-item-preview">{memberCount} member{memberCount !== 1 ? 's' : ''}</div>
+            )}
+            {publicResults?.length === 0 && (
+              <div style={{padding:24,textAlign:'center',color:'var(--text-muted)',fontSize:13}}>
+                No public channels found
               </div>
-            </div>
-          );
-        })}
-
-        {chats.filter(c => {
-          if (!chatSearch.trim()) return true;
-          const q = chatSearch.toLowerCase();
-          const name = c.type === 'dm' ? getDMName(c, user.id) : c.name || '';
-          return name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q);
-        }).map(c => {
-          const name = c.type === 'dm' ? getDMName(c, user.id) : c.name;
-          const avatar = c.type === 'dm' ? (c.members?.find(m => m.id !== user.id)?.avatar_color || c.icon_color) : c.icon_color;
-          const unread = c.unread_count || 0;
-          return (
-            <div key={c.id} className={'chat-item' + (c.id === activeId ? ' active' : '') + (c.pinned ? ' pinned' : '') + (c.visibility === 'public' ? ' public' : '')}
-              onClick={() => onSelectChat(c.id)}>
-              <div className="chat-item-avatar" style={{background:avatar}}>
-                {name ? name[0].toUpperCase() : '?'}
-              </div>
-              <div className="chat-item-info">
-                <div className="chat-item-name">{name || getDMName(c, user.id)}</div>
-                <div className="chat-item-preview">
-                  {c.last_message ? (c.last_message.deleted ? '(message deleted)' : c.last_message.author?.username + ': ' + c.last_message.content) : ''}
+            )}
+            {publicResults?.map(c => (
+              <div key={c.id} className="chat-item" onClick={() => handleJoinPublic(c.id)}>
+                <div className="chat-item-avatar" style={{background:c.icon_color}}>
+                  {c.name ? c.name[0].toUpperCase() : '?'}
+                </div>
+                <div className="chat-item-info">
+                  <div className="chat-item-name">{c.name}</div>
+                  <div className="chat-item-preview">{c.members?.length || 0} members</div>
                 </div>
               </div>
-              <div className="chat-item-meta">
-                <div className="chat-item-time">{timeAgo(c.last_message_at)}</div>
-                {unread > 0 && <div className="unread-badge">{unread}</div>}
-                <div className="chat-item-menu-wrap">
-                  <button className="btn-ghost chat-item-menu-btn" title="More"
-                    onClick={(e) => handleContextMenu(e, c.id)}>⋮</button>
-                  {contextMenu === c.id && (
-                    <div className="context-menu">
-                      {c.pinned
-                        ? <button className="context-menu-item" onClick={(e) => handlePin(e, c.id, true)}>Unpin</button>
-                        : <button className="context-menu-item" onClick={(e) => handlePin(e, c.id, false)}>Pin</button>}
-                      {c.owner_id === user.id && (
-                        <button className="context-menu-item danger" onClick={(e) => handleDeleteChat(e, c.id)}>Delete</button>
+            ))}
+          </>
+        )}
+
+        {searchMode === 'local' && (
+          <>
+            {chats.filter(c => {
+              if (!chatSearch.trim()) return true;
+              const q = chatSearch.toLowerCase();
+              const name = c.type === 'dm' ? getDMName(c, user.id) : c.name || '';
+              return name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q);
+            }).map(c => {
+              const name = c.type === 'dm' ? getDMName(c, user.id) : c.name;
+              const avatar = c.type === 'dm' ? (c.members?.find(m => m.id !== user.id)?.avatar_color || c.icon_color) : c.icon_color;
+              const unread = c.unread_count || 0;
+              return (
+                <div key={c.id} className={'chat-item' + (c.id === activeId ? ' active' : '') + (c.pinned ? ' pinned' : '') + (c.visibility === 'public' ? ' public' : '')}
+                  onClick={() => onSelectChat(c.id)}>
+                  <div className="chat-item-avatar" style={{background:avatar}}>
+                    {name ? name[0].toUpperCase() : '?'}
+                  </div>
+                  <div className="chat-item-info">
+                    <div className="chat-item-name">{name || getDMName(c, user.id)}</div>
+                    <div className="chat-item-preview">
+                      {c.last_message ? (c.last_message.deleted ? '(message deleted)' : c.last_message.author?.username + ': ' + c.last_message.content) : ''}
+                    </div>
+                  </div>
+                  <div className="chat-item-meta">
+                    <div className="chat-item-time">{timeAgo(c.last_message_at)}</div>
+                    {unread > 0 && <div className="unread-badge">{unread}</div>}
+                    <div className="chat-item-menu-wrap">
+                      <button className="btn-ghost chat-item-menu-btn" title="More"
+                        onClick={(e) => handleContextMenu(e, c.id)}>⋮</button>
+                      {contextMenu === c.id && (
+                        <div className="context-menu">
+                          {c.pinned
+                            ? <button className="context-menu-item" onClick={(e) => handlePin(e, c.id, true)}>Unpin</button>
+                            : <button className="context-menu-item" onClick={(e) => handlePin(e, c.id, false)}>Pin</button>}
+                          {c.owner_id === user.id && (
+                            <button className="context-menu-item danger" onClick={(e) => handleDeleteChat(e, c.id)}>Delete</button>
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
+                  </div>
                 </div>
+              );
+            })}
+            {chats.length === 0 && (
+              <div style={{padding:24,textAlign:'center',color:'var(--text-muted)',fontSize:14}}>
+                No conversations yet. Create a group or DM someone!
               </div>
-            </div>
-          );
-        })}
-        {chats.length === 0 && (
-          <div style={{padding:24,textAlign:'center',color:'var(--text-muted)',fontSize:14}}>
-            No conversations yet. Create a group or DM someone!
-          </div>
+            )}
+          </>
         )}
       </div>
 

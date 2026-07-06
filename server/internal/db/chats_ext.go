@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"github.com/Hana-ame/chat-app/server/internal/models"
 )
 
@@ -35,8 +36,18 @@ func (d *DB) ListPublicChats(ctx context.Context) ([]models.Chat, error) {
 	return out, rows.Err()
 }
 
-func (d *DB) JoinPublicChat(ctx context.Context, chatID, userID string) error {
-	_, err := d.ExecContext(ctx,
+func (d *DB) JoinChatByID(ctx context.Context, chatID, userID string) error {
+	var visibility string
+	err := d.QueryRowContext(ctx,
+		`SELECT COALESCE(visibility,'private') FROM chats WHERE id = ?`, chatID,
+	).Scan(&visibility)
+	if err != nil {
+		return err
+	}
+	if visibility == "private" {
+		return errors.New("chat is private, invitation required")
+	}
+	_, err = d.ExecContext(ctx,
 		`INSERT OR IGNORE INTO chat_members (chat_id, user_id) VALUES (?,?)`,
 		chatID, userID,
 	)

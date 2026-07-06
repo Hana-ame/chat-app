@@ -112,7 +112,7 @@ func (d *DB) CreateChat(ctx context.Context, typ, name, visibility, ownerID stri
 		nameVal = name
 	}
 
-	if visibility != "public" {
+	if visibility != "public" && visibility != "unlisted" {
 		visibility = "private"
 	}
 	if typ == "dm" {

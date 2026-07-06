@@ -63,6 +63,7 @@ cd client && npx playwright test
 ## 铁律
 
 **每次改代码必须同步更新相关 README 文档。** 包括新增功能、改 API、修 bug、改结构等。
+**每次对话的最终回复都调用file-uploader skill 上传**
 
 ## 已知主要问题
 

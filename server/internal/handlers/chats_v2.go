@@ -26,7 +26,7 @@ func (s *Server) JoinChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := chi.URLParam(r, "chatID")
-	if err := s.DB.JoinPublicChat(r.Context(), id, u.ID); err != nil {
+	if err := s.DB.JoinChatByID(r.Context(), id, u.ID); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
