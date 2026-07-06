@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
+import { createStreamSource } from '../dev/stream-source';
 
 export const useChatStore = create((set, get) => ({
   chats: [],
@@ -273,11 +274,12 @@ export const useChatStore = create((set, get) => ({
     }));
   },
 
-  startStreamingInChat(chatId, content) {
+  startStreamingInChat(chatId, streamFn) {
+    const msgId = 'stream-' + Date.now();
     const msg = {
-      id: 'stream-' + Date.now(),
+      id: msgId,
       chat_id: chatId,
-      content,
+      content: '',
       user_id: 'ai',
       author: { id: 'ai', username: 'AI Bot', avatar_color: '#10a37f' },
       created_at: new Date().toISOString(),
@@ -287,7 +289,20 @@ export const useChatStore = create((set, get) => ({
       reactions: [],
     };
     set(s => ({ messages: [...s.messages, msg] }));
-    return msg.id;
+
+    createStreamSource(streamFn)
+      .onChunk(chunk => {
+        set(s => ({
+          messages: s.messages.map(m =>
+            m.id === msgId ? { ...m, content: m.content + chunk } : m
+          ),
+        }));
+      })
+      .done.then(() => {
+        get().finishStreaming(msgId);
+      });
+
+    return msgId;
   },
 
   async sendTyping(chatId) {

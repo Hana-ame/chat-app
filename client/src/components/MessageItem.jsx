@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
@@ -23,26 +23,6 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
   const chatStore = useChatStore();
   const author = msg.author || { username: 'Unknown', avatar_color: '#5865F2', id: msg.user_id };
   const initials = author.username ? author.username[0].toUpperCase() : '?';
-  const [visibleLen, setVisibleLen] = useState(0);
-  const streamingRef = useRef(null);
-
-  useEffect(() => {
-    if (!msg.streaming) return;
-    setVisibleLen(0);
-    const speed = Math.max(20, Math.min(80, 4000 / msg.content.length));
-    streamingRef.current = setInterval(() => {
-      setVisibleLen(prev => {
-        if (prev >= msg.content.length) {
-          clearInterval(streamingRef.current);
-          streamingRef.current = null;
-          chatStore.finishStreaming(msg.id);
-          return msg.content.length;
-        }
-        return prev + 1;
-      });
-    }, speed);
-    return () => { if (streamingRef.current) clearInterval(streamingRef.current); };
-  }, [msg.streaming, msg.content, msg.id]);
 
   const handleReaction = async (emoji) => {
     const has = msg.reactions?.find(r => r.emoji === emoji && r.me);
@@ -95,8 +75,7 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
             </div>
           ) : msg.streaming ? (
             <div className="msg-content" style={{whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
-              {msg.content.slice(0, visibleLen)}
-              <span className="stream-cursor" />
+              {msg.content}<span className="stream-cursor" />
             </div>
           ) : (
             <div className="msg-content">

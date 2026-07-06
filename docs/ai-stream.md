@@ -1,103 +1,102 @@
 # AI 打字机消息机制
 
-## 概述
+## 架构
 
-完全前端模拟，不涉及任何 AI API 调用。只是一个打字机效果的 UI 动画。
+基于 **promise 风格的 stream 源头**。`streamFn` 是一个接收 `emit(chunk)` 回调的 async 函数，`emit` 每次被调用时 store 即时追加内容，渲染层直接展示。
 
-## 触发入口
+## Stream 源头抽象
 
-`Composer.jsx` — 🤖 按钮：
+`client/src/dev/stream-source.js`
 
-```jsx
-<button onClick={() => startStreamingInChat(chatId, text.trim() || '默认消息...')}>
-  🤖
-</button>
+```js
+createStreamSource(async (emit) => {
+  // 调用 emit(chunk) 逐块推送
+  // 函数 resolve 时 stream 结束
+})
 ```
+
+返回 `{ onChunk(cb), done: Promise }`。
 
 ## Store 层
 
-`store/chat.js:276-291`
+`store/chat.js:276-305`
 
 ```js
-startStreamingInChat(chatId, content) {
-  const msg = {
-    id: 'stream-' + Date.now(),
-    chat_id: chatId,
-    content,                          // 完整文本
-    user_id: 'ai',
-    author: { id: 'ai', username: 'AI Bot', avatar_color: '#10a37f' },
-    created_at: new Date().toISOString(),
-    streaming: true,                  // 标记为流式
-    deleted: false,
-    attachments: [],
-    reactions: [],
-  };
-  set(s => ({ messages: [...s.messages, msg] }));
+startStreamingInChat(chatId, streamFn) {
+  // 1. 创建空消息 (content: '', streaming: true)
+  // 2. 注入到 messages
+  // 3. 调用 createStreamSource(streamFn)
+  //    .onChunk(chunk => 追加到 msg.content)
+  //    .done  → finishStreaming(msgId)
 }
 ```
 
-`finishStreaming(msgId)` — 将 `streaming` 设为 `false`，触发渲染切换。
+关键变化：不再预置内容，而是通过 `emit(chunk)` 实时追加。
 
 ## 渲染层
 
-`MessageItem.jsx:29-45` — 打字机动画：
+`MessageItem.jsx` — 移除旧的 `setInterval` + `visibleLen` 动画，直接渲染 `msg.content`：
 
 ```jsx
-useEffect(() => {
-  if (!msg.streaming) return;
-  setVisibleLen(0);
-  const speed = Math.max(20, Math.min(80, 4000 / msg.content.length));
-  streamingRef.current = setInterval(() => {
-    setVisibleLen(prev => {
-      if (prev >= msg.content.length) {
-        clearInterval(streamingRef.current);
-        chatStore.finishStreaming(msg.id);   // 完成后关闭流状态
-        return msg.content.length;
-      }
-      return prev + 1;                       // 逐字递增
-    });
-  }, speed);
-  return () => { if (streamingRef.current) clearInterval(streamingRef.current); };
-}, [msg.streaming, msg.content, msg.id]);
+{msg.streaming ? (
+  <div className="msg-content" style={{whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
+    {msg.content}<span className="stream-cursor" />
+  </div>
+) : (
+  <ReactMarkdown ...>{msg.content}</ReactMarkdown>
+)}
 ```
 
-- 速度自适应: `4000ms / content.length`，限定在 20-80ms 之间
-- 完成后 `finishStreaming` → 切换为普通 Markdown 渲染
+## 使用示例
 
-### 两种渲染状态
+### 模拟流 (demo)
 
-| 状态 | 渲染方式 |
-|------|---------|
-| `msg.streaming === true` | 纯文本 `slice(0, visibleLen)` + 闪烁光标 `.stream-cursor` |
-| `msg.streaming === false` | 完整 ReactMarkdown 渲染（含 GFM、链接、图片等） |
+```js
+startStreamingInChat(chatId, async (emit) => {
+  const text = 'Hello world!';
+  for (const char of text) {
+    await new Promise(r => setTimeout(r, 40));
+    emit(char);
+  }
+});
+```
 
-`stream-cursor` CSS (`global.css`):
+### 真实 SSE
 
-```css
-.stream-cursor::after {
-  content: '▊';
-  animation: blink 0.8s step-end infinite;
-}
-@keyframes blink { 50% { opacity: 0; } }
+```js
+startStreamingInChat(chatId, async (emit) => {
+  const res = await fetch('/api/ai/chat', { ... });
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    emit(dec.decode(value, { stream: true }));
+  }
+});
 ```
 
 ## 数据流
 
 ```
 Composer 🤖 点击
-  → store.startStreamingInChat(chatId, content)
-    → 插入 streaming:true 的消息到 messages 数组
-    → MessageItem 检测到 msg.streaming
-      → useEffect 启动 setInterval 逐字 reveal
-      → 每 tick setVisibleLen(prev + 1)
-      → 渲染 msg.content.slice(0, visibleLen) + 光标
-      → 全部 reveal 后调用 finishStreaming(msgId)
-        → streaming:false
-        → 切换为 ReactMarkdown 渲染
+  → store.startStreamingInChat(chatId, async (emit) => { ... })
+    → 插入 { content: '', streaming: true }
+    → createStreamSource(streamFn)
+      → streamFn 执行中，emit(chunk) 被调用
+        → onChunk: store 追加 chunk 到 msg.content
+          → MessageItem 重渲染，显示新内容
+      → streamFn resolve
+        → .done.then → finishStreaming(msgId)
+          → streaming: false → 切换 Markdown 渲染
 ```
 
-## 注意
+## 关键文件
 
-- 不调用任何后端 API
-- 消息只存在于当前前端 store，刷新即消失
-- AI Bot 用户是虚拟的（`id: 'ai'`），无对应后端用户
+| 文件 | 说明 |
+|------|------|
+| `src/dev/stream-source.js` | Stream 源头抽象 |
+| `src/store/chat.js:276-305` | `startStreamingInChat` |
+| `src/components/MessageItem.jsx` | 流式/完成两种渲染 |
+| `src/components/Composer.jsx:74` | 🤖 触发按钮 |
+
