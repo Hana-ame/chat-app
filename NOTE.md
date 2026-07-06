@@ -60,6 +60,10 @@ cd client && npx playwright test
 3. `go-build` — 交叉编译 linux/amd64, linux/arm64, windows/amd64
 4. `release` — 创建 GitHub Release `build-<shortsha>` 附带三个二进制
 
+## 铁律
+
+**每次改代码必须同步更新相关 README 文档。** 包括新增功能、改 API、修 bug、改结构等。
+
 ## 已知主要问题
 
 - `Load older messages` 功能不可用 (store 未合并)
