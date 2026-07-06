@@ -80,6 +80,8 @@ jobs:
   release:
     needs: [go-build, frontend-build]
     if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -114,4 +116,4 @@ jobs:
             release/chatd-linux-amd64 \
             release/chatd-linux-arm64 \
             release/chatd-windows-amd64.exe \
-            || echo "Release already exists, skipping"
+            || echo "::warning::Release creation skipped (may already exist)"
