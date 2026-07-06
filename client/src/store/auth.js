@@ -68,5 +68,13 @@ export const useAuthStore = create((set, get) => {
       s.user = user;
       storage.set(s);
     },
+
+    debugMode: saved.debugMode || false,
+    setDebugMode: (v) => {
+      set({ debugMode: v });
+      const s = storage.get();
+      s.debugMode = v;
+      storage.set(s);
+    },
   };
 });

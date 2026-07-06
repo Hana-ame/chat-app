@@ -6,12 +6,17 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const { register, loading, error } = useAuthStore();
+  const { register, debugMode, loading, error } = useAuthStore();
   const nav = useNavigate();
 
   const handle = async (e) => {
     e.preventDefault();
     try { await register(email, username, password); nav('/'); } catch {}
+  };
+
+  const quickEnter = async () => {
+    const u = 'user' + Date.now();
+    try { await register(u + '@test.com', u, 'password123'); nav('/'); } catch {}
   };
 
   return (
@@ -28,6 +33,9 @@ export default function RegisterPage() {
         <button className="btn btn-primary" style={{width:'100%',marginTop:16}} disabled={loading}>
           {loading ? 'Registering...' : 'Continue'}
         </button>
+        {debugMode && <button type="button" className="btn" style={{width:'100%',marginTop:8,background:'var(--danger)',color:'#fff'}} onClick={quickEnter} disabled={loading}>
+          ⚡ Debug Quick Enter
+        </button>}
         <p style={{marginTop:12,fontSize:13,color:'var(--text-muted)'}}>
           <Link to="/login">Already have an account?</Link>
         </p>
