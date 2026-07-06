@@ -38,6 +38,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const [showProfile, setShowProfile] = useState(false);
   const [chatSearch, setChatSearch] = useState('');
   const [publicResults, setPublicResults] = useState(null);
+  const [publicSearching, setPublicSearching] = useState(false);
 
   const joinAction = chatSearch.trim() && /^\d{1,2}-\d{1,2}$/.test(chatSearch.trim()) ? 'join'
     : chatSearch.trim() && /^\d+$/.test(chatSearch.trim()) ? 'join'
@@ -87,15 +88,16 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   };
 
   const searchPublic = async (q) => {
-    if (!q.trim()) { setPublicResults(null); return; }
+    if (!q.trim()) { setPublicResults(null); setPublicSearching(false); return; }
+    setPublicSearching(true);
     try {
       const data = await api.listPublicChats(accessToken);
       const all = data.chats || [];
       const lower = q.toLowerCase();
       const matched = all.filter(c => c.name?.toLowerCase().includes(lower) || c.id.toLowerCase().includes(lower));
       setPublicResults(matched);
-      setSearchMode('public');
-    } catch (e) { alert(e.message); }
+    } catch {}
+    setPublicSearching(false);
   };
 
   const handleJoinPublic = async (chatId) => {
@@ -250,7 +252,12 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       )}
 
       <div className="sidebar-body">
-        {publicResults !== null && publicResults.length > 0 && (
+        {publicSearching && (
+          <div style={{padding:24,textAlign:'center',color:'var(--text-muted)',fontSize:13}}>
+            搜索中...
+          </div>
+        )}
+        {publicResults !== null && !publicSearching && publicResults.length > 0 && (
           <>
             <div style={{padding:'4px 12px',fontSize:11,color:'var(--text-muted)',textTransform:'uppercase'}}>
               Public Channels
@@ -267,6 +274,11 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
               </div>
             ))}
           </>
+        )}
+        {publicResults !== null && !publicSearching && publicResults.length === 0 && (
+          <div style={{padding:24,textAlign:'center',color:'var(--text-muted)',fontSize:13}}>
+            无结果
+          </div>
         )}
 
         {chats.filter(c => {
