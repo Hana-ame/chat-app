@@ -76,5 +76,15 @@ export const useAuthStore = create((set, get) => {
       s.debugMode = v;
       storage.set(s);
     },
+
+    mockLogin: () => {
+      const payload = {
+        user: { id: 'mock-' + Date.now(), username: 'DebugUser', email: 'debug@test.com', avatar_color: '#5865F2' },
+        accessToken: 'mock-token-' + Date.now(),
+        refreshToken: 'mock-refresh-' + Date.now(),
+      };
+      storage.set(payload);
+      set({ ...payload, loading: false, error: null });
+    },
   };
 });

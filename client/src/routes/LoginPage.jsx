@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/auth';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, debugMode, setDebugMode, loading, error } = useAuthStore();
+  const { login, debugMode, setDebugMode, mockLogin, loading, error } = useAuthStore();
   const nav = useNavigate();
 
   const handle = async (e) => {
@@ -13,8 +13,9 @@ export default function LoginPage() {
     try { await login(email, password); nav('/'); } catch {}
   };
 
-  const quickEnter = async () => {
-    try { await login('debug@test.com', 'password123'); nav('/'); } catch {}
+  const quickEnter = () => {
+    mockLogin();
+    nav('/');
   };
 
   return (
@@ -35,8 +36,8 @@ export default function LoginPage() {
             <input type="checkbox" checked={debugMode} onChange={e => setDebugMode(e.target.checked)} />
             Debug mode
           </label>
-          {debugMode && <button type="button" className="btn-ghost" style={{fontSize:12}} onClick={quickEnter} disabled={loading}>
-            ⚡ Quick Enter (debug@test.com)
+          {debugMode && <button type="button" className="btn-ghost" style={{fontSize:12}} onClick={quickEnter}>
+            ⚡ Quick Enter (mock)
           </button>}
         </div>
         <p style={{marginTop:12,fontSize:13,color:'var(--text-muted)'}}>
