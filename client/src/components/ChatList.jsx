@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
+import { generateDummyData } from '../dev/dummy';
 
 function timeAgo(t) {
   if (!t) return '';
@@ -136,6 +137,12 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       setShowSettings(false);
     } catch (e) { alert(e.message); }
     setSaving(false);
+  };
+
+  const handleGenerateDummy = () => {
+    const data = generateDummyData({ chatCount: 5, msgPerChat: 40 });
+    useChatStore.setState(data);
+    if (data.chats[0]) onSelectChat(data.chats[0].id);
   };
 
   const isOnline = (uid) => onlineUserIds.includes(uid);
@@ -275,6 +282,9 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
           </div>
           <button className="btn-ghost" onClick={(e)=>{e.stopPropagation(); setShowSettings(true); setSettingsName(user.username);}} title="Settings">⚙</button>
           <button className="btn-ghost" onClick={(e)=>{e.stopPropagation();onLogout();}}>↪</button>
+        </div>
+        <div style={{marginTop:4,borderTop:'1px solid var(--border)',paddingTop:4}}>
+          <button className="btn-ghost" style={{fontSize:11,width:'100%'}} onClick={handleGenerateDummy}>🧪 Generate test data</button>
         </div>
       </div>
 
