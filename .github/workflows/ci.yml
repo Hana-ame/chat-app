@@ -91,7 +91,7 @@ jobs:
           mkdir -p release
           mv chatd-linux-amd64     release/chatd-linux-amd64
           mv chatd-linux-arm64     release/chatd-linux-arm64
-          mv chatd-windows-amd64   release/chatd-windows-amd64.exe
+          mv chatd-windows-amd64.exe   release/chatd-windows-amd64.exe
           mv client-dist           release/client-dist
       - uses: actions/upload-artifact@v4
         with:
