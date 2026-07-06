@@ -42,21 +42,58 @@ jobs:
           name: client-dist
           path: client/dist/
 
+  go-build:
+    needs: [go-test]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            suffix: ''
+          - goos: linux
+            goarch: arm64
+            suffix: ''
+          - goos: windows
+            goarch: amd64
+            suffix: '.exe'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.23' }
+      - name: Build chatd (${{ matrix.goos }}/${{ matrix.goarch }})
+        run: |
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
+            -ldflags="-s -w" \
+            -o ../chatd-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }} \
+            ./cmd/chatd/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chatd-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: server/../chatd-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }}
+          if-no-files-found: error
+
   release:
-    needs: [go-test, frontend-build]
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    needs: [go-build, frontend-build]
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-      - name: Package
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - name: Assemble release
         run: |
-          cp -r client-dist client/dist
-          cd server && go build -o ../chatd ./cmd/chatd/
+          mkdir -p release
+          mv chatd-linux-amd64     release/chatd-linux-amd64
+          mv chatd-linux-arm64     release/chatd-linux-arm64
+          mv chatd-windows-amd64   release/chatd-windows-amd64.exe
+          mv client-dist           release/client-dist
       - uses: actions/upload-artifact@v4
         with:
           name: chatd-release
-          path: |
-            chatd
-            client/dist/**
+          path: release/**
