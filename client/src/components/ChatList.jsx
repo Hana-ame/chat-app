@@ -170,18 +170,15 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     <div className="sidebar">
       <div className="sidebar-header">
         <h3 style={{fontSize:15,fontWeight:700}}>WebChat</h3>
-        <div style={{display:'flex',gap:4}}>
-          <button className={'btn-ghost' + (showCreate ? ' active-mode' : '')} title="Create Group" onClick={() => setShowCreate(v => !v)}>+</button>
-          <button className={'btn-ghost' + (showDmSearch ? ' active-mode' : '')} title="New DM" onClick={() => { setShowDmSearch(v => !v); if (!showDmSearch) { setDmSearch(''); setDmResults([]); } }} style={{fontWeight:700}}>@</button>
-        </div>
+        <div style={{display:'flex',gap:4,alignItems:'stretch'}}>
+          <button className={'btn-ghost' + (mode === 'ws' ? ' active-mode' : '')} style={{fontSize:10,fontWeight:600,minWidth:34,textAlign:'center'}}
+            onClick={() => setMode(MODES[(MODES.findIndex(m => m.key === mode) + 1) % MODES.length].key)} title={mode.toUpperCase()}>
+            {mode.toUpperCase()}
+          </button>
+          <button className={'btn-ghost' + (showCreate ? ' active-mode' : '')} style={{minWidth:34}} title="Create Group" onClick={() => setShowCreate(v => !v)}>+</button>
+          <button className={'btn-ghost' + (showDmSearch ? ' active-mode' : '')} style={{minWidth:34,fontWeight:700}} title="New DM" onClick={() => { setShowDmSearch(v => !v); if (!showDmSearch) { setDmSearch(''); setDmResults([]); } }}>@</button>
       </div>
 
-      <div style={{display:'flex',gap:2,padding:'4px 8px',borderBottom:'1px solid var(--border)'}}>
-        <button className="btn-ghost active-mode" style={{flex:1,fontSize:11,padding:'2px 4px',borderRadius:4}}
-          onClick={() => setMode(MODES[(MODES.findIndex(m => m.key === mode) + 1) % MODES.length].key)}>
-          📡 {mode.toUpperCase()}
-        </button>
-      </div>
 
       <div style={{padding:'4px 8px',borderBottom:'1px solid var(--border)'}}>
         <input className="input-field" placeholder="Search chats or public channels..." value={chatSearch}
