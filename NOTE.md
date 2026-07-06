@@ -63,6 +63,12 @@ cd client && npx playwright test
 ## 铁律
 
 **每次改代码必须同步更新相关 README 文档。** 包括新增功能、改 API、修 bug、改结构等。
+
+## 搜索栏行为
+
+- 单输入框搜索
+- 输入即搜索本地聊天（name/ID）+ 自动检索公开频道（Public Channels 分组显示）
+- 输入纯数字时触发 Join/Create 操作按钮
 **每次对话的最终回复都调用file-uploader skill 上传**
 
 ## 已知主要问题
