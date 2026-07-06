@@ -129,6 +129,20 @@ cd server && CHAT_JWT_SECRET=your-fixed-secret nohup go run ./cmd/chatd &
 # 用 go run 而非 go build: go build 首次也会卡在 link
 ```
 
+## ⚠️ 重要：每次修改后必须 Push
+
+每次代码或文档修改完成后，**必须 `git push`**，Cloudflare Pages 会自动重新部署前端。
+
+```
+git add -A
+git commit -m "描述改动"
+git push
+```
+
+如果只改了后端，也需要 push（CI 触发重新编译），但后端可手动 `go run` 重启。
+
+---
+
 ## Dev Log & Pitfalls
 
 ### Architecture decisions
