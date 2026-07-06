@@ -85,14 +85,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
+          pattern: chatd-*
           merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: client-dist
+          path: client-dist
       - name: Assemble release
         run: |
-          mkdir -p release
-          mv chatd-linux-amd64     release/chatd-linux-amd64
-          mv chatd-linux-arm64     release/chatd-linux-arm64
-          mv chatd-windows-amd64.exe   release/chatd-windows-amd64.exe
-          mv client-dist           release/client-dist
+          mkdir -p release/client-dist
+          mv chatd-linux-amd64        release/chatd-linux-amd64
+          mv chatd-linux-arm64        release/chatd-linux-arm64
+          mv chatd-windows-amd64.exe  release/chatd-windows-amd64.exe
+          cp -r client-dist/*         release/client-dist/
       - uses: actions/upload-artifact@v4
         with:
           name: chatd-release
