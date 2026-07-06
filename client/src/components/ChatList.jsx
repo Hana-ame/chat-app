@@ -183,6 +183,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
           </button>
           <button className={'btn-ghost' + (showCreate ? ' active-mode' : '')} style={{minWidth:34}} title="Create Group" onClick={() => setShowCreate(v => !v)}>+</button>
           <button className={'btn-ghost' + (showDmSearch ? ' active-mode' : '')} style={{minWidth:34,fontWeight:700}} title="New DM" onClick={() => { setShowDmSearch(v => !v); if (!showDmSearch) { setDmSearch(''); setDmResults([]); } }}>@</button>
+        </div>
       </div>
 
 
