@@ -19,15 +19,10 @@ type loginReq struct {
 	Password string `json:"password"`
 }
 
-type refreshReq struct {
-	RefreshToken string `json:"refresh_token"`
-}
-
 type sessionResp struct {
-	User         any    `json:"user"`
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    int64  `json:"expires_in"`
+	User        any   `json:"user"`
+	AccessToken string `json:"access_token"`
+	ExpiresIn   int64 `json:"expires_in"`
 }
 
 // Register godoc
@@ -122,34 +117,29 @@ func (s *Server) issueSession(w http.ResponseWriter, r *http.Request, userID str
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	setRefreshCookie(w, r, raw, s.Cfg.RefreshTokenTTL)
 	_ = exp
 	writeJSON(w, http.StatusOK, sessionResp{
-		User:         u,
-		AccessToken:  access,
-		RefreshToken: raw,
-		ExpiresIn:    int64(s.Cfg.AccessTokenTTL.Seconds()),
+		User:        u,
+		AccessToken: access,
+		ExpiresIn:   int64(s.Cfg.AccessTokenTTL.Seconds()),
 	})
 }
 
 // Refresh godoc
 // @Summary      Refresh access token
-// @Description  Exchange a refresh token for a new session
+// @Description  Exchange a refresh token for a new session (via httpOnly cookie)
 // @Tags         auth
-// @Param        body  body  refreshReq  true  "Refresh token"
 // @Success      200  {object}  sessionResp
 // @Failure      401  {object}  map[string]any
 // @Router       /api/auth/refresh [post]
 func (s *Server) Refresh(w http.ResponseWriter, r *http.Request) {
-	var req refreshReq
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+	c, err := r.Cookie("refresh_token")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", "refresh token missing")
 		return
 	}
-	if req.RefreshToken == "" {
-		writeError(w, http.StatusBadRequest, "bad_request", "refresh_token required")
-		return
-	}
-	hash := auth.HashRefreshToken(req.RefreshToken)
+	hash := auth.HashRefreshToken(c.Value)
 	rt, err := s.DB.FindRefreshToken(r.Context(), hash)
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, "refresh_invalid", "invalid refresh token")
@@ -169,10 +159,9 @@ func (s *Server) Refresh(w http.ResponseWriter, r *http.Request) {
 
 // Logout godoc
 // @Summary      Log out
-// @Description  Invalidate refresh token to end session
+// @Description  Revoke all refresh tokens for the user and clear cookie
 // @Tags         auth
 // @Security     BearerAuth
-// @Param        body  body  refreshReq  true  "Refresh token to revoke"
 // @Success      200  {object}  map[string]any
 // @Router       /api/auth/logout [post]
 func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
@@ -181,14 +170,8 @@ func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "missing user")
 		return
 	}
-	var req refreshReq
-	_ = decodeJSON(r, &req)
-	if req.RefreshToken != "" {
-		hash := auth.HashRefreshToken(req.RefreshToken)
-		if rt, err := s.DB.FindRefreshToken(r.Context(), hash); err == nil && rt.UserID == u.ID {
-			_ = s.DB.DeleteRefreshToken(r.Context(), rt.ID)
-		}
-	}
+	clearRefreshCookie(w, r)
+	_ = s.DB.DeleteUserRefreshTokens(r.Context(), u.ID)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

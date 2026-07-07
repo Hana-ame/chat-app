@@ -59,7 +59,7 @@ App → ChatPage
 ### `useAuthStore`
 
 ```js
-user, accessToken, refreshToken, loading, error
+user, accessToken, loading, error
 register(email, username, password)
 login(email, password)
 logout()

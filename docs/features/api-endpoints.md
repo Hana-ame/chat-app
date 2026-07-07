@@ -42,8 +42,8 @@ All standard API calls pass through the `request(method, path, token, body?)` he
 |---|---|---|---|---|
 | `POST` | `/api/auth/register` | — | — | `{ email, username, password }` |
 | `POST` | `/api/auth/login` | — | — | `{ email, password }` |
-| `POST` | `/api/auth/refresh` | — | — | `{ refresh_token }` |
-| `POST` | `/api/auth/logout` | — | `token` | `{ refresh_token }` |
+| `POST` | `/api/auth/refresh` | — | — | (读取 httpOnly cookie) |
+| `POST` | `/api/auth/logout` | — | `token` | — |
 
 ### Users
 

@@ -22,22 +22,19 @@ async function request(method, path, token, body) {
   const res = await fetch(API_BASE + path, opts);
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && path !== '/api/auth/refresh') {
-    const { refreshToken } = useAuthStore.getState();
-    if (refreshToken && !_refreshing) {
+    if (!_refreshing) {
       _refreshing = true;
       try {
         const rr = await fetch(API_BASE + '/api/auth/refresh', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refresh_token: refreshToken }),
+          method: 'POST', credentials: 'include',
         });
         const rd = await rr.json().catch(() => ({}));
         if (rr.ok) {
           const saved = JSON.parse(localStorage.getItem('auth') || '{}');
           saved.accessToken = rd.access_token;
-          saved.refreshToken = rd.refresh_token;
           if (rd.user) saved.user = rd.user;
           localStorage.setItem('auth', JSON.stringify(saved));
-          useAuthStore.setState({ accessToken: rd.access_token, refreshToken: rd.refresh_token, user: rd.user || saved.user });
+          useAuthStore.setState({ accessToken: rd.access_token, user: rd.user || saved.user });
           opts.headers['Authorization'] = 'Bearer ' + rd.access_token;
           const retryRes = await fetch(API_BASE + path, opts);
           const retryData = await retryRes.json().catch(() => ({}));
@@ -62,10 +59,10 @@ export const api = {
     request('POST', '/api/auth/register', null, { email, username, password }),
   login: (email, password) =>
     request('POST', '/api/auth/login', null, { email, password }),
-  refresh: (refreshToken) =>
-    request('POST', '/api/auth/refresh', null, { refresh_token: refreshToken }),
-  logout: (token, refreshToken) =>
-    request('POST', '/api/auth/logout', token, { refresh_token: refreshToken }),
+  refresh: () =>
+    fetch(API_BASE + '/api/auth/refresh', { method: 'POST', credentials: 'include' }).then(r => { if (!r.ok) throw r; return r.json(); }),
+  logout: (token) =>
+    request('POST', '/api/auth/logout', token),
   me: (token) => request('GET', '/api/users/me', token),
   updateProfile: (token, data) => request('PATCH', '/api/users/me', token, data),
   searchUsers: (token, q) => request('GET', '/api/users?q=' + encodeURIComponent(q), token),

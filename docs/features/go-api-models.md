@@ -23,22 +23,16 @@ type loginReq struct {
 }
 ```
 
-### `refreshReq` — `POST /api/auth/refresh`, `POST /api/auth/logout`
-```go
-type refreshReq struct {
-    RefreshToken string `json:"refresh_token"`
-}
-```
-
 ### `sessionResp` — Response for register / login / refresh
 ```go
 type sessionResp struct {
-    User         any    `json:"user"`
-    AccessToken  string `json:"access_token"`
-    RefreshToken string `json:"refresh_token"`
-    ExpiresIn    int64  `json:"expires_in"`
+    User        any   `json:"user"`
+    AccessToken string `json:"access_token"`
+    ExpiresIn   int64 `json:"expires_in"`
 }
 ```
+
+> Refresh token 改为 httpOnly cookie (`Path=/api/auth/refresh`)，不再出现于 JSON 响应中。
 
 ---
 

@@ -19,8 +19,8 @@
 |------|------|------|
 | `register(email, username, password)` | POST `/api/auth/register` | 注册 |
 | `login(email, password)` | POST `/api/auth/login` | 登录 |
-| `refresh(refreshToken)` | POST `/api/auth/refresh` | 刷新 token |
-| `logout(token, refreshToken)` | POST `/api/auth/logout` | 登出 |
+| `refresh()` | POST `/api/auth/refresh` | 刷新 token (httpOnly cookie) |
+| `logout(token)` | POST `/api/auth/logout` | 登出 |
 | `me(token)` | GET `/api/users/me` | 当前用户信息 |
 | `updateProfile(token, data)` | PATCH `/api/users/me` | 修改资料（username / avatar_url） |
 | `searchUsers(token, q)` | GET `/api/users?q=` | 搜索用户 |

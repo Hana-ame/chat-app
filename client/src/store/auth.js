@@ -12,7 +12,6 @@ export const useAuthStore = create((set, get) => {
   return {
     user: saved.user || null,
     accessToken: saved.accessToken || null,
-    refreshToken: saved.refreshToken || null,
     loading: false,
     error: null,
 
@@ -20,7 +19,7 @@ export const useAuthStore = create((set, get) => {
       set({ loading: true, error: null });
       try {
         const data = await api.register(email, username, password);
-        const payload = { user: data.user || data, accessToken: data.access_token, refreshToken: data.refresh_token };
+        const payload = { user: data.user || data, accessToken: data.access_token };
         storage.set(payload);
         set({ ...payload, loading: false });
       } catch (e) {
@@ -33,7 +32,7 @@ export const useAuthStore = create((set, get) => {
       set({ loading: true, error: null });
       try {
         const data = await api.login(email, password);
-        const payload = { user: data.user || data, accessToken: data.access_token, refreshToken: data.refresh_token };
+        const payload = { user: data.user || data, accessToken: data.access_token };
         storage.set(payload);
         set({ ...payload, loading: false });
       } catch (e) {
@@ -43,23 +42,21 @@ export const useAuthStore = create((set, get) => {
     },
 
     refreshAuth: async () => {
-      const rt = get().refreshToken;
-      if (!rt) { set({ accessToken: null, refreshToken: null, user: null }); return; }
       try {
-        const data = await api.refresh(rt);
-        const payload = { user: data.user, accessToken: data.access_token, refreshToken: data.refresh_token };
+        const data = await api.refresh();
+        const payload = { user: data.user, accessToken: data.access_token };
         storage.set(payload);
         set(payload);
       } catch {
         storage.clear();
-        set({ user: null, accessToken: null, refreshToken: null });
+        set({ user: null, accessToken: null });
       }
     },
 
     logout: async () => {
-      try { await api.logout(get().accessToken, get().refreshToken); } catch (e) { console.error('Logout error:', e); }
+      try { await api.logout(get().accessToken); } catch (e) { console.error('Logout error:', e); }
       storage.clear();
-      set({ user: null, accessToken: null, refreshToken: null });
+      set({ user: null, accessToken: null });
     },
 
     setUser: (user) => {
@@ -81,7 +78,6 @@ export const useAuthStore = create((set, get) => {
       const payload = {
         user: { id: 'mock-' + Date.now(), username: 'DebugUser', email: 'debug@test.com', avatar_color: '#5865F2' },
         accessToken: 'mock-token-' + Date.now(),
-        refreshToken: 'mock-refresh-' + Date.now(),
       };
       storage.set(payload);
       set({ ...payload, loading: false, error: null });
