@@ -267,7 +267,7 @@ func TestSearchUsers(t *testing.T) {
 
 func TestDeleteMessageAsAdmin(t *testing.T) {
 	f := testutil.New(t)
-	alice := f.Register(t, "admin@d.t", "Admin", "password123")
+	alice := f.Register(t, "admin@moonchan.xyz", "Nanaka", "password123")
 	bob := f.Register(t, "user@d.t", "User", "password123")
 
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
