@@ -26,11 +26,19 @@ type Session struct {
 	} `json:"user"`
 }
 
-func cookieValue(res *http.Response, name string) string {
+func ResponseCookie(res *http.Response, name string) *http.Cookie {
 	for _, c := range res.Cookies() {
 		if c.Name == name {
-			return c.Value
+			return c
 		}
+	}
+	return nil
+}
+
+func cookieValue(res *http.Response, name string) string {
+	c := ResponseCookie(res, name)
+	if c != nil {
+		return c.Value
 	}
 	return ""
 }
