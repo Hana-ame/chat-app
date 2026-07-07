@@ -1,5 +1,6 @@
 import { mockListChats, mockListMessages, mockSendMessage, resetMockData } from './mock';
 import { createStreamSource } from '../dev/stream-source';
+import { useAuthStore } from '../store/auth';
 
 const IS_PAGES = typeof window !== 'undefined' && window.location.hostname.endsWith('pages.dev');
 const API_BASE = IS_PAGES ? 'https://wsl-8080.moonchan.xyz' : '';
@@ -8,6 +9,8 @@ const UPLOAD_BASE = 'https://upload.moonchan.xyz';
 function buildUploadUrl(data, filename) {
   return UPLOAD_BASE + '/api/' + data.id + '/' + encodeURIComponent(filename);
 }
+
+let _refreshing = false;
 
 async function request(method, path, token, body) {
   const opts = { method, headers: {} };
@@ -18,7 +21,35 @@ async function request(method, path, token, body) {
   }
   const res = await fetch(API_BASE + path, opts);
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401) {
+  if (res.status === 401 && path !== '/api/auth/refresh') {
+    const { refreshToken } = useAuthStore.getState();
+    if (refreshToken && !_refreshing) {
+      _refreshing = true;
+      try {
+        const rr = await fetch(API_BASE + '/api/auth/refresh', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        const rd = await rr.json().catch(() => ({}));
+        if (rr.ok) {
+          const saved = JSON.parse(localStorage.getItem('auth') || '{}');
+          saved.accessToken = rd.access_token;
+          saved.refreshToken = rd.refresh_token;
+          if (rd.user) saved.user = rd.user;
+          localStorage.setItem('auth', JSON.stringify(saved));
+          useAuthStore.setState({ accessToken: rd.access_token, refreshToken: rd.refresh_token, user: rd.user || saved.user });
+          opts.headers['Authorization'] = 'Bearer ' + rd.access_token;
+          const retryRes = await fetch(API_BASE + path, opts);
+          const retryData = await retryRes.json().catch(() => ({}));
+          if (!retryRes.ok) throw { status: retryRes.status, ...retryData };
+          return retryData;
+        }
+      } catch (e) {
+        // refresh failed
+      } finally {
+        _refreshing = false;
+      }
+    }
     window.dispatchEvent(new CustomEvent('auth:unauthorized'));
   }
   if (!res.ok) throw { status: res.status, ...data };

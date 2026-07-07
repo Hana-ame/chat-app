@@ -35,6 +35,16 @@ func sanitizeFilename(name string) string {
 	return name
 }
 
+// Upload godoc
+// @Summary      Upload a file
+// @Description  Upload a file via multipart form (validates mime type and size)
+// @Tags         uploads
+// @Security     BearerAuth
+// @Param        file  formData  file  true  "File to upload"
+// @Success      201  {object}  map[string]any
+// @Failure      413  {object}  map[string]any
+// @Failure      415  {object}  map[string]any
+// @Router       /api/uploads [post]
 func (s *Server) Upload(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	if u == nil {

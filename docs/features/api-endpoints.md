@@ -1,53 +1,126 @@
 # API Endpoints & Architecture
 
-This document describes how the frontend communicates with the backend and handles API endpoints.
+This document describes how the frontend communicates with the backend and lists all API endpoints.
 
 ## 🌐 Base URL & Environment Handling
 
-The API base URL is dynamically determined in `client/src/api/client.js` to support both local development and production deployments.
-
 ```javascript
-const IS_PAGES = typeof window !== 'undefined' && window.location.hostname.endsWith('pages.dev');
+const IS_PAGES = (typeof window !== 'undefined' && window.location.hostname.endsWith('pages.dev'));
 const API_BASE = IS_PAGES ? 'https://wsl-8080.moonchan.xyz' : '';
 ```
 
-- **Production (Cloudflare Pages)**: Uses `https://wsl-8080.moonchan.xyz` as the prefix.
-- **Local Development**: Uses an empty string `''`, triggering relative requests (e.g., `/api/auth/login`).
+- **Production (Cloudflare Pages)**: `https://wsl-8080.moonchan.xyz`
+- **Local Development**: empty string, uses Vite proxy to `http://localhost:8080`
 
 ## 🛠 Development Proxy (Vite)
 
-In local development, Vite acts as a reverse proxy to avoid CORS issues and simplify request paths.
-
-**Configuration (`client/vite.config.js`):**
-- `/api` $\rightarrow$ `http://localhost:8080`
-- `/uploads` $\rightarrow$ `http://localhost:8080`
-
-This allows the frontend to call `/api/...` while the request is actually routed to the Go backend running on port 8080.
+| Prefix | Target |
+|---|---|
+| `/api` | `http://localhost:8080` |
+| `/uploads` | `http://localhost:8080` |
 
 ## 📤 External Upload Service
 
-File uploads are decoupled from the main API server to optimize binary data handling.
-
-- **Upload Base**: `https://upload.moonchan.xyz`
+- **Base**: `https://upload.moonchan.xyz`
 - **Method**: `PUT`
-- **Endpoint**: `/api/upload`
-- **Payload**: Raw binary stream.
-- **Return URL Format**: `https://upload.moonchan.xyz/api/{id}/{filename}`
+- **Payload**: Raw binary stream
+- **Return URL**: `https://upload.moonchan.xyz/api/{id}/{filename}`
 
-## 📡 Real-time Events (SSE)
+## 📡 SSE (Real-time Events)
 
-The app uses Server-Sent Events (SSE) for real-time updates (presence, new messages).
+`api.sseUrl(token)` → `API_BASE + '/api/events?access_token={token}'`
 
-- **Endpoint**: `API_BASE + '/api/events?access_token={token}'`
-- **Implementation**: Handled via `api.startStreaming` using `fetch` and a `ReadableStream` reader.
+---
 
-## 🔄 Request Workflow
+## 📋 Complete API Reference
 
-All standard API calls pass through a centralized `request` helper in `client/src/api/client.js`, which manages:
+All standard API calls pass through the `request(method, path, token, body?)` helper. All responses expect JSON. `401` triggers the `auth:unauthorized` custom event.
 
-1. **Authentication**: Automatically attaches `Authorization: Bearer {token}` to headers.
-2. **Content-Type**: Sets `application/json` for POST/PATCH requests.
-3. **Error Handling**: 
-   - Intercepts `401 Unauthorized` to trigger the `auth:unauthorized` custom event.
-   - Throws a formatted error object containing the status and server response.
-4. **Parsing**: Automatically parses JSON responses.
+### Auth
+
+| Method | Endpoint | Parameters | Token | Body |
+|---|---|---|---|---|
+| `POST` | `/api/auth/register` | — | — | `{ email, username, password }` |
+| `POST` | `/api/auth/login` | — | — | `{ email, password }` |
+| `POST` | `/api/auth/refresh` | — | — | `{ refresh_token }` |
+| `POST` | `/api/auth/logout` | — | `token` | `{ refresh_token }` |
+
+### Users
+
+| Method | Endpoint | Parameters | Token | Body |
+|---|---|---|---|---|
+| `GET` | `/api/users/me` | — | `token` | — |
+| `PATCH` | `/api/users/me` | — | `token` | `{...data}` |
+| `GET` | `/api/users?q={query}` | `q`: search keyword | `token` | — |
+
+### Chats
+
+| Method | Endpoint | Parameters | Token | Body |
+|---|---|---|---|---|
+| `GET` | `/api/chats` | — | `token` | — |
+| `GET` | `/api/chats/public` | — | `token` | — |
+| `POST` | `/api/chats` | — | `token` | `{ type: "group", name, member_ids[], visibility: "public" \| "unlisted" \| "private" }` |
+| `GET` | `/api/chats/{id}` | `id`: chat ID | `token` | — |
+| `DELETE` | `/api/chats/{id}` | `id`: chat ID | `token` | — |
+| `PATCH` | `/api/chats/{id}` | `id`: chat ID | `token` | `{ name }` |
+| `POST` | `/api/dms` | — | `token` | `{ user_id }` |
+| `POST` | `/api/chats/{id}/join` | `id`: chat ID | `token` | — |
+| `POST` | `/api/chats/{id}/pin` | `id`: chat ID | `token` | — |
+| `POST` | `/api/chats/{id}/unpin` | `id`: chat ID | `token` | — |
+
+### Members
+
+| Method | Endpoint | Parameters | Token | Body |
+|---|---|---|---|---|
+| `POST` | `/api/chats/{chatId}/members` | `chatId` | `token` | `{ user_id }` |
+| `DELETE` | `/api/chats/{chatId}/members/{userId}` | `chatId`, `userId` | `token` | — |
+
+### Messages
+
+| Method | Endpoint | Parameters | Token | Body |
+|---|---|---|---|---|
+| `GET` | `/api/chats/{chatId}/messages?limit={n}&before={msgId}` | `limit` (default 50), `before` (cursor) | `token` | — |
+| `POST` | `/api/chats/{chatId}/messages` | `chatId` | `token` | `{ content, attachments[] }` |
+| `PATCH` | `/api/chats/{chatId}/messages/{msgId}` | `chatId`, `msgId` | `token` | `{ content }` |
+| `DELETE` | `/api/chats/{chatId}/messages/{msgId}` | `chatId`, `msgId` | `token` | — |
+| `POST` | `/api/chats/{chatId}/read` | `chatId` | `token` | `{ message_id }` |
+
+### Reactions
+
+| Method | Endpoint | Parameters | Token | Body |
+|---|---|---|---|---|
+| `PUT` | `/api/chats/{chatId}/messages/{msgId}/reactions/{emoji}` | `chatId`, `msgId`, `emoji` | `token` | — |
+| `DELETE` | `/api/chats/{chatId}/messages/{msgId}/reactions/{emoji}` | `chatId`, `msgId`, `emoji` | `token` | — |
+
+### Uploads
+
+| Method | Endpoint | Parameters | Token | Body |
+|---|---|---|---|---|
+| `PUT` | `https://upload.moonchan.xyz/api/upload` | — | — | Raw binary (`file`) |
+| (calls `api.upload` internally) | — | `_token` (ignored), `file` | — | — |
+
+### Application API (non-HTTP)
+
+The `api.startStreaming(source)` method handles streaming message sources:
+
+```typescript
+startStreaming(source: 
+  | (emit: (chunk: string) => void) => Promise<void>    // custom function
+  | { type: 'mock', fn: ... }                           // mock AI reply
+  | { type: 'sse', url: string }                        // Server-Sent Events
+)
+```
+
+---
+
+## 🔄 Mock System
+
+When mock is enabled, three methods are overridden:
+
+| Original | Mock Replacement |
+|---|---|
+| `api.listChats` | `mockListChats()` — returns `{ chats: [...] }` from dummy data |
+| `api.listMessages` | `mockListMessages(token, chatId, before?, limit?)` — paginated from dummy data |
+| `api.sendMessage` | `mockSendMessage(token, chatId, content, attachments?)` — creates user msg + delayed AI reply via `source.type: 'mock'` |
+
+Helpers: `api.enableMock()`, `api.disableMock()`, `api.isMockEnabled()`

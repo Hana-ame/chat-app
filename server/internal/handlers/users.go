@@ -14,6 +14,14 @@ type updateProfileReq struct {
 	AvatarURL   string `json:"avatar_url"`
 }
 
+// UpdateMe godoc
+// @Summary      Update user profile
+// @Description  Update username, avatar color, or avatar URL
+// @Tags         users
+// @Security     BearerAuth
+// @Param        body  body  updateProfileReq  true  "Profile fields to update"
+// @Success      200  {object}  models.User
+// @Router       /api/users/me [patch]
 func (s *Server) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	if u == nil {
@@ -55,6 +63,14 @@ func (s *Server) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, updated)
 }
 
+// SearchUsers godoc
+// @Summary      Search users
+// @Description  Search users by username or email prefix (excludes self)
+// @Tags         users
+// @Security     BearerAuth
+// @Param        q   query  string  true  "Search query (min 1 char)"
+// @Success      200  {object}  map[string]any
+// @Router       /api/users [get]
 func (s *Server) SearchUsers(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	if len(q) < 1 {

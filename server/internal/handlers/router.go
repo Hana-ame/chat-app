@@ -11,8 +11,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimid "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
+// Router builds the HTTP handler with all routes and middleware.
 func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 	r := chi.NewRouter()
 	r.Use(chimid.RealIP)
@@ -75,6 +77,10 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 		r.Get("/ws", gateway.ServeHTTP)
 	}
 	r.Get("/api/events", s.SSE)
+
+	r.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.URL("https://wsl-8080.moonchan.xyz/swagger/doc.json"),
+	))
 
 	r.Get("/uploads/*", s.serveUpload)
 	if s.Cfg.StaticDir != "" {

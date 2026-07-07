@@ -21,6 +21,7 @@ const (
 	ctxKeyToken ctxKey = "token"
 )
 
+// Server is the HTTP handler container holding shared dependencies.
 type Server struct {
 	Cfg  *config.Config
 	DB   *db.DB
@@ -28,6 +29,7 @@ type Server struct {
 	Hub  *ws.Hub
 }
 
+// New creates a new Server.
 func New(cfg *config.Config, database *db.DB, authSvc *auth.Service, hub *ws.Hub) *Server {
 	return &Server{Cfg: cfg, DB: database, Auth: authSvc, Hub: hub}
 }
@@ -74,4 +76,36 @@ func bearerToken(r *http.Request) string {
 		return t
 	}
 	return ""
+}
+
+// authMiddleware authenticates requests via Bearer JWT token.
+func (s *Server) authMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tok := bearerToken(r)
+		if tok == "" {
+			writeError(w, http.StatusUnauthorized, "unauthorized", "missing token")
+			return
+		}
+		claims, err := s.Auth.ParseAccessToken(tok)
+		if err != nil {
+			if errors.Is(err, auth.ErrTokenExpired) {
+				writeError(w, http.StatusUnauthorized, "token_expired", "access token expired")
+				return
+			}
+			writeError(w, http.StatusUnauthorized, "token_invalid", "access token invalid")
+			return
+		}
+		u, err := s.DB.GetUserByID(r.Context(), claims.UserID)
+		if err != nil {
+			if errors.Is(err, db.ErrNotFound) {
+				writeError(w, http.StatusUnauthorized, "user_not_found", "user does not exist")
+				return
+			}
+			writeError(w, http.StatusInternalServerError, "internal", err.Error())
+			return
+		}
+		ctx := context.WithValue(r.Context(), ctxKeyUser, u)
+		ctx = context.WithValue(ctx, ctxKeyToken, tok)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

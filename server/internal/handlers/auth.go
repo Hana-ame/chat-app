@@ -30,6 +30,14 @@ type sessionResp struct {
 	ExpiresIn    int64  `json:"expires_in"`
 }
 
+// Register godoc
+// @Summary      Register a new user
+// @Description  Create account with email, username and password
+// @Tags         auth
+// @Param        body  body  registerReq  true  "Registration details"
+// @Success      200  {object}  sessionResp
+// @Failure      409  {object}  map[string]any
+// @Router       /api/auth/register [post]
 func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
 	var req registerReq
 	if err := decodeJSON(r, &req); err != nil {
@@ -63,6 +71,14 @@ func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
 	s.issueSession(w, r, u.ID)
 }
 
+// Login godoc
+// @Summary      Log in
+// @Description  Authenticate with email and password
+// @Tags         auth
+// @Param        body  body  loginReq  true  "Login credentials"
+// @Success      200  {object}  sessionResp
+// @Failure      401  {object}  map[string]any
+// @Router       /api/auth/login [post]
 func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginReq
 	if err := decodeJSON(r, &req); err != nil {
@@ -115,6 +131,14 @@ func (s *Server) issueSession(w http.ResponseWriter, r *http.Request, userID str
 	})
 }
 
+// Refresh godoc
+// @Summary      Refresh access token
+// @Description  Exchange a refresh token for a new session
+// @Tags         auth
+// @Param        body  body  refreshReq  true  "Refresh token"
+// @Success      200  {object}  sessionResp
+// @Failure      401  {object}  map[string]any
+// @Router       /api/auth/refresh [post]
 func (s *Server) Refresh(w http.ResponseWriter, r *http.Request) {
 	var req refreshReq
 	if err := decodeJSON(r, &req); err != nil {
@@ -143,6 +167,14 @@ func (s *Server) Refresh(w http.ResponseWriter, r *http.Request) {
 	s.issueSession(w, r, rt.UserID)
 }
 
+// Logout godoc
+// @Summary      Log out
+// @Description  Invalidate refresh token to end session
+// @Tags         auth
+// @Security     BearerAuth
+// @Param        body  body  refreshReq  true  "Refresh token to revoke"
+// @Success      200  {object}  map[string]any
+// @Router       /api/auth/logout [post]
 func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	if u == nil {
@@ -160,6 +192,13 @@ func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
+// Me godoc
+// @Summary      Get current user
+// @Description  Return the authenticated user's profile
+// @Tags         users
+// @Security     BearerAuth
+// @Success      200  {object}  models.User
+// @Router       /api/users/me [get]
 func (s *Server) Me(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	if u == nil {

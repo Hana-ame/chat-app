@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -61,6 +63,7 @@ func randomHex(n int) string {
 }
 
 func Load() *Config {
+	_ = godotenv.Load()
 	secret := os.Getenv("CHAT_JWT_SECRET")
 	if secret == "" {
 		secret = randomHex(32)
@@ -79,8 +82,8 @@ func Load() *Config {
 		UploadDir:       uploadDir,
 		BaseURL:         getenv("CHAT_BASE_URL", ""),
 		JWTSecret:       []byte(secret),
-		AccessTokenTTL:  getenvDuration("CHAT_ACCESS_TTL", 87600*time.Hour),
-		RefreshTokenTTL: getenvDuration("CHAT_REFRESH_TTL", 30*24*time.Hour),
+		AccessTokenTTL:  getenvDuration("CHAT_ACCESS_TTL", 30*time.Minute),
+		RefreshTokenTTL: getenvDuration("CHAT_REFRESH_TTL", 365*24*time.Hour),
 		MaxUploadBytes:  getenvInt64("CHAT_MAX_UPLOAD", 20<<20),
 		StaticDir:       getenv("CHAT_STATIC_DIR", "../client/dist"),
 		AllowOrigins:    []string{"*"},

@@ -1,11 +1,9 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 
-	"github.com/Hana-ame/chat-app/server/internal/db"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -20,18 +18,21 @@ type createDMReq struct {
 	UserID string `json:"user_id"`
 }
 
-type addMemberReq struct {
-	UserID string `json:"user_id"`
-}
-
 type renameChatReq struct {
 	Name string `json:"name"`
 }
 
-type readReq struct {
-	MessageID string `json:"message_id"`
+type joinReq struct {
+	ChatID string `json:"chat_id"`
 }
 
+// ListChats godoc
+// @Summary      List user's chats
+// @Description  Get all chats the authenticated user is a member of
+// @Tags         chats
+// @Security     BearerAuth
+// @Success      200  {object}  map[string]any
+// @Router       /api/chats [get]
 func (s *Server) ListChats(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	chats, err := s.DB.ListUserChats(r.Context(), u.ID)
@@ -42,6 +43,14 @@ func (s *Server) ListChats(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"chats": chats})
 }
 
+// CreateChat godoc
+// @Summary      Create a group chat
+// @Description  Create a new group chat with specified members
+// @Tags         chats
+// @Security     BearerAuth
+// @Param        body  body  createChatReq  true  "Chat details"
+// @Success      201  {object}  models.Chat
+// @Router       /api/chats [post]
 func (s *Server) CreateChat(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	var req createChatReq
@@ -83,6 +92,15 @@ func (s *Server) CreateChat(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, chat)
 }
 
+// CreateOrGetDM godoc
+// @Summary      Create or get DM chat
+// @Description  Find existing DM or create a new one with another user
+// @Tags         chats
+// @Security     BearerAuth
+// @Param        body  body  createDMReq  true  "Target user ID"
+// @Success      200  {object}  models.Chat
+// @Success      201  {object}  models.Chat
+// @Router       /api/dms [post]
 func (s *Server) CreateOrGetDM(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	var req createDMReq
@@ -114,6 +132,14 @@ func (s *Server) CreateOrGetDM(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, chat)
 }
 
+// GetChat godoc
+// @Summary      Get chat details
+// @Description  Fetch a single chat by ID (must be a member)
+// @Tags         chats
+// @Security     BearerAuth
+// @Param        chatID  path  string  true  "Chat ID"
+// @Success      200  {object}  models.Chat
+// @Router       /api/chats/{chatID} [get]
 func (s *Server) GetChat(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	id := chi.URLParam(r, "chatID")
@@ -134,6 +160,15 @@ func (s *Server) GetChat(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, c)
 }
 
+// RenameChat godoc
+// @Summary      Rename a group chat
+// @Description  Change chat name (owner only, not allowed on DMs)
+// @Tags         chats
+// @Security     BearerAuth
+// @Param        chatID  path  string         true  "Chat ID"
+// @Param        body    body  renameChatReq  true  "New name"
+// @Success      200  {object}  models.Chat
+// @Router       /api/chats/{chatID} [patch]
 func (s *Server) RenameChat(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	id := chi.URLParam(r, "chatID")
@@ -166,6 +201,14 @@ func (s *Server) RenameChat(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, updated)
 }
 
+// DeleteChat godoc
+// @Summary      Delete a group chat
+// @Description  Remove chat and all messages (owner only, not allowed on DMs)
+// @Tags         chats
+// @Security     BearerAuth
+// @Param        chatID  path  string  true  "Chat ID"
+// @Success      200  {object}  map[string]any
+// @Router       /api/chats/{chatID} [delete]
 func (s *Server) DeleteChat(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	id := chi.URLParam(r, "chatID")
@@ -192,116 +235,87 @@ func (s *Server) DeleteChat(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-func (s *Server) ListMembers(w http.ResponseWriter, r *http.Request) {
-	u := userFrom(r.Context())
-	id := chi.URLParam(r, "chatID")
-	ok, err := s.DB.IsChatMember(r.Context(), id, u.ID)
-	if err != nil || !ok {
-		writeError(w, http.StatusForbidden, "forbidden", "")
-		return
-	}
-	members, err := s.DB.GetChatMembers(r.Context(), id)
+// ListPublicChats godoc
+// @Summary      List public chats
+// @Description  Get all discoverable public chats
+// @Tags         chats
+// @Security     BearerAuth
+// @Success      200  {object}  map[string]any
+// @Router       /api/chats/public [get]
+func (s *Server) ListPublicChats(w http.ResponseWriter, r *http.Request) {
+	chats, err := s.DB.ListPublicChats(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"members": members})
+	writeJSON(w, http.StatusOK, map[string]any{"chats": chats})
 }
 
-func (s *Server) AddMember(w http.ResponseWriter, r *http.Request) {
+// JoinChat godoc
+// @Summary      Join a public chat
+// @Description  Authenticated user joins a public chat by ID
+// @Tags         chats
+// @Security     BearerAuth
+// @Param        chatID  path  string  true  "Chat ID"
+// @Success      200  {object}  map[string]any
+// @Router       /api/chats/{chatID}/join [post]
+func (s *Server) JoinChat(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
+	if u == nil {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "")
+		return
+	}
 	id := chi.URLParam(r, "chatID")
-	c, err := s.DB.GetChat(r.Context(), id)
-	if err != nil {
-		writeError(w, http.StatusNotFound, "not_found", "")
-		return
-	}
-	if c.Type == "dm" {
-		writeError(w, http.StatusBadRequest, "bad_request", "cannot add to dm")
-		return
-	}
-	ok, _ := s.DB.IsChatMember(r.Context(), id, u.ID)
-	if !ok {
-		writeError(w, http.StatusForbidden, "forbidden", "")
-		return
-	}
-	var req addMemberReq
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
-		return
-	}
-	if _, err := s.DB.GetUserByID(r.Context(), req.UserID); err != nil {
-		writeError(w, http.StatusNotFound, "user_not_found", "")
-		return
-	}
-	if err := s.DB.AddChatMember(r.Context(), id, req.UserID); err != nil {
-		if errors.Is(err, db.ErrConflict) {
-			writeError(w, http.StatusConflict, "already_member", "")
-			return
-		}
+	if err := s.DB.JoinChatByID(r.Context(), id, u.ID); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
-	updated, _ := s.DB.GetChat(r.Context(), id)
-	if s.Hub != nil && updated != nil {
-		s.Hub.BroadcastChatUpdated(updated)
-		s.Hub.NotifyUserNewChat(req.UserID, updated)
-	}
-	writeJSON(w, http.StatusOK, updated)
-}
-
-func (s *Server) RemoveMember(w http.ResponseWriter, r *http.Request) {
-	u := userFrom(r.Context())
-	id := chi.URLParam(r, "chatID")
-	target := chi.URLParam(r, "userID")
-	c, err := s.DB.GetChat(r.Context(), id)
-	if err != nil {
-		writeError(w, http.StatusNotFound, "not_found", "")
-		return
-	}
-	if c.Type == "dm" {
-		writeError(w, http.StatusBadRequest, "bad_request", "cannot remove from dm")
-		return
-	}
-	if target != u.ID && c.OwnerID != u.ID {
-		writeError(w, http.StatusForbidden, "forbidden", "only owner can kick others")
-		return
-	}
-	if target == c.OwnerID && target != u.ID {
-		writeError(w, http.StatusForbidden, "forbidden", "cannot kick owner")
-		return
-	}
-	if err := s.DB.RemoveChatMember(r.Context(), id, target); err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	if s.Hub != nil {
-		s.Hub.NotifyUserLeftChat(target, id)
-		if updated, _ := s.DB.GetChat(r.Context(), id); updated != nil {
-			s.Hub.BroadcastChatUpdated(updated)
-		}
+	chat, _ := s.DB.GetChat(r.Context(), id)
+	if s.Hub != nil && chat != nil {
+		s.Hub.NotifyUserNewChat(u.ID, chat)
+		s.Hub.BroadcastChatUpdated(chat)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-func (s *Server) MarkRead(w http.ResponseWriter, r *http.Request) {
+// PinChat godoc
+// @Summary      Pin a chat
+// @Description  Pin chat to top of user's chat list
+// @Tags         chats
+// @Security     BearerAuth
+// @Param        chatID  path  string  true  "Chat ID"
+// @Success      200  {object}  map[string]any
+// @Router       /api/chats/{chatID}/pin [post]
+func (s *Server) PinChat(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
+	if u == nil {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "")
+		return
+	}
 	id := chi.URLParam(r, "chatID")
-	ok, _ := s.DB.IsChatMember(r.Context(), id, u.ID)
-	if !ok {
-		writeError(w, http.StatusForbidden, "forbidden", "")
+	if err := s.DB.PinChat(r.Context(), id, u.ID); err != nil {
+		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
-	var req readReq
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// UnpinChat godoc
+// @Summary      Unpin a chat
+// @Description  Remove pin from a chat
+// @Tags         chats
+// @Security     BearerAuth
+// @Param        chatID  path  string  true  "Chat ID"
+// @Success      200  {object}  map[string]any
+// @Router       /api/chats/{chatID}/unpin [post]
+func (s *Server) UnpinChat(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r.Context())
+	if u == nil {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "")
 		return
 	}
-	if req.MessageID == "" {
-		writeError(w, http.StatusBadRequest, "bad_request", "message_id required")
-		return
-	}
-	if err := s.DB.UpdateLastRead(r.Context(), id, u.ID, req.MessageID); err != nil {
+	id := chi.URLParam(r, "chatID")
+	if err := s.DB.UnpinChat(r.Context(), id, u.ID); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}

@@ -1,0 +1,874 @@
+basePath: /api
+definitions:
+  handlers.addMemberReq:
+    properties:
+      user_id:
+        type: string
+    type: object
+  handlers.createChatReq:
+    properties:
+      member_ids:
+        items:
+          type: string
+        type: array
+      name:
+        type: string
+      type:
+        type: string
+      visibility:
+        type: string
+    type: object
+  handlers.createDMReq:
+    properties:
+      user_id:
+        type: string
+    type: object
+  handlers.editMsgReq:
+    properties:
+      content:
+        type: string
+    type: object
+  handlers.loginReq:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  handlers.readReq:
+    properties:
+      message_id:
+        type: string
+    type: object
+  handlers.refreshReq:
+    properties:
+      refresh_token:
+        type: string
+    type: object
+  handlers.registerReq:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  handlers.renameChatReq:
+    properties:
+      name:
+        type: string
+    type: object
+  handlers.sendMsgReq:
+    properties:
+      attachments:
+        items:
+          $ref: '#/definitions/models.Attachment'
+        type: array
+      content:
+        type: string
+    type: object
+  handlers.sessionResp:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      refresh_token:
+        type: string
+      user: {}
+    type: object
+  handlers.updateProfileReq:
+    properties:
+      avatar_color:
+        type: string
+      avatar_url:
+        type: string
+      username:
+        type: string
+    type: object
+  models.Attachment:
+    properties:
+      filename:
+        type: string
+      id:
+        type: string
+      message_id:
+        type: string
+      mime_type:
+        type: string
+      size:
+        type: integer
+      url:
+        type: string
+    type: object
+  models.Chat:
+    properties:
+      created_at:
+        type: string
+      icon_color:
+        type: string
+      id:
+        type: string
+      last_message:
+        $ref: '#/definitions/models.Message'
+      last_message_at:
+        type: string
+      members:
+        items:
+          $ref: '#/definitions/models.User'
+        type: array
+      name:
+        type: string
+      owner_id:
+        type: string
+      pinned:
+        type: boolean
+      type:
+        type: string
+      unread_count:
+        type: integer
+      visibility:
+        type: string
+    type: object
+  models.Message:
+    properties:
+      attachments:
+        items:
+          $ref: '#/definitions/models.Attachment'
+        type: array
+      author:
+        $ref: '#/definitions/models.User'
+      chat_id:
+        type: string
+      content:
+        type: string
+      created_at:
+        type: string
+      deleted:
+        type: boolean
+      edited_at:
+        type: string
+      id:
+        type: string
+      mentions:
+        items:
+          type: string
+        type: array
+      reactions:
+        items:
+          $ref: '#/definitions/models.Reaction'
+        type: array
+      user_id:
+        type: string
+    type: object
+  models.Reaction:
+    properties:
+      count:
+        type: integer
+      emoji:
+        type: string
+      me:
+        type: boolean
+      user_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  models.User:
+    properties:
+      avatar_color:
+        type: string
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      status:
+        type: string
+      username:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Real-time chat server with WebSocket and SSE
+  title: Chat App API
+  version: "1.0"
+paths:
+  /api/auth/login:
+    post:
+      description: Authenticate with email and password
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.loginReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.sessionResp'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Log in
+      tags:
+      - auth
+  /api/auth/logout:
+    post:
+      description: Invalidate refresh token to end session
+      parameters:
+      - description: Refresh token to revoke
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.refreshReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Log out
+      tags:
+      - auth
+  /api/auth/refresh:
+    post:
+      description: Exchange a refresh token for a new session
+      parameters:
+      - description: Refresh token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.refreshReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.sessionResp'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Refresh access token
+      tags:
+      - auth
+  /api/auth/register:
+    post:
+      description: Create account with email, username and password
+      parameters:
+      - description: Registration details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.registerReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.sessionResp'
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Register a new user
+      tags:
+      - auth
+  /api/chats:
+    get:
+      description: Get all chats the authenticated user is a member of
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List user's chats
+      tags:
+      - chats
+    post:
+      description: Create a new group chat with specified members
+      parameters:
+      - description: Chat details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createChatReq'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Chat'
+      security:
+      - BearerAuth: []
+      summary: Create a group chat
+      tags:
+      - chats
+  /api/chats/{chatID}:
+    delete:
+      description: Remove chat and all messages (owner only, not allowed on DMs)
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete a group chat
+      tags:
+      - chats
+    get:
+      description: Fetch a single chat by ID (must be a member)
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Chat'
+      security:
+      - BearerAuth: []
+      summary: Get chat details
+      tags:
+      - chats
+    patch:
+      description: Change chat name (owner only, not allowed on DMs)
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      - description: New name
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.renameChatReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Chat'
+      security:
+      - BearerAuth: []
+      summary: Rename a group chat
+      tags:
+      - chats
+  /api/chats/{chatID}/join:
+    post:
+      description: Authenticated user joins a public chat by ID
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Join a public chat
+      tags:
+      - chats
+  /api/chats/{chatID}/members:
+    get:
+      description: Get all members of a chat (must be a member)
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List chat members
+      tags:
+      - members
+    post:
+      description: Add a user to a group chat (existing member required, DM not allowed)
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      - description: User ID to add
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.addMemberReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Chat'
+      security:
+      - BearerAuth: []
+      summary: Add a member to a chat
+      tags:
+      - members
+  /api/chats/{chatID}/members/{userID}:
+    delete:
+      description: Kick a user or leave chat (DM not allowed, owner cannot be kicked)
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      - description: User ID to remove
+        in: path
+        name: userID
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Remove a member from a chat
+      tags:
+      - members
+  /api/chats/{chatID}/messages:
+    get:
+      description: Get paginated messages for a chat the user is a member of
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      - description: Max messages (default 50)
+        in: query
+        name: limit
+        type: integer
+      - description: Message ID to paginate before
+        in: query
+        name: before
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List messages in a chat
+      tags:
+      - messages
+    post:
+      description: Create and broadcast a new message
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      - description: Message content and attachments
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.sendMsgReq'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Message'
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Send a message to a chat
+      tags:
+      - messages
+  /api/chats/{chatID}/messages/{messageID}:
+    delete:
+      description: Delete own message or any message as chat owner
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      - description: Message ID
+        in: path
+        name: messageID
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete a message
+      tags:
+      - messages
+    patch:
+      description: Update message content (author only)
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      - description: Message ID
+        in: path
+        name: messageID
+        required: true
+        type: string
+      - description: New content
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.editMsgReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Message'
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Edit a message
+      tags:
+      - messages
+  /api/chats/{chatID}/messages/{messageID}/reactions/{emoji}:
+    delete:
+      description: Remove your emoji reaction from a message
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      - description: Message ID
+        in: path
+        name: messageID
+        required: true
+        type: string
+      - description: Emoji (URL-encoded)
+        in: path
+        name: emoji
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Message'
+      security:
+      - BearerAuth: []
+      summary: Remove a reaction from a message
+      tags:
+      - reactions
+    put:
+      description: React with an emoji to a message
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      - description: Message ID
+        in: path
+        name: messageID
+        required: true
+        type: string
+      - description: Emoji (URL-encoded)
+        in: path
+        name: emoji
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Message'
+      security:
+      - BearerAuth: []
+      summary: Add a reaction to a message
+      tags:
+      - reactions
+  /api/chats/{chatID}/pin:
+    post:
+      description: Pin chat to top of user's chat list
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Pin a chat
+      tags:
+      - chats
+  /api/chats/{chatID}/read:
+    post:
+      description: Update the last-read message pointer for a chat
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      - description: Last read message ID
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.readReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Mark messages as read
+      tags:
+      - messages
+  /api/chats/{chatID}/unpin:
+    post:
+      description: Remove pin from a chat
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Unpin a chat
+      tags:
+      - chats
+  /api/chats/public:
+    get:
+      description: Get all discoverable public chats
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List public chats
+      tags:
+      - chats
+  /api/dms:
+    post:
+      description: Find existing DM or create a new one with another user
+      parameters:
+      - description: Target user ID
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createDMReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Chat'
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Chat'
+      security:
+      - BearerAuth: []
+      summary: Create or get DM chat
+      tags:
+      - chats
+  /api/events:
+    get:
+      description: Connect to server-sent events for real-time updates
+      parameters:
+      - description: JWT access token
+        in: query
+        name: access_token
+        required: true
+        type: string
+      responses:
+        "200":
+          description: text/event-stream
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: SSE event stream
+      tags:
+      - sse
+  /api/uploads:
+    post:
+      description: Upload a file via multipart form (validates mime type and size)
+      parameters:
+      - description: File to upload
+        in: formData
+        name: file
+        required: true
+        type: file
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "413":
+          description: Request Entity Too Large
+          schema:
+            additionalProperties: true
+            type: object
+        "415":
+          description: Unsupported Media Type
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Upload a file
+      tags:
+      - uploads
+  /api/users:
+    get:
+      description: Search users by username or email prefix (excludes self)
+      parameters:
+      - description: Search query (min 1 char)
+        in: query
+        name: q
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Search users
+      tags:
+      - users
+  /api/users/me:
+    get:
+      description: Return the authenticated user's profile
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+      security:
+      - BearerAuth: []
+      summary: Get current user
+      tags:
+      - users
+    patch:
+      description: Update username, avatar color, or avatar URL
+      parameters:
+      - description: Profile fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.updateProfileReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+      security:
+      - BearerAuth: []
+      summary: Update user profile
+      tags:
+      - users
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

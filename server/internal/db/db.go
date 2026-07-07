@@ -61,7 +61,7 @@ func (d *DB) Migrate() error {
 			return fmt.Errorf("read migration %s: %w", n, err)
 		}
 		if _, err := d.ExecContext(context.Background(), string(b)); err != nil {
-			if !(strings.Contains(n, "0002") && isDupColumnErr(err)) {
+			if !isDupColumnErr(err) {
 				return fmt.Errorf("apply migration %s: %w", n, err)
 			}
 		}

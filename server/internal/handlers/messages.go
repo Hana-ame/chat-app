@@ -20,6 +20,10 @@ type editMsgReq struct {
 	Content string `json:"content"`
 }
 
+type readReq struct {
+	MessageID string `json:"message_id"`
+}
+
 var mentionRegex = regexp.MustCompile(`<@([a-f0-9-]{36})>`)
 
 func extractMentions(content string) []string {
@@ -31,6 +35,17 @@ func extractMentions(content string) []string {
 	return out
 }
 
+// ListMessages godoc
+// @Summary      List messages in a chat
+// @Description  Get paginated messages for a chat the user is a member of
+// @Tags         messages
+// @Security     BearerAuth
+// @Param        chatID  path  string  true  "Chat ID"
+// @Param        limit   query int     false "Max messages (default 50)"
+// @Param        before  query string  false "Message ID to paginate before"
+// @Success      200  {object}  map[string]any
+// @Failure      403  {object}  map[string]any
+// @Router       /api/chats/{chatID}/messages [get]
 func (s *Server) ListMessages(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	id := chi.URLParam(r, "chatID")
@@ -49,6 +64,16 @@ func (s *Server) ListMessages(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"messages": msgs})
 }
 
+// SendMessage godoc
+// @Summary      Send a message to a chat
+// @Description  Create and broadcast a new message
+// @Tags         messages
+// @Security     BearerAuth
+// @Param        chatID  path  string       true  "Chat ID"
+// @Param        body    body  sendMsgReq   true  "Message content and attachments"
+// @Success      201  {object}  models.Message
+// @Failure      403  {object}  map[string]any
+// @Router       /api/chats/{chatID}/messages [post]
 func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	id := chi.URLParam(r, "chatID")
@@ -83,6 +108,17 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, msg)
 }
 
+// EditMessage godoc
+// @Summary      Edit a message
+// @Description  Update message content (author only)
+// @Tags         messages
+// @Security     BearerAuth
+// @Param        chatID     path  string      true  "Chat ID"
+// @Param        messageID  path  string      true  "Message ID"
+// @Param        body       body  editMsgReq  true  "New content"
+// @Success      200  {object}  models.Message
+// @Failure      403  {object}  map[string]any
+// @Router       /api/chats/{chatID}/messages/{messageID} [patch]
 func (s *Server) EditMessage(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	chatID := chi.URLParam(r, "chatID")
@@ -116,6 +152,16 @@ func (s *Server) EditMessage(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, msg)
 }
 
+// DeleteMessage godoc
+// @Summary      Delete a message
+// @Description  Delete own message or any message as chat owner
+// @Tags         messages
+// @Security     BearerAuth
+// @Param        chatID     path  string  true  "Chat ID"
+// @Param        messageID  path  string  true  "Message ID"
+// @Success      200  {object}  map[string]any
+// @Failure      403  {object}  map[string]any
+// @Router       /api/chats/{chatID}/messages/{messageID} [delete]
 func (s *Server) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	chatID := chi.URLParam(r, "chatID")
@@ -146,6 +192,40 @@ func (s *Server) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.Hub != nil {
 		s.Hub.BroadcastMessageDelete(chatID, id)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// MarkRead godoc
+// @Summary      Mark messages as read
+// @Description  Update the last-read message pointer for a chat
+// @Tags         messages
+// @Security     BearerAuth
+// @Param        chatID  path  string   true  "Chat ID"
+// @Param        body    body  readReq  true  "Last read message ID"
+// @Success      200  {object}  map[string]any
+// @Failure      403  {object}  map[string]any
+// @Router       /api/chats/{chatID}/read [post]
+func (s *Server) MarkRead(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r.Context())
+	id := chi.URLParam(r, "chatID")
+	ok, _ := s.DB.IsChatMember(r.Context(), id, u.ID)
+	if !ok {
+		writeError(w, http.StatusForbidden, "forbidden", "")
+		return
+	}
+	var req readReq
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
+	if req.MessageID == "" {
+		writeError(w, http.StatusBadRequest, "bad_request", "message_id required")
+		return
+	}
+	if err := s.DB.UpdateLastRead(r.Context(), id, u.ID, req.MessageID); err != nil {
+		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }

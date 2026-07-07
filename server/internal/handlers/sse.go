@@ -6,13 +6,14 @@ import (
 	"net/http"
 )
 
-type sseClient struct {
-	w       http.ResponseWriter
-	flusher http.Flusher
-	userID  string
-	closed  bool
-}
-
+// SSE godoc
+// @Summary      SSE event stream
+// @Description  Connect to server-sent events for real-time updates
+// @Tags         sse
+// @Security     BearerAuth
+// @Param        access_token  query  string  true  "JWT access token"
+// @Success      200  {string}  string  "text/event-stream"
+// @Router       /api/events [get]
 func (s *Server) SSE(w http.ResponseWriter, r *http.Request) {
 	tok := bearerToken(r)
 	if tok == "" {
