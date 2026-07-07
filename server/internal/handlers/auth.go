@@ -139,21 +139,26 @@ func (s *Server) Refresh(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "refresh token missing")
 		return
 	}
+	s.refreshMu.Lock()
 	hash := auth.HashRefreshToken(c.Value)
 	rt, err := s.DB.FindRefreshToken(r.Context(), hash)
 	if err != nil {
+		s.refreshMu.Unlock()
 		writeError(w, http.StatusUnauthorized, "refresh_invalid", "invalid refresh token")
 		return
 	}
 	if rt.ExpiresAt.Before(timeNow()) {
 		_ = s.DB.DeleteRefreshToken(r.Context(), rt.ID)
+		s.refreshMu.Unlock()
 		writeError(w, http.StatusUnauthorized, "refresh_expired", "refresh token expired")
 		return
 	}
 	if err := s.DB.DeleteRefreshToken(r.Context(), rt.ID); err != nil {
+		s.refreshMu.Unlock()
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	s.refreshMu.Unlock()
 	s.issueSession(w, r, rt.UserID)
 }
 

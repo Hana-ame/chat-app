@@ -3,6 +3,8 @@ package testutil_test
 import (
 	"encoding/json"
 	"io"
+	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/Hana-ame/chat-app/server/internal/testutil"
@@ -205,6 +207,124 @@ func TestLoginWrongPassword(t *testing.T) {
 	}
 	if errResp.Error != "invalid_credentials" {
 		t.Fatalf("want 'invalid_credentials' got '%s'", errResp.Error)
+	}
+}
+
+func TestConcurrentRefreshRotation(t *testing.T) {
+	f := testutil.New(t)
+	s := f.Register(t, "concur@test.dev", "ConcurUser", "testPass1!")
+
+	const N = 10
+	var mu sync.Mutex
+	okCount := 0
+	errCount := 0
+
+	var wg sync.WaitGroup
+	for i := 0; i < N; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			res := f.DoWithCookie(t, "POST", "/api/auth/refresh", "", "refresh_token", s.RefreshToken, nil)
+			res.Body.Close()
+			mu.Lock()
+			if res.StatusCode == 200 {
+				okCount++
+			} else {
+				errCount++
+			}
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+
+	if okCount != 1 {
+		t.Fatalf("concurrent refresh: want exactly 1 success, got %d (failures=%d)", okCount, errCount)
+	}
+	if errCount != N-1 {
+		t.Fatalf("concurrent refresh: want %d failures, got %d", N-1, errCount)
+	}
+}
+
+func TestLogoutInvalidatesTokens(t *testing.T) {
+	f := testutil.New(t)
+	s := f.Register(t, "logout2@test.dev", "LogoutTester", "testPass1!")
+
+	res := f.Do(t, "POST", "/api/auth/logout", s.AccessToken, nil)
+	res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatalf("logout: want 200 got %d", res.StatusCode)
+	}
+
+	// JWT is stateless — access token remains valid until expiry.
+	// Logout only kills the refresh token chain.
+	res2 := f.Do(t, "GET", "/api/users/me", s.AccessToken, nil)
+	res2.Body.Close()
+	if res2.StatusCode != 200 {
+		t.Fatalf("access token should still work (stateless JWT): want 200 got %d", res2.StatusCode)
+	}
+
+	res3 := f.DoWithCookie(t, "POST", "/api/auth/refresh", "", "refresh_token", s.RefreshToken, nil)
+	res3.Body.Close()
+	if res3.StatusCode != 401 {
+		t.Fatalf("old refresh token after logout: want 401 got %d", res3.StatusCode)
+	}
+}
+
+func TestCookieSecurityAttributes(t *testing.T) {
+	f := testutil.New(t)
+	res := f.Do(t, "POST", "/api/auth/register", "", map[string]string{
+		"email": "cookie@test.dev", "username": "CookieUser", "password": "testPass1!",
+	})
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatal("register failed")
+	}
+
+	c := testutil.ResponseCookie(res, "refresh_token")
+	if c == nil {
+		t.Fatal("refresh_token cookie not set")
+	}
+	if !c.HttpOnly {
+		t.Error("cookie missing HttpOnly flag")
+	}
+	if c.SameSite != http.SameSiteStrictMode {
+		t.Errorf("cookie SameSite: want StrictMode(%d) got %d", http.SameSiteStrictMode, c.SameSite)
+	}
+}
+
+func TestMultiDeviceRefreshIsolation(t *testing.T) {
+	f := testutil.New(t)
+
+	_ = f.Register(t, "multi@test.dev", "MultiUser", "testPass1!")
+	devA := f.Login(t, "multi@test.dev", "testPass1!")
+	devB := f.Login(t, "multi@test.dev", "testPass1!")
+	if devA.RefreshToken == devB.RefreshToken {
+		t.Fatal("two logins should produce different refresh tokens")
+	}
+
+	devA2 := f.Refresh(t, devA.RefreshToken)
+	devB2 := f.Refresh(t, devB.RefreshToken)
+
+	resA := f.DoWithCookie(t, "POST", "/api/auth/refresh", "", "refresh_token", devA.RefreshToken, nil)
+	defer resA.Body.Close()
+	if resA.StatusCode != 401 {
+		t.Fatalf("reused devA old refresh: want 401 got %d", resA.StatusCode)
+	}
+
+	resB := f.DoWithCookie(t, "POST", "/api/auth/refresh", "", "refresh_token", devB.RefreshToken, nil)
+	defer resB.Body.Close()
+	if resB.StatusCode != 401 {
+		t.Fatalf("reused devB old refresh: want 401 got %d", resB.StatusCode)
+	}
+
+	devA3 := f.Refresh(t, devA2.RefreshToken)
+	if devA3.UserID != devA2.UserID {
+		t.Fatal("devA chain broken")
+	}
+
+	devB3 := f.Refresh(t, devB2.RefreshToken)
+	if devB3.UserID != devB2.UserID {
+		t.Fatal("devB chain broken")
 	}
 }
 

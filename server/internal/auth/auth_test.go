@@ -1,6 +1,7 @@
 package auth_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -135,6 +136,56 @@ func TestValidateUsername(t *testing.T) {
 		}
 		if err == nil {
 			t.Errorf("should be invalid: %q", u)
+		}
+	}
+}
+
+func TestPasswordTruncation(t *testing.T) {
+	// bcrypt only considers the first 72 bytes.
+	// HashPassword truncates to 72 before hashing.
+	long := strings.Repeat("a", 100)
+	hash, err := auth.HashPassword(long)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := auth.VerifyPassword(hash, long); err != nil {
+		t.Fatal("verify with original long password failed")
+	}
+	if err := auth.VerifyPassword(hash, long[:72]); err != nil {
+		t.Fatal("verify with truncated password failed")
+	}
+}
+
+func TestUsernameBoundaries(t *testing.T) {
+	valid := []string{
+		strings.Repeat("a", 32),
+		"正常用户名",
+		"user-name_123",
+		"  spaced  ",
+	}
+	for _, u := range valid {
+		n, err := auth.ValidateUsername(u)
+		if err != nil {
+			t.Errorf("valid username %q should pass: %v", u, err)
+		}
+		if n == "" {
+			t.Errorf("valid username %q returned empty", u)
+		}
+	}
+
+	invalid := []string{
+		"",
+		" ",
+		"a",
+		strings.Repeat("a", 33),
+		"\x00null",
+		string(rune(0x7f)),
+		"new\nline",
+	}
+	for _, u := range invalid {
+		_, err := auth.ValidateUsername(u)
+		if err == nil {
+			t.Errorf("invalid username %q should fail", u)
 		}
 	}
 }

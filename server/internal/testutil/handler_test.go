@@ -77,7 +77,7 @@ func TestCreateGroupChatAndSendMessage(t *testing.T) {
 	}
 }
 
-func TCRUDCreateDM(t *testing.T) {
+func TestCreateDM(t *testing.T) {
 	f := testutil.New(t)
 	alice := f.Register(t, "dm1@dm.t", "AliceDM", "password123")
 	bob := f.Register(t, "dm2@dm.t", "BobDM", "password123")
@@ -108,7 +108,7 @@ func TCRUDCreateDM(t *testing.T) {
 	}
 }
 
-func TCRUDAddRemoveMembers(t *testing.T) {
+func TestAddRemoveMembers(t *testing.T) {
 	f := testutil.New(t)
 	alice := f.Register(t, "owner@mem.t", "Owner", "password123")
 	bob := f.Register(t, "joiner@mem.t", "Joiner", "password123")
@@ -158,7 +158,7 @@ func TCRUDAddRemoveMembers(t *testing.T) {
 	}
 }
 
-func TCRUDReactionsFlow(t *testing.T) {
+func TestReactionsFlow(t *testing.T) {
 	f := testutil.New(t)
 	alice := f.Register(t, "r1@rx.t", "AliceRx", "password123")
 	bob := f.Register(t, "r2@rx.t", "BobRx", "password123")
@@ -219,7 +219,7 @@ func TCRUDReactionsFlow(t *testing.T) {
 	}
 }
 
-func TCRUDUpdateProfile(t *testing.T) {
+func TestUpdateProfile(t *testing.T) {
 	f := testutil.New(t)
 	alice := f.Register(t, "prof@p.t", "ProfUser", "password123")
 
@@ -237,7 +237,7 @@ func TCRUDUpdateProfile(t *testing.T) {
 	}
 }
 
-func TCRUDSearchUsers(t *testing.T) {
+func TestSearchUsers(t *testing.T) {
 	f := testutil.New(t)
 	f.Register(t, "search1@s.t", "SearchTarget", "password123")
 	alice := f.Register(t, "search2@s.t", "AliceSearch", "password123")
@@ -265,7 +265,7 @@ func TCRUDSearchUsers(t *testing.T) {
 	}
 }
 
-func TCRUDDeleteMessageAsAdmin(t *testing.T) {
+func TestDeleteMessageAsAdmin(t *testing.T) {
 	f := testutil.New(t)
 	alice := f.Register(t, "admin@d.t", "Admin", "password123")
 	bob := f.Register(t, "user@d.t", "User", "password123")
@@ -293,7 +293,7 @@ func TCRUDDeleteMessageAsAdmin(t *testing.T) {
 	}
 }
 
-func TCRUDLeaveGroupChat(t *testing.T) {
+func TestLeaveGroupChat(t *testing.T) {
 	f := testutil.New(t)
 	alice := f.Register(t, "leave1@lv.t", "LeaveMe", "password123")
 	bob := f.Register(t, "leave2@lv.t", "StayHere", "password123")
@@ -585,5 +585,226 @@ func TestHealthz(t *testing.T) {
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("healthz: %d", res.StatusCode)
+	}
+}
+
+func TestUploadFile(t *testing.T) {
+	f := testutil.New(t)
+	s := f.Register(t, "upload@test.dev", "Uploader", "testPass1!")
+
+	res := f.DoMultipart(t, "POST", "/api/uploads", s.AccessToken, nil, "file", "hello.txt", []byte("hello world"))
+	defer res.Body.Close()
+	if res.StatusCode != 201 {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("upload: want 201 got %d body=%s", res.StatusCode, string(b))
+	}
+	var uploadResp struct {
+		ID       string `json:"id"`
+		URL      string `json:"url"`
+		Filename string `json:"filename"`
+		MimeType string `json:"mime_type"`
+		Size     int64  `json:"size"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&uploadResp); err != nil {
+		t.Fatal(err)
+	}
+	if uploadResp.ID == "" || uploadResp.URL == "" {
+		t.Fatal("upload response missing id/url")
+	}
+	if uploadResp.Filename != "hello.txt" {
+		t.Fatalf("filename: want hello.txt got %s", uploadResp.Filename)
+	}
+	if uploadResp.Size != 11 {
+		t.Fatalf("size: want 11 got %d", uploadResp.Size)
+	}
+}
+
+func TestUploadExceedsSizeLimit(t *testing.T) {
+	f := testutil.New(t)
+	s := f.Register(t, "bigupload@test.dev", "BigUploader", "testPass1!")
+
+	// MaxUploadBytes is 5MB in test config
+	data := make([]byte, 6<<20)
+	res := f.DoMultipart(t, "POST", "/api/uploads", s.AccessToken, nil, "file", "big.bin", data)
+	defer res.Body.Close()
+	if res.StatusCode != 413 {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("oversize upload: want 413 got %d body=%s", res.StatusCode, string(b))
+	}
+
+	var errResp struct {
+		Error string `json:"error"`
+	}
+	json.NewDecoder(res.Body).Decode(&errResp)
+	if errResp.Error != "too_large" {
+		t.Fatalf("want error='too_large' got '%s'", errResp.Error)
+	}
+}
+
+func TestUploadRejectsUnsupportedMime(t *testing.T) {
+	f := testutil.New(t)
+	s := f.Register(t, "badmime@test.dev", "BadMime", "testPass1!")
+
+	// .exe extension maps to application/x-msdownload which is not in allowedMime
+	res := f.DoMultipart(t, "POST", "/api/uploads", s.AccessToken, nil, "file", "virus.exe", []byte("MZ..."))
+	defer res.Body.Close()
+	if res.StatusCode != 415 {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("bad mime: want 415 got %d body=%s", res.StatusCode, string(b))
+	}
+}
+
+func TestUpdateMeUsernameConflict(t *testing.T) {
+	f := testutil.New(t)
+	a := f.Register(t, "upa@test.dev", "UserA", "testPass1!")
+	b := f.Register(t, "upb@test.dev", "UserB", "testPass1!")
+
+	res := f.Do(t, "PATCH", "/api/users/me", b.AccessToken, map[string]string{
+		"username": "UserA",
+	})
+	defer res.Body.Close()
+	if res.StatusCode != 409 {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("username conflict: want 409 got %d body=%s", res.StatusCode, string(b))
+	}
+
+	res2 := f.Do(t, "PATCH", "/api/users/me", b.AccessToken, map[string]string{
+		"username": "UserB-renamed",
+	})
+	defer res2.Body.Close()
+	if res2.StatusCode != 200 {
+		b, _ := io.ReadAll(res2.Body)
+		t.Fatalf("rename: want 200 got %d body=%s", res2.StatusCode, string(b))
+	}
+	var u struct {
+		Username string `json:"username"`
+	}
+	json.NewDecoder(res2.Body).Decode(&u)
+	if u.Username != "UserB-renamed" {
+		t.Fatalf("want UserB-renamed got %s", u.Username)
+	}
+}
+
+func TestCreateChatInvalidInput(t *testing.T) {
+	f := testutil.New(t)
+	s := f.Register(t, "chatbad@test.dev", "ChatBad", "testPass1!")
+
+	res := f.Do(t, "POST", "/api/chats", s.AccessToken, map[string]any{
+		"type": "invalid-type", "name": "Test", "member_ids": []string{},
+	})
+	defer res.Body.Close()
+	if res.StatusCode != 400 {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("invalid chat type: want 400 got %d body=%s", res.StatusCode, string(b))
+	}
+}
+
+func TestSendMessageNonMember(t *testing.T) {
+	f := testutil.New(t)
+	a := f.Register(t, "nmsga@test.dev", "NonMemberA", "testPass1!")
+	b := f.Register(t, "nmsgb@test.dev", "NonMemberB", "testPass1!")
+
+	res := f.Do(t, "POST", "/api/chats", a.AccessToken, map[string]any{
+		"type": "group", "name": "Exclusive", "member_ids": []string{},
+	})
+	var chat struct{ ID string `json:"id"` }
+	json.NewDecoder(res.Body).Decode(&chat)
+	res.Body.Close()
+
+	sendRes := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", b.AccessToken, map[string]string{
+		"content": "interloper message",
+	})
+	defer sendRes.Body.Close()
+	if sendRes.StatusCode != 403 {
+		b, _ := io.ReadAll(sendRes.Body)
+		t.Fatalf("non-member send: want 403 got %d body=%s", sendRes.StatusCode, string(b))
+	}
+}
+
+func TestSearchUsersEmptyQuery(t *testing.T) {
+	f := testutil.New(t)
+	s := f.Register(t, "searchqa@test.dev", "SearchQA", "testPass1!")
+
+	res := f.Do(t, "GET", "/api/users", s.AccessToken, nil)
+	defer res.Body.Close()
+	var resp struct {
+		Users []map[string]any `json:"users"`
+	}
+	json.NewDecoder(res.Body).Decode(&resp)
+	if len(resp.Users) != 0 {
+		t.Fatalf("empty query: want 0 users got %d", len(resp.Users))
+	}
+}
+
+func TestSearchUsersExcludesSelf(t *testing.T) {
+	f := testutil.New(t)
+	s := f.Register(t, "searchqa2@test.dev", "SearchQA", "testPass1!")
+
+	res := f.Do(t, "GET", "/api/users?q=SearchQA", s.AccessToken, nil)
+	defer res.Body.Close()
+	var resp struct {
+		Users []map[string]any `json:"users"`
+	}
+	json.NewDecoder(res.Body).Decode(&resp)
+	for _, u := range resp.Users {
+		if u["id"] == s.UserID {
+			t.Fatal("search returned self")
+		}
+	}
+}
+
+func TestDeleteChatByNonOwner(t *testing.T) {
+	f := testutil.New(t)
+	a := f.Register(t, "delowner@test.dev", "DelOwner", "testPass1!")
+	b := f.Register(t, "deluser@test.dev", "DelUser", "testPass1!")
+
+	res := f.Do(t, "POST", "/api/chats", a.AccessToken, map[string]any{
+		"type": "group", "name": "DelTest", "member_ids": []string{b.UserID},
+	})
+	var chat struct{ ID string `json:"id"` }
+	json.NewDecoder(res.Body).Decode(&chat)
+	res.Body.Close()
+
+	delRes := f.Do(t, "DELETE", "/api/chats/"+chat.ID, b.AccessToken, nil)
+	defer delRes.Body.Close()
+	if delRes.StatusCode != 403 {
+		t.Fatalf("non-owner delete: want 403 got %d", delRes.StatusCode)
+	}
+
+	delRes2 := f.Do(t, "DELETE", "/api/chats/"+chat.ID, a.AccessToken, nil)
+	defer delRes2.Body.Close()
+	if delRes2.StatusCode != 200 {
+		t.Fatalf("owner delete: want 200 got %d", delRes2.StatusCode)
+	}
+}
+
+func TestCreateOrGetDM(t *testing.T) {
+	f := testutil.New(t)
+	a := f.Register(t, "dma@test.dev", "DMA", "testPass1!")
+	b := f.Register(t, "dmb@test.dev", "DMB", "testPass1!")
+
+	res := f.Do(t, "POST", "/api/dms", a.AccessToken, map[string]string{
+		"user_id": b.UserID,
+	})
+	defer res.Body.Close()
+	if res.StatusCode != 201 && res.StatusCode != 200 {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("create dm: %d %s", res.StatusCode, string(b))
+	}
+
+	res2 := f.Do(t, "POST", "/api/dms", a.AccessToken, map[string]string{
+		"user_id": b.UserID,
+	})
+	defer res2.Body.Close()
+	if res2.StatusCode != 200 {
+		t.Fatal("second DM create should return existing")
+	}
+
+	res3 := f.Do(t, "POST", "/api/dms", a.AccessToken, map[string]string{
+		"user_id": a.UserID,
+	})
+	defer res3.Body.Close()
+	if res3.StatusCode == 201 || res3.StatusCode == 200 {
+		t.Fatal("self dm should fail")
 	}
 }

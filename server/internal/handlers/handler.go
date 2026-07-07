@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/Hana-ame/chat-app/server/internal/auth"
 	"github.com/Hana-ame/chat-app/server/internal/config"
@@ -23,10 +24,11 @@ const (
 
 // Server is the HTTP handler container holding shared dependencies.
 type Server struct {
-	Cfg  *config.Config
-	DB   *db.DB
-	Auth *auth.Service
-	Hub  *ws.Hub
+	Cfg       *config.Config
+	DB        *db.DB
+	Auth      *auth.Service
+	Hub       *ws.Hub
+	refreshMu sync.Mutex
 }
 
 // New creates a new Server.
