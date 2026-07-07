@@ -51,6 +51,9 @@ func main() {
 		Addr:              cfg.Addr,
 		Handler:           r,
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	go func() {
