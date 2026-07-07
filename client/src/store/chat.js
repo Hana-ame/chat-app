@@ -216,6 +216,23 @@ export const useChatStore = create((set, get) => ({
         }),
       };
     });
+    if (msg.streaming && msg.source) {
+      get().startConsumingStream(msg);
+    }
+  },
+
+  startConsumingStream(msg) {
+    api.startStreaming(msg.source)
+      .onChunk(chunk => {
+        set(s => ({
+          messages: s.messages.map(m =>
+            m.id === msg.id ? { ...m, content: m.content + chunk } : m
+          ),
+        }));
+      })
+      .done.then(() => {
+        get().finishStreaming(msg.id);
+      });
   },
 
   onMessageUpdate(msg) {
@@ -272,37 +289,6 @@ export const useChatStore = create((set, get) => ({
     set(s => ({
       messages: s.messages.map(m => m.id === msgId ? { ...m, streaming: false } : m),
     }));
-  },
-
-  startStreamingInChat(chatId, streamFn) {
-    const msgId = 'stream-' + Date.now();
-    const msg = {
-      id: msgId,
-      chat_id: chatId,
-      content: '',
-      user_id: 'ai',
-      author: { id: 'ai', username: 'AI Bot', avatar_color: '#10a37f' },
-      created_at: new Date().toISOString(),
-      streaming: true,
-      deleted: false,
-      attachments: [],
-      reactions: [],
-    };
-    set(s => ({ messages: [...s.messages, msg] }));
-
-    api.startStreaming(streamFn)
-      .onChunk(chunk => {
-        set(s => ({
-          messages: s.messages.map(m =>
-            m.id === msgId ? { ...m, content: m.content + chunk } : m
-          ),
-        }));
-      })
-      .done.then(() => {
-        get().finishStreaming(msgId);
-      });
-
-    return msgId;
   },
 
   async sendTyping(chatId) {

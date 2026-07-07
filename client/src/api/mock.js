@@ -78,12 +78,28 @@ export function mockSendMessage(_token, chatId, content, attachments) {
     setTimeout(() => {
       const text = AI_RESPONSES[Math.floor(Math.random() * AI_RESPONSES.length)];
       const cur = store.getState();
-      cur.startStreamingInChat(chatId, async (emit) => {
-        for (const char of text) {
-          await new Promise(r => setTimeout(r, 25 + Math.random() * 20));
-          emit(char);
-        }
-      });
+      const aiMsg = {
+        id: 'mock-ai-' + Date.now(),
+        chat_id: chatId,
+        content: '',
+        user_id: 'ai',
+        author: { id: 'ai', username: 'AI Bot', avatar_color: '#10a37f' },
+        created_at: new Date().toISOString(),
+        streaming: true,
+        deleted: false,
+        attachments: [],
+        reactions: [],
+        source: {
+          type: 'mock',
+          fn: async (emit) => {
+            for (const char of text) {
+              await new Promise(r => setTimeout(r, 25 + Math.random() * 20));
+              emit(char);
+            }
+          },
+        },
+      };
+      cur.onMessageCreate(aiMsg);
     }, delay);
   } catch (e) { console.error('mockSendMessage error:', e); }
 }

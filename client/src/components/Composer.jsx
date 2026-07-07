@@ -5,7 +5,7 @@ import { api } from '../api/client';
 
 export default function Composer({ chatId }) {
   const { accessToken } = useAuthStore();
-  const { sendMessage, sendTyping, startStreamingInChat } = useChatStore();
+  const { sendMessage, sendTyping } = useChatStore();
   const [text, setText] = useState('');
   const [uploading, setUploading] = useState(false);
   const [attachments, setAttachments] = useState([]);

@@ -107,7 +107,25 @@ export const api = {
   sseUrl: (token) => API_BASE + '/api/events?access_token=' + encodeURIComponent(token),
 };
 
-api.startStreaming = (streamFn) => createStreamSource(streamFn);
+api.startStreaming = (source) => {
+  if (typeof source === 'function') return createStreamSource(source);
+  if (source.type === 'mock') return createStreamSource(source.fn);
+  if (source.type === 'sse') {
+    return createStreamSource(async (emit) => {
+      const res = await fetch(source.url);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        for (const line of decoder.decode(value).split('\n')) {
+          if (line.startsWith('data: ')) emit(line.slice(6));
+        }
+      }
+    });
+  }
+  return createStreamSource(source);
+};
 
 let _mockEnabled = false;
 const _origListChats = api.listChats;
