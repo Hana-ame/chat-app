@@ -114,11 +114,16 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	clean := strings.TrimPrefix(r.URL.Path, "/")
-	if clean == "" {
-		clean = "index.html"
+	clean := filepath.Clean("/" + r.URL.Path)
+	rel := strings.TrimPrefix(clean, "/")
+	if rel == "" {
+		rel = "index.html"
 	}
-	p := filepath.Join(s.Cfg.StaticDir, clean)
+	p := filepath.Join(s.Cfg.StaticDir, rel)
+	if !strings.HasPrefix(p, s.Cfg.StaticDir) {
+		http.NotFound(w, r)
+		return
+	}
 	if info, err := os.Stat(p); err == nil && !info.IsDir() {
 		http.ServeFile(w, r, p)
 		return

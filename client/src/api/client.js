@@ -13,8 +13,11 @@ function buildUploadUrl(data, filename) {
 let _refreshing = false;
 
 async function request(method, path, token, body) {
-  const opts = { method, headers: {} };
-  if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+  const opts = { 
+    method, 
+    headers: {}, 
+    credentials: 'include' 
+  };
   if (body) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
@@ -35,7 +38,6 @@ async function request(method, path, token, body) {
           if (rd.user) saved.user = rd.user;
           localStorage.setItem('auth', JSON.stringify(saved));
           useAuthStore.setState({ accessToken: rd.access_token, user: rd.user || saved.user });
-          opts.headers['Authorization'] = 'Bearer ' + rd.access_token;
           const retryRes = await fetch(API_BASE + path, opts);
           const retryData = await retryRes.json().catch(() => ({}));
           if (!retryRes.ok) throw { status: retryRes.status, ...retryData };

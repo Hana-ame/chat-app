@@ -117,6 +117,7 @@ func (s *Server) issueSession(w http.ResponseWriter, r *http.Request, userID str
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	setAuthCookie(w, r, "access_token", access, "/", s.Cfg.AccessTokenTTL)
 	setRefreshCookie(w, r, raw, s.Cfg.RefreshTokenTTL)
 	_ = exp
 	writeJSON(w, http.StatusOK, sessionResp{

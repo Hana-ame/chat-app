@@ -3,6 +3,7 @@ package ws
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/Hana-ame/chat-app/server/internal/auth"
@@ -35,6 +36,10 @@ func NewGateway(hub *Hub, database *db.DB, authSvc *auth.Service) *Gateway {
 }
 
 func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("WS_ENABLED") != "true" {
+		http.Error(w, "WebSocket is disabled in this version", http.StatusForbidden)
+		return
+	}
 	tok := r.URL.Query().Get("access_token")
 	if tok == "" {
 		http.Error(w, "missing access_token", http.StatusUnauthorized)

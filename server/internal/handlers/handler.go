@@ -85,6 +85,11 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tok := bearerToken(r)
 		if tok == "" {
+			if c, err := r.Cookie("access_token"); err == nil {
+				tok = c.Value
+			}
+		}
+		if tok == "" {
 			writeError(w, http.StatusUnauthorized, "unauthorized", "missing token")
 			return
 		}

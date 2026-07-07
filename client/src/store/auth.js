@@ -11,7 +11,6 @@ export const useAuthStore = create((set, get) => {
   const saved = storage.get();
   return {
     user: saved.user || null,
-    accessToken: saved.accessToken || null,
     loading: false,
     error: null,
 
@@ -19,7 +18,7 @@ export const useAuthStore = create((set, get) => {
       set({ loading: true, error: null });
       try {
         const data = await api.register(email, username, password);
-        const payload = { user: data.user || data, accessToken: data.access_token };
+        const payload = { user: data.user || data };
         storage.set(payload);
         set({ ...payload, loading: false });
       } catch (e) {
@@ -32,7 +31,7 @@ export const useAuthStore = create((set, get) => {
       set({ loading: true, error: null });
       try {
         const data = await api.login(email, password);
-        const payload = { user: data.user || data, accessToken: data.access_token };
+        const payload = { user: data.user || data };
         storage.set(payload);
         set({ ...payload, loading: false });
       } catch (e) {
@@ -44,19 +43,19 @@ export const useAuthStore = create((set, get) => {
     refreshAuth: async () => {
       try {
         const data = await api.refresh();
-        const payload = { user: data.user, accessToken: data.access_token };
+        const payload = { user: data.user };
         storage.set(payload);
         set(payload);
       } catch {
         storage.clear();
-        set({ user: null, accessToken: null });
+        set({ user: null });
       }
     },
 
     logout: async () => {
-      try { await api.logout(get().accessToken); } catch (e) { console.error('Logout error:', e); }
+      try { await api.logout(); } catch (e) { console.error('Logout error:', e); }
       storage.clear();
-      set({ user: null, accessToken: null });
+      set({ user: null });
     },
 
     setUser: (user) => {
@@ -77,7 +76,6 @@ export const useAuthStore = create((set, get) => {
     mockLogin: () => {
       const payload = {
         user: { id: 'mock-' + Date.now(), username: 'DebugUser', email: 'debug@test.com', avatar_color: '#5865F2' },
-        accessToken: 'mock-token-' + Date.now(),
       };
       storage.set(payload);
       set({ ...payload, loading: false, error: null });
