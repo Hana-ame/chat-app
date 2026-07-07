@@ -55,33 +55,35 @@ const AI_RESPONSES = [
 
 export function mockSendMessage(_token, chatId, content, attachments) {
   const store = _store;
-  if (!store) return;
+  if (!store) { console.warn('mock: _store null'); return; }
+  try {
+    const s = store.getState();
+    const now = new Date().toISOString();
 
-  const s = store.getState();
-  const now = new Date().toISOString();
+    const userMsg = {
+      id: 'mock-msg-' + Date.now(),
+      chat_id: chatId,
+      content,
+      user_id: 'dev-self',
+      author: { id: 'dev-self', username: 'Alice', avatar_color: '#5865F2' },
+      created_at: now,
+      edited_at: null,
+      deleted: false,
+      attachments: attachments || [],
+      reactions: [],
+    };
+    s.onMessageCreate(userMsg);
 
-  const userMsg = {
-    id: 'mock-msg-' + Date.now(),
-    chat_id: chatId,
-    content,
-    user_id: 'dev-self',
-    author: { id: 'dev-self', username: 'Alice', avatar_color: '#5865F2' },
-    created_at: now,
-    edited_at: null,
-    deleted: false,
-    attachments: attachments || [],
-    reactions: [],
-  };
-  s.onMessageCreate(userMsg);
-
-  const delay = 500 + Math.random() * 1200;
-  setTimeout(() => {
-    const text = AI_RESPONSES[Math.floor(Math.random() * AI_RESPONSES.length)];
-    s.startStreamingInChat(chatId, async (emit) => {
-      for (const char of text) {
-        await new Promise(r => setTimeout(r, 25 + Math.random() * 20));
-        emit(char);
-      }
-    });
-  }, delay);
+    const delay = 500 + Math.random() * 1200;
+    setTimeout(() => {
+      const text = AI_RESPONSES[Math.floor(Math.random() * AI_RESPONSES.length)];
+      const cur = store.getState();
+      cur.startStreamingInChat(chatId, async (emit) => {
+        for (const char of text) {
+          await new Promise(r => setTimeout(r, 25 + Math.random() * 20));
+          emit(char);
+        }
+      });
+    }, delay);
+  } catch (e) { console.error('mockSendMessage error:', e); }
 }

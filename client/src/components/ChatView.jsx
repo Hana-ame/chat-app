@@ -87,7 +87,7 @@ export default function ChatView({ chatId, onBack }) {
           )}
           {loading && <div style={{textAlign:'center',padding:8,color:'var(--text-muted)',fontSize:13}}>Loading...</div>}
           {filtered.map((msg, i) => {
-            const prev = i < filtered.length - 1 ? filtered[i + 1] : null;
+            const prev = i > 0 ? filtered[i - 1] : null;
             const sameAuthor = prev && prev.user_id === msg.user_id && !prev.deleted && !msg.deleted;
             return <MessageItem key={msg.id} msg={msg} sameAuthor={sameAuthor} chatId={chatId} />;
           })}

@@ -72,14 +72,10 @@ export default function Composer({ chatId }) {
           <input type="file" ref={fileInput} onChange={handleFile} style={{display:'none'}} multiple />
           <button className="btn-ghost" style={{fontSize:18}} onClick={() => fileInput.current?.click()} title="Attach file">📎</button>
           <button className="btn-ghost" style={{fontSize:18}} onClick={() => {
-            const input = text.trim() || 'Hello! This is a streaming message that types out slowly. You can see each character appearing one by one. ✨';
-            startStreamingInChat(chatId, async (emit) => {
-              for (const char of input) {
-                await new Promise(r => setTimeout(r, 40));
-                emit(char);
-              }
-            });
-          }} title="AI stream test">🤖</button>
+            if (!api.isMockEnabled()) { alert('Enable mock first (🧪 Generate test data)'); return; }
+            const content = text.trim() || 'Tell me something interesting';
+            sendMessage(accessToken, chatId, content, []).catch(console.error);
+          }} title="Send to AI (mock only)">🤖</button>
           <button className="btn-ghost" style={{fontSize:13}} disabled={(!text.trim() && attachments.length === 0) || uploading}
             onClick={handleSend}>{uploading ? 'Uploading...' : 'Send'}</button>
         </div>

@@ -294,6 +294,23 @@ export function generateDummyData({ chatCount = 10, msgPerChat = 65 } = {}) {
     if (mi === msgPerChat - 1) chats[0].last_message = msg;
   }
 
+  const aliceImgUrl = 'https://proxy.moonchan.xyz/mw2000/78318f19gy1id3yg7ubx0j20k00hkdhr.jpg?proxy_host=wx2.sinaimg.cn&proxy_referer=https%3A%2F%2Fweibo.com%2F';
+  let aliceImgCount = 0;
+  for (let mi = allMessages.length - 1; mi >= 0 && aliceImgCount < 10; mi--) {
+    const msg = allMessages[mi];
+    if (msg.chat_id === dmChatId && msg.user_id === 'dev-self' && !msg.deleted) {
+      msg.attachments = msg.attachments || [];
+      msg.attachments.push({
+        id: id('att'),
+        filename: 'alice-photo.jpg',
+        mime_type: 'image/jpeg',
+        size: 102400,
+        url: aliceImgUrl,
+      });
+      aliceImgCount++;
+    }
+  }
+
   // Group chats
   for (let ci = 0; ci < chatCount - 1; ci++) {
     const chatId = id('chat');
