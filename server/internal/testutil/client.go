@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/textproto"
 	"net/url"
 	"strings"
 	"testing"
@@ -163,16 +164,21 @@ func (f *Fixture) DoJSON(t *testing.T, method, path, token string, body, out int
 	return res.StatusCode
 }
 
-func (f *Fixture) DoMultipart(t *testing.T, method, path, token string, fields map[string]string, fileField, filename string, content []byte) *http.Response {
+func (f *Fixture) DoMultipart(t *testing.T, method, path, token string, fields map[string]string, fileField, filename string, content []byte, contentType string) *http.Response {
 	t.Helper()
 	var buf bytes.Buffer
 	mw := newMultipart(&buf)
 	for k, v := range fields {
 		_ = mw.WriteField(k, v)
 	}
-	w, err := mw.CreateFormFile(fileField, filename)
+	h := make(textproto.MIMEHeader)
+	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, fileField, filename))
+	if contentType != "" {
+		h.Set("Content-Type", contentType)
+	}
+	w, err := mw.CreatePart(h)
 	if err != nil {
-		t.Fatalf("create file: %v", err)
+		t.Fatalf("create part: %v", err)
 	}
 	_, _ = w.Write(content)
 	_ = mw.Close()
