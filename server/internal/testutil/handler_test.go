@@ -344,9 +344,7 @@ func TestAuthEndpoints(t *testing.T) {
 	})
 
 	t.Run("refresh with garbage token", func(t *testing.T) {
-		res := f.Do(t, "POST", "/api/auth/refresh", "", map[string]string{
-			"refresh_token": "not-a-real-token",
-		})
+		res := f.DoWithCookie(t, "POST", "/api/auth/refresh", "", "refresh_token", "not-a-real-token", nil)
 		res.Body.Close()
 		if res.StatusCode != 401 {
 			t.Fatalf("want 401 for invalid refresh, got %d", res.StatusCode)
@@ -355,16 +353,12 @@ func TestAuthEndpoints(t *testing.T) {
 
 	t.Run("logout cleans up refresh token", func(t *testing.T) {
 		s := f.Register(t, "logout@t.com", "LogoutUser", "testtest123")
-		res := f.Do(t, "POST", "/api/auth/logout", s.AccessToken, map[string]string{
-			"refresh_token": s.RefreshToken,
-		})
+		res := f.Do(t, "POST", "/api/auth/logout", s.AccessToken, nil)
 		res.Body.Close()
 		if res.StatusCode != 200 {
 			t.Fatalf("logout: %d", res.StatusCode)
 		}
-		refreshRes := f.Do(t, "POST", "/api/auth/refresh", "", map[string]string{
-			"refresh_token": s.RefreshToken,
-		})
+		refreshRes := f.DoWithCookie(t, "POST", "/api/auth/refresh", "", "refresh_token", s.RefreshToken, nil)
 		refreshRes.Body.Close()
 		if refreshRes.StatusCode != 401 {
 			t.Fatal("refresh should fail after logout")

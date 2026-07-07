@@ -3,6 +3,7 @@ package testutil
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -25,6 +26,15 @@ type Session struct {
 	} `json:"user"`
 }
 
+func cookieValue(res *http.Response, name string) string {
+	for _, c := range res.Cookies() {
+		if c.Name == name {
+			return c.Value
+		}
+	}
+	return ""
+}
+
 func (f *Fixture) Register(t *testing.T, email, username, password string) *Session {
 	t.Helper()
 	body := map[string]string{"email": email, "username": username, "password": password}
@@ -39,6 +49,7 @@ func (f *Fixture) Register(t *testing.T, email, username, password string) *Sess
 		t.Fatalf("decode session: %v", err)
 	}
 	s.UserID = s.User.ID
+	s.RefreshToken = cookieValue(res, "refresh_token")
 	return &s
 }
 
@@ -56,6 +67,52 @@ func (f *Fixture) Login(t *testing.T, email, password string) *Session {
 		t.Fatalf("decode session: %v", err)
 	}
 	s.UserID = s.User.ID
+	s.RefreshToken = cookieValue(res, "refresh_token")
+	return &s
+}
+
+func (f *Fixture) DoWithCookie(t *testing.T, method, path, token, cookieName, cookieValue string, body interface{}) *http.Response {
+	t.Helper()
+	var reader io.Reader
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			t.Fatalf("marshal: %v", err)
+		}
+		reader = bytes.NewReader(b)
+	}
+	req, err := http.NewRequest(method, f.HTTP.URL+path, reader)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	req.Header.Set("Cookie", fmt.Sprintf("%s=%s", cookieName, cookieValue))
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("http do: %v", err)
+	}
+	return res
+}
+
+func (f *Fixture) Refresh(t *testing.T, refreshToken string) *Session {
+	t.Helper()
+	res := f.DoWithCookie(t, "POST", "/api/auth/refresh", "", "refresh_token", refreshToken, nil)
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("refresh failed: %d %s", res.StatusCode, string(b))
+	}
+	var s Session
+	if err := json.NewDecoder(res.Body).Decode(&s); err != nil {
+		t.Fatalf("decode session: %v", err)
+	}
+	s.UserID = s.User.ID
+	s.RefreshToken = cookieValue(res, "refresh_token")
 	return &s
 }
 

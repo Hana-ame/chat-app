@@ -54,18 +54,13 @@ func TestUnauthorizedAccess(t *testing.T) {
 func TestRefreshTokenFlow(t *testing.T) {
 	f := testutil.New(t)
 	s := f.Register(t, "refresh@test.dev", "refresher", "password123")
-	res := f.Do(t, "POST", "/api/auth/refresh", "", map[string]string{
-		"refresh_token": s.RefreshToken,
-	})
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		t.Fatalf("refresh failed: %d", res.StatusCode)
+	s2 := f.Refresh(t, s.RefreshToken)
+	if s2.UserID != s.UserID {
+		t.Fatal("refresh returned different user")
 	}
-	res2 := f.Do(t, "POST", "/api/auth/refresh", "", map[string]string{
-		"refresh_token": s.RefreshToken,
-	})
+	res2 := f.DoWithCookie(t, "POST", "/api/auth/refresh", "", "refresh_token", s.RefreshToken, nil)
 	defer res2.Body.Close()
-	if res2.StatusCode == 200 {
-		t.Fatal("reused refresh token should fail")
+	if res2.StatusCode != 401 {
+		t.Fatalf("reused refresh token: want 401 got %d", res2.StatusCode)
 	}
 }
