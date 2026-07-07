@@ -79,7 +79,7 @@ cd server && go test ./... -cover -count=1 -timeout 120s
 | DELETE | `/api/chats/:id/messages/:mid` | Bearer | Delete |
 | PUT | `/api/chats/:id/messages/:mid/reactions/:emoji` | Bearer | Add reaction |
 | DELETE | `/api/chats/:id/messages/:mid/reactions/:emoji` | Bearer | Remove |
-| POST | `/api/uploads` | Bearer | File upload (multipart) |
+| PUT | `upload.moonchan.xyz/api/upload` | - | External file upload (binary stream) |
 | GET | `/ws?access_token=` | - | WebSocket gateway |
 | GET | `/api/events?access_token=` | - | SSE event stream |
 
@@ -174,6 +174,10 @@ git push
 
 10. **DB 迁移幂等**: `ALTER TABLE ADD COLUMN IF NOT EXISTS` SQLite 3.37+ 支持,但 safer: Go 层面 catch `duplicate column name` error 并忽略
 
-11. **DisallowUnknownFields**: `json.Decoder` 设置了 `DisallowUnknownFields()` → 新字段(`visibility`)发送到旧 server 报错 → 更新 server 重启即可
-
-12. **测试 CreateChat 签名变更**: 加 `visibility` 参数后 → 所有测试 `CreateChat()` 调用需加 `""` → 用 perl regex 批量替换
+  11. **DisallowUnknownFields**: `json.Decoder` 设置了 `DisallowUnknownFields()` → 新字段(`visibility`)发送到旧 server 报错 → 更新 server 重启即可
+  12. **测试 CreateChat 签名变更**: 加 `visibility` 参数后 → 所有测试 `CreateChat()` 调用需加 `""` → 用 perl regex 批量替换
+  13. **Sidebar Scroll & Tab Order**: Fixed CSS flex-direction and overflow constraints to ensure correct tab navigation and scroll behavior.
+  14. **Source-based AI Streaming**: Refactored AI responses to use a `source` object, decoupling message creation from the streaming transport (Mock/SSE).
+  15. **Pinned Messages**: Implemented a collapsible pinned messages area with support for both message-pins and custom text pins.
+  16. **Smart Auto-Scroll**: Implemented a distance-based scroll check to prevent interrupting users reading history while still auto-scrolling on new messages.
+  17. **Real-time Presence**: Integrated `onlineUserIds` tracking via `presence_update` events with priority sorting in member panels.
