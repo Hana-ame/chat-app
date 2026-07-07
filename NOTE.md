@@ -11,7 +11,7 @@ chat-app/
 ├── client/              # 前端 (React 19 + Vite + Zustand)
 │   └── src/
 │       ├── api/         # HTTP 请求封装
-│       ├── components/  # ChatList, ChatView, MessageItem, Composer, MemberPanel
+│       ├── components/  # ChatList, ChatListItem, ChatView, MessageItem, Composer, MemberPanel, CreateGroupForm, DmSearchPanel, PublicChannelList, SettingsModal
 │       ├── store/       # Zustand (auth / chat)
 │       ├── routes/      # LoginPage, RegisterPage, ChatPage
 │       ├── dev/         # 测试数据生成器
@@ -68,6 +68,51 @@ cd client && npx playwright test
 
 **所有交互元素必须同时适配触控（手机/平板）和鼠标（PC）操作。** 按钮/输入框等至少 44px 触控区域，`hover` 效果不能作为唯一操作提示。
 
+**UI 重构类 PR 必须附带三态截图：空数据 / 少量数据 / 大量数据（100+）。** 参见下方 Flexbox 陷阱。
+
+**分页/列表数据加载后必须更新 Store/State，不能只在局部变量中持有。**
+
+## Flexbox 溢出陷阱 — 避坑指南
+
+### 症状
+- `overflow-y: auto` 设置了但不生效
+- 内容撑破父容器，导致外层滚动而非内层滚动
+- 空状态不占满剩余空间
+
+### 根因
+flex 子项默认 `min-height: auto`，意味着它的高度"至少等于所有子元素的内容高度之和"。当这个 flex 子项自身也是一个 flex 容器时，它的 `min-height: auto` 会阻止父 flex 容器的约束传递下去，导致内部 `overflow-y` 永远不会触发。
+
+### Flexbox 优先级检查清单
+```
+✅ 父容器 display: flex
+✅ 子项 flex-grow / flex-shrink / flex-basis
+🔥 子项 min-height: 0 / min-width: 0（最容易忘！）
+✅ 子项 overflow-y: auto
+```
+
+### 修复示例
+```css
+/* 错误：只给内层加 min-height:0 */
+.sidebar-body { min-height: 0; overflow-y: auto; }
+
+/* 正确：外层（flex 子项）也需要 min-height:0 */
+.sidebar {
+  display: flex; flex-direction: column;
+  min-height: 0;         /* ← 关键 */
+  height: 100%; overflow: hidden;
+}
+.sidebar-body {
+  flex: 1; overflow-y: auto; min-height: 0;
+  display: flex; flex-direction: column;
+}
+```
+
+### 经验教训
+1. **"只改目标元素"的直觉是错的** — 问题常出在外层约束链断裂
+2. `min-height: auto` 是 flex 子项看不见的默认值，逐层检查每一级 flex 子项
+3. 拆分组件时注意包装层是否打断了 flex 父子约束链
+4. 使用 `<ScrollArea>` 组件替代手写 `.sidebar-body` 样式，一次踩坑全局受益
+
 ## 搜索栏行为
 
 - 单输入框搜索
@@ -77,8 +122,18 @@ cd client && npx playwright test
 
 ## 已知主要问题
 
-- `Load older messages` 功能不可用 (store 未合并)
-- Tab 顺序因 `column-reverse` 倒置
-- ChatList 组件过大 (313 行)
+- `Load older messages` → 已修复
+- Tab 顺序倒置 → 已修复（改为普通 column 布局）
+- ChatList 组件过大 → 已拆为 5 个子组件
+
+## 已修复 Bug 记录
+
+详见 [Sidebar Scroll Bug 排查报告](https://page.moonchan.xyz/?url=https://upload.moonchan.xyz/api/01LLWEUU6SSRBRJKKOFBA3FSOZTXG4ZEVM/sidebar-scroll-report.md.gz#markdown-parser) (Board 666)。
+
+修复列表：
+1. **侧边栏不滚动** — 给 `.sidebar` 加 `min-height: 0`
+2. **空状态不撑满** — `display: flex` on `.sidebar-body` + `<EmptyState>` 组件
+3. **loadMore 不合并数据** — 将 API 返回直接写入 store（`useChatStore.setState`）
+4. **Tab 键顺序颠倒** — 去掉 `column-reverse`，改用普通 column
 
 详见 `docs/todo-20260706.md`。

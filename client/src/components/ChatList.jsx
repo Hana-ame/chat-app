@@ -8,6 +8,8 @@ import PublicChannelList from './PublicChannelList';
 import CreateGroupForm from './CreateGroupForm';
 import DmSearchPanel from './DmSearchPanel';
 import SettingsModal from './SettingsModal';
+import ScrollArea from './ScrollArea';
+import EmptyState from './EmptyState';
 
 const MODES = [
   { key: 'ws', label: 'WS' },
@@ -60,7 +62,6 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const handleDM = async (u) => {
     try {
       const data = await api.createDM(accessToken, u.id);
-      setDmUserId('');
       setDmSearch('');
       setDmResults([]);
       setShowDmSearch(false);
@@ -154,7 +155,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
         </div>
       </div>
 
-      <div style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>
+      <div className="sidebar-search-row">
         <input className="input-field" placeholder="Search chats..." value={chatSearch}
           onChange={e => { setChatSearch(e.target.value); setPublicResults(null); }}
           style={{ fontSize: 14, padding: '8px 10px' }} />
@@ -182,7 +183,9 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
             )}
           </div>
         )}
+      </div>
 
+      <ScrollArea className="sidebar-body">
         {showDmSearch && (
           <DmSearchPanel query={dmSearch} results={dmResults} onSearch={searchUser} onSelect={handleDM} />
         )}
@@ -195,39 +198,35 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
             onCreate={handleCreate}
             onCancel={() => setShowCreate(false)} />
         )}
+        <PublicChannelList results={publicResults} searching={publicSearching} onJoin={handleJoinPublic} />
 
-        <div className="sidebar-body">
-          <PublicChannelList results={publicResults} searching={publicSearching} onJoin={handleJoinPublic} />
+        {filteredChats.map(c => (
+          <ChatListItem key={c.id} chat={c} activeId={activeId} onSelectChat={onSelectChat}
+            contextMenu={contextMenu} onContextMenu={setContextMenu} />
+        ))}
 
-          {filteredChats.map(c => (
-            <ChatListItem key={c.id} chat={c} activeId={activeId} onSelectChat={onSelectChat}
-              contextMenu={contextMenu} onContextMenu={setContextMenu} />
-          ))}
-          {chats.length === 0 && (
-            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
-              No conversations yet. Create a group or DM someone!
+        {chats.length === 0 && (
+          <EmptyState message="No conversations yet. Create a group or DM someone!" />
+        )}
+      </ScrollArea>
+
+      <div className="sidebar-footer">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          {user.avatar_url
+            ? <img src={user.avatar_url} className="user-avatar-img" alt="" />
+            : <div className="chat-item-avatar" style={{ width: 32, height: 32, fontSize: 13, background: user.avatar_color }}>
+              {user.username[0].toUpperCase()}
             </div>
-          )}
+          }
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{user.username}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Online</div>
+          </div>
+          <button className="btn-ghost" onClick={() => { setShowSettings(true); }} title="Settings">⚙</button>
+          <button className="btn-ghost" onClick={onLogout}>↪</button>
         </div>
-
-        <div className="sidebar-footer">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            {user.avatar_url
-              ? <img src={user.avatar_url} className="user-avatar-img" alt="" />
-              : <div className="chat-item-avatar" style={{ width: 32, height: 32, fontSize: 13, background: user.avatar_color }}>
-                {user.username[0].toUpperCase()}
-              </div>
-            }
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>{user.username}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Online</div>
-            </div>
-            <button className="btn-ghost" onClick={() => { setShowSettings(true); }} title="Settings">⚙</button>
-            <button className="btn-ghost" onClick={onLogout}>↪</button>
-          </div>
-          <div style={{ marginTop: 4, borderTop: '1px solid var(--border)', paddingTop: 4 }}>
-            <button className="btn-ghost" style={{ fontSize: 11, width: '100%' }} onClick={handleGenerateDummy}>🧪 Generate test data</button>
-          </div>
+        <div style={{ marginTop: 4, borderTop: '1px solid var(--border)', paddingTop: 4 }}>
+          <button className="btn-ghost" style={{ fontSize: 11, width: '100%' }} onClick={handleGenerateDummy}>🧪 Generate test data</button>
         </div>
       </div>
 

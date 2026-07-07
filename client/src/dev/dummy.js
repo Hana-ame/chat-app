@@ -245,7 +245,7 @@ function expandMessages(topicMsgs) {
   return result;
 }
 
-export function generateDummyData({ chatCount = 10, msgPerChat = 100 } = {}) {
+export function generateDummyData({ chatCount = 10, msgPerChat = 65 } = {}) {
   const chats = [];
   const allMessages = [];
 
@@ -317,11 +317,11 @@ export function generateDummyData({ chatCount = 10, msgPerChat = 100 } = {}) {
     chats.push(chat);
 
     const expandedTopics = expandMessages(GROUP_TOPICS[groupName]);
-    const msgCount = Math.min(expandedTopics.length, msgPerChat);
-    for (let mi = 0; mi < msgCount; mi++) {
-      const { content, userId, isSystem } = expandedTopics[mi];
+    for (let mi = 0; mi < msgPerChat; mi++) {
+      const src = expandedTopics[mi % expandedTopics.length];
+      const { content, userId, isSystem } = src;
       const author = isSystem ? GM : USERS.find(u => u.id === userId) || pick(members);
-      const createdAt = timeAgo((msgCount - mi) * 180 + ci * 3600);
+      const createdAt = timeAgo((msgPerChat - mi) * 180 + ci * 3600);
       const isDeleted = mi === 1;
       const msg = {
         id: id('msg'),
@@ -343,7 +343,7 @@ export function generateDummyData({ chatCount = 10, msgPerChat = 100 } = {}) {
         })() : [],
       };
       allMessages.push(msg);
-      if (mi === msgCount - 1) chat.last_message = msg;
+      if (mi === msgPerChat - 1) chat.last_message = msg;
     }
   }
 

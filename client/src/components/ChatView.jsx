@@ -31,8 +31,13 @@ export default function ChatView({ chatId, onBack }) {
   const loadMore = useCallback(async () => {
     if (loading || !hasMore) return;
     setLoading(true);
+    // Fetch older messages before the earliest message we have
     const msgs = await api.listMessages(accessToken, chatId, messages[0]?.id, 50);
     const list = msgs.messages || [];
+    // Prepend fetched messages into the store
+    if (list.length) {
+      useChatStore.setState(s => ({ messages: [...list, ...s.messages] }));
+    }
     if (list.length < 50) setHasMore(false);
     setLoading(false);
   }, [loading, hasMore, chatId, accessToken, messages]);
@@ -40,10 +45,10 @@ export default function ChatView({ chatId, onBack }) {
   const filtered = messages.filter(m => m.chat_id === chatId);
 
   useEffect(() => {
-    if (filtered.length > 0) {
-      const last = filtered[filtered.length - 1];
+    if (filtered.length > 0 && bodyRef.current) {
+      bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
     }
-  }, [filtered.length]);
+  }, [chatId, filtered.length]);
 
   const name = chat ? getDMName(chat, user.id) : 'Loading...';
   const memberCount = chat?.members?.length || 0;
