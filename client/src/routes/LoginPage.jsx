@@ -10,7 +10,7 @@ export default function LoginPage() {
 
   const handle = async (e) => {
     e.preventDefault();
-    try { await login(email, password); nav('/'); } catch {}
+    try { await login(email, password); nav('/'); } catch (e) { console.error('Login page error:', e); }
   };
 
   const quickEnter = () => {

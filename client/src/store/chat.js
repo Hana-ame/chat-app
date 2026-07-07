@@ -6,6 +6,7 @@ export const useChatStore = create((set, get) => ({
   chats: [],
   activeChatId: null,
   messages: [],
+  pinnedMessages: {}, // { chatId: [{ id, content, type }] }
   onlineUserIds: [],
 
   mode: 'ws',
@@ -80,7 +81,7 @@ export const useChatStore = create((set, get) => ({
           case 'typing':
             break;
         }
-      } catch {}
+      } catch (e) { console.error('WS message parse error:', e); }
     };
     ws.onclose = () => {
       set({ wsReady: false });
@@ -102,7 +103,7 @@ export const useChatStore = create((set, get) => ({
         const p = JSON.parse(e.data);
         set({ onlineUserIds: p.online_user_ids || [], sseReady: true });
         get().setChats(p.chats || []);
-      } catch {}
+      } catch (e) { console.error('SSE ready parse error:', e); }
     });
     sse.onmessage = (e) => {
       try {
@@ -122,7 +123,7 @@ export const useChatStore = create((set, get) => ({
             return { onlineUserIds: [...ids] };
           });
         }
-      } catch {}
+      } catch (e) { console.error('SSE message parse error:', e); }
     };
     sse.onerror = () => {
       set({ sseReady: false });
@@ -140,12 +141,12 @@ export const useChatStore = create((set, get) => ({
       try {
         const data = await api.listChats(token);
         get().setChats(data.chats || []);
-      } catch {}
+      } catch (e) { console.error('Polling chats error:', e); }
       if (get().activeChatId) {
         try {
           const data = await api.listMessages(token, get().activeChatId);
           set({ messages: data.messages || [] });
-        } catch {}
+        } catch (e) { console.error('Polling messages error:', e); }
       }
       if (get().mode === 'poll') {
         const t = setTimeout(poll, 2000);
@@ -268,7 +269,7 @@ export const useChatStore = create((set, get) => ({
     try {
       const data = await api.listChats(token);
       set({ chats: data.chats || [] });
-    } catch {}
+    } catch (e) { console.error('loadChats error:', e); }
   },
 
   async loadMessages(token, chatId, before) {
@@ -278,7 +279,7 @@ export const useChatStore = create((set, get) => ({
       set(s => ({
         messages: before ? [...msgs, ...s.messages] : msgs,
       }));
-    } catch {}
+    } catch (e) { console.error('loadMessages error:', e); }
   },
 
   async sendMessage(token, chatId, content, attachments) {
@@ -303,6 +304,25 @@ export const useChatStore = create((set, get) => ({
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ op: 'subscribe', chat_id: chatId }));
     }
+  },
+
+  pinMessage(chatId, pinItem) {
+    set(s => {
+      const pinned = s.pinnedMessages[chatId] || [];
+      if (pinned.find(p => p.id === pinItem.id)) return { pinnedMessages: s.pinnedMessages };
+      return {
+        pinnedMessages: { ...s.pinnedMessages, [chatId]: [...pinned, pinItem] }
+      };
+    });
+  },
+
+  unpinMessage(chatId, pinId) {
+    set(s => {
+      const pinned = s.pinnedMessages[chatId] || [];
+      return {
+        pinnedMessages: { ...s.pinnedMessages, [chatId]: pinned.filter(p => p.id !== pinId) }
+      };
+    });
   },
 
   async pinChat(token, chatId) {

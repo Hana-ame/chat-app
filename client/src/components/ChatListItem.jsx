@@ -28,14 +28,14 @@ export default function ChatListItem({ chat, activeId, onSelectChat, contextMenu
 
   const handlePin = async (e, chatId, pinned) => {
     e.stopPropagation();
-    try { if (pinned) await unpinChat(accessToken, chatId); else await pinChat(accessToken, chatId); } catch { }
+    try { if (pinned) await unpinChat(accessToken, chatId); else await pinChat(accessToken, chatId); } catch (e) { console.error('Pin chat error:', e); }
     onContextMenu(null);
   };
 
   const handleDelete = async (e, chatId) => {
     e.stopPropagation();
     if (!confirm('Delete this chat?')) return;
-    try { await api.deleteChat(accessToken, chatId); } catch { }
+    try { await api.deleteChat(accessToken, chatId); } catch (e) { console.error('Delete chat error:', e); }
     onContextMenu(null);
   };
 

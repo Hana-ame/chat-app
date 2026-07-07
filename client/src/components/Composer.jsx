@@ -25,7 +25,7 @@ export default function Composer({ chatId }) {
       await sendMessage(accessToken, chatId, content, attachments);
       setText('');
       setAttachments([]);
-    } catch {}
+    } catch (e) { console.error('Send message error:', e); }
   };
 
   const handleKey = (e) => {

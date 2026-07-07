@@ -15,10 +15,13 @@ function timeFormat(t) {
 
 export default function MessageItem({ msg, sameAuthor, chatId }) {
   const { user, accessToken } = useAuthStore();
+  const { pinMessage, unpinMessage, pinnedMessages } = useChatStore();
   const isMe = msg.user_id === user.id;
+  const isPinned = pinnedMessages[chatId]?.some(p => p.id === msg.id);
   const [showEmoji, setShowEmoji] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(msg.content);
+  const [opPending, setOpPending] = useState(false);
 
   const chatStore = useChatStore();
   const author = msg.author || { username: 'Unknown', avatar_color: '#5865F2', id: msg.user_id };
@@ -29,23 +32,29 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
     try {
       if (has) await api.removeReaction(accessToken, chatId, msg.id, emoji);
       else await api.addReaction(accessToken, chatId, msg.id, emoji);
-    } catch {}
+    } catch (e) { console.error('Reaction error:', e); }
     setShowEmoji(false);
   };
 
   const handleEdit = async () => {
     if (!editText.trim()) return;
+    setOpPending(true);
     try {
       await api.editMessage(accessToken, chatId, msg.id, editText);
       setEditing(false);
-    } catch {}
+    } catch (e) { console.error('Edit message error:', e); } finally {
+      setOpPending(false);
+    }
   };
 
   const handleDelete = async () => {
     if (!confirm('Delete this message?')) return;
+    setOpPending(true);
     try {
       await api.deleteMessage(accessToken, chatId, msg.id);
-    } catch {}
+    } catch (e) { console.error('Delete message error:', e); } finally {
+      setOpPending(false);
+    }
   };
 
   return (
@@ -70,7 +79,9 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
             <div style={{display:'flex',gap:8}}>
               <input className="input-field" value={editText} onChange={e=>setEditText(e.target.value)}
                 style={{flex:1}} autoFocus onKeyDown={e=>e.key==='Enter'&&handleEdit()} />
-              <button className="btn btn-primary" style={{padding:'4px 12px',fontSize:12}} onClick={handleEdit}>Save</button>
+               <button className="btn btn-primary" style={{padding:'4px 12px',fontSize:12}} onClick={handleEdit} disabled={opPending}>
+                 {opPending ? '...' : 'Save'}
+               </button>
               <button className="btn-ghost" style={{fontSize:12}} onClick={()=>setEditing(false)}>Cancel</button>
             </div>
           ) : msg.streaming ? (
@@ -84,8 +95,10 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
                 components={{
                   a: ({ href, children }) =>
                     <a href={href} target="_blank" rel="noreferrer">{children}</a>,
-                  img: ({ src, alt }) =>
-                    <img src={src} alt={alt} className="msg-inline-img" loading="lazy" />,
+                   img: ({ src, alt }) =>
+                     <a href={src} target="_blank" rel="noreferrer">
+                       <img src={src} alt={alt} className="msg-inline-img" loading="lazy" />
+                     </a>,
                   h1: 'p', h2: 'p', h3: 'p', h4: 'p', h5: 'p', h6: 'p',
                   blockquote: 'p',
                   table: ({ children }) => <>{children}</>,
@@ -94,14 +107,14 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
               >{msg.content}</ReactMarkdown>
             </div>
           )}
-          {msg.attachments?.map(a => (
-            <div key={a.id} className="file-attach">
-              {a.mime_type?.startsWith('image/')
-                ? <img src={a.url} alt={a.filename} loading="lazy" />
-                : <a href={a.url} target="_blank" rel="noreferrer" style={{fontSize:13}}>{a.filename}</a>
-              }
-            </div>
-          ))}
+           {msg.attachments?.map(a => (
+             <div key={a.id} className="file-attach">
+               {a.mime_type?.startsWith('image/')
+                 ? <a href={a.url} target="_blank" rel="noreferrer"><img src={a.url} alt={a.filename} loading="lazy" /></a>
+                 : <div className="file-pill"><a href={a.url} target="_blank" rel="noreferrer" style={{fontSize:13}}>{a.filename}</a></div>
+               }
+             </div>
+           ))}
           {msg.reactions?.length > 0 && (
             <div className="reaction-bar">
               {msg.reactions.map(r => (
@@ -114,11 +127,14 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
             </div>
           )}
           {!msg.deleted && (
-            <div className="msg-actions">
-              <button className="msg-btn" onClick={() => setShowEmoji(!showEmoji)}>😀</button>
-              {isMe && <button className="msg-btn" onClick={() => { setEditing(true); setEditText(msg.content); }}>Edit</button>}
-              {isMe && <button className="msg-btn" onClick={handleDelete}>Delete</button>}
-            </div>
+             <div className="msg-actions">
+               <button className="msg-btn" onClick={() => setShowEmoji(!showEmoji)} disabled={opPending}>😀</button>
+               <button className="msg-btn" onClick={() => isPinned ? unpinMessage(chatId, msg.id) : pinMessage(chatId, { id: msg.id, content: msg.content, type: 'message' })} disabled={opPending}>
+                 {isPinned ? 'Unpin' : 'Pin'}
+               </button>
+               {isMe && <button className="msg-btn" onClick={() => { setEditing(true); setEditText(msg.content); }} disabled={opPending}>Edit</button>}
+               {isMe && <button className="msg-btn" onClick={handleDelete} disabled={opPending}>Delete</button>}
+             </div>
           )}
           {showEmoji && (
             <div className="emoji-picker">

@@ -8,7 +8,7 @@ export default function SettingsModal({ user, onClose, onSave }) {
     setSaving(true);
     try {
       await onSave(name);
-    } catch { }
+    } catch (e) { console.error('Save settings error:', e); }
     setSaving(false);
   };
 

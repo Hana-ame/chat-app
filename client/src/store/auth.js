@@ -57,7 +57,7 @@ export const useAuthStore = create((set, get) => {
     },
 
     logout: async () => {
-      try { await api.logout(get().accessToken, get().refreshToken); } catch {}
+      try { await api.logout(get().accessToken, get().refreshToken); } catch (e) { console.error('Logout error:', e); }
       storage.clear();
       set({ user: null, accessToken: null, refreshToken: null });
     },

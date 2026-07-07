@@ -11,7 +11,7 @@ export default function RegisterPage() {
 
   const handle = async (e) => {
     e.preventDefault();
-    try { await register(email, username, password); nav('/'); } catch {}
+    try { await register(email, username, password); nav('/'); } catch (e) { console.error('Register page error:', e); }
   };
 
   const quickEnter = () => {

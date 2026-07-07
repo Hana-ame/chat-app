@@ -295,19 +295,37 @@ export function generateDummyData({ chatCount = 10, msgPerChat = 65 } = {}) {
   }
 
   const aliceImgUrl = 'https://proxy.moonchan.xyz/mw2000/78318f19gy1id3yg7ubx0j20k00hkdhr.jpg?proxy_host=wx2.sinaimg.cn&proxy_referer=https%3A%2F%2Fweibo.com%2F';
-  let aliceImgCount = 0;
-  for (let mi = allMessages.length - 1; mi >= 0 && aliceImgCount < 10; mi--) {
+  const dummyFiles = [
+    { name: 'project-spec.pdf', mime: 'application/pdf', size: 512000, url: 'https://upload.moonchan.xyz/api/test/spec.pdf' },
+    { name: 'archive.zip', mime: 'application/zip', size: 2048000, url: 'https://upload.moonchan.xyz/api/test/arc.zip' },
+    { name: 'meeting-notes.txt', mime: 'text/plain', size: 10240, url: 'https://upload.moonchan.xyz/api/test/notes.txt' },
+    { name: 'budget.xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', size: 307200, url: 'https://upload.moonchan.xyz/api/test/budget.xlsx' },
+  ];
+
+  let attachedCount = 0;
+  for (let mi = allMessages.length - 1; mi >= 0 && attachedCount < 15; mi--) {
     const msg = allMessages[mi];
     if (msg.chat_id === dmChatId && msg.user_id === 'dev-self' && !msg.deleted) {
       msg.attachments = msg.attachments || [];
-      msg.attachments.push({
-        id: id('att'),
-        filename: 'alice-photo.jpg',
-        mime_type: 'image/jpeg',
-        size: 102400,
-        url: aliceImgUrl,
-      });
-      aliceImgCount++;
+      if (attachedCount % 2 === 0) {
+        msg.attachments.push({
+          id: id('att'),
+          filename: 'alice-photo.jpg',
+          mime_type: 'image/jpeg',
+          size: 102400,
+          url: aliceImgUrl,
+        });
+      } else {
+        const file = pick(dummyFiles);
+        msg.attachments.push({
+          id: id('att'),
+          filename: file.name,
+          mime_type: file.mime,
+          size: file.size,
+          url: file.url,
+        });
+      }
+      attachedCount++;
     }
   }
 

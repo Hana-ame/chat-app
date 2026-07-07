@@ -6,6 +6,7 @@ import { useChatStore } from '../store/chat';
 import ChatList from '../components/ChatList';
 import ChatView from '../components/ChatView';
 import MemberPanel from '../components/MemberPanel';
+import WelcomeView from '../components/WelcomeView';
 
 export default function ChatPage() {
   const { chatId: urlChatId } = useParams();
@@ -66,17 +67,14 @@ export default function ChatPage() {
   return (
     <div className={appClass}>
       <ChatList onSelectChat={handleSelectChat} activeId={activeChatId} onLogout={logout} />
-      {activeChatId ? (
-        <ChatView
-          chatId={activeChatId}
-          onBack={isMobile ? handleBack : null}
-        />
-      ) : isMobile ? null : (
-        <div className="main" style={{alignItems:'center',justifyContent:'center',color:'var(--text-muted)'}}>
-          Select a conversation
-        </div>
-      )}
-      {!isMobile && activeChatId && <MemberPanel chatId={activeChatId} />}
+       {activeChatId ? (
+         <ChatView
+           chatId={activeChatId}
+           onBack={isMobile ? handleBack : null}
+         />
+       ) : isMobile ? null : <WelcomeView />}
+       {!isMobile && activeChatId && <MemberPanel chatId={activeChatId} />}
+
     </div>
   );
 }

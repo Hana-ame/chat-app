@@ -74,7 +74,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     try {
       const data = await api.searchUsers(accessToken, q);
       setDmResults(data.users || []);
-    } catch { }
+    } catch (e) { console.error('Search users error:', e); }
   };
 
   const searchPublic = async (q) => {
@@ -86,7 +86,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       const lower = q.toLowerCase();
       const matched = all.filter(c => c.name?.toLowerCase().includes(lower) || c.id.toLowerCase().includes(lower));
       setPublicResults(matched);
-    } catch { }
+    } catch (e) { console.error('Search public chats error:', e); }
     setPublicSearching(false);
   };
 

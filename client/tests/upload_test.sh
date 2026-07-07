@@ -23,7 +23,7 @@ echo "=== Upload Service Tests ==="
 
 # 1. Upload a text file (should succeed)
 echo "hello world" > /tmp/upload_test_hello.txt
-res=$(curl -s -w '\n%{http_code}' -X PUT -F "file=@/tmp/upload_test_hello.txt" "$URL")
+res=$(curl -s -w '\n%{http_code}' -X PUT --data-binary "@/tmp/upload_test_hello.txt" "$URL")
 body=$(head -n -1 <<< "$res")
 code=$(tail -n1 <<< "$res")
 if [[ "$code" =~ ^2 ]]; then
@@ -41,7 +41,7 @@ fi
 
 # 2. Upload a PNG image (generate a 1x1 red pixel)
 printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82' > /tmp/upload_test_red.png
-res=$(curl -s -w '\n%{http_code}' -X PUT -F "file=@/tmp/upload_test_red.png" "$URL")
+res=$(curl -s -w '\n%{http_code}' -X PUT --data-binary "@/tmp/upload_test_red.png" "$URL")
 body=$(head -n -1 <<< "$res")
 code=$(tail -n1 <<< "$res")
 if [[ "$code" =~ ^2 ]]; then

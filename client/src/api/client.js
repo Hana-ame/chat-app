@@ -83,11 +83,9 @@ export const api = {
 
   // ── Uploads (external upload.moonchan.xyz) ──
   upload: async (file) => {
-    const form = new FormData();
-    form.append('file', file);
     const res = await fetch(UPLOAD_BASE + '/api/upload', {
       method: 'PUT',
-      body: form,
+      body: file,
     });
     if (!res.ok) throw { status: res.status, message: 'Upload failed' };
     const data = await res.json();
