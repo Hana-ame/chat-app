@@ -17,6 +17,7 @@ export default function ChatView({ chatId, onBack }) {
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const bodyRef = useRef(null);
+  const loadingMoreRef = useRef(false);
 
   const chat = useMemo(() => chats.find(c => c.id === chatId), [chats, chatId]);
 
@@ -31,12 +32,22 @@ export default function ChatView({ chatId, onBack }) {
   const loadMore = useCallback(async () => {
     if (loading || !hasMore) return;
     setLoading(true);
-    // Fetch older messages before the earliest message we have
+    loadingMoreRef.current = true;
+    const prevScrollHeight = bodyRef.current?.scrollHeight || 0;
+    const prevScrollTop = bodyRef.current?.scrollTop || 0;
+
     const msgs = await api.listMessages(accessToken, chatId, messages[0]?.id, 50);
     const list = msgs.messages || [];
-    // Prepend fetched messages into the store
     if (list.length) {
       useChatStore.setState(s => ({ messages: [...list, ...s.messages] }));
+      requestAnimationFrame(() => {
+        if (bodyRef.current) {
+          bodyRef.current.scrollTop = bodyRef.current.scrollHeight - prevScrollHeight + prevScrollTop;
+        }
+        loadingMoreRef.current = false;
+      });
+    } else {
+      loadingMoreRef.current = false;
     }
     if (list.length < 50) setHasMore(false);
     setLoading(false);
@@ -45,6 +56,7 @@ export default function ChatView({ chatId, onBack }) {
   const filtered = messages.filter(m => m.chat_id === chatId);
 
   useEffect(() => {
+    if (loadingMoreRef.current) return;
     if (filtered.length > 0 && bodyRef.current) {
       bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
     }

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
-import { createStreamSource } from '../dev/stream-source';
+import { __setStoreRef } from '../api/mock';
 
 export const useChatStore = create((set, get) => ({
   chats: [],
@@ -290,7 +290,7 @@ export const useChatStore = create((set, get) => ({
     };
     set(s => ({ messages: [...s.messages, msg] }));
 
-    createStreamSource(streamFn)
+    api.startStreaming(streamFn)
       .onChunk(chunk => {
         set(s => ({
           messages: s.messages.map(m =>
@@ -337,3 +337,5 @@ export const useChatStore = create((set, get) => ({
     set({ ws: null, wsReady: false, sse: null, sseReady: false, pollTimer: null });
   },
 }));
+
+__setStoreRef(useChatStore);

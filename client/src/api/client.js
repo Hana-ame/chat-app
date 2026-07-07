@@ -1,3 +1,6 @@
+import { mockListChats, mockListMessages, mockSendMessage, resetMockData } from './mock';
+import { createStreamSource } from '../dev/stream-source';
+
 const IS_PAGES = typeof window !== 'undefined' && window.location.hostname.endsWith('pages.dev');
 const API_BASE = IS_PAGES ? 'https://wsl-8080.moonchan.xyz' : '';
 const UPLOAD_BASE = 'https://upload.moonchan.xyz';
@@ -103,3 +106,29 @@ export const api = {
   // ── Misc ──
   sseUrl: (token) => API_BASE + '/api/events?access_token=' + encodeURIComponent(token),
 };
+
+api.startStreaming = (streamFn) => createStreamSource(streamFn);
+
+let _mockEnabled = false;
+const _origListChats = api.listChats;
+const _origListMessages = api.listMessages;
+const _origSendMessage = api.sendMessage;
+
+api.enableMock = () => {
+  if (_mockEnabled) return;
+  _mockEnabled = true;
+  resetMockData();
+  api.listChats = mockListChats;
+  api.listMessages = mockListMessages;
+  api.sendMessage = mockSendMessage;
+};
+
+api.disableMock = () => {
+  if (!_mockEnabled) return;
+  _mockEnabled = false;
+  api.listChats = _origListChats;
+  api.listMessages = _origListMessages;
+  api.sendMessage = _origSendMessage;
+};
+
+api.isMockEnabled = () => _mockEnabled;

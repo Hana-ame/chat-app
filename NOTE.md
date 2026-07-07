@@ -51,6 +51,8 @@ cd client && npx playwright test
 | **前端** | SPA, Zustand 全局状态, 暗色 Discord 风格 |
 | **上传** | 头像/附件统一走外部 `upload.moonchan.xyz` (PUT multipart) |
 | **实时** | WebSocket 为主, SSE/Poll 备选 |
+| **Mock API** | `client/src/api/mock.js` — 测试数据生成, 替换 `api.listChats`/`api.listMessages` 实现分页 |
+| **范围** | 所有测试数据逻辑集中在 `api/` 层, React 组件不直接操作 `generateDummyData` |
 
 ## CI 流水线
 

@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
-import { generateDummyData } from '../dev/dummy';
 import ChatListItem from './ChatListItem';
 import PublicChannelList from './PublicChannelList';
 import CreateGroupForm from './CreateGroupForm';
@@ -122,10 +121,11 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     setShowSettings(false);
   };
 
-  const handleGenerateDummy = () => {
-    const data = generateDummyData({ chatCount: 10, msgPerChat: 100 });
-    useChatStore.setState(data);
-    if (data.chats[0]) onSelectChat(data.chats[0].id);
+  const handleGenerateDummy = async () => {
+    api.enableMock();
+    await useChatStore.getState().loadChats(accessToken);
+    const firstChat = useChatStore.getState().chats[0];
+    if (firstChat) onSelectChat(firstChat.id);
   };
 
   const [buildCount] = useState(() => {
