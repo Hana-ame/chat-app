@@ -19,7 +19,13 @@ type User struct {
     AvatarColor string    `json:"avatar_color"`
     AvatarURL   string    `json:"avatar_url,omitempty"`
     Status      string    `json:"status"`
+    LastSeen    time.Time `json:"last_seen,omitempty"`
     CreatedAt   time.Time `json:"created_at"`
+}
+
+type PinnedContent struct {
+    Content  string    `json:"content"`
+    PinnedAt time.Time `json:"pinned_at"`
 }
 
 type Chat struct {
@@ -31,25 +37,26 @@ type Chat struct {
     OwnerID         string     `json:"owner_id,omitempty"`
     CreatedAt       time.Time  `json:"created_at"`
     LastMessageAt   time.Time  `json:"last_message_at"`
-    Members         []User     `json:"members,omitempty"`
+    MemberCount     int        `json:"member_count"`
     UnreadCount     int        `json:"unread_count"`
-    Pinned          bool       `json:"pinned"`
+    PinnedMessage   *PinnedContent `json:"pinned_message,omitempty"`
     LastMessage     *Message   `json:"last_message,omitempty"`
 }
 
 type ChatMember struct {
     ChatID            string    `json:"chat_id"`
     UserID            string    `json:"user_id"`
+    Role              string    `json:"role"`
+    LastSeen          time.Time `json:"last_seen,omitempty"`
     JoinedAt          time.Time `json:"joined_at"`
     LastReadMessageID string    `json:"last_read_message_id,omitempty"`
-    Pinned            bool      `json:"pinned"`
 }
 
 type Message struct {
     ID              string       `json:"id"`
     ChatID          string       `json:"chat_id"`
     UserID          string       `json:"user_id"`
-    Author          *User        `json:"author,omitempty"`
+    Author          *User        `json:"author,omitempty"` // Deprecated.
     Content         string       `json:"content"`
     CreatedAt       time.Time    `json:"created_at"`
     EditedAt        *time.Time   `json:"edited_at,omitempty"`
@@ -72,10 +79,8 @@ type Attachment struct {
 }
 
 type Reaction struct {
-    Emoji   string   `json:"emoji"`
-    Count   int      `json:"count"`
-    UserIDs []string `json:"user_ids"`
-    Me      bool     `json:"me"`
+    Emoji string `json:"emoji"`
+    Count int    `json:"count"`
 }
 
 type RefreshToken struct {
@@ -101,6 +106,7 @@ type RefreshToken struct {
 | AvatarColor | `string` | `"avatar_color"` | 服务端计算 | `PickColor(username)` → palette\[uuid.ID() % 8\]（UUID 取模） |
 | AvatarURL | `string` | `"avatar_url"` | 用户上传 | 外部 `upload.moonchan.xyz` 返回的 URL |
 | Status | `string` | `"status"` | 服务端设置 | 默认 `"offline"`，WS 连接时 `"online"` |
+| LastSeen | `time.Time` | `"last_seen"` | 服务端更新 | WS 连接/断开 及 发消息时更新为 `now` |
 | CreatedAt | `time.Time` | `"created_at"` | 服务端生成 | SQLite `strftime('%Y-%m-%dT%H:%M:%fZ','now')` |
 
 ### Chat
@@ -115,9 +121,9 @@ type RefreshToken struct {
 | OwnerID | `string` | `"owner_id"` | 用户指定 | 引用 `users(id)`，可为 null（dm） |
 | CreatedAt | `time.Time` | `"created_at"` | 服务端生成 | SQLite default |
 | LastMessageAt | `time.Time` | `"last_message_at"` | 服务端更新 | 发消息时 `UPDATE chats SET last_message_at = now`；DB NULL 时降级为 `CreatedAt` |
-| Members | `[]User` | `"members"` | JOIN 查询 | `GetChatMembers` → `SELECT ... FROM chat_members JOIN users` |
+| MemberCount | `int` | `"member_count"` | 服务端计算 | 子查询 `(SELECT COUNT(*) FROM chat_members WHERE chat_id = c.id)` |
 | UnreadCount | `int` | `"unread_count"` | 服务端计算 | `COUNT(messages) WHERE deleted_at IS NULL AND (created_at,id) > lastReadID` |
-| Pinned | `bool` | `"pinned"` | 用户动作 | `POST /pin` → `pinned = 1`，`/unpin` → `0` |
+| PinnedMessage | `*PinnedContent` | `"pinned_message"` | 用户动作 | JSON 对象 `{"content","pinned_at"}`；由 `SetPinnedMessage` 写入 |
 | LastMessage | `*Message` | `"last_message"` | 服务端查询 | `fetchMessageRow(chat_id, LIMIT 1)`·无 `attachExtras` |
 
 ### ChatMember
@@ -126,9 +132,10 @@ type RefreshToken struct {
 |------|------|------|------|----------|
 | ChatID | `string` | `"chat_id"` | 关联 | 引用 `chats(id)` ON DELETE CASCADE |
 | UserID | `string` | `"user_id"` | 关联 | 引用 `users(id)` ON DELETE CASCADE |
+| Role | `string` | `"role"` | 服务端设置 | `"owner"` (创建者), `"admin"` (管理员), `""` (普通成员) |
+| LastSeen | `time.Time` | `"last_seen"` | 服务端更新 | WS 连接/断开 及 发消息时更新为 `now` |
 | JoinedAt | `time.Time` | `"joined_at"` | 服务端生成 | SQLite default |
 | LastReadMessageID | `string` | `"last_read_message_id"` | 用户动作 | 调用 `POST /read` 时更新 |
-| Pinned | `bool` | `"pinned"` | 用户动作 | 同上 |
 
 ### Message
 
@@ -137,7 +144,7 @@ type RefreshToken struct {
 | ID | `string` | `"id"` | 服务端生成 | UUID v4 |
 | ChatID | `string` | `"chat_id"` | 用户关联 | 引用 `chats(id)` |
 | UserID | `string` | `"user_id"` | 用户关联 | 引用 `users(id)` |
-| Author | `*User` | `"author"` | JOIN 查询 | `messages JOIN users` |
+| Author | `*User` | `"author"` | JOIN 查询 | `messages JOIN users` (Deprecated) |
 | Content | `string` | `"content"` | 用户输入 | 最大 4000 字符，超长返回 403/`content_too_long` |
 | CreatedAt | `time.Time` | `"created_at"` | 服务端生成 | Go `time.Now().UTC().Format("2006-01-02T15:04:05.000Z")` |
 | EditedAt | `*time.Time` | `"edited_at"` | 服务端设置 | `UpdateMessage` 时记录当前时间 |
@@ -145,8 +152,8 @@ type RefreshToken struct {
 | AttachmentCount | `int` | `"attachment_count"` | 服务端设置 | 写入时从 `attachments` 数组长度计算 |
 | MentionCount | `int` | `"mention_count"` | 服务端设置 | 写入时从 `mentions` 数组去重后长度计算 |
 | ReactionCount | `int` | `"reaction_count"` | 服务端更新 | `AddReaction`/`RemoveReaction` 时 `COUNT(*)` 重新计算 |
-| Attachments | `[]Attachment` | `"attachments"` | 子查询 | `SELECT ... FROM attachments WHERE message_id = ?`（仅 `?details=true`） |
-| Reactions | `[]Reaction` | `"reactions"` | 子查询 | `SELECT emoji, user_id FROM reactions ...`（仅 `?details=true`） |
+| Attachments | `[]Attachment` | `"attachments"` | JSON 列 | 存储在 `messages.attachments` TEXT 列中 |
+| Reactions | `[]Reaction` | `"reactions"` | JSON 列 | 存储在 `messages.reactions` TEXT 列中 |
 | Mentions | `[]string` | `"mentions"` | 子查询 | `SELECT user_id FROM mentions WHERE message_id = ?`（仅 `?details=true`） |
 
 ### Attachment
@@ -155,19 +162,17 @@ type RefreshToken struct {
 |------|------|------|------|----------|
 | ID | `string` | `"id"` | 服务端生成 | 若客户端未传，用 `NewID()` |
 | MessageID | `string` | `"message_id"` | 关联 | 引用 `messages(id)` |
-| Filename | `string` | `"filename"` | 用户传入 | `filepath.Base` + `Replace("..", "_")` + 截断 200 字符 |
+| Filename | `string` | `"filename"` | 用户传入 | `filepath.Base` + `Replace("..", "_")`；若长度 > 200 则改为 `file + ext` |
 | MimeType | `string` | `"mime_type"` | 用户/推断 | 根据 `Content-Type` 或 `mime.TypeByExtension`，默认 `application/octet-stream` |
 | Size | `int64` | `"size"` | 用户传入 | 文件字节数 |
 | URL | `string` | `"url"` | 用户传入 | 指向 `upload.moonchan.xyz` 外部存储 |
 
-### Reaction（API 响应结构，非原始行）
+### Reaction（API 响应结构）
 
 | 字段 | 类型 | JSON | 来源 | 生成规则 |
 |------|------|------|------|----------|
 | Emoji | `string` | `"emoji"` | 用户输入 | 最大 32 字符 |
 | Count | `int` | `"count"` | 服务端聚合 | `GROUP BY emoji → COUNT(*)` |
-| UserIDs | `[]string` | `"user_ids"` | 服务端聚合 | `GROUP BY emoji → json_agg(user_id)` |
-| Me | `bool` | `"me"` | 服务端计算 | 当前 viewer 是否在此 emoji 的 user_ids 中 |
 
 ### RefreshToken
 
@@ -268,13 +273,13 @@ ValidateUsername → strings.TrimSpace, 非空检查
 ### 3.9 消息内容
 
 ```go
-// server/internal/db/messages.go:16-20
+// server/internal/db/messages.go
 if len(content) > 4000 {
     return nil, errors.New("content too long, use file upload instead")
 }
 ```
 
-**变更**：从静默截断改为拒绝并返回 403/`content_too_long`。超长内容应通过附件上传。
+**规则**：最大 4000 字符。超长内容不再截断，而是直接返回 403/`content_too_long`，强制用户通过附件上传。
 
 ### 3.10 Emoji 反应
 
@@ -284,14 +289,16 @@ emoji = strings.TrimSpace(emoji)
 if emoji == "" || len(emoji) > 32 { return error }
 ```
 
-**规则**：非空、≤32 字符。未做 Unicode 有效性校验。
+**规则**：非空、≤32 字符。API 响应中仅包含 `emoji` 与 `count`。
 
 ### 3.11 消息详情懒加载
 
 ```
-?details=true 控制 attachExtras（3 条子查询）。默认跳过。
+?details=true 控制 attachExtras（1 条子查询）。默认跳过。
 LastMessage（聊天列表预览）永远不查 attachExtras。
 ```
+
+**变更**：Attachments 与 Reactions 现在通过 `messages` 表的 JSON 列直接读取，不再使用子查询。仅 Mentions 仍使用子查询。
 
 ---
 

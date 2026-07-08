@@ -69,18 +69,20 @@ func (d *DB) CreateUser(ctx context.Context, email, username, passwordHash strin
 func (d *DB) GetUserByID(ctx context.Context, id string) (*models.User, error) {
 	var (
 		u         models.User
+		lastSeen  string
 		createdAt string
 	)
 	err := d.QueryRowContext(ctx,
-		`SELECT id, email, username, avatar_color, avatar_url, status, created_at FROM users WHERE id = ?`,
+		`SELECT id, email, username, avatar_color, avatar_url, status, last_seen, created_at FROM users WHERE id = ?`,
 		id,
-	).Scan(&u.ID, &u.Email, &u.Username, &u.AvatarColor, &u.AvatarURL, &u.Status, &createdAt)
+	).Scan(&u.ID, &u.Email, &u.Username, &u.AvatarColor, &u.AvatarURL, &u.Status, &lastSeen, &createdAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
+	u.LastSeen = parseTime(lastSeen)
 	u.CreatedAt = parseTime(createdAt)
 	return &u, nil
 }
@@ -90,18 +92,20 @@ func (d *DB) GetUserByEmail(ctx context.Context, email string) (*models.User, st
 	var (
 		u         models.User
 		pwHash    string
+		lastSeen  string
 		createdAt string
 	)
 	err := d.QueryRowContext(ctx,
-		`SELECT id, email, username, avatar_color, avatar_url, status, created_at, password_hash FROM users WHERE email = ?`,
+		`SELECT id, email, username, avatar_color, avatar_url, status, last_seen, created_at, password_hash FROM users WHERE email = ?`,
 		email,
-	).Scan(&u.ID, &u.Email, &u.Username, &u.AvatarColor, &u.AvatarURL, &u.Status, &createdAt, &pwHash)
+	).Scan(&u.ID, &u.Email, &u.Username, &u.AvatarColor, &u.AvatarURL, &u.Status, &lastSeen, &createdAt, &pwHash)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, "", ErrNotFound
 	}
 	if err != nil {
 		return nil, "", err
 	}
+	u.LastSeen = parseTime(lastSeen)
 	u.CreatedAt = parseTime(createdAt)
 	return &u, pwHash, nil
 }
@@ -132,13 +136,19 @@ func (d *DB) UpdateUserStatus(ctx context.Context, id, status string) error {
 	return err
 }
 
+func (d *DB) UpdateUserLastSeen(ctx context.Context, id string) error {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	_, err := d.ExecContext(ctx, `UPDATE users SET last_seen = ? WHERE id = ?`, now, id)
+	return err
+}
+
 func (d *DB) SearchUsers(ctx context.Context, query string, limit int) ([]models.User, error) {
 	if limit <= 0 || limit > 50 {
 		limit = 25
 	}
 	query = strings.TrimSpace(query)
 	rows, err := d.QueryContext(ctx,
-		`SELECT id, username, avatar_color, avatar_url, status, created_at FROM users
+		`SELECT id, username, avatar_color, avatar_url, status, last_seen, created_at FROM users
 		 WHERE username LIKE ? OR email LIKE ?
 		 ORDER BY username LIMIT ?`,
 		"%"+query+"%", "%"+strings.ToLower(query)+"%", limit,
@@ -150,10 +160,11 @@ func (d *DB) SearchUsers(ctx context.Context, query string, limit int) ([]models
 	out := []models.User{}
 	for rows.Next() {
 		var u models.User
-		var createdAt string
-		if err := rows.Scan(&u.ID, &u.Username, &u.AvatarColor, &u.AvatarURL, &u.Status, &createdAt); err != nil {
+		var lastSeen, createdAt string
+		if err := rows.Scan(&u.ID, &u.Username, &u.AvatarColor, &u.AvatarURL, &u.Status, &lastSeen, &createdAt); err != nil {
 			return nil, err
 		}
+		u.LastSeen = parseTime(lastSeen)
 		u.CreatedAt = parseTime(createdAt)
 		out = append(out, u)
 	}

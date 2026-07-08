@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type User struct {
 	ID          string    `json:"id"`
@@ -57,12 +60,12 @@ type Message struct {
 	CreatedAt       time.Time    `json:"created_at"`
 	EditedAt        *time.Time   `json:"edited_at,omitempty"`
 	DeletedAt       *time.Time   `json:"deleted_at,omitempty"`
-	AttachmentCount int `json:"attachment_count"`
-	MentionCount    int `json:"mention_count"`
-	ReactionCount   int `json:"reaction_count"`
-	Attachments     []Attachment `json:"attachments,omitempty"`
-	Reactions       []Reaction   `json:"reactions,omitempty"`
-	Mentions        []string     `json:"mentions,omitempty"`
+	AttachmentCount int          `json:"attachment_count"`
+	MentionCount    int          `json:"mention_count"`
+	ReactionCount   int          `json:"reaction_count"`
+	Attachments     json.RawMessage `json:"attachments,omitempty"`
+	Reactions       json.RawMessage `json:"reactions,omitempty"`
+	Mentions        json.RawMessage `json:"mentions,omitempty"`
 }
 
 type Attachment struct {

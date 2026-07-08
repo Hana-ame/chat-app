@@ -29,13 +29,8 @@ func (d *DB) syncReactionsColumn(ctx context.Context, messageID string) error {
 
 func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, mentions []string, attachments []models.Attachment) (*models.Message, error) {
 	content = strings.TrimRight(content, " \n\t")
-	if len(content) > 200 {
-		if len(attachments) > 0 {
-			ext := filepath.Ext(attachments[0].Filename)
-			content = "file" + ext
-		} else {
-			content = content[:200]
-		}
+	if len(content) > 4000 {
+		return nil, errors.New("content too long, use file upload instead")
 	}
 	if content == "" && len(attachments) == 0 {
 		return nil, errors.New("empty message")
@@ -49,9 +44,20 @@ func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, 
 
 	id := NewID()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
+	for i := range attachments {
+		if attachments[i].ID == "" {
+			attachments[i].ID = NewID()
+		}
+		if len(attachments[i].Filename) > 200 {
+			ext := filepath.Ext(attachments[i].Filename)
+			attachments[i].Filename = "file" + ext
+		}
+	}
+	attJSON, _ := json.Marshal(attachments)
+	mentJSON, _ := json.Marshal(dedupe(mentions))
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO messages (id, chat_id, user_id, content, created_at, attachment_count, mention_count) VALUES (?,?,?,?,?,?,?)`,
-		id, chatID, userID, content, now, len(attachments), len(dedupe(mentions)),
+		`INSERT INTO messages (id, chat_id, user_id, content, created_at, attachment_count, mention_count, attachments, mentions) VALUES (?,?,?,?,?,?,?,?,?)`,
+		id, chatID, userID, content, now, len(attachments), len(dedupe(mentions)), string(attJSON), string(mentJSON),
 	)
 	if err != nil {
 		return nil, err
@@ -70,28 +76,17 @@ func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, 
 	if err != nil {
 		return nil, err
 	}
-	for _, m := range dedupe(mentions) {
-		_, err = tx.ExecContext(ctx,
-			`INSERT OR IGNORE INTO mentions (message_id, user_id) VALUES (?,?)`,
-			id, m,
-		)
-		if err != nil {
-			return nil, err
-		}
+	_, err = tx.ExecContext(ctx,
+		`UPDATE users SET last_seen = ? WHERE id = ?`,
+		now, userID,
+	)
+	if err != nil {
+		return nil, err
 	}
-	for i, a := range attachments {
-		if a.ID == "" {
-			a.ID = NewID()
-			attachments[i].ID = a.ID
-		}
-		_, err = tx.ExecContext(ctx,
-			`INSERT INTO attachments (id, message_id, filename, mime_type, size, url) VALUES (?,?,?,?,?,?)`,
-			a.ID, id, a.Filename, a.MimeType, a.Size, a.URL,
-		)
-		if err != nil {
-			return nil, err
-		}
+	for range dedupe(mentions) {
+		// Deprecated: mentions are stored as JSON in messages.mentions column.
 	}
+	// Deprecated: attachments are stored as JSON in messages.attachments column.
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
@@ -114,7 +109,7 @@ func dedupe(in []string) []string {
 func (d *DB) GetMessage(ctx context.Context, id string) (*models.Message, error) {
 	m, err := d.fetchMessageRow(ctx,
 		`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted_at,
-		        m.attachment_count, m.mention_count, m.reaction_count, m.reactions,
+		        m.attachment_count, m.mention_count, m.reaction_count, m.reactions, m.attachments, m.mentions,
 		        u.id, u.username, u.avatar_color, u.status
 		 FROM messages m JOIN users u ON u.id = m.user_id
 		 WHERE m.id = ?`,
@@ -136,6 +131,8 @@ func (d *DB) fetchMessageRow(ctx context.Context, q, id string) (*models.Message
 		edited    sql.NullString
 		deletedAt sql.NullString
 		rxnJSON   sql.NullString
+		attJSON   sql.NullString
+		mentJSON  sql.NullString
 		created   string
 		attCnt    int
 		mentCnt   int
@@ -143,7 +140,7 @@ func (d *DB) fetchMessageRow(ctx context.Context, q, id string) (*models.Message
 	)
 	err := d.QueryRowContext(ctx, q, id).Scan(
 		&m.ID, &m.ChatID, &m.UserID, &m.Content, &created, &edited, &deletedAt,
-		&attCnt, &mentCnt, &rxnCnt, &rxnJSON,
+		&attCnt, &mentCnt, &rxnCnt, &rxnJSON, &attJSON, &mentJSON,
 		&author.ID, &author.Username, &author.AvatarColor, &author.Status,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -166,36 +163,25 @@ func (d *DB) fetchMessageRow(ctx context.Context, q, id string) (*models.Message
 	m.MentionCount = mentCnt
 	m.ReactionCount = rxnCnt
 	if rxnJSON.Valid && rxnJSON.String != "" {
-		json.Unmarshal([]byte(rxnJSON.String), &m.Reactions)
+		m.Reactions = json.RawMessage(rxnJSON.String)
 	}
-	// Deprecated.
+	if attJSON.Valid && attJSON.String != "" {
+		m.Attachments = json.RawMessage(attJSON.String)
+	}
+	if mentJSON.Valid && mentJSON.String != "" {
+		m.Mentions = json.RawMessage(mentJSON.String)
+	}
 	m.Author = &author
 	return &m, nil
 }
 
 func (d *DB) attachExtras(ctx context.Context, m *models.Message, viewerID string) error {
-	if m.AttachmentCount > 0 {
-		atts, err := d.attachmentsFor(ctx, m.ID)
-		if err != nil {
-			return err
-		}
-		m.Attachments = atts
-	}
+	// Attachments loaded from column m.attachments in the main query.
 	if m.MentionCount > 0 {
-		mentions, err := d.mentionsFor(ctx, m.ID)
-		if err != nil {
-			return err
-		}
-		m.Mentions = mentions
+		// Mentions loaded from column m.mentions in the main query.
 	}
 	// Reactions loaded from column m.reactions in the main query.
-	if m.ReactionCount > 0 && len(m.Reactions) == 0 && viewerID != "" {
-		rxs, err := d.reactionsFor(ctx, m.ID, viewerID)
-		if err != nil {
-			return err
-		}
-		m.Reactions = rxs
-	}
+	// me is excluded from the API; clients check user_ids for self.
 	return nil
 }
 
@@ -210,7 +196,7 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 	if before == "" {
 		rows, err = d.QueryContext(ctx,
 			`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted_at,
-			        m.attachment_count, m.mention_count, m.reaction_count, m.reactions,
+			        m.attachment_count, m.mention_count, m.reaction_count, m.reactions, m.attachments, m.mentions,
 			        u.id, u.username, u.avatar_color, u.status
 			 FROM messages m JOIN users u ON u.id = m.user_id
 			 WHERE m.chat_id = ?
@@ -220,7 +206,7 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 	} else {
 		rows, err = d.QueryContext(ctx,
 			`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted_at,
-			        m.attachment_count, m.mention_count, m.reaction_count, m.reactions,
+			        m.attachment_count, m.mention_count, m.reaction_count, m.reactions, m.attachments, m.mentions,
 			        u.id, u.username, u.avatar_color, u.status
 			 FROM messages m JOIN users u ON u.id = m.user_id
 			 WHERE m.chat_id = ? AND (m.created_at, m.id) < (
@@ -243,6 +229,8 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 			edited    sql.NullString
 			deletedAt sql.NullString
 			rxnJSON   sql.NullString
+			attJSON   sql.NullString
+			mentJSON  sql.NullString
 			created   string
 			attCnt    int
 			mentCnt   int
@@ -250,7 +238,7 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 		)
 		if err := rows.Scan(
 			&m.ID, &m.ChatID, &m.UserID, &m.Content, &created, &edited, &deletedAt,
-			&attCnt, &mentCnt, &rxnCnt, &rxnJSON,
+			&attCnt, &mentCnt, &rxnCnt, &rxnJSON, &attJSON, &mentJSON,
 			&author.ID, &author.Username, &author.AvatarColor, &author.Status,
 		); err != nil {
 			return nil, err
@@ -269,7 +257,13 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 		m.MentionCount = mentCnt
 		m.ReactionCount = rxnCnt
 		if rxnJSON.Valid && rxnJSON.String != "" {
-			json.Unmarshal([]byte(rxnJSON.String), &m.Reactions)
+			m.Reactions = json.RawMessage(rxnJSON.String)
+		}
+		if attJSON.Valid && attJSON.String != "" {
+			m.Attachments = json.RawMessage(attJSON.String)
+		}
+		if mentJSON.Valid && mentJSON.String != "" {
+			m.Mentions = json.RawMessage(mentJSON.String)
 		}
 		// Deprecated.
 		m.Author = &author
@@ -295,7 +289,7 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 func (d *DB) LastMessage(ctx context.Context, chatID string) (*models.Message, error) {
 	m, err := d.fetchMessageRow(ctx,
 		`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted_at,
-		        m.attachment_count, m.mention_count, m.reaction_count, m.reactions,
+		        m.attachment_count, m.mention_count, m.reaction_count, m.reactions, m.attachments, m.mentions,
 		        u.id, u.username, u.avatar_color, u.status
 		 FROM messages m JOIN users u ON u.id = m.user_id
 		 WHERE m.chat_id = ?
@@ -377,6 +371,7 @@ func (d *DB) DeleteMessage(ctx context.Context, id, userID string, allowAny bool
 
 // ── Attachments ──────────────────────────────────────────────────────
 
+// Deprecated.
 func (d *DB) attachmentsFor(ctx context.Context, messageID string) ([]models.Attachment, error) {
 	rows, err := d.QueryContext(ctx,
 		`SELECT id, message_id, filename, mime_type, size, url FROM attachments WHERE message_id = ?`,
@@ -480,16 +475,10 @@ func (d *DB) reactionsFor(ctx context.Context, messageID, viewerID string) ([]mo
 		}
 		if r, ok := grouped[emoji]; ok {
 			r.Count++
-			r.UserIDs = append(r.UserIDs, uid)
-			if uid == viewerID {
-				r.Me = true
-			}
 		} else {
 			r := &models.Reaction{
-				Emoji:   emoji,
-				Count:   1,
-				UserIDs: []string{uid},
-				Me:      viewerID != "" && uid == viewerID,
+				Emoji: emoji,
+				Count: 1,
 			}
 			grouped[emoji] = r
 			order = append(order, emoji)

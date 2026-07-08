@@ -42,10 +42,11 @@
 - 问题：持有锁 (`h.mu.Lock()`) 期间调用 `db.UpdateUserStatus`
 - 影响：高并发下注册/注销阻塞，成为瓶颈
 
-### 7. 消息分页 N+1 查询
-- 位置：`server/internal/db/messages.go:218-227`
-- 问题：每条消息额外查 attachments、reactions、mentions 三张表
-- 影响：50 条消息最多触发 150 次额外查询
+### 7. 消息分页 N+1 查询 (已修复)
+- 位置：`server/internal/db/messages.go`
+- 问题：原逻辑每条消息额外查 attachments、reactions、mentions 三张表
+- 修复：将 attachments 和 reactions 改为 JSON TEXT 列存储在 messages 表中，一次性读取，移除重复子查询
+- 影响：大幅降低读取压力，50 条消息从 150+ 次查询降至 1 次主查询 + 少量 mentions 查询
 
 ### 8. 刷新 token 竞态
 - 位置：`server/internal/handlers/auth.go:143-162`
@@ -56,10 +57,11 @@
 
 ## 代码问题
 
-### 9. 时间精度不一致
-- 位置：`server/internal/db/messages.go:31` vs `chats.go:122`
-- 问题：消息时间用毫秒格式，chat last_message_at 用纳秒格式
-- 影响：极短时间内消息排序可能错乱
+### 9. 时间精度不一致 (部分修复)
+- 位置：`server/internal/db/messages.go` vs `chats.go`
+- 问题：时间戳格式不统一导致排序风险
+- 修复：统一使用 `time.RFC3339Nano` 格式化写入，减少精度损失
+- 影响：极大程度上缓解了排序错乱风险
 
 ### 10. 上传文件名清洗不充分
 - 位置：`server/internal/handlers/uploads.go:29-35`
@@ -103,3 +105,23 @@
 - Cookie SameSite 从 Strict 改为 Lax（加注释说明）
 - WS 测试在 `WS_ENABLED` 未设置时跳过，避免 CI 环境无效失败
 - 测试适配 SameSite 变化
+
+---
+
+## 近期优化与功能更新 (2026-07-08)
+
+### 1. 数据库架构优化
+- **迁移合并**：将 9 个碎片化迁移文件合并为单个 `init.sql`，简化初始化流程，修正 `deleted = 0` 为 `deleted_at IS NULL` 的死列引用。
+- **Reaction 缓存**：引入 `messages.reactions` JSON 列存储聚合结果，消除读取时的 `GROUP BY` 开销。
+- **Attachment 缓存**：引入 `messages.attachments` JSON 列存储附件信息，消除附件子查询。
+- **成员计数**：将 `Chat.Members` 列表替换为 `Chat.MemberCount` 整数，通过 subquery 实时计算。
+
+### 2. 功能变更与约束
+- **Pinned Message**：由 `Pinned bool` 升级为 `PinnedMessage` (JSON 对象 `{content, pinned_at}`)，支持自定义置顶内容。
+- **LastSeen 追踪**：在 `User` 和 `ChatMember` 模型中增加 `LastSeen` 字段，实时更新连接状态与消息发送时间。
+- **内容截断策略**：
+  - 消息 > 4000 字符 $\rightarrow$ 返回 403 (`content_too_long`)，强制附件上传。
+  - 附件文件名 > 200 字符 $\rightarrow$ 强制改为 `file + ext` 格式。
+- **Reaction 简化**：API 响应由 `[{emoji, count, user_ids, me}]` 简化为 `[{emoji, count}]`，移除冗余字段。
+- **API 弃用**：标记 `CreateOrGetDM` 等 DM 创建接口为 `// Deprecated`。
+

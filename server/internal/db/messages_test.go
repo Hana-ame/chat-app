@@ -1,6 +1,7 @@
 package db_test
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -134,11 +135,15 @@ func TestReactionsAddRemove(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(m.Reactions) != 2 {
-		t.Fatalf("want 2 reactions, got %d", len(m.Reactions))
+	var rxs []models.Reaction
+	if err := json.Unmarshal(m.Reactions, &rxs); err != nil {
+		t.Fatal(err)
+	}
+	if len(rxs) != 2 {
+		t.Fatalf("want 2 reactions, got %d", len(rxs))
 	}
 	reactionMap := map[string]int{}
-	for _, r := range m.Reactions {
+	for _, r := range rxs {
 		reactionMap[r.Emoji] = r.Count
 	}
 	if reactionMap["👍"] != 2 {
@@ -151,8 +156,12 @@ func TestReactionsAddRemove(t *testing.T) {
 		t.Fatal(err)
 	}
 	m, _ = f.DB.GetMessage(f.Ctx(), msg.ID)
+	var rxs2 []models.Reaction
+	if err := json.Unmarshal(m.Reactions, &rxs2); err != nil {
+		t.Fatal(err)
+	}
 	reactionMap = map[string]int{}
-	for _, r := range m.Reactions {
+	for _, r := range rxs2 {
 		reactionMap[r.Emoji] = r.Count
 	}
 	if reactionMap["👍"] != 1 {
@@ -166,8 +175,12 @@ func TestMessageWithMentions(t *testing.T) {
 	b, _ := f.DB.CreateUser(f.Ctx(), "ment2@x.com", "MentB", "pw00000000")
 	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "MentionTest", "", a.ID, []string{a.ID, b.ID})
 	msg, _ := f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, "Hey <@there>", []string{b.ID}, nil)
-	if len(msg.Mentions) != 1 || msg.Mentions[0] != b.ID {
-		t.Fatalf("mentions: %v", msg.Mentions)
+	var ments []string
+	if err := json.Unmarshal(msg.Mentions, &ments); err != nil {
+		t.Fatal(err)
+	}
+	if len(ments) != 1 || ments[0] != b.ID {
+		t.Fatalf("mentions: %v", ments)
 	}
 }
 
@@ -182,10 +195,14 @@ func TestMessageWithAttachments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(msg.Attachments) != 1 {
-		t.Fatalf("want 1 attachment, got %d", len(msg.Attachments))
+	var attsOut []models.Attachment
+	if err := json.Unmarshal(msg.Attachments, &attsOut); err != nil {
+		t.Fatal(err)
 	}
-	if msg.Attachments[0].Filename != "foo.png" {
+	if len(attsOut) != 1 {
+		t.Fatalf("want 1 attachment, got %d", len(attsOut))
+	}
+	if attsOut[0].Filename != "foo.png" {
 		t.Fatal("attachment filename wrong")
 	}
 }
@@ -296,7 +313,11 @@ func TestMessageWithAttachmentOnlyAllowed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("attachment-only message should work: %v", err)
 	}
-	if len(msg.Attachments) != 1 {
+	var attsOut []models.Attachment
+	if err := json.Unmarshal(msg.Attachments, &attsOut); err != nil {
+		t.Fatal(err)
+	}
+	if len(attsOut) != 1 {
 		t.Fatal("attachment missing")
 	}
 }

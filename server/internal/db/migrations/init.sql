@@ -113,6 +113,7 @@ ALTER TABLE messages ADD COLUMN deleted_at TEXT;
 -- Avoids subquery on the reactions table for the common read path.
 ALTER TABLE messages ADD COLUMN reactions TEXT NOT NULL DEFAULT '[]';
 ALTER TABLE messages ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE messages ADD COLUMN mentions TEXT NOT NULL DEFAULT '[]';
 
 -- ── Attachments ──────────────────────────────────────────────────────────────
 
