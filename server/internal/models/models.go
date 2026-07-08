@@ -20,7 +20,7 @@ type Chat struct {
 	Visibility    string     `json:"visibility,omitempty"`
 	OwnerID       string     `json:"owner_id,omitempty"`
 	CreatedAt     time.Time  `json:"created_at"`
-	LastMessageAt *time.Time `json:"last_message_at,omitempty"`
+	LastMessageAt time.Time `json:"last_message_at"`
 	Members       []User     `json:"members,omitempty"`
 	UnreadCount   int        `json:"unread_count"`
 	Pinned        bool       `json:"pinned"`

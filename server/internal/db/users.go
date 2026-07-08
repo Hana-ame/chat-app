@@ -43,17 +43,6 @@ func parseTime(s string) time.Time {
 	return time.Time{}
 }
 
-func parseTimePtr(s sql.NullString) *time.Time {
-	if !s.Valid || s.String == "" {
-		return nil
-	}
-	t := parseTime(s.String)
-	if t.IsZero() {
-		return nil
-	}
-	return &t
-}
-
 // ── Users ────────────────────────────────────────────────────────────
 
 func (d *DB) CreateUser(ctx context.Context, email, username, passwordHash string) (*models.User, error) {

@@ -28,7 +28,11 @@ func (d *DB) ListPublicChats(ctx context.Context) ([]models.Chat, error) {
 		c.Name = name.String
 		c.OwnerID = owner.String
 		c.CreatedAt = parseTime(created)
-		c.LastMessageAt = parseTimePtr(lastMsg)
+		if lastMsg.Valid && lastMsg.String != "" {
+			c.LastMessageAt = parseTime(lastMsg.String)
+		} else {
+			c.LastMessageAt = c.CreatedAt
+		}
 		members, _ := d.GetChatMembers(ctx, c.ID)
 		c.Members = members
 		out = append(out, c)

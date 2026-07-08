@@ -166,7 +166,11 @@ func (d *DB) GetChat(ctx context.Context, id string) (*models.Chat, error) {
 	c.Name = name.String
 	c.OwnerID = owner.String
 	c.CreatedAt = parseTime(createdAt)
-	c.LastMessageAt = parseTimePtr(lastMsgAt)
+	if lastMsgAt.Valid && lastMsgAt.String != "" {
+		c.LastMessageAt = parseTime(lastMsgAt.String)
+	} else {
+		c.LastMessageAt = c.CreatedAt
+	}
 	members, err := d.GetChatMembers(ctx, id)
 	if err != nil {
 		return nil, err
@@ -249,7 +253,11 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 		c.Pinned = pinned == 1
 		c.OwnerID = owner.String
 		c.CreatedAt = parseTime(created)
-		c.LastMessageAt = parseTimePtr(lastMsg)
+		if lastMsg.Valid && lastMsg.String != "" {
+			c.LastMessageAt = parseTime(lastMsg.String)
+		} else {
+			c.LastMessageAt = c.CreatedAt
+		}
 		rows2 = append(rows2, row{chat: c, lastRead: lastRead})
 	}
 	if err := rows.Err(); err != nil {
@@ -281,15 +289,7 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 	}
 
 	sort.SliceStable(out, func(i, j int) bool {
-		ai := out[i].CreatedAt
-		if out[i].LastMessageAt != nil {
-			ai = *out[i].LastMessageAt
-		}
-		aj := out[j].CreatedAt
-		if out[j].LastMessageAt != nil {
-			aj = *out[j].LastMessageAt
-		}
-		return ai.After(aj)
+		return out[i].LastMessageAt.After(out[j].LastMessageAt)
 	})
 	return out, nil
 }
