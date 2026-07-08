@@ -9,7 +9,13 @@ type User struct {
 	AvatarColor string    `json:"avatar_color"`
 	AvatarURL   string    `json:"avatar_url,omitempty"`
 	Status      string    `json:"status"`
+	LastSeen    time.Time `json:"last_seen,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
+}
+
+type PinnedContent struct {
+	Content  string    `json:"content"`
+	PinnedAt time.Time `json:"pinned_at"`
 }
 
 type Chat struct {
@@ -21,11 +27,10 @@ type Chat struct {
 	OwnerID       string     `json:"owner_id,omitempty"`
 	CreatedAt     time.Time  `json:"created_at"`
 	LastMessageAt time.Time `json:"last_message_at"`
-	Members       []User     `json:"members,omitempty"`
+	MemberCount   int        `json:"member_count"`
 	// Deprecated.
 	UnreadCount   int        `json:"unread_count"`
-	PinnedMessage  string     `json:"pinned_message,omitempty"`
-	PinnedAt       time.Time  `json:"pinned_at,omitempty"`
+	PinnedMessage  *PinnedContent `json:"pinned_message,omitempty"`
 	// Deprecated.
 	LastMessage   *Message   `json:"last_message,omitempty"`
 }
@@ -70,10 +75,8 @@ type Attachment struct {
 }
 
 type Reaction struct {
-	Emoji   string   `json:"emoji"`
-	Count   int      `json:"count"`
-	UserIDs []string `json:"user_ids"`
-	Me      bool     `json:"me"`
+	Emoji   string `json:"emoji"`
+	Count   int    `json:"count"`
 }
 
 type RefreshToken struct {

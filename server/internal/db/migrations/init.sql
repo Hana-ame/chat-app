@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     avatar_color  TEXT NOT NULL DEFAULT '#5865F2',
     status        TEXT NOT NULL DEFAULT 'offline',
+    last_seen     TEXT NOT NULL DEFAULT '',
     created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     avatar_url    TEXT NOT NULL DEFAULT ''
 );
@@ -108,9 +109,10 @@ ALTER TABLE messages ADD COLUMN reaction_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE messages ADD COLUMN deleted_at TEXT;
 
 -- Aggregated reactions JSON array, synced on every add/remove reaction.
--- Format: [{"emoji":"👍","count":2,"user_ids":["uid1","uid2"],"me":false}]
+-- Format: [{"emoji":"👍","count":2}]
 -- Avoids subquery on the reactions table for the common read path.
 ALTER TABLE messages ADD COLUMN reactions TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE messages ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]';
 
 -- ── Attachments ──────────────────────────────────────────────────────────────
 

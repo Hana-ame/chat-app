@@ -66,6 +66,7 @@ func (h *Hub) register(c *Client) {
 	wasOffline := len(set) == 1
 	if wasOffline && h.db != nil {
 		_ = h.db.UpdateUserStatus(context.Background(), c.userID, "online")
+		_ = h.db.UpdateUserLastSeen(context.Background(), c.userID)
 		go h.broadcastPresence(c.userID, "online")
 	}
 }
@@ -83,6 +84,7 @@ func (h *Hub) unregister(c *Client) {
 	h.mu.Unlock()
 	if wasLast && h.db != nil {
 		_ = h.db.UpdateUserStatus(context.Background(), c.userID, "offline")
+		_ = h.db.UpdateUserLastSeen(context.Background(), c.userID)
 		h.broadcastPresence(c.userID, "offline")
 	}
 }
@@ -190,22 +192,15 @@ func (h *Hub) BroadcastReaction(chatID, messageID, emoji, userID string, added b
 }
 
 func (h *Hub) BroadcastChatCreated(c *models.Chat) {
-	for _, m := range c.Members {
-		h.sendToUser(m.ID, envelope(OpChatCreate, c))
-	}
+	h.sendToChat(c.ID, envelope(OpChatCreate, c), "")
 }
 
 func (h *Hub) BroadcastChatUpdated(c *models.Chat) {
-	for _, m := range c.Members {
-		h.sendToUser(m.ID, envelope(OpChatUpdate, c))
-	}
+	h.sendToChat(c.ID, envelope(OpChatUpdate, c), "")
 }
 
 func (h *Hub) BroadcastChatDeleted(c *models.Chat, chatID string) {
-	payload := map[string]string{"chat_id": chatID}
-	for _, m := range c.Members {
-		h.sendToUser(m.ID, envelope(OpChatDelete, payload))
-	}
+	h.sendToChat(chatID, envelope(OpChatDelete, map[string]string{"chat_id": chatID}), "")
 }
 
 func (h *Hub) NotifyUserNewChat(userID string, c *models.Chat) {

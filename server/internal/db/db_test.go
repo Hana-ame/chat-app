@@ -89,10 +89,14 @@ func TestCreateChatGroupAndDM(t *testing.T) {
 	if chat.Name != "TestGroup" || chat.Type != "group" || chat.OwnerID != a.ID {
 		t.Fatal("chat metadata wrong")
 	}
-	if len(chat.Members) != 3 {
-		t.Fatalf("want 3 members, got %d", len(chat.Members))
+	if chat.MemberCount != 3 {
+		t.Fatalf("want 3 members, got %d", chat.MemberCount)
 	}
-	for _, m := range chat.Members {
+	members, err := f.DB.GetChatMembers(f.Ctx(), chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range members {
 		if m.ID != a.ID && m.ID != b.ID && m.ID != c.ID {
 			t.Fatalf("unexpected member: %s", m.ID)
 		}
