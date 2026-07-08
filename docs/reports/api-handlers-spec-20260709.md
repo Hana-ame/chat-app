@@ -564,13 +564,16 @@ func (s *Server) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
-	if req.Username == "" {
-		req.Username = u.Username
-	}
-	name, err := auth.ValidateUsername(req.Username)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_username", err.Error())
-		return
+	var name string
+	var err error
+	if req.Username != "" {
+		name, err = auth.ValidateUsername(req.Username)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_username", err.Error())
+			return
+		}
+	} else {
+		name = u.Username
 	}
 	if req.AvatarColor == "" {
 		req.AvatarColor = u.AvatarColor
@@ -600,8 +603,7 @@ func (s *Server) UpdateMe(w http.ResponseWriter, r *http.Request) {
 **条件分支:**
 - `userFrom(ctx) == nil` → `401 {"error":"unauthorized"}`
 - `decodeJSON` 失败 → `400 {"error":"bad_request","message":err.Error()}`
-- `req.Username == ""` → 沿用 `u.Username`
-- `auth.ValidateUsername` 失败 → `400 {"error":"invalid_username","message":err.Error()}`
+- `req.Username == ""` → 沿用 `u.Username`（跳过校验）
 - `req.AvatarColor == ""` → 沿用 `u.AvatarColor`
 - `errors.Is(err, db.ErrNotFound)` → `404 {"error":"not_found","message":"user disappeared"}`
 - `errors.Is(err, db.ErrConflict)` → `409 {"error":"username_taken","message":"username already taken"}`
@@ -1108,10 +1110,6 @@ func (s *Server) RemoveMember(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusForbidden, "forbidden", "only owner or admin can kick others")
 			return
 		}
-	}
-	if err := s.DB.RemoveChatMember(r.Context(), id, target); err != nil {
-		writeError(w, http.StatusForbidden, "forbidden", "cannot kick owner")
-		return
 	}
 	if err := s.DB.RemoveChatMember(r.Context(), id, target); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
