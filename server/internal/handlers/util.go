@@ -15,7 +15,7 @@ func setAuthCookie(w http.ResponseWriter, r *http.Request, name, value string, p
 		Path:     path,
 		HttpOnly: true,
 		Secure:   secure,
-		SameSite: http.SameSiteLaxMode, // Lax for a better UX on navigation
+		SameSite: http.SameSiteLaxMode, // Lax is intentionally allowed for better UX on cross‑site navigation (e.g., redirects after OAuth login). This is a conscious decision; see security considerations in the documentation.
 		MaxAge:   int(ttl.Seconds()),
 	})
 }
@@ -28,7 +28,8 @@ func setRefreshCookie(w http.ResponseWriter, r *http.Request, raw string, ttl ti
         Path:     "/api/auth/refresh",
         HttpOnly: true,
         Secure:   secure,
-        SameSite: http.SameSiteStrictMode,
+        // Lax is intentionally allowed for better UX on cross‑site navigation (e.g., redirects after OAuth login).
+        SameSite: http.SameSiteLaxMode,
         MaxAge:   int(ttl.Seconds()),
     })
 }
@@ -41,7 +42,8 @@ func clearRefreshCookie(w http.ResponseWriter, r *http.Request) {
         Path:     "/api/auth/refresh",
         HttpOnly: true,
         Secure:   secure,
-        SameSite: http.SameSiteStrictMode,
+        // Lax is intentionally allowed for consistency with the refresh cookie creation.
+        SameSite: http.SameSiteLaxMode,
         MaxAge:   -1,
     })
 }

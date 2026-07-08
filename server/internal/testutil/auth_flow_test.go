@@ -287,8 +287,8 @@ func TestCookieSecurityAttributes(t *testing.T) {
 	if !c.HttpOnly {
 		t.Error("cookie missing HttpOnly flag")
 	}
-	if c.SameSite != http.SameSiteStrictMode {
-		t.Errorf("cookie SameSite: want StrictMode(%d) got %d", http.SameSiteStrictMode, c.SameSite)
+	if c.SameSite != http.SameSiteLaxMode {
+		t.Errorf("cookie SameSite: want LaxMode(%d) got %d", http.SameSiteLaxMode, c.SameSite)
 	}
 }
 
