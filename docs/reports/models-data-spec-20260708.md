@@ -142,7 +142,7 @@ type RefreshToken struct {
 | Role | `string` | `"role"` | 服务端设置 | `"owner"` (创建者), `"admin"` (管理员), `""` (普通成员) |
 | LastSeen | `time.Time` | `"last_seen"` | 服务端更新 | WS 连接/断开 及 发消息时更新为 `now` |
 | JoinedAt | `time.Time` | `"joined_at"` | 服务端生成 | SQLite default |
-| LastReadMessageID | `string` | `"last_read_message_id"` | 用户动作 | 调用 `POST /read` 时更新 |
+| LastReadMessageID | `string` | `"last_read_message_id"` | (Deprecated) 用户动作 | 调用 `POST /read` 时更新 |
 
 ### Message
 

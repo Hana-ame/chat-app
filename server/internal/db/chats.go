@@ -411,6 +411,7 @@ func (d *DB) RenameChat(ctx context.Context, chatID, name string) error {
 	return err
 }
 
+// Deprecated.
 func (d *DB) UpdateLastRead(ctx context.Context, chatID, userID, messageID string) error {
 	_, err := d.ExecContext(ctx,
 		`UPDATE chat_members SET last_read_message_id = ? WHERE chat_id = ? AND user_id = ?`,
