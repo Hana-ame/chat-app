@@ -129,6 +129,7 @@ type RefreshToken struct {
 | MemberCount | `int` | `"member_count"` | 服务端计算 | 子查询 `(SELECT COUNT(*) FROM chat_members WHERE chat_id = c.id)` |
 | UnreadCount | `int` | `"unread_count"` | (Deprecated) 服务端计算 | `COUNT(messages) WHERE deleted_at IS NULL AND (created_at,id) > lastReadID` |
 | PinnedMessage | `*PinnedContent` | `"pinned_message"` | 用户动作 | JSON 对象 `{"content","pinned_at"}`；由 `SetPinnedMessage` 写入 |
+| LastMessageID | `string` | `"last_message_id"` | 服务端查询 | 最后一条消息的 ID |
 | LastMessage | `*Message` | `"last_message"` | (Deprecated) 服务端查询 | `fetchMessageRow(chat_id, LIMIT 1)`·无 `attachExtras` |
 
 ### ChatMember

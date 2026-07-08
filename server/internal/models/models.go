@@ -34,6 +34,7 @@ type Chat struct {
 	// Deprecated.
 	UnreadCount   int        `json:"unread_count"`
 	PinnedMessage  *PinnedContent `json:"pinned_message,omitempty"`
+	LastMessageID  string     `json:"last_message_id,omitempty"`
 	// Deprecated.
 	LastMessage   *Message   `json:"last_message,omitempty"`
 }

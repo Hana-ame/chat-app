@@ -187,6 +187,11 @@ func (d *DB) GetChat(ctx context.Context, id string) (*models.Chat, error) {
 		}
 	}
 	c.MemberCount = memberCount
+	lastMsg, err := d.LastMessage(ctx, id)
+	if err == nil {
+		c.LastMessage = lastMsg
+		c.LastMessageID = lastMsg.ID
+	}
 	return &c, nil
 }
 
@@ -316,6 +321,9 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 		}
 		// Deprecated.
 		c.LastMessage = last
+		if last != nil {
+			c.LastMessageID = last.ID
+		}
 		var lastReadID string
 		if r.lastRead.Valid {
 			lastReadID = r.lastRead.String
