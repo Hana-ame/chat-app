@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -14,6 +16,7 @@ type createChatReq struct {
 	MemberIDs  []string `json:"member_ids"`
 }
 
+// Deprecated.
 type createDMReq struct {
 	UserID string `json:"user_id"`
 }
@@ -92,6 +95,7 @@ func (s *Server) CreateChat(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, chat)
 }
 
+// Deprecated.
 // CreateOrGetDM godoc
 // @Summary      Create or get DM chat
 // @Description  Find existing DM or create a new one with another user
@@ -278,12 +282,35 @@ func (s *Server) JoinChat(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
+type pinContentReq struct {
+	Content string `json:"content"`
+}
+
+func (s *Server) requireOwnerOrAdmin(ctx context.Context, chatID, userID string) error {
+	c, err := s.DB.GetChat(ctx, chatID)
+	if err != nil {
+		return err
+	}
+	if c.OwnerID == userID {
+		return nil
+	}
+	role, err := s.DB.GetChatMemberRole(ctx, chatID, userID)
+	if err != nil {
+		return err
+	}
+	if role == "admin" {
+		return nil
+	}
+	return errors.New("forbidden")
+}
+
 // PinChat godoc
-// @Summary      Pin a chat
-// @Description  Pin chat to top of user's chat list
+// @Summary      Set pinned message
+// @Description  Set pinned message text (owner/admin only, chat must have ≥3 members)
 // @Tags         chats
 // @Security     BearerAuth
-// @Param        chatID  path  string  true  "Chat ID"
+// @Param        chatID  path  string        true  "Chat ID"
+// @Param        body    body  pinContentReq true  "Pinned message content"
 // @Success      200  {object}  map[string]any
 // @Router       /api/chats/{chatID}/pin [post]
 func (s *Server) PinChat(w http.ResponseWriter, r *http.Request) {
@@ -293,29 +320,64 @@ func (s *Server) PinChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := chi.URLParam(r, "chatID")
-	if err := s.DB.PinChat(r.Context(), id, u.ID); err != nil {
+	if err := s.requireOwnerOrAdmin(r.Context(), id, u.ID); err != nil {
+		writeError(w, http.StatusForbidden, "forbidden", "")
+		return
+	}
+	n, err := s.DB.ChatMemberCount(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	if n < 3 {
+		writeError(w, http.StatusBadRequest, "bad_request", "need at least 3 members to pin")
+		return
+	}
+	var req pinContentReq
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
+	if err := s.DB.SetPinnedMessage(r.Context(), id, req.Content); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-// UnpinChat godoc
-// @Summary      Unpin a chat
-// @Description  Remove pin from a chat
+// UpdatePinnedChat godoc
+// @Summary      Update pinned message
+// @Description  Update the pinned message text
+// @Tags         chats
+// @Security     BearerAuth
+// @Param        chatID  path  string        true  "Chat ID"
+// @Param        body    body  pinContentReq true  "New pinned message content"
+// @Success      200  {object}  map[string]any
+// @Router       /api/chats/{chatID}/pin [patch]
+func (s *Server) UpdatePinnedChat(w http.ResponseWriter, r *http.Request) {
+	s.PinChat(w, r)
+}
+
+// DeletePinnedChat godoc
+// @Summary      Remove pinned message
+// @Description  Clear the pinned message from a chat (owner/admin only)
 // @Tags         chats
 // @Security     BearerAuth
 // @Param        chatID  path  string  true  "Chat ID"
 // @Success      200  {object}  map[string]any
-// @Router       /api/chats/{chatID}/unpin [post]
-func (s *Server) UnpinChat(w http.ResponseWriter, r *http.Request) {
+// @Router       /api/chats/{chatID}/pin [delete]
+func (s *Server) DeletePinnedChat(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	if u == nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "")
 		return
 	}
 	id := chi.URLParam(r, "chatID")
-	if err := s.DB.UnpinChat(r.Context(), id, u.ID); err != nil {
+	if err := s.requireOwnerOrAdmin(r.Context(), id, u.ID); err != nil {
+		writeError(w, http.StatusForbidden, "forbidden", "")
+		return
+	}
+	if err := s.DB.ClearPinnedMessage(r.Context(), id); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}

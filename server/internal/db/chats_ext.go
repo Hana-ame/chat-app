@@ -4,12 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 	"github.com/Hana-ame/chat-app/server/internal/models"
 )
 
 func (d *DB) ListPublicChats(ctx context.Context) ([]models.Chat, error) {
 	rows, err := d.QueryContext(ctx,
-		`SELECT id, type, name, icon_color, COALESCE(visibility,'private'), owner_id, created_at, last_message_at
+		`SELECT id, type, name, icon_color, COALESCE(visibility,'private'), owner_id, created_at, last_message_at, pinned_message, pinned_updated_at
 		 FROM chats WHERE type = 'group' AND visibility = 'public'
 		 ORDER BY created_at DESC`,
 	)
@@ -20,9 +21,9 @@ func (d *DB) ListPublicChats(ctx context.Context) ([]models.Chat, error) {
 	out := []models.Chat{}
 	for rows.Next() {
 		var c models.Chat
-		var name, owner, lastMsg sql.NullString
+		var name, owner, lastMsg, pinnedMsg, pinnedAt sql.NullString
 		var created string
-		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.Visibility, &owner, &created, &lastMsg); err != nil {
+		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.Visibility, &owner, &created, &lastMsg, &pinnedMsg, &pinnedAt); err != nil {
 			return nil, err
 		}
 		c.Name = name.String
@@ -32,6 +33,10 @@ func (d *DB) ListPublicChats(ctx context.Context) ([]models.Chat, error) {
 			c.LastMessageAt = parseTime(lastMsg.String)
 		} else {
 			c.LastMessageAt = c.CreatedAt
+		}
+		c.PinnedMessage = pinnedMsg.String
+		if pinnedAt.Valid {
+			c.PinnedAt = parseTime(pinnedAt.String)
 		}
 		members, _ := d.GetChatMembers(ctx, c.ID)
 		c.Members = members
@@ -52,24 +57,25 @@ func (d *DB) JoinChatByID(ctx context.Context, chatID, userID string) error {
 		return errors.New("chat is private, invitation required")
 	}
 	_, err = d.ExecContext(ctx,
-		`INSERT OR IGNORE INTO chat_members (chat_id, user_id) VALUES (?,?)`,
+		`INSERT OR IGNORE INTO chat_members (chat_id, user_id, role) VALUES (?,?,'')`,
 		chatID, userID,
 	)
 	return err
 }
 
-func (d *DB) PinChat(ctx context.Context, chatID, userID string) error {
+func (d *DB) SetPinnedMessage(ctx context.Context, chatID, content string) error {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
 	_, err := d.ExecContext(ctx,
-		`UPDATE chat_members SET pinned = 1 WHERE chat_id = ? AND user_id = ?`,
-		chatID, userID,
+		`UPDATE chats SET pinned_message = ?, pinned_updated_at = ? WHERE id = ?`,
+		content, now, chatID,
 	)
 	return err
 }
 
-func (d *DB) UnpinChat(ctx context.Context, chatID, userID string) error {
+func (d *DB) ClearPinnedMessage(ctx context.Context, chatID string) error {
 	_, err := d.ExecContext(ctx,
-		`UPDATE chat_members SET pinned = 0 WHERE chat_id = ? AND user_id = ?`,
-		chatID, userID,
+		`UPDATE chats SET pinned_message = '', pinned_updated_at = NULL WHERE id = ?`,
+		chatID,
 	)
 	return err
 }

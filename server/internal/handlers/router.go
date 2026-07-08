@@ -49,7 +49,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 			r.Get("/chats", s.ListChats)
 			r.Get("/chats/public", s.ListPublicChats)
 			r.Post("/chats", s.CreateChat)
-			r.Post("/dms", s.CreateOrGetDM)
+			r.Post("/dms", s.CreateOrGetDM) // Deprecated.
 			r.Route("/chats/{chatID}", func(r chi.Router) {
 				r.Get("/", s.GetChat)
 				r.Patch("/", s.RenameChat)
@@ -66,7 +66,8 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 				r.Delete("/messages/{messageID}/reactions/{emoji}", s.RemoveReaction)
 				r.Post("/join", s.JoinChat)
 				r.Post("/pin", s.PinChat)
-				r.Post("/unpin", s.UnpinChat)
+				r.Patch("/pin", s.UpdatePinnedChat)
+				r.Delete("/pin", s.DeletePinnedChat)
 			})
 
 			r.Post("/uploads", s.Upload) // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.

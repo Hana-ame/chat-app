@@ -22,23 +22,31 @@ type Chat struct {
 	CreatedAt     time.Time  `json:"created_at"`
 	LastMessageAt time.Time `json:"last_message_at"`
 	Members       []User     `json:"members,omitempty"`
+	// Deprecated.
 	UnreadCount   int        `json:"unread_count"`
-	Pinned        bool       `json:"pinned"`
+	PinnedMessage  string     `json:"pinned_message,omitempty"`
+	PinnedAt       time.Time  `json:"pinned_at,omitempty"`
+	// Deprecated.
 	LastMessage   *Message   `json:"last_message,omitempty"`
 }
 
 type ChatMember struct {
-	ChatID            string    `json:"chat_id"`
-	UserID            string    `json:"user_id"`
-	JoinedAt          time.Time `json:"joined_at"`
-	LastReadMessageID string    `json:"last_read_message_id,omitempty"`
-	Pinned            bool      `json:"pinned"`
+	ChatID   string    `json:"chat_id"`
+	UserID   string    `json:"user_id"`
+	Role     string    `json:"role"`
+	LastSeen time.Time `json:"last_seen,omitempty"`
+	JoinedAt time.Time `json:"joined_at"`
+	// Deprecated.
+	LastReadMessageID string `json:"last_read_message_id,omitempty"`
+	// Deprecated.
+	Pinned bool `json:"pinned"`
 }
 
 type Message struct {
 	ID              string       `json:"id"`
 	ChatID          string       `json:"chat_id"`
 	UserID          string       `json:"user_id"`
+	// Deprecated.
 	Author          *User        `json:"author,omitempty"`
 	Content         string       `json:"content"`
 	CreatedAt       time.Time    `json:"created_at"`

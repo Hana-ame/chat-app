@@ -131,9 +131,13 @@ func (d *DB) CreateChat(ctx context.Context, typ, name, visibility, ownerID stri
 			continue
 		}
 		seen[m] = struct{}{}
+		role := ""
+		if m == ownerID {
+			role = "owner"
+		}
 		_, err = tx.ExecContext(ctx,
-			`INSERT OR IGNORE INTO chat_members (chat_id, user_id) VALUES (?,?)`,
-			id, m,
+			`INSERT OR IGNORE INTO chat_members (chat_id, user_id, role) VALUES (?,?,?)`,
+			id, m, role,
 		)
 		if err != nil {
 			return nil, err
@@ -152,11 +156,13 @@ func (d *DB) GetChat(ctx context.Context, id string) (*models.Chat, error) {
 		owner       sql.NullString
 		createdAt   string
 		lastMsgAt   sql.NullString
+		pinnedMsg   sql.NullString
+		pinnedAt    sql.NullString
 	)
 	err := d.QueryRowContext(ctx,
-		`SELECT id, type, name, icon_color, visibility, owner_id, created_at, last_message_at FROM chats WHERE id = ?`,
+		`SELECT id, type, name, icon_color, visibility, owner_id, created_at, last_message_at, pinned_message, pinned_updated_at FROM chats WHERE id = ?`,
 		id,
-	).Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.Visibility, &owner, &createdAt, &lastMsgAt)
+	).Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.Visibility, &owner, &createdAt, &lastMsgAt, &pinnedMsg, &pinnedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -170,6 +176,10 @@ func (d *DB) GetChat(ctx context.Context, id string) (*models.Chat, error) {
 		c.LastMessageAt = parseTime(lastMsgAt.String)
 	} else {
 		c.LastMessageAt = c.CreatedAt
+	}
+	c.PinnedMessage = pinnedMsg.String
+	if pinnedAt.Valid {
+		c.PinnedAt = parseTime(pinnedAt.String)
 	}
 	members, err := d.GetChatMembers(ctx, id)
 	if err != nil {
@@ -204,6 +214,30 @@ func (d *DB) GetChatMembers(ctx context.Context, chatID string) ([]models.User, 
 	return out, rows.Err()
 }
 
+func (d *DB) GetChatMemberRole(ctx context.Context, chatID, userID string) (string, error) {
+	var role string
+	err := d.QueryRowContext(ctx,
+		`SELECT COALESCE(role,'') FROM chat_members WHERE chat_id = ? AND user_id = ?`,
+		chatID, userID,
+	).Scan(&role)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	return role, nil
+}
+
+func (d *DB) ChatMemberCount(ctx context.Context, chatID string) (int, error) {
+	var n int
+	err := d.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM chat_members WHERE chat_id = ?`,
+		chatID,
+	).Scan(&n)
+	return n, err
+}
+
 func (d *DB) IsChatMember(ctx context.Context, chatID, userID string) (bool, error) {
 	var x int
 	err := d.QueryRowContext(ctx,
@@ -222,10 +256,10 @@ func (d *DB) IsChatMember(ctx context.Context, chatID, userID string) (bool, err
 func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, error) {
 	rows, err := d.QueryContext(ctx,
 		`SELECT c.id, c.type, c.name, c.icon_color, c.visibility, c.owner_id, c.created_at, c.last_message_at,
-		        cm.last_read_message_id, COALESCE(cm.pinned,0)
+		        cm.last_read_message_id, c.pinned_message, c.pinned_updated_at
 		 FROM chat_members cm JOIN chats c ON c.id = cm.chat_id
 		 WHERE cm.user_id = ?
-		 ORDER BY cm.pinned DESC, COALESCE(c.last_message_at, c.created_at) DESC`,
+		 ORDER BY COALESCE(c.last_message_at, c.created_at) DESC`,
 		userID,
 	)
 	if err != nil {
@@ -241,22 +275,24 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 	rows2 := []row{}
 	for rows.Next() {
 		var c models.Chat
-		var name, owner, lastMsg, lastRead sql.NullString
+		var name, owner, lastMsg, lastRead, pinnedMsg, pinnedAt sql.NullString
 		var visibility sql.NullString
-		var pinned int
 		var created string
-		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &visibility, &owner, &created, &lastMsg, &lastRead, &pinned); err != nil {
+		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &visibility, &owner, &created, &lastMsg, &lastRead, &pinnedMsg, &pinnedAt); err != nil {
 			return nil, err
 		}
 		c.Name = name.String
 		c.Visibility = visibility.String
-		c.Pinned = pinned == 1
 		c.OwnerID = owner.String
 		c.CreatedAt = parseTime(created)
 		if lastMsg.Valid && lastMsg.String != "" {
 			c.LastMessageAt = parseTime(lastMsg.String)
 		} else {
 			c.LastMessageAt = c.CreatedAt
+		}
+		c.PinnedMessage = pinnedMsg.String
+		if pinnedAt.Valid {
+			c.PinnedAt = parseTime(pinnedAt.String)
 		}
 		rows2 = append(rows2, row{chat: c, lastRead: lastRead})
 	}
@@ -271,19 +307,23 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 			return nil, err
 		}
 		c.Members = members
+		// Deprecated.
 		last, err := d.LastMessage(ctx, c.ID)
 		if err != nil && !errors.Is(err, ErrNotFound) {
 			return nil, err
 		}
+		// Deprecated.
 		c.LastMessage = last
 		var lastReadID string
 		if r.lastRead.Valid {
 			lastReadID = r.lastRead.String
 		}
+		// Deprecated.
 		unread, err := d.UnreadCount(ctx, c.ID, lastReadID)
 		if err != nil {
 			return nil, err
 		}
+		// Deprecated.
 		c.UnreadCount = unread
 		out = append(out, c)
 	}
@@ -294,6 +334,7 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 	return out, nil
 }
 
+// Deprecated.
 func (d *DB) FindDMBetween(ctx context.Context, a, b string) (*models.Chat, error) {
 	if a == b {
 		return nil, errors.New("cannot dm yourself")
