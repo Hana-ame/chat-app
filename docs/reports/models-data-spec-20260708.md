@@ -152,7 +152,6 @@ type RefreshToken struct {
 | UserID | `string` | `"user_id"` | 用户关联 | 引用 `users(id)` |
 | Author | `*User` | `"author"` | (Deprecated) JOIN 查询 | `messages JOIN users` |
 | Content | `string` | `"content"` | 用户输入 | 最大 4000 字符，超长返回 403/`content_too_long` |
-
 | CreatedAt | `time.Time` | `"created_at"` | 服务端生成 | Go `time.Now().UTC().Format("2006-01-02T15:04:05.000Z")` |
 | EditedAt | `*time.Time` | `"edited_at"` | 服务端设置 | `UpdateMessage` 时记录当前时间 |
 | DeletedAt | `*time.Time` | `"deleted_at"` | 服务端设置 | soft delete（设 `deleted_at=now`, `content=''`） |
