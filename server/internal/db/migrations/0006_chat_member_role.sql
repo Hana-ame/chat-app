@@ -1,1 +1,0 @@
-ALTER TABLE chat_members ADD COLUMN role TEXT NOT NULL DEFAULT '';

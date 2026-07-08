@@ -321,7 +321,7 @@ func (d *DB) UnreadCount(ctx context.Context, chatID, lastReadID string) (int, e
 	}
 	err := d.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM messages
-		 WHERE chat_id = ? AND deleted = 0
+		 WHERE chat_id = ? AND deleted_at IS NULL
 		   AND (created_at, id) > (SELECT created_at, id FROM messages WHERE id = ?)`,
 		chatID, lastReadID,
 	).Scan(&n)
