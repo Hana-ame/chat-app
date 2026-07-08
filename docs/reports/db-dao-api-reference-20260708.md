@@ -275,7 +275,7 @@ func (d *DB) CreateChat(ctx context.Context, typ, name, visibility, ownerID stri
 |---|------|
 | **操作** | **R** — 查询 chat 详情 |
 | **目标 Model** | `models.Chat` |
-| **SQL** | `SELECT ... pinned_message, (SELECT COUNT(*) FROM chat_members WHERE chat_id = ?) AS member_count FROM chats WHERE id = ?` |
+| **SQL** | `SELECT ... pinned_message, member_count FROM chats WHERE id = ?` |
 | **填充** | 填充 `LastMessage` 及其 `ID` |
 
 ```go
@@ -294,7 +294,7 @@ func (d *DB) GetChat(ctx context.Context, id string) (*models.Chat, error) {
 | **操作** | **R** — 查询用户所有聊天（含成员数、最后消息、未读数） |
 | **目标 Model** | `[]models.Chat` |
 | **排序** | `last_message_at DESC` |
-| **SQL** | `SELECT ... (SELECT COUNT(*) FROM chat_members WHERE chat_id = c.id) AS member_count FROM chat_members JOIN chats ...` |
+| **SQL** | `SELECT ... c.member_count FROM chat_members JOIN chats ...` |
 | **填充** | 为每项填充 `LastMessage` 及 `LastMessageID` |
 
 ```go

@@ -127,7 +127,7 @@ type RefreshToken struct {
 | OwnerID | `string` | `"owner_id"` | 用户指定 | 引用 `users(id)`，可为 null（dm） |
 | CreatedAt | `time.Time` | `"created_at"` | 服务端生成 | SQLite default |
 | LastMessageAt | `time.Time` | `"last_message_at"` | 服务端更新 | 发消息时 `UPDATE chats SET last_message_at = now`；DB NULL 时降级为 `CreatedAt` |
-| MemberCount | `int` | `"member_count"` | 服务端计算 | 子查询 `(SELECT COUNT(*) FROM chat_members WHERE chat_id = c.id)` |
+| MemberCount | `int` | `"member_count"` | 服务端缓存 | 存储于 `chats` 表，`CreateChat`/`AddChatMember`/`RemoveChatMember` 时更新 |
 | UnreadCount | `int` | `"unread_count"` | (Deprecated) 服务端计算 | `COUNT(messages) WHERE deleted_at IS NULL AND (created_at,id) > lastReadID` |
 | PinnedMessage | `*PinnedContent` | `"pinned_message"` | 用户动作 | JSON 对象 `{"content","pinned_at"}`；由 `SetPinnedMessage` 写入 |
 | LastMessageID | `string` | `"last_message_id"` | 服务端缓存 | 存储在 `chats` 表中，由发送消息时更新 |

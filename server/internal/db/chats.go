@@ -120,8 +120,8 @@ func (d *DB) CreateChat(ctx context.Context, typ, name, visibility, ownerID stri
 		visibility = ""
 	}
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO chats (id, type, name, icon_color, owner_id, visibility) VALUES (?,?,?,?,?,?)`,
-		id, typ, nameVal, color, ownerVal, visibility,
+		`INSERT INTO chats (id, type, name, icon_color, owner_id, visibility, member_count) VALUES (?,?,?,?,?,?,?)`,
+		id, typ, nameVal, color, ownerVal, visibility, len(memberIDs),
 	)
 	if err != nil {
 		return nil, err
@@ -162,10 +162,9 @@ func (d *DB) GetChat(ctx context.Context, id string) (*models.Chat, error) {
 		memberCount int
 	)
 	err := d.QueryRowContext(ctx,
-		`SELECT id, type, name, icon_color, visibility, owner_id, created_at, last_message_at, last_message_id, pinned_message,
-		        (SELECT COUNT(*) FROM chat_members WHERE chat_id = ?) AS member_count
+		`SELECT id, type, name, icon_color, visibility, owner_id, created_at, last_message_at, last_message_id, pinned_message, member_count
 		 FROM chats WHERE id = ?`,
-		id, id,
+		id,
 	).Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.Visibility, &owner, &createdAt, &lastMsgAt, &lastMsgID, &pinnedMsg, &memberCount)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -266,8 +265,7 @@ func (d *DB) IsChatMember(ctx context.Context, chatID, userID string) (bool, err
 func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, error) {
 	rows, err := d.QueryContext(ctx,
 		`SELECT c.id, c.type, c.name, c.icon_color, c.visibility, c.owner_id, c.created_at, c.last_message_at, c.last_message_id,
-		        cm.last_read_message_id, c.pinned_message,
-		        (SELECT COUNT(*) FROM chat_members WHERE chat_id = c.id) AS member_count
+		        cm.last_read_message_id, c.pinned_message, c.member_count
 		 FROM chat_members cm JOIN chats c ON c.id = cm.chat_id
 		 WHERE cm.user_id = ?
 		 ORDER BY COALESCE(c.last_message_at, c.created_at) DESC`,
@@ -380,14 +378,22 @@ func (d *DB) AddChatMember(ctx context.Context, chatID, userID string) error {
 	if n == 0 {
 		return ErrConflict
 	}
-	return nil
+	_, err = d.ExecContext(ctx, `UPDATE chats SET member_count = member_count + 1 WHERE id = ?`, chatID)
+	return err
 }
 
 func (d *DB) RemoveChatMember(ctx context.Context, chatID, userID string) error {
-	_, err := d.ExecContext(ctx,
+	res, err := d.ExecContext(ctx,
 		`DELETE FROM chat_members WHERE chat_id = ? AND user_id = ?`,
 		chatID, userID,
 	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n > 0 {
+		_, err = d.ExecContext(ctx, `UPDATE chats SET member_count = member_count - 1 WHERE id = ?`, chatID)
+	}
 	return err
 }
 
