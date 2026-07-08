@@ -96,6 +96,8 @@ type RefreshToken struct {
 
 ## 二、模型字段总表
 
+> **⚠️ 重要提示**：所有标注为 `(Deprecated)` 的字段目前仅为兼容性保留。在收到明确指令前，**严禁删除**任何标注为 `(Deprecated)` 的字段。
+
 ### User
 
 | 字段 | 类型 | JSON | 来源 | 生成规则 |
@@ -122,9 +124,9 @@ type RefreshToken struct {
 | CreatedAt | `time.Time` | `"created_at"` | 服务端生成 | SQLite default |
 | LastMessageAt | `time.Time` | `"last_message_at"` | 服务端更新 | 发消息时 `UPDATE chats SET last_message_at = now`；DB NULL 时降级为 `CreatedAt` |
 | MemberCount | `int` | `"member_count"` | 服务端计算 | 子查询 `(SELECT COUNT(*) FROM chat_members WHERE chat_id = c.id)` |
-| UnreadCount | `int` | `"unread_count"` | 服务端计算 | `COUNT(messages) WHERE deleted_at IS NULL AND (created_at,id) > lastReadID` |
+| UnreadCount | `int` | `"unread_count"` | (Deprecated) 服务端计算 | `COUNT(messages) WHERE deleted_at IS NULL AND (created_at,id) > lastReadID` |
 | PinnedMessage | `*PinnedContent` | `"pinned_message"` | 用户动作 | JSON 对象 `{"content","pinned_at"}`；由 `SetPinnedMessage` 写入 |
-| LastMessage | `*Message` | `"last_message"` | 服务端查询 | `fetchMessageRow(chat_id, LIMIT 1)`·无 `attachExtras` |
+| LastMessage | `*Message` | `"last_message"` | (Deprecated) 服务端查询 | `fetchMessageRow(chat_id, LIMIT 1)`·无 `attachExtras` |
 
 ### ChatMember
 
@@ -144,8 +146,9 @@ type RefreshToken struct {
 | ID | `string` | `"id"` | 服务端生成 | UUID v4 |
 | ChatID | `string` | `"chat_id"` | 用户关联 | 引用 `chats(id)` |
 | UserID | `string` | `"user_id"` | 用户关联 | 引用 `users(id)` |
-| Author | `*User` | `"author"` | JOIN 查询 | `messages JOIN users` (Deprecated) |
+| Author | `*User` | `"author"` | (Deprecated) JOIN 查询 | `messages JOIN users` |
 | Content | `string` | `"content"` | 用户输入 | 最大 4000 字符，超长返回 403/`content_too_long` |
+
 | CreatedAt | `time.Time` | `"created_at"` | 服务端生成 | Go `time.Now().UTC().Format("2006-01-02T15:04:05.000Z")` |
 | EditedAt | `*time.Time` | `"edited_at"` | 服务端设置 | `UpdateMessage` 时记录当前时间 |
 | DeletedAt | `*time.Time` | `"deleted_at"` | 服务端设置 | soft delete（设 `deleted_at=now`, `content=''`） |
@@ -167,7 +170,9 @@ type RefreshToken struct {
 | Size | `int64` | `"size"` | 用户传入 | 文件字节数 |
 | URL | `string` | `"url"` | 用户传入 | 指向 `upload.moonchan.xyz` 外部存储 |
 
-### Reaction（API 响应结构）
+### Reaction（API 响应聚合结构）
+
+**说明**：该结构非数据库原始行，而是基于 `reactions` 表的 `GROUP BY emoji` 聚合结果。
 
 | 字段 | 类型 | JSON | 来源 | 生成规则 |
 |------|------|------|------|----------|

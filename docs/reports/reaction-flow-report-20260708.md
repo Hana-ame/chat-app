@@ -12,6 +12,14 @@
   ```
 - **Message** 中的 `Reactions []Reaction` 仅返回计数，**不再包含** `user_ids` 与 `me`。
 
+#### 原始行 $\rightarrow$ 聚合结构 映射关系
+| 维度 | 原始数据 (`reactions` 表) | API 响应结构 (`Reaction` struct) |
+| :--- | :--- | :--- |
+| **存储形式** | 一行 $\rightarrow$ 一个人的一个反应 | 一个对象 $\rightarrow$ 某种表情的总数 |
+| **包含字段** | `message_id`, `user_id`, `emoji`, `created_at` | `emoji`, `count` |
+| **目的** | 记录精确的反应行为，支持撤销反应 | 快速告诉前端该表情有多少人点 |
+| **关系** | **数据源** | **聚合结果** |
+
 ---
 
 ### 2. 数据库层

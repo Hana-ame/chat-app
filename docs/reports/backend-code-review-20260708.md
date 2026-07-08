@@ -123,5 +123,9 @@
   - 消息 > 4000 字符 $\rightarrow$ 返回 403 (`content_too_long`)，强制附件上传。
   - 附件文件名 > 200 字符 $\rightarrow$ 强制改为 `file + ext` 格式。
 - **Reaction 简化**：API 响应由 `[{emoji, count, user_ids, me}]` 简化为 `[{emoji, count}]`，移除冗余字段。
+  - **映射逻辑**：
+    - **原始数据** (`reactions` 表) $\rightarrow$ **聚合结果** (`Reaction` 结构体)
+    - 存储维度：`(message_id, user_id, emoji)` $\rightarrow$ 响应维度：`(emoji, count)`
+    - 目的：极致简化 API 响应体积，将 `me` 与 `user_ids` 的判断移交给客户端。
 - **API 弃用**：标记 `CreateOrGetDM` 等 DM 创建接口为 `// Deprecated`。
 
