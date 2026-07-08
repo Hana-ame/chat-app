@@ -1,0 +1,1 @@
+opencode run "git status to see what is happened. commit all files." --models nvidia/openai/gpt-oss-120b

@@ -63,10 +63,11 @@ All standard API calls pass through the `request(method, path, token, body?)` he
 | `GET` | `/api/chats/{id}` | `id`: chat ID | `token` | — |
 | `DELETE` | `/api/chats/{id}` | `id`: chat ID | `token` | — |
 | `PATCH` | `/api/chats/{id}` | `id`: chat ID | `token` | `{ name }` |
-| `POST` | `/api/dms` | — | `token` | `{ user_id }` |
+| `POST` | `/api/dms` | — | `token` | `{ user_id }` | (Deprecated) |
 | `POST` | `/api/chats/{id}/join` | `id`: chat ID | `token` | — |
-| `POST` | `/api/chats/{id}/pin` | `id`: chat ID | `token` | — |
-| `POST` | `/api/chats/{id}/unpin` | `id`: chat ID | `token` | — |
+| `POST` | `/api/chats/{id}/pin` | `id`: chat ID | `token` | `{ content: "..." }` |
+| `PATCH` | `/api/chats/{id}/pin` | `id`: chat ID | `token` | `{ content: "..." }` |
+| `DELETE` | `/api/chats/{id}/pin` | `id`: chat ID | `token` | — |
 
 ### Members
 

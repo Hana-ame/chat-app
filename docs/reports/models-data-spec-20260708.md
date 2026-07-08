@@ -10,7 +10,10 @@
 ```go
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type User struct {
     ID          string    `json:"id"`
@@ -61,12 +64,12 @@ type Message struct {
     CreatedAt       time.Time    `json:"created_at"`
     EditedAt        *time.Time   `json:"edited_at,omitempty"`
     DeletedAt       *time.Time   `json:"deleted_at,omitempty"`
-    AttachmentCount int          `json:"attachment_count"`
-    MentionCount    int          `json:"mention_count"`
-    ReactionCount   int          `json:"reaction_count"`
-    Attachments     []Attachment `json:"attachments,omitempty"`
-    Reactions       []Reaction   `json:"reactions,omitempty"`
-    Mentions        []string     `json:"mentions,omitempty"`
+	AttachmentCount int          `json:"attachment_count"`
+	MentionCount    int          `json:"mention_count"`
+	ReactionCount   int          `json:"reaction_count"`
+	Attachments     json.RawMessage `json:"attachments,omitempty"`
+	Reactions       json.RawMessage `json:"reactions,omitempty"`
+	Mentions        json.RawMessage `json:"mentions,omitempty"`
 }
 
 type Attachment struct {
@@ -155,9 +158,9 @@ type RefreshToken struct {
 | AttachmentCount | `int` | `"attachment_count"` | 服务端设置 | 写入时从 `attachments` 数组长度计算 |
 | MentionCount | `int` | `"mention_count"` | 服务端设置 | 写入时从 `mentions` 数组去重后长度计算 |
 | ReactionCount | `int` | `"reaction_count"` | 服务端更新 | `AddReaction`/`RemoveReaction` 时 `COUNT(*)` 重新计算 |
-| Attachments | `[]Attachment` | `"attachments"` | JSON 列 | 存储在 `messages.attachments` TEXT 列中 |
-| Reactions | `[]Reaction` | `"reactions"` | JSON 列 | 存储在 `messages.reactions` TEXT 列中 |
-| Mentions | `[]string` | `"mentions"` | 子查询 | `SELECT user_id FROM mentions WHERE message_id = ?`（仅 `?details=true`） |
+| Attachments | `json.RawMessage` | `"attachments"` | JSON 列 | 存储在 `messages.attachments` TEXT 列中 |
+| Reactions | `json.RawMessage` | `"reactions"` | JSON 列 | 存储在 `messages.reactions` TEXT 列中 |
+| Mentions | `json.RawMessage` | `"mentions"` | JSON 列 | 存储在 `messages.mentions` TEXT 列中 |
 
 ### Attachment
 
@@ -303,7 +306,7 @@ if emoji == "" || len(emoji) > 32 { return error }
 LastMessage（聊天列表预览）永远不查 attachExtras。
 ```
 
-**变更**：Attachments 与 Reactions 现在通过 `messages` 表的 JSON 列直接读取，不再使用子查询。仅 Mentions 仍使用子查询。
+**变更**：Attachments、Reactions 与 Mentions 现在全部通过 `messages` 表的 JSON 列直接读取，不再使用子查询。
 
 ---
 
@@ -329,9 +332,9 @@ LastMessage（聊天列表预览）永远不查 attachExtras。
 
 服务端推断（子查询 / JOIN，仅 ?details=true）
   ├── Members ──→ ChatMember → JOIN users
-  ├── Attachments ──→ attachment 表 WHERE message_id（仅当 count>0）
-  ├── Reactions ──→ reaction 表 GROUP BY emoji（仅当 count>0）
-  ├── Mentions ──→ mention 表 WHERE message_id（仅当 count>0）
+  ├── Attachments ──→ JSON 列存储
+  ├── Reactions ──→ JSON 列存储
+  ├── Mentions ──→ JSON 列存储
   └── UnreadCount ──→ COUNT(messages) WHERE deleted_at IS NULL AND >lastRead
 ```
 

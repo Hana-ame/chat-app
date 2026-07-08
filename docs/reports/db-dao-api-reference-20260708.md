@@ -134,6 +134,7 @@ func (d *DB) GetUserByID(ctx context.Context, id string) (*models.User, error) {
 |---|------|
 | **操作** | **R** — 按邮箱查用户（含密码 hash） |
 | **目标 Model** | `models.User` + `passwordHash` |
+| **SQL** | `SELECT id, email, username, avatar_color, avatar_url, status, last_seen, created_at, password_hash FROM users WHERE email = ?` |
 | **返回** | `(*User, passwordHash, error)` |
 
 ### `(d *DB) UpdateUserProfile(ctx, id, username, avatarColor, avatarURL string) (*models.User, error)`
@@ -170,6 +171,7 @@ func (d *DB) UpdateUserProfile(ctx context.Context, id, username, avatarColor, a
 |---|------|
 | **操作** | **R** — 按用户名/邮箱搜索（LIKE） |
 | **目标 Model** | `[]models.User` |
+| **SQL** | `SELECT id, username, avatar_color, avatar_url, status, last_seen, created_at FROM users ...` |
 | **注意** | limit 上限 50，默认 25 |
 
 ```go
@@ -271,8 +273,9 @@ func (d *DB) CreateChat(ctx context.Context, typ, name, visibility, ownerID stri
 
 | 项 | 内容 |
 |---|------|
-| **操作** | **R** — 查询 chat 详情（含 members） |
-| **目标 Model** | `models.Chat` + `[]models.User`（成员） |
+| **操作** | **R** — 查询 chat 详情 |
+| **目标 Model** | `models.Chat` |
+| **SQL** | `SELECT ... pinned_message, (SELECT COUNT(*) FROM chat_members WHERE chat_id = ?) AS member_count FROM chats WHERE id = ?` |
 
 ```go
 func (d *DB) GetChat(ctx context.Context, id string) (*models.Chat, error) {
@@ -287,9 +290,10 @@ func (d *DB) GetChat(ctx context.Context, id string) (*models.Chat, error) {
 
 | 项 | 内容 |
 |---|------|
-| **操作** | **R** — 查询用户所有聊天（含成员、最后消息、未读数） |
+| **操作** | **R** — 查询用户所有聊天（含成员数、最后消息、未读数） |
 | **目标 Model** | `[]models.Chat` |
-| **排序** | `pinned DESC, last_message_at DESC` |
+| **排序** | `last_message_at DESC` |
+| **SQL** | `SELECT ... (SELECT COUNT(*) FROM chat_members WHERE chat_id = c.id) AS member_count FROM chat_members JOIN chats ...` |
 
 ```go
 func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, error) {
@@ -337,7 +341,7 @@ func (d *DB) FindDMBetween(ctx context.Context, a, b string) (*models.Chat, erro
 |---|------|
 | **操作** | **R** — 查询聊天成员列表 |
 | **目标 Model** | `[]models.User` |
-| **SQL** | `SELECT u.* FROM chat_members cm JOIN users u ON u.id = cm.user_id WHERE cm.chat_id = ?` |
+| **SQL** | `SELECT u.id, u.username, u.avatar_color, u.avatar_url, u.status, u.last_seen, u.created_at FROM chat_members cm JOIN users u ...` |
 
 #### `(d *DB) AddChatMember(ctx, chatID, userID string) error`
 
@@ -441,9 +445,10 @@ func (d *DB) ListPublicChats(ctx context.Context) ([]models.Chat, error) {
 | 项 | 内容 |
 |---|------|
 | **操作** | **C** — 创建消息（含 mention、attachment 写入） |
-| **目标 Model** | `models.Message` + `mentions` + `attachments` |
+| **目标 Model** | `models.Message` |
 | **事务** | ✅ `BeginTx` |
-| **副作用** | 同时更新 `chats.last_message_at` |
+| **实现** | 附件和提及均通过 JSON 序列化存入 `messages.attachments` 和 `messages.mentions` 列 |
+| **副作用** | 同时更新 `chats.last_message_at` 和 `users.last_seen` |
 
 ```go
 func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, mentions []string, attachments []models.Attachment) (*models.Message, error) {
@@ -465,7 +470,8 @@ func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, 
 | 项 | 内容 |
 |---|------|
 | **操作** | **R** — 按 ID 查消息（含 author, attachments, reactions, mentions） |
-| **目标 Model** | `models.Message` + `Author` + `Attachments` + `Reactions` + `Mentions` |
+| **目标 Model** | `models.Message` |
+| **实现** | 附件、反应、提及均直接从 `messages` 表的 JSON 列读取，无需子查询 |
 
 ```go
 func (d *DB) GetMessage(ctx context.Context, id string) (*models.Message, error) {
@@ -481,6 +487,7 @@ func (d *DB) GetMessage(ctx context.Context, id string) (*models.Message, error)
 |---|------|
 | **操作** | **R** — 分页查询消息（按时间倒序） |
 | **目标 Model** | `[]models.Message` |
+| **实现** | 附件、反应、提及均从 JSON 列读取 |
 | **分页** | `before` 为消息 ID 时使用游标 `(created_at, id) <` |
 | **排序** | 从 DB 取 DESC，Go 中反转回 ASC |
 
@@ -508,7 +515,7 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 | 项 | 内容 |
 |---|------|
 | **操作** | **R** — 统计未读消息数 |
-| **条件** | `deleted = 0` 且大于最后读取位置 |
+| **条件** | `deleted_at IS NULL` 且大于最后读取位置 |
 
 ```go
 func (d *DB) UnreadCount(ctx context.Context, chatID, lastReadID string) (int, error) {
@@ -524,7 +531,7 @@ func (d *DB) UnreadCount(ctx context.Context, chatID, lastReadID string) (int, e
 | 项 | 内容 |
 |---|------|
 | **操作** | **U** — 编辑消息（仅作者可编辑，且未删除） |
-| **限制** | `user_id = ? AND deleted = 0` |
+| **限制** | `user_id = ? AND deleted_at IS NULL` |
 
 ```go
 func (d *DB) UpdateMessage(ctx context.Context, id, userID, content string) (*models.Message, error) {
@@ -540,7 +547,7 @@ func (d *DB) UpdateMessage(ctx context.Context, id, userID, content string) (*mo
 
 | 项 | 内容 |
 |---|------|
-| **操作** | **U**（软删除）— 标记 `deleted = 1` 并清空 content |
+| **操作** | **U**（软删除）— 标记 `deleted_at = now` 并清空 content |
 | **权限** | `allowAny=true` 时忽略 `user_id` 检查（群主可删） |
 | **注意** | 非硬删除，级联 attachments/reactions/mentions 保留 |
 
@@ -556,16 +563,14 @@ func (d *DB) DeleteMessage(ctx context.Context, id, userID string, allowAny bool
 
 ---
 
-### Attachment（内部方法）
+### Attachment（内部方法 - 已弃用）
 
 #### `(d *DB) attachmentsFor(ctx, messageID string) ([]models.Attachment, error)`
 
 | 项 | 内容 |
 |---|------|
-| **操作** | **R** — 查消息的所有附件 |
-| **目标 Model** | `[]models.Attachment` |
-| **表** | `attachments` |
-| **SQL** | `SELECT id, message_id, filename, mime_type, size, url FROM attachments WHERE message_id = ?` |
+| **操作** | **R** — 查消息的所有附件（Deprecated） |
+| **注意** | 现改为从 `messages.attachments` JSON 列直接读取 |
 
 ---
 
