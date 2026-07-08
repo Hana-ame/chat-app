@@ -72,7 +72,7 @@ func (d *DB) Migrate() error {
 |------|------|
 | `NewID() string` | 生成 UUID v4 |
 | `PickColor(seed string) string` | 根据字符串哈希选择一个颜色 |
-| `parseTime(s string) time.Time` | 解析多种时间格式为 UTC Time |
+| `parseTime(s string) time.Time` | 解析 `time.RFC3339Nano` 格式为 UTC Time |
 | `parseTimePtr(s sql.NullString) *time.Time` | 同上，返回指针 |
 | `isDupColumnErr(err error) bool` | 判断是否为 `duplicate column` 错误 |
 
@@ -164,6 +164,15 @@ func (d *DB) UpdateUserProfile(ctx context.Context, id, username, avatarColor, a
 | **操作** | **U** — 更新在线状态 |
 | **目标 Model** | `models.User`（仅 status 字段） |
 | **SQL** | `UPDATE users SET status = ? WHERE id = ?` |
+
+### `(d *DB) UpdateUserLastSeen(ctx, id string) error`
+
+| 项 | 内容 |
+|---|------|
+| **操作** | **U** — 更新用户最后在线时间 |
+| **目标 Model** | `models.User`（仅 last_seen 字段） |
+| **时间格式** | `time.RFC3339Nano` |
+| **SQL** | `UPDATE users SET last_seen = ? WHERE id = ?` |
 
 ### `(d *DB) SearchUsers(ctx, query string, limit int) ([]models.User, error)`
 
@@ -280,10 +289,8 @@ func (d *DB) CreateChat(ctx context.Context, typ, name, visibility, ownerID stri
 
 ```go
 func (d *DB) GetChat(ctx context.Context, id string) (*models.Chat, error) {
-    // SELECT ... FROM chats WHERE id = ?
-    // + d.GetChatMembers() 填充 c.Members
-    // + d.LastMessage() 填充 c.LastMessage（仅在 ListUserChats 中）
-    // + d.UnreadCount()（仅在 ListUserChats 中）
+    // SELECT id, type, name, icon_color, visibility, owner_id, created_at, last_message_at, last_message_id, pinned_message, member_count FROM chats WHERE id = ?
+    // + d.GetMessage(c.LastMessageID) 填充 c.LastMessage（当 LastMessageID 非空时）
 }
 ```
 
@@ -291,59 +298,25 @@ func (d *DB) GetChat(ctx context.Context, id string) (*models.Chat, error) {
 
 | 项 | 内容 |
 |---|------|
-| **操作** | **R** — 查询用户所有聊天（含成员数、最后消息、未读数） |
+| **操作** | **R** — 查询用户所有聊天（含成员数、最后消息） |
 | **目标 Model** | `[]models.Chat` |
 | **排序** | `last_message_at DESC` |
-| **SQL** | `SELECT ... c.member_count FROM chat_members JOIN chats ...` |
-| **填充** | 为每项填充 `LastMessage` 及 `LastMessageID` |
+| **SQL** | `SELECT c.id, c.type, c.name, c.icon_color, c.visibility, c.owner_id, c.created_at, c.last_message_at, c.last_message_id, cm.last_read_message_id, c.pinned_message, c.member_count FROM chat_members cm JOIN chats c ...` |
+| **填充** | 为每项填充 `LastMessage` 及 `LastMessageID`；`UnreadCount`（Deprecated） |
 
 ```go
 func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, error) {
     rows, err := d.QueryContext(ctx,
         `SELECT c.id, c.type, c.name, c.icon_color, c.visibility, c.owner_id,
-                c.created_at, c.last_message_at,
-                cm.last_read_message_id, COALESCE(cm.pinned,0)
+                c.created_at, c.last_message_at, c.last_message_id,
+                cm.last_read_message_id, c.pinned_message, c.member_count
          FROM chat_members cm JOIN chats c ON c.id = cm.chat_id
          WHERE cm.user_id = ?
-         ORDER BY cm.pinned DESC, COALESCE(c.last_message_at, c.created_at) DESC`, userID,
+         ORDER BY COALESCE(c.last_message_at, c.created_at) DESC`, userID,
     )
-    // for each row: d.GetChatMembers + d.LastMessage + d.UnreadCount
+    // for each row: fill from columns + GetMessage (for LastMessage) + UnreadCount (Deprecated)
 }
 ```
-
-#### `(d *DB) FindDMBetween(ctx, a, b string) (*models.Chat, error)`
-
-| 项 | 内容 |
-|---|------|
-| **操作** | **R** — 查询两人之间是否已有私聊 |
-| **SQL** | 使用两个 JOIN 找出两个成员都存在的 type='dm' chat |
-
-```go
-func (d *DB) FindDMBetween(ctx context.Context, a, b string) (*models.Chat, error) {
-    err := d.QueryRowContext(ctx,
-        `SELECT c.id FROM chats c
-         JOIN chat_members cm1 ON cm1.chat_id = c.id AND cm1.user_id = ?
-         JOIN chat_members cm2 ON cm2.chat_id = c.id AND cm2.user_id = ?
-         WHERE c.type = 'dm' LIMIT 1`, a, b,
-    ).Scan(&id)
-    return d.GetChat(ctx, id)
-}
-```
-
-#### `(d *DB) IsChatMember(ctx, chatID, userID string) (bool, error)`
-
-| 项 | 内容 |
-|---|------|
-| **操作** | **R** — 检查用户是否为聊天成员 |
-| **SQL** | `SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?` |
-
-#### `(d *DB) GetChatMembers(ctx, chatID string) ([]models.User, error)`
-
-| 项 | 内容 |
-|---|------|
-| **操作** | **R** — 查询聊天成员列表 |
-| **目标 Model** | `[]models.User` |
-| **SQL** | `SELECT u.id, u.username, u.avatar_color, u.avatar_url, u.status, u.last_seen, u.created_at FROM chat_members cm JOIN users u ...` |
 
 #### `(d *DB) AddChatMember(ctx, chatID, userID string) error`
 
@@ -351,6 +324,7 @@ func (d *DB) FindDMBetween(ctx context.Context, a, b string) (*models.Chat, erro
 |---|------|
 | **操作** | **C** — 添加成员（幂等） |
 | **目标 Model** | `chat_members` 记录 |
+| **副作用** | 递增 `chats.member_count` |
 
 ```go
 func (d *DB) AddChatMember(ctx context.Context, chatID, userID string) error {
@@ -359,6 +333,7 @@ func (d *DB) AddChatMember(ctx context.Context, chatID, userID string) error {
         chatID, userID,
     )
     // if n==0 → ErrConflict
+    // UPDATE chats SET member_count = member_count + 1 WHERE id = ?
 }
 ```
 
@@ -368,27 +343,17 @@ func (d *DB) AddChatMember(ctx context.Context, chatID, userID string) error {
 |---|------|
 | **操作** | **D** — 删除成员 |
 | **表** | `chat_members` |
+| **副作用** | 递减 `chats.member_count` |
 
-#### `(d *DB) DeleteChat(ctx, chatID string) error`
-
-| 项 | 内容 |
-|---|------|
-| **操作** | **D** — 删除聊天（级联删除 messages, members, attachments, reactions, mentions） |
-
-#### `(d *DB) RenameChat(ctx, chatID, name string) error`
-
-| 项 | 内容 |
-|---|------|
-| **操作** | **U** — 重命名群聊 |
-| **SQL** | `UPDATE chats SET name = ? WHERE id = ?` |
-
-#### `(d *DB) UpdateLastRead(ctx, chatID, userID, messageID string) error`
-
-| 项 | 内容 |
-|---|------|
-| **操作** | **U** — 更新最后读取消息位置 |
-| **表** | `chat_members` |
-| **SQL** | `UPDATE chat_members SET last_read_message_id = ? WHERE chat_id = ? AND user_id = ?` |
+```go
+func (d *DB) RemoveChatMember(ctx context.Context, chatID, userID string) error {
+    res, err := d.ExecContext(ctx,
+        `DELETE FROM chat_members WHERE chat_id = ? AND user_id = ?`,
+        chatID, userID,
+    )
+    // if n > 0: UPDATE chats SET member_count = member_count - 1 WHERE id = ?
+}
+```
 
 ---
 
@@ -401,16 +366,17 @@ func (d *DB) AddChatMember(ctx context.Context, chatID, userID string) error {
 | **操作** | **R** — 列出所有公开群聊 |
 | **目标 Model** | `[]models.Chat` |
 | **过滤** | `type = 'group' AND visibility = 'public'` |
+| **注意** | `member_count` 仍使用子查询（低频操作无需缓存） |
 
 ```go
 func (d *DB) ListPublicChats(ctx context.Context) ([]models.Chat, error) {
     rows, err := d.QueryContext(ctx,
         `SELECT id, type, name, icon_color, COALESCE(visibility,'private'),
-                owner_id, created_at, last_message_at
+                owner_id, created_at, last_message_at, pinned_message,
+                (SELECT COUNT(*) FROM chat_members WHERE chat_id = id) AS member_count
          FROM chats WHERE type = 'group' AND visibility = 'public'
          ORDER BY created_at DESC`,
     )
-    // + d.GetChatMembers() per row
 }
 ```
 
@@ -422,19 +388,21 @@ func (d *DB) ListPublicChats(ctx context.Context) ([]models.Chat, error) {
 | **检查** | 拒绝 `visibility = 'private'` |
 | **SQL** | `INSERT OR IGNORE INTO chat_members` |
 
-#### `(d *DB) PinChat(ctx, chatID, userID string) error`
+#### `(d *DB) SetPinnedMessage(ctx, chatID, content string) error`
 
 | 项 | 内容 |
 |---|------|
-| **操作** | **U** — 置顶聊天 |
-| **SQL** | `UPDATE chat_members SET pinned = 1 WHERE chat_id = ? AND user_id = ?` |
+| **操作** | **U** — 设置置顶消息内容 |
+| **目标 Model** | `models.PinnedContent`（序列化为 JSON） |
+| **SQL** | `UPDATE chats SET pinned_message = ?, pinned_updated_at = ? WHERE id = ?` |
+| **时间格式** | `time.RFC3339Nano` |
 
-#### `(d *DB) UnpinChat(ctx, chatID, userID string) error`
+#### `(d *DB) ClearPinnedMessage(ctx, chatID string) error`
 
 | 项 | 内容 |
 |---|------|
-| **操作** | **U** — 取消置顶 |
-| **SQL** | `UPDATE chat_members SET pinned = 0 WHERE chat_id = ? AND user_id = ?` |
+| **操作** | **U** — 清除置顶消息 |
+| **SQL** | `UPDATE chats SET pinned_message = '', pinned_updated_at = NULL WHERE id = ?` |
 
 ---
 
@@ -450,7 +418,7 @@ func (d *DB) ListPublicChats(ctx context.Context) ([]models.Chat, error) {
 | **目标 Model** | `models.Message` |
 | **事务** | ✅ `BeginTx` |
 | **实现** | 附件和提及均通过 JSON 序列化存入 `messages.attachments` 和 `messages.mentions` 列 |
-| **副作用** | 同时更新 `chats.last_message_at` 和 `users.last_seen` |
+| **副作用** | 同时更新 `chats.last_message_at`、`chats.last_message_id` 和 `users.last_seen` |
 
 ```go
 func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, mentions []string, attachments []models.Attachment) (*models.Message, error) {
@@ -458,9 +426,9 @@ func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, 
     defer tx.Rollback()
 
     // 1. INSERT INTO messages
-    // 2. UPDATE chats SET last_message_at = ?
-    // 3. for each mention: INSERT OR IGNORE INTO mentions
-    // 4. for each attachment: INSERT INTO attachments
+    // 2. UPDATE chats SET last_message_at = ?, last_message_id = ?
+    // 3. UPDATE chat_members SET last_seen = ?
+    // 4. UPDATE users SET last_seen = ?
 
     tx.Commit()
     return d.GetMessage(ctx, id)
@@ -512,7 +480,7 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 | **操作** | **R** — 查聊天最后一条消息 |
 | **方法** | 先 `SELECT id ... ORDER BY created_at DESC LIMIT 1`，再 `GetMessage` |
 
-#### `(d *DB) UnreadCount(ctx, chatID, lastReadID string) (int, error)`
+#### `(d *DB) UnreadCount(ctx, chatID, lastReadID string) (int, error)` **// Deprecated.**
 
 | 项 | 内容 |
 |---|------|
@@ -522,11 +490,19 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 ```go
 func (d *DB) UnreadCount(ctx context.Context, chatID, lastReadID string) (int, error) {
     if lastReadID == "" {
-        return COUNT(*) WHERE chat_id = ? AND deleted = 0
+        return COUNT(*) WHERE chat_id = ? AND deleted_at IS NULL
     }
-    return COUNT(*) WHERE chat_id = ? AND deleted = 0 AND (created_at, id) > (SELECT ...)
+    return COUNT(*) WHERE chat_id = ? AND deleted_at IS NULL AND (created_at, id) > (SELECT ...)
 }
 ```
+
+#### `(d *DB) UpdateLastRead(ctx, chatID, userID, messageID string) error` **// Deprecated.**
+
+| 项 | 内容 |
+|---|------|
+| **操作** | **U** — 更新最后读取消息位置 |
+| **表** | `chat_members` |
+| **SQL** | `UPDATE chat_members SET last_read_message_id = ? WHERE chat_id = ? AND user_id = ?` |
 
 #### `(d *DB) UpdateMessage(ctx, id, userID, content string) (*models.Message, error)`
 
@@ -538,8 +514,8 @@ func (d *DB) UnreadCount(ctx context.Context, chatID, lastReadID string) (int, e
 ```go
 func (d *DB) UpdateMessage(ctx context.Context, id, userID, content string) (*models.Message, error) {
     res, err := d.ExecContext(ctx,
-        `UPDATE messages SET content = ?, edited_at = ? WHERE id = ? AND user_id = ? AND deleted = 0`,
-        content, time.Now().UTC().Format("2006-01-02T15:04:05.000Z"), id, userID,
+        `UPDATE messages SET content = ?, edited_at = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL`,
+        content, time.Now().UTC().Format(time.RFC3339Nano), id, userID,
     )
     return d.GetMessage(ctx, id)
 }
@@ -556,9 +532,9 @@ func (d *DB) UpdateMessage(ctx context.Context, id, userID, content string) (*mo
 ```go
 func (d *DB) DeleteMessage(ctx context.Context, id, userID string, allowAny bool) error {
     if allowAny {
-        UPDATE messages SET deleted = 1, content = '' WHERE id = ?
+        UPDATE messages SET deleted_at = now, content = '' WHERE id = ?
     } else {
-        UPDATE messages SET deleted = 1, content = '' WHERE id = ? AND user_id = ?
+        UPDATE messages SET deleted_at = now, content = '' WHERE id = ? AND user_id = ?
     }
 }
 ```
@@ -630,17 +606,17 @@ func (d *DB) reactionsFor(ctx context.Context, messageID, viewerID string) ([]mo
 | 文件 | 方法数 | 操作模型 | 说明 |
 |------|--------|----------|------|
 | `db.go` | 2 | — | 初始化 + 迁移 |
-| `users.go` | 6+3 helper | `User` | CRUD + 搜索 |
-| `chats.go` | 13 | `RefreshToken` + `Chat` + `chat_members` | 含事务、含锁 |
-| `chats_ext.go` | 4 | `Chat` + `chat_members` | 公开聊天 + 置顶 |
-| `messages.go` | 12 | `Message` + `Attachment` + `Reaction` + `Mention` | 含游标分页、软删除 |
+| `users.go` | 6+3 helper | `User` | CRUD + 搜索 + 在线状态 |
+| `chats.go` | 14 | `RefreshToken` + `Chat` + `chat_members` | 含事务、含锁、含成员数缓存 |
+| `chats_ext.go` | 4 | `Chat` + `chat_members` | 公开聊天 + 置顶消息 |
+| `messages.go` | 12 | `Message` + `Attachment` + `Reaction` + `Mention` | 含游标分页、软删除、JSON 列 |
 
-**总计：36 个 `*DB` 接收器方法**
+**总计：38 个 `*DB` 接收器方法**
 
 ```
 CRUD 分布:
   Create: 8  (User, RefreshToken, Chat, Message, Attachment, Mention, Reaction, chat_member)
-  Read:   11 (User ×2, RefreshToken, Chat ×3, Message ×3, Attachment, Reaction, Mention)
-  Update: 7  (User ×2, Chat ×2, Message, chat_member ×2)
-  Delete: 8  (RefreshToken ×3, Chat, chat_member, Message, Reaction, purge)
+  Read:   13 (User ×2, RefreshToken, Chat ×3, Message ×3, Attachment, Reaction, Mention, member_count, is_member)
+  Update: 8  (User ×3, Chat ×3, Message, chat_member)
+  Delete: 9  (RefreshToken ×3, Chat, chat_member, Message, Reaction, purge, pinned_message)
 ```
