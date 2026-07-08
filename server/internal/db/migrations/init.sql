@@ -55,7 +55,9 @@ CREATE TABLE IF NOT EXISTS chats (
     icon_color      TEXT NOT NULL DEFAULT '#5865F2',
     owner_id        TEXT REFERENCES users(id) ON DELETE SET NULL,
     created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-    last_message_at TEXT
+    last_message_at TEXT,
+    last_message_id TEXT,
+    member_count    INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_chats_last_msg ON chats(last_message_at DESC);
