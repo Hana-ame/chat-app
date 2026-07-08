@@ -51,7 +51,7 @@ func TestAccessDeniedWithoutToken(t *testing.T) {
 		{"GET", "/api/users/me"},
 		{"PATCH", "/api/users/me"},
 		{"GET", "/api/users"},
-		{"GET", "/api/chats"},
+		{"GET", "/api/chats/my"},
 		{"POST", "/api/chats"},
 		{"POST", "/api/dms"},
 		{"POST", "/api/auth/logout"},

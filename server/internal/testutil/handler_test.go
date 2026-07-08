@@ -397,7 +397,7 @@ func TestListChatsWithUnreads(t *testing.T) {
 		res2.Body.Close()
 	}
 
-	listRes := f.Do(t, "GET", "/api/chats", alice.AccessToken, nil)
+	listRes := f.Do(t, "GET", "/api/chats/my", alice.AccessToken, nil)
 	defer listRes.Body.Close()
 	if listRes.StatusCode != 200 {
 		t.Fatal("list chats failed")
@@ -581,10 +581,25 @@ func TestConcurrentRegister(t *testing.T) {
 
 func TestHealthz(t *testing.T) {
 	f := testutil.New(t)
+	// Send a header so the echo can be verified
 	res := f.Do(t, "GET", "/healthz", "", nil)
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("healthz: %d", res.StatusCode)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if body["status"] != "ok" {
+		t.Fatalf("expected status ok, got %v", body["status"])
+	}
+	echo, ok := body["echo"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected echo object, got %T", body["echo"])
+	}
+	if len(echo) == 0 {
+		t.Fatalf("expected non-empty echo object")
 	}
 }
 

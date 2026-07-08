@@ -4,9 +4,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
+	"github.com/Hana-ame/chat-app/server/internal/orderedmap"
 	"github.com/Hana-ame/chat-app/server/internal/ws"
 	"github.com/go-chi/chi/v5"
 	chimid "github.com/go-chi/chi/v5/middleware"
@@ -30,7 +32,16 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 	}))
 
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+		om := orderedmap.New()
+		om.Set("status", "ok")
+		echo := orderedmap.New()
+		for k, v := range r.Header {
+			echo.Set(k, strings.Join(v, ", "))
+		}
+		echo.SortKeys(func(keys []string) { sort.Strings(keys) })
+		om.Set("echo", echo)
+		om.SortKeys(func(keys []string) { sort.Strings(keys) })
+		writeJSON(w, http.StatusOK, om)
 	})
 
 	r.Route("/api", func(r chi.Router) {
@@ -46,7 +57,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 			r.Patch("/users/me", s.UpdateMe)
 			r.Get("/users", s.SearchUsers)
 
-			r.Get("/chats", s.ListChats)
+			r.Get("/chats/my", s.ListChats)
 			r.Get("/chats/public", s.ListPublicChats)
 			r.Post("/chats", s.CreateChat)
 			r.Post("/dms", s.CreateOrGetDM) // Deprecated.

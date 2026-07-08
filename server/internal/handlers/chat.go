@@ -320,7 +320,12 @@ func (s *Server) PinChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := chi.URLParam(r, "chatID")
-	if err := s.requireOwnerOrAdmin(r.Context(), id, u.ID); err != nil {
+	c, err := s.DB.GetChat(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "not_found", "")
+		return
+	}
+	if c.OwnerID != u.ID {
 		writeError(w, http.StatusForbidden, "forbidden", "")
 		return
 	}

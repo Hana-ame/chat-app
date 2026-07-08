@@ -149,9 +149,9 @@ func (d *DB) SearchUsers(ctx context.Context, query string, limit int) ([]models
 	query = strings.TrimSpace(query)
 	rows, err := d.QueryContext(ctx,
 		`SELECT id, username, avatar_color, avatar_url, status, last_seen, created_at FROM users
-		 WHERE username LIKE ? OR email LIKE ?
+		 WHERE username LIKE ? OR id = ?
 		 ORDER BY username LIMIT ?`,
-		"%"+query+"%", "%"+strings.ToLower(query)+"%", limit,
+		"%"+query+"%", query, limit,
 	)
 	if err != nil {
 		return nil, err

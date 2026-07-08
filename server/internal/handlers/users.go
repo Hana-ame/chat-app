@@ -33,13 +33,16 @@ func (s *Server) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
-	if req.Username == "" {
-		req.Username = u.Username
-	}
-	name, err := auth.ValidateUsername(req.Username)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_username", err.Error())
-		return
+	var name string
+	var err error
+	if req.Username != "" {
+		name, err = auth.ValidateUsername(req.Username)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_username", err.Error())
+			return
+		}
+	} else {
+		name = u.Username
 	}
 	if req.AvatarColor == "" {
 		req.AvatarColor = u.AvatarColor

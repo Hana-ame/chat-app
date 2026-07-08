@@ -44,7 +44,7 @@ func TestUnauthorizedAccess(t *testing.T) {
 	if res.StatusCode != 401 {
 		t.Fatalf("want 401 got %d", res.StatusCode)
 	}
-	res = f.Do(t, "GET", "/api/chats", "", nil)
+	res = f.Do(t, "GET", "/api/chats/my", "", nil)
 	defer res.Body.Close()
 	if res.StatusCode != 401 {
 		t.Fatalf("want 401 got %d", res.StatusCode)

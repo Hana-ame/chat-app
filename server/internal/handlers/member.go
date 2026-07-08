@@ -109,13 +109,15 @@ func (s *Server) RemoveMember(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "cannot remove from dm")
 		return
 	}
-	if target != u.ID && c.OwnerID != u.ID {
-		writeError(w, http.StatusForbidden, "forbidden", "only owner can kick others")
-		return
-	}
 	if target == c.OwnerID && target != u.ID {
 		writeError(w, http.StatusForbidden, "forbidden", "cannot kick owner")
 		return
+	}
+	if target != u.ID {
+		if err := s.requireOwnerOrAdmin(r.Context(), id, u.ID); err != nil {
+			writeError(w, http.StatusForbidden, "forbidden", "only owner or admin can kick others")
+			return
+		}
 	}
 	if err := s.DB.RemoveChatMember(r.Context(), id, target); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())

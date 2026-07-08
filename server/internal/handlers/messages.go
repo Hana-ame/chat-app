@@ -191,7 +191,7 @@ func (s *Server) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	chat, _ := s.DB.GetChat(r.Context(), chatID)
-	canDeleteAny := chat != nil && chat.OwnerID == u.ID
+	canDeleteAny := chat != nil && (chat.OwnerID == u.ID || s.requireOwnerOrAdmin(r.Context(), chatID, u.ID) == nil)
 	if existing.UserID != u.ID && !canDeleteAny {
 		writeError(w, http.StatusForbidden, "forbidden", "")
 		return
