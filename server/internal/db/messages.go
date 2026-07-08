@@ -15,7 +15,7 @@ import (
 func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, mentions []string, attachments []models.Attachment) (*models.Message, error) {
 	content = strings.TrimRight(content, " \n\t")
 	if len(content) > 4000 {
-		content = content[:4000]
+		return nil, errors.New("content too long, use file upload instead")
 	}
 	if content == "" && len(attachments) == 0 {
 		return nil, errors.New("empty message")
@@ -298,7 +298,7 @@ func (d *DB) UpdateMessage(ctx context.Context, id, userID, content string) (*mo
 		return nil, errors.New("empty content")
 	}
 	if len(content) > 4000 {
-		content = content[:4000]
+		return nil, errors.New("content too long, use file upload instead")
 	}
 	res, err := d.ExecContext(ctx,
 		`UPDATE messages SET content = ?, edited_at = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL`,

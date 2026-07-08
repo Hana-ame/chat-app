@@ -328,31 +328,36 @@ func TestMultiDeviceRefreshIsolation(t *testing.T) {
 	}
 }
 
-func TestRegisterInvalidInput(t *testing.T) {
+func TestRegisterNoValidation(t *testing.T) {
+	// All validations removed per spec: only uniqueness check remains.
 	f := testutil.New(t)
-
 	tests := []struct {
 		name     string
 		email    string
 		username string
 		password string
-		wantCode int
 	}{
-		{"bad email", "not-an-email", "ValidName", "password123", 400},
-		{"short username", "u@t.com", "a", "password123", 400},
-		{"short password", "p@t.com", "ValidName", "12", 400},
-		{"empty email", "", "ValidName", "password123", 400},
+		{"any email", "not-an-email", "UserA", "password123"},
+		{"short username", "u@t.com", "a", "password123"},
+		{"short password", "p@t.com", "UserB", "12"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			res := f.Do(t, "POST", "/api/auth/register", "", map[string]string{
 				"email": tt.email, "username": tt.username, "password": tt.password,
 			})
-			defer res.Body.Close()
-			if res.StatusCode != tt.wantCode {
-				b, _ := io.ReadAll(res.Body)
-				t.Fatalf("want %d got %d body=%s", tt.wantCode, res.StatusCode, string(b))
+			res.Body.Close()
+			if res.StatusCode != 200 {
+				t.Fatalf("want 200 got %d", res.StatusCode)
 			}
 		})
+	}
+	// empty email should error at DB layer
+	res := f.Do(t, "POST", "/api/auth/register", "", map[string]string{
+		"email": "", "username": "UserC", "password": "password123",
+	})
+	res.Body.Close()
+	if res.StatusCode != 500 {
+		t.Fatalf("want 500 got %d", res.StatusCode)
 	}
 }

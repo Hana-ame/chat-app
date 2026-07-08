@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"net/mail"
 	"strings"
 	"time"
 
@@ -18,8 +17,6 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrTokenExpired       = errors.New("token expired")
 	ErrTokenInvalid       = errors.New("token invalid")
-	ErrPasswordTooShort   = errors.New("password must be at least 8 characters")
-	ErrInvalidEmail       = errors.New("invalid email address")
 )
 
 type Service struct {
@@ -99,9 +96,6 @@ func HashRefreshToken(raw string) string {
 }
 
 func HashPassword(password string) (string, error) {
-	if len(password) < 8 {
-		return "", ErrPasswordTooShort
-	}
 	if len(password) > 72 {
 		password = password[:72]
 	}
@@ -122,29 +116,14 @@ func VerifyPassword(hash, password string) error {
 	return nil
 }
 
-func NormalizeEmail(email string) (string, error) {
-	email = strings.ToLower(strings.TrimSpace(email))
-	if email == "" {
-		return "", ErrInvalidEmail
-	}
-	if _, err := mail.ParseAddress(email); err != nil {
-		return "", ErrInvalidEmail
-	}
-	return email, nil
+func NormalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
 }
 
 func ValidateUsername(username string) (string, error) {
 	username = strings.TrimSpace(username)
-	if len(username) < 2 {
-		return "", errors.New("username must be at least 2 characters")
-	}
-	if len(username) > 32 {
-		return "", errors.New("username must be at most 32 characters")
-	}
-	for _, r := range username {
-		if r < 0x20 || r == 0x7f {
-			return "", errors.New("username contains invalid characters")
-		}
+	if username == "" {
+		return "", errors.New("username required")
 	}
 	return username, nil
 }

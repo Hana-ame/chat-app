@@ -39,11 +39,7 @@ func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
-	email, err := auth.NormalizeEmail(req.Email)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_email", err.Error())
-		return
-	}
+	email := auth.NormalizeEmail(req.Email)
 	username, err := auth.ValidateUsername(req.Username)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_username", err.Error())
@@ -80,11 +76,7 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
-	email, err := auth.NormalizeEmail(req.Email)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_email", err.Error())
-		return
-	}
+	email := auth.NormalizeEmail(req.Email)
 	u, hash, err := s.DB.GetUserByEmail(r.Context(), email)
 	if err != nil {
 		if errors.Is(err, db.ErrNotFound) {

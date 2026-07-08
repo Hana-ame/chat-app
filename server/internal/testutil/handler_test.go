@@ -322,13 +322,13 @@ func TestLeaveGroupChat(t *testing.T) {
 func TestAuthEndpoints(t *testing.T) {
 	f := testutil.New(t)
 
-	t.Run("register with bad input", func(t *testing.T) {
+	t.Run("register accepts any input (validations removed)", func(t *testing.T) {
 		res := f.Do(t, "POST", "/api/auth/register", "", map[string]string{
 			"email": "not-an-email", "username": "a", "password": "12",
 		})
 		res.Body.Close()
-		if res.StatusCode < 400 {
-			t.Fatalf("want error, got %d", res.StatusCode)
+		if res.StatusCode != 200 {
+			t.Fatalf("want 200 got %d", res.StatusCode)
 		}
 	})
 

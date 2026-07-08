@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/Hana-ame/chat-app/server/internal/db"
 	"github.com/Hana-ame/chat-app/server/internal/models"
@@ -100,6 +101,10 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 	mentions := extractMentions(req.Content)
 	msg, err := s.DB.CreateMessage(r.Context(), id, u.ID, req.Content, mentions, req.Attachments)
 	if err != nil {
+		if strings.Contains(err.Error(), "content too long") {
+			writeError(w, http.StatusForbidden, "content_too_long", err.Error())
+			return
+		}
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}

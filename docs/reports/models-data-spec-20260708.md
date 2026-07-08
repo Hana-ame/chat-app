@@ -23,18 +23,18 @@ type User struct {
 }
 
 type Chat struct {
-    ID            string     `json:"id"`
-    Type          string     `json:"type"`
-    Name          string     `json:"name,omitempty"`
-    IconColor     string     `json:"icon_color,omitempty"`
-    Visibility    string     `json:"visibility,omitempty"`
-    OwnerID       string     `json:"owner_id,omitempty"`
-    CreatedAt     time.Time  `json:"created_at"`
-    LastMessageAt *time.Time `json:"last_message_at,omitempty"`
-    Members       []User     `json:"members,omitempty"`
-    UnreadCount   int        `json:"unread_count"`
-    Pinned        bool       `json:"pinned"`
-    LastMessage   *Message   `json:"last_message,omitempty"`
+    ID              string     `json:"id"`
+    Type            string     `json:"type"`
+    Name            string     `json:"name,omitempty"`
+    IconColor       string     `json:"icon_color,omitempty"`
+    Visibility      string     `json:"visibility,omitempty"`
+    OwnerID         string     `json:"owner_id,omitempty"`
+    CreatedAt       time.Time  `json:"created_at"`
+    LastMessageAt   time.Time  `json:"last_message_at"`
+    Members         []User     `json:"members,omitempty"`
+    UnreadCount     int        `json:"unread_count"`
+    Pinned          bool       `json:"pinned"`
+    LastMessage     *Message   `json:"last_message,omitempty"`
 }
 
 type ChatMember struct {
@@ -46,17 +46,20 @@ type ChatMember struct {
 }
 
 type Message struct {
-    ID          string       `json:"id"`
-    ChatID      string       `json:"chat_id"`
-    UserID      string       `json:"user_id"`
-    Author      *User        `json:"author,omitempty"`
-    Content     string       `json:"content"`
-    CreatedAt   time.Time    `json:"created_at"`
-    EditedAt    *time.Time   `json:"edited_at,omitempty"`
-    Deleted     bool         `json:"deleted"`
-    Attachments []Attachment `json:"attachments,omitempty"`
-    Reactions   []Reaction   `json:"reactions,omitempty"`
-    Mentions    []string     `json:"mentions,omitempty"`
+    ID              string       `json:"id"`
+    ChatID          string       `json:"chat_id"`
+    UserID          string       `json:"user_id"`
+    Author          *User        `json:"author,omitempty"`
+    Content         string       `json:"content"`
+    CreatedAt       time.Time    `json:"created_at"`
+    EditedAt        *time.Time   `json:"edited_at,omitempty"`
+    DeletedAt       *time.Time   `json:"deleted_at,omitempty"`
+    AttachmentCount int          `json:"attachment_count"`
+    MentionCount    int          `json:"mention_count"`
+    ReactionCount   int          `json:"reaction_count"`
+    Attachments     []Attachment `json:"attachments,omitempty"`
+    Reactions       []Reaction   `json:"reactions,omitempty"`
+    Mentions        []string     `json:"mentions,omitempty"`
 }
 
 type Attachment struct {
@@ -93,9 +96,9 @@ type RefreshToken struct {
 | 字段 | 类型 | JSON | 来源 | 生成规则 |
 |------|------|------|------|----------|
 | ID | `string` | `"id"` | 服务端生成 | `uuid.NewString()` → UUID v4 |
-| Email | `string` | `"email"` | 用户输入 | `strings.ToLower` + `mail.ParseAddress` 校验；客户端 `omitempty` |
-| Username | `string` | `"username"` | 用户输入 | 长度 2‑32，排除控制字符 (0x00‑0x1F, 0x7F) |
-| AvatarColor | `string` | `"avatar_color"` | 服务端计算 | `PickColor(username)` → palette\[h % 8\]（哈希取模） |
+| Email | `string` | `"email"` | 用户输入 | `strings.ToLower` + `strings.TrimSpace`；仅查重 |
+| Username | `string` | `"username"` | 用户输入 | `strings.TrimSpace`；仅查重 |
+| AvatarColor | `string` | `"avatar_color"` | 服务端计算 | `PickColor(username)` → palette\[uuid.ID() % 8\]（UUID 取模） |
 | AvatarURL | `string` | `"avatar_url"` | 用户上传 | 外部 `upload.moonchan.xyz` 返回的 URL |
 | Status | `string` | `"status"` | 服务端设置 | 默认 `"offline"`，WS 连接时 `"online"` |
 | CreatedAt | `time.Time` | `"created_at"` | 服务端生成 | SQLite `strftime('%Y-%m-%dT%H:%M:%fZ','now')` |
@@ -111,11 +114,11 @@ type RefreshToken struct {
 | Visibility | `string` | `"visibility"` | 用户指定 | 枚举 `public / unlisted / private`；dm 为空串 |
 | OwnerID | `string` | `"owner_id"` | 用户指定 | 引用 `users(id)`，可为 null（dm） |
 | CreatedAt | `time.Time` | `"created_at"` | 服务端生成 | SQLite default |
-| LastMessageAt | `*time.Time` | `"last_message_at"` | 服务端更新 | 发消息时 `UPDATE chats SET last_message_at = now` |
+| LastMessageAt | `time.Time` | `"last_message_at"` | 服务端更新 | 发消息时 `UPDATE chats SET last_message_at = now`；DB NULL 时降级为 `CreatedAt` |
 | Members | `[]User` | `"members"` | JOIN 查询 | `GetChatMembers` → `SELECT ... FROM chat_members JOIN users` |
-| UnreadCount | `int` | `"unread_count"` | 服务端计算 | `COUNT(messages) WHERE deleted=0 AND (created_at,id) > lastReadID` |
+| UnreadCount | `int` | `"unread_count"` | 服务端计算 | `COUNT(messages) WHERE deleted_at IS NULL AND (created_at,id) > lastReadID` |
 | Pinned | `bool` | `"pinned"` | 用户动作 | `POST /pin` → `pinned = 1`，`/unpin` → `0` |
-| LastMessage | `*Message` | `"last_message"` | 服务端查询 | `GetMessage(LastMessageID)` |
+| LastMessage | `*Message` | `"last_message"` | 服务端查询 | `fetchMessageRow(chat_id, LIMIT 1)`·无 `attachExtras` |
 
 ### ChatMember
 
@@ -135,13 +138,16 @@ type RefreshToken struct {
 | ChatID | `string` | `"chat_id"` | 用户关联 | 引用 `chats(id)` |
 | UserID | `string` | `"user_id"` | 用户关联 | 引用 `users(id)` |
 | Author | `*User` | `"author"` | JOIN 查询 | `messages JOIN users` |
-| Content | `string` | `"content"` | 用户输入 | 最大 4000 字符，`strings.TrimRight` |
+| Content | `string` | `"content"` | 用户输入 | 最大 4000 字符，超长返回 403/`content_too_long` |
 | CreatedAt | `time.Time` | `"created_at"` | 服务端生成 | Go `time.Now().UTC().Format("2006-01-02T15:04:05.000Z")` |
 | EditedAt | `*time.Time` | `"edited_at"` | 服务端设置 | `UpdateMessage` 时记录当前时间 |
-| Deleted | `bool` | `"deleted"` | 服务端设置 | soft delete（设 `deleted=1`, `content=''`） |
-| Attachments | `[]Attachment` | `"attachments"` | 子查询 | `SELECT ... FROM attachments WHERE message_id = ?` |
-| Reactions | `[]Reaction` | `"reactions"` | 子查询 | `SELECT emoji, user_id FROM reactions ... ORDER BY created_at` |
-| Mentions | `[]string` | `"mentions"` | 子查询 | `SELECT user_id FROM mentions WHERE message_id = ?` |
+| DeletedAt | `*time.Time` | `"deleted_at"` | 服务端设置 | soft delete（设 `deleted_at=now`, `content=''`） |
+| AttachmentCount | `int` | `"attachment_count"` | 服务端设置 | 写入时从 `attachments` 数组长度计算 |
+| MentionCount | `int` | `"mention_count"` | 服务端设置 | 写入时从 `mentions` 数组去重后长度计算 |
+| ReactionCount | `int` | `"reaction_count"` | 服务端更新 | `AddReaction`/`RemoveReaction` 时 `COUNT(*)` 重新计算 |
+| Attachments | `[]Attachment` | `"attachments"` | 子查询 | `SELECT ... FROM attachments WHERE message_id = ?`（仅 `?details=true`） |
+| Reactions | `[]Reaction` | `"reactions"` | 子查询 | `SELECT emoji, user_id FROM reactions ...`（仅 `?details=true`） |
+| Mentions | `[]string` | `"mentions"` | 子查询 | `SELECT user_id FROM mentions WHERE message_id = ?`（仅 `?details=true`） |
 
 ### Attachment
 
@@ -152,7 +158,7 @@ type RefreshToken struct {
 | Filename | `string` | `"filename"` | 用户传入 | `filepath.Base` + `Replace("..", "_")` + 截断 200 字符 |
 | MimeType | `string` | `"mime_type"` | 用户/推断 | 根据 `Content-Type` 或 `mime.TypeByExtension`，默认 `application/octet-stream` |
 | Size | `int64` | `"size"` | 用户传入 | 文件字节数 |
-| URL | `string` | `"url"` | 用户传入 | 指向 `/uploads/...` 或外部存储 |
+| URL | `string` | `"url"` | 用户传入 | 指向 `upload.moonchan.xyz` 外部存储 |
 
 ### Reaction（API 响应结构，非原始行）
 
@@ -189,16 +195,15 @@ func NewID() string { return uuid.NewString() }
 ### 3.2 颜色选择
 
 ```go
-// server/internal/db/users.go:24-33
+// server/internal/db/users.go:24-31
 func PickColor(seed string) string {
     if seed == "" { return "#5865F2" }
-    h := 0
-    for _, r := range seed { h = (h*31 + int(r)) & 0x7fffffff }
-    return palette[h % 8]
+    id, _ := uuid.Parse(seed)
+    return palette[int(id.ID()) % 8]
 }
 ```
 
-**规则**：DJBernstein 哈希变体 × 31 → 取模 8 → 从固定 8 色调色板选色。相同 seed 产生相同颜色。
+**规则**：将 seed 解析为 UUID，取 `id.ID()`（UUID 第 9‑16 字节的前 8 位）→ 取模 8 → 从固定 8 色调色板选色。
 
 ### 3.3 时间戳
 
@@ -207,10 +212,12 @@ func PickColor(seed string) string {
 | SQL 默认值（migration） | 微秒 | `strftime('%Y-%m-%dT%H:%M:%fZ','now')` |
 | Go `CreateMessage` | 毫秒 | `"2006-01-02T15:04:05.000Z"` |
 | Go `UpdateMessage` | 毫秒 | 同上 |
+| Go `DeleteMessage` | 纳秒 | `time.RFC3339Nano` |
+| Go `AddReaction` | 纳秒 | SQLite default |
 | Go `CreateRefreshToken` | 纳秒 | `time.RFC3339Nano` |
 | Go `PurgeExpiredTokens` | 纳秒 | `time.RFC3339Nano` |
 
-**规则**：统一使用 UTC，以 TEXT 存储。**注意精度不统一**：message 的时间截断到毫秒，chat 的 `last_message_at` 和 token 用纳秒级格式。
+**规则**：统一使用 UTC，以 TEXT 存储。
 
 ### 3.4 Token 生成
 
@@ -223,54 +230,68 @@ func PickColor(seed string) string {
 ### 3.5 密码
 
 ```go
-// server/internal/auth/auth.go:101-113
+// server/internal/auth/auth.go:99-104
 HashPassword → bcrypt.GenerateFromPassword(password, bcrypt.DefaultCost)
+if len(password) > 72 { password = password[:72] } // bcrypt 硬限制
 ```
 
-**规则**：bcrypt cost 10；密码长于 72 字节时截断；至少 8 字符。
+**规则**：bcrypt cost 10；仅因 bcrypt 72 字节限制截断。无最小长度、无格式要求。
+**变更**：移除了 8 字符最小长度检查。
 
 ### 3.6 邮箱
 
 ```go
-// server/internal/auth/auth.go:125-134
-NormalizeEmail → strings.ToLower + strings.TrimSpace + mail.ParseAddress
+// server/internal/auth/auth.go:115-117
+NormalizeEmail → strings.ToLower + strings.TrimSpace
 ```
 
-**规则**：小写、去空格、`mail.ParseAddress` 验证格式。
+**规则**：只做小写和去空格。不再校验格式、不再调用 `mail.ParseAddress`。
+**变更**：移除了 email 格式验证。
 
 ### 3.7 用户名
 
 ```go
-// server/internal/auth/auth.go:136-149
-ValidateUsername → 长度 2-32，排除控制字符 (0x00-0x1F, 0x7F)
+// server/internal/auth/auth.go:127-131
+ValidateUsername → strings.TrimSpace, 非空检查
 ```
 
-### 3.8 上传文件命名
+**规则**：只做去空格和空值检查。无长度限制、无字符限制。
+**变更**：移除了 2‑32 长度、控制字符、最大长度等所有校验。
 
-```go
-// server/internal/handlers/uploads.go:29-36
-sanitizeFilename → filepath.Base + strings.ReplaceAll("..", "_") + 截断 200
+### 3.8 上传
+
+```
+废弃，保留代码但标记 Deprecated。
+前端直接上传到 upload.moonchan.xyz，返回 URL + MIME 后随消息体传入。
 ```
 
 ### 3.9 消息内容
 
 ```go
-// server/internal/db/messages.go:16-18
-content = strings.TrimRight(content, " \n\t")
-if len(content) > 4000 { content = content[:4000] }
+// server/internal/db/messages.go:16-20
+if len(content) > 4000 {
+    return nil, errors.New("content too long, use file upload instead")
+}
 ```
 
-**规则**：去尾部空白 + 截断 4000 字符。空内容但有 attachment 也允许。
+**变更**：从静默截断改为拒绝并返回 403/`content_too_long`。超长内容应通过附件上传。
 
 ### 3.10 Emoji 反应
 
 ```go
-// server/internal/db/messages.go:334-339
+// server/internal/db/messages.go
 emoji = strings.TrimSpace(emoji)
 if emoji == "" || len(emoji) > 32 { return error }
 ```
 
 **规则**：非空、≤32 字符。未做 Unicode 有效性校验。
+
+### 3.11 消息详情懒加载
+
+```
+?details=true 控制 attachExtras（3 条子查询）。默认跳过。
+LastMessage（聊天列表预览）永远不查 attachExtras。
+```
 
 ---
 
@@ -278,41 +299,42 @@ if emoji == "" || len(emoji) > 32 { return error }
 
 ```
 用户输入
-  ├── email / username / password ──→ User
+  ├── email / username / password ──→ User（仅查重，无格式限制）
   ├── chat type / name / visibility ──→ Chat
-  ├── message content ──→ Message
-  ├── file upload ──→ Attachment（经 sanitizeFilename 清洗）
+  ├── message content (≤4000) ──→ Message；超长 → 403
+  ├── file upload（upload.moonchan.xyz）──→ Attachment URL
   └── emoji ──→ Reaction
 
 服务端计算
   ├── uuid.NewString() ──→ 所有实体 ID
-  ├── PickColor(seed) ──→ AvatarColor / IconColor
-  ├── time.Now().UTC() ──→ CreatedAt / ExpiresAt / LastMessageAt
-  ├── bcrypt(password) ──→ password_hash
+  ├── PickColor(uuid) ──→ AvatarColor / IconColor（UUID.ID() 取模）
+  ├── time.Now().UTC() ──→ CreatedAt / ExpiresAt / LastMessageAt / DeletedAt
+  ├── bcrypt(password) ──→ password_hash（72 字节截断）
   ├── JWT(jti, uid, exp) ──→ access_token
   ├── sha256(randomBytes) ──→ refresh_token hash
-  └── status "online"/"offline" (WS hook)
+  ├── status "online"/"offline" (WS hook)
+  └── counts ──→ attachment_count / mention_count / reaction_count（写入时计算）
 
-服务端推断（子查询 / JOIN）
+服务端推断（子查询 / JOIN，仅 ?details=true）
   ├── Members ──→ ChatMember → JOIN users
-  ├── Attachments ──→ attachment 表 WHERE message_id
-  ├── Reactions ──→ reaction 表 GROUP BY emoji → 聚合结构
-  ├── Mentions ──→ mention 表 WHERE message_id
-  └── UnreadCount ──→ COUNT(messages) WHERE deleted=0 AND >lastRead
+  ├── Attachments ──→ attachment 表 WHERE message_id（仅当 count>0）
+  ├── Reactions ──→ reaction 表 GROUP BY emoji（仅当 count>0）
+  ├── Mentions ──→ mention 表 WHERE message_id（仅当 count>0）
+  └── UnreadCount ──→ COUNT(messages) WHERE deleted_at IS NULL AND >lastRead
 ```
 
 ---
 
 ## 五、约束汇总
 
-| 约束 | 检查位置 | 违反后果 |
-|------|----------|----------|
-| email 必须可解析 | `auth.NormalizeEmail` | 400/`invalid_email` |
-| username 2-32 字符，无控制符 | `auth.ValidateUsername` | 400/`invalid_username` |
-| password ≥ 8 字符 | `auth.HashPassword` | 400/`weak_password` |
-| 唯一 email/username | 数据库 UNIQUE 索引 | 409/`already_taken` |
-| chat type = dm / group | DB CHECK 约束 | 语句失败 |
-| message content ≤ 4000 | `strings[:4000]` | 静默截断 |
-| emoji ≤ 32 字符 | DB 层校验 | 400/`bad_request` |
-| 外键引用 | DB FOREIGN KEY | 级联删除或 ABORT |
-| 时间格式 | Go layout 解析 | 回退 `time.Time{}` |
+| 约束 | 检查位置 | 违反后果 | 变更说明 |
+|------|----------|----------|----------|
+| 唯一 email | 数据库 UNIQUE 索引 | 409/`already_taken` | 移除了格式校验 |
+| 唯一 username | 数据库 UNIQUE 索引 | 409/`already_taken` | 移除了长度/字符校验 |
+| chat type = dm / group | DB CHECK 约束 | 语句失败 | 不变 |
+| message content ≤ 4000 | DB 层 `CreateMessage`/`UpdateMessage` | 403/`content_too_long` | 变更：从静默截断改为拒绝 |
+| emoji ≤ 32 字符 | DB 层校验 | 400/`bad_request` | 不变 |
+| 外键引用 | DB FOREIGN KEY | 级联删除或 ABORT | 不变 |
+| 密码 bcrypt 72 字节 | `HashPassword`/`VerifyPassword` 截断 | 自动截断 | 移除了 8 字符最小长度 |
+| 附件上限 20MB（默认） | `MaxUploadBytes` config | 413/`too_large` | 废弃（前端直传 upload.moonchan.xyz） |
+| 时间格式 | Go layout 解析 | 回退 `time.Time{}` | 不变 |
