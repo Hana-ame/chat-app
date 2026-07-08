@@ -46,14 +46,14 @@ func TestGetMessagesWithPagination(t *testing.T) {
 		ids = append(ids, msg.ID)
 	}
 
-	msgs, err := f.DB.GetMessages(f.Ctx(), chat.ID, a.ID, "", 3)
+	msgs, err := f.DB.GetMessages(f.Ctx(), chat.ID, a.ID, "", 3, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(msgs) != 3 {
 		t.Fatalf("first page: want 3 got %d", len(msgs))
 	}
-	msgs2, err := f.DB.GetMessages(f.Ctx(), chat.ID, a.ID, msgs[0].ID, 10)
+	msgs2, err := f.DB.GetMessages(f.Ctx(), chat.ID, a.ID, msgs[0].ID, 10, false)
 	if err != nil {
 		t.Fatal(err)
 	}

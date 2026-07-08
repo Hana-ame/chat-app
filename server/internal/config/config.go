@@ -14,12 +14,12 @@ import (
 type Config struct {
 	Addr             string
 	DBPath           string
-	UploadDir        string
+	UploadDir        string        // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
 	BaseURL          string
 	JWTSecret        []byte
 	AccessTokenTTL   time.Duration
 	RefreshTokenTTL  time.Duration
-	MaxUploadBytes   int64
+	MaxUploadBytes   int64         // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
 	StaticDir        string
 	AllowOrigins     []string
 }

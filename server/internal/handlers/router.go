@@ -69,7 +69,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 				r.Post("/unpin", s.UnpinChat)
 			})
 
-			r.Post("/uploads", s.Upload)
+			r.Post("/uploads", s.Upload) // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
 		})
 	})
 
@@ -82,13 +82,14 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 		httpSwagger.URL("https://wsl-8080.moonchan.xyz/swagger/doc.json"),
 	))
 
-	r.Get("/uploads/*", s.serveUpload)
+	r.Get("/uploads/*", s.serveUpload) // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
 	if s.Cfg.StaticDir != "" {
 		r.NotFound(s.serveStatic)
 	}
 	return r
 }
 
+// Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
 func (s *Server) serveUpload(w http.ResponseWriter, r *http.Request) {
 	rel := strings.TrimPrefix(r.URL.Path, "/uploads/")
 	if rel == "" || strings.Contains(rel, "..") {

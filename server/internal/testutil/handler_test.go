@@ -200,7 +200,7 @@ func TestReactionsFlow(t *testing.T) {
 		t.Fatalf("remove reaction: %d", delRes.StatusCode)
 	}
 
-	listRes := f.Do(t, "GET", "/api/chats/"+chatID+"/messages?limit=5", alice.AccessToken, nil)
+	listRes := f.Do(t, "GET", "/api/chats/"+chatID+"/messages?limit=5&details=true", alice.AccessToken, nil)
 	defer listRes.Body.Close()
 	var listResp struct {
 		Messages []struct {

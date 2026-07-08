@@ -43,7 +43,7 @@ func main() {
 	srv := handlers.New(cfg, database, authSvc, hub)
 	r := srv.Router(gateway)
 
-	if err := os.MkdirAll(cfg.UploadDir, 0o755); err != nil {
+	if err := os.MkdirAll(cfg.UploadDir, 0o755); err != nil { // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
 		log.Fatalf("upload dir: %v", err)
 	}
 

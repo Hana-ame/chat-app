@@ -30,8 +30,8 @@ func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, 
 	id := NewID()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO messages (id, chat_id, user_id, content, created_at) VALUES (?,?,?,?,?)`,
-		id, chatID, userID, content, now,
+		`INSERT INTO messages (id, chat_id, user_id, content, created_at, attachment_count, mention_count) VALUES (?,?,?,?,?,?,?)`,
+		id, chatID, userID, content, now, len(attachments), len(dedupe(mentions)),
 	)
 	if err != nil {
 		return nil, err
@@ -87,6 +87,7 @@ func dedupe(in []string) []string {
 func (d *DB) GetMessage(ctx context.Context, id string) (*models.Message, error) {
 	m, err := d.fetchMessageRow(ctx,
 		`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted,
+		        m.attachment_count, m.mention_count, m.reaction_count,
 		        u.id, u.username, u.avatar_color, u.status
 		 FROM messages m JOIN users u ON u.id = m.user_id
 		 WHERE m.id = ?`,
@@ -108,9 +109,13 @@ func (d *DB) fetchMessageRow(ctx context.Context, q, id string) (*models.Message
 		edited   sql.NullString
 		created  string
 		deleted  int
+		attCnt   int
+		mentCnt  int
+		rxnCnt   int
 	)
 	err := d.QueryRowContext(ctx, q, id).Scan(
 		&m.ID, &m.ChatID, &m.UserID, &m.Content, &created, &edited, &deleted,
+		&attCnt, &mentCnt, &rxnCnt,
 		&author.ID, &author.Username, &author.AvatarColor, &author.Status,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -125,6 +130,9 @@ func (d *DB) fetchMessageRow(ctx context.Context, q, id string) (*models.Message
 		m.EditedAt = &t
 	}
 	m.Deleted = deleted == 1
+	m.AttachmentCount = attCnt
+	m.MentionCount = mentCnt
+	m.ReactionCount = rxnCnt
 	m.Author = &author
 	if m.Deleted {
 		m.Content = ""
@@ -133,25 +141,31 @@ func (d *DB) fetchMessageRow(ctx context.Context, q, id string) (*models.Message
 }
 
 func (d *DB) attachExtras(ctx context.Context, m *models.Message, viewerID string) error {
-	atts, err := d.attachmentsFor(ctx, m.ID)
-	if err != nil {
-		return err
+	if m.AttachmentCount > 0 {
+		atts, err := d.attachmentsFor(ctx, m.ID)
+		if err != nil {
+			return err
+		}
+		m.Attachments = atts
 	}
-	m.Attachments = atts
-	rxs, err := d.reactionsFor(ctx, m.ID, viewerID)
-	if err != nil {
-		return err
+	if m.MentionCount > 0 {
+		mentions, err := d.mentionsFor(ctx, m.ID)
+		if err != nil {
+			return err
+		}
+		m.Mentions = mentions
 	}
-	m.Reactions = rxs
-	mentions, err := d.mentionsFor(ctx, m.ID)
-	if err != nil {
-		return err
+	if m.ReactionCount > 0 {
+		rxs, err := d.reactionsFor(ctx, m.ID, viewerID)
+		if err != nil {
+			return err
+		}
+		m.Reactions = rxs
 	}
-	m.Mentions = mentions
 	return nil
 }
 
-func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, limit int) ([]models.Message, error) {
+func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, limit int, details bool) ([]models.Message, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
@@ -162,6 +176,7 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 	if before == "" {
 		rows, err = d.QueryContext(ctx,
 			`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted,
+			        m.attachment_count, m.mention_count, m.reaction_count,
 			        u.id, u.username, u.avatar_color, u.status
 			 FROM messages m JOIN users u ON u.id = m.user_id
 			 WHERE m.chat_id = ?
@@ -171,6 +186,7 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 	} else {
 		rows, err = d.QueryContext(ctx,
 			`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted,
+			        m.attachment_count, m.mention_count, m.reaction_count,
 			        u.id, u.username, u.avatar_color, u.status
 			 FROM messages m JOIN users u ON u.id = m.user_id
 			 WHERE m.chat_id = ? AND (m.created_at, m.id) < (
@@ -193,9 +209,13 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 			edited  sql.NullString
 			created string
 			deleted int
+			attCnt  int
+			mentCnt int
+			rxnCnt  int
 		)
 		if err := rows.Scan(
 			&m.ID, &m.ChatID, &m.UserID, &m.Content, &created, &edited, &deleted,
+			&attCnt, &mentCnt, &rxnCnt,
 			&author.ID, &author.Username, &author.AvatarColor, &author.Status,
 		); err != nil {
 			return nil, err
@@ -206,6 +226,9 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 			m.EditedAt = &t
 		}
 		m.Deleted = deleted == 1
+		m.AttachmentCount = attCnt
+		m.MentionCount = mentCnt
+		m.ReactionCount = rxnCnt
 		m.Author = &author
 		if m.Deleted {
 			m.Content = ""
@@ -215,9 +238,11 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	for i := range out {
-		if err := d.attachExtras(ctx, &out[i], viewerID); err != nil {
-			return nil, err
+	if details {
+		for i := range out {
+			if err := d.attachExtras(ctx, &out[i], viewerID); err != nil {
+				return nil, err
+			}
 		}
 	}
 	// Reverse to chronological ascending order for client
@@ -228,18 +253,20 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 }
 
 func (d *DB) LastMessage(ctx context.Context, chatID string) (*models.Message, error) {
-	var id string
-	err := d.QueryRowContext(ctx,
-		`SELECT id FROM messages WHERE chat_id = ? ORDER BY created_at DESC, id DESC LIMIT 1`,
+	m, err := d.fetchMessageRow(ctx,
+		`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted,
+		        m.attachment_count, m.mention_count, m.reaction_count,
+		        u.id, u.username, u.avatar_color, u.status
+		 FROM messages m JOIN users u ON u.id = m.user_id
+		 WHERE m.chat_id = ?
+		 ORDER BY m.created_at DESC, m.id DESC LIMIT 1`,
 		chatID,
-	).Scan(&id)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
-	}
+	)
 	if err != nil {
 		return nil, err
 	}
-	return d.GetMessage(ctx, id)
+	// No attachExtras — chat list only needs content preview and counts.
+	return m, nil
 }
 
 func (d *DB) UnreadCount(ctx context.Context, chatID, lastReadID string) (int, error) {
@@ -338,19 +365,53 @@ func (d *DB) AddReaction(ctx context.Context, messageID, userID, emoji string) e
 	if len(emoji) > 32 {
 		return errors.New("emoji too long")
 	}
-	_, err := d.ExecContext(ctx,
+	tx, err := d.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	_, err = tx.ExecContext(ctx,
 		`INSERT OR IGNORE INTO reactions (message_id, user_id, emoji) VALUES (?,?,?)`,
 		messageID, userID, emoji,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx,
+		`UPDATE messages SET reaction_count = (
+			SELECT COUNT(*) FROM reactions WHERE message_id = ?
+		) WHERE id = ?`,
+		messageID, messageID,
+	)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (d *DB) RemoveReaction(ctx context.Context, messageID, userID, emoji string) error {
-	_, err := d.ExecContext(ctx,
+	tx, err := d.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	_, err = tx.ExecContext(ctx,
 		`DELETE FROM reactions WHERE message_id = ? AND user_id = ? AND emoji = ?`,
 		messageID, userID, emoji,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx,
+		`UPDATE messages SET reaction_count = (
+			SELECT COUNT(*) FROM reactions WHERE message_id = ?
+		) WHERE id = ?`,
+		messageID, messageID,
+	)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (d *DB) reactionsFor(ctx context.Context, messageID, viewerID string) ([]models.Reaction, error) {

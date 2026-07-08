@@ -35,6 +35,10 @@ func sanitizeFilename(name string) string {
 	return name
 }
 
+// Deprecated: frontend uploads directly to upload.moonchan.xyz.
+// This handler is kept for fallback but no longer called.
+// Remove in future version along with serveUpload, randomKey, sanitizeFilename, allowedMime.
+//
 // Upload godoc
 // @Summary      Upload a file
 // @Description  Upload a file via multipart form (validates mime type and size)

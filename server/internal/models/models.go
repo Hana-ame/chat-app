@@ -36,17 +36,20 @@ type ChatMember struct {
 }
 
 type Message struct {
-	ID          string       `json:"id"`
-	ChatID      string       `json:"chat_id"`
-	UserID      string       `json:"user_id"`
-	Author      *User        `json:"author,omitempty"`
-	Content     string       `json:"content"`
-	CreatedAt   time.Time    `json:"created_at"`
-	EditedAt    *time.Time   `json:"edited_at,omitempty"`
-	Deleted     bool         `json:"deleted"`
-	Attachments []Attachment `json:"attachments,omitempty"`
-	Reactions   []Reaction   `json:"reactions,omitempty"`
-	Mentions    []string     `json:"mentions,omitempty"`
+	ID              string       `json:"id"`
+	ChatID          string       `json:"chat_id"`
+	UserID          string       `json:"user_id"`
+	Author          *User        `json:"author,omitempty"`
+	Content         string       `json:"content"`
+	CreatedAt       time.Time    `json:"created_at"`
+	EditedAt        *time.Time   `json:"edited_at,omitempty"`
+	Deleted         bool         `json:"deleted"`
+	AttachmentCount int          `json:"-"`
+	MentionCount    int          `json:"-"`
+	ReactionCount   int          `json:"-"`
+	Attachments     []Attachment `json:"attachments,omitempty"`
+	Reactions       []Reaction   `json:"reactions,omitempty"`
+	Mentions        []string     `json:"mentions,omitempty"`
 }
 
 type Attachment struct {
