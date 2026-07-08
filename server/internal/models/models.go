@@ -43,7 +43,7 @@ type Message struct {
 	Content         string       `json:"content"`
 	CreatedAt       time.Time    `json:"created_at"`
 	EditedAt        *time.Time   `json:"edited_at,omitempty"`
-	Deleted         bool         `json:"deleted"`
+	DeletedAt       *time.Time   `json:"deleted_at,omitempty"`
 	AttachmentCount int `json:"attachment_count"`
 	MentionCount    int `json:"mention_count"`
 	ReactionCount   int `json:"reaction_count"`

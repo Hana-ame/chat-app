@@ -24,7 +24,7 @@ func TestCreateGetMessage(t *testing.T) {
 	if msg.Author == nil || msg.Author.Username != "MsgUser" {
 		t.Fatal("author not populated")
 	}
-	if msg.Deleted {
+	if msg.DeletedAt != nil {
 		t.Fatal("new message marked deleted")
 	}
 	if msg.EditedAt != nil {
@@ -96,7 +96,7 @@ func TestDeleteMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 	m, _ := f.DB.GetMessage(f.Ctx(), msg.ID)
-	if !m.Deleted {
+	if m.DeletedAt == nil {
 		t.Fatal("should be deleted")
 	}
 	if m.Content != "" {

@@ -86,7 +86,7 @@ func dedupe(in []string) []string {
 
 func (d *DB) GetMessage(ctx context.Context, id string) (*models.Message, error) {
 	m, err := d.fetchMessageRow(ctx,
-		`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted,
+		`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted_at,
 		        m.attachment_count, m.mention_count, m.reaction_count,
 		        u.id, u.username, u.avatar_color, u.status
 		 FROM messages m JOIN users u ON u.id = m.user_id
@@ -104,17 +104,17 @@ func (d *DB) GetMessage(ctx context.Context, id string) (*models.Message, error)
 
 func (d *DB) fetchMessageRow(ctx context.Context, q, id string) (*models.Message, error) {
 	var (
-		m        models.Message
-		author   models.User
-		edited   sql.NullString
-		created  string
-		deleted  int
-		attCnt   int
-		mentCnt  int
-		rxnCnt   int
+		m         models.Message
+		author    models.User
+		edited    sql.NullString
+		deletedAt sql.NullString
+		created   string
+		attCnt    int
+		mentCnt   int
+		rxnCnt    int
 	)
 	err := d.QueryRowContext(ctx, q, id).Scan(
-		&m.ID, &m.ChatID, &m.UserID, &m.Content, &created, &edited, &deleted,
+		&m.ID, &m.ChatID, &m.UserID, &m.Content, &created, &edited, &deletedAt,
 		&attCnt, &mentCnt, &rxnCnt,
 		&author.ID, &author.Username, &author.AvatarColor, &author.Status,
 	)
@@ -129,14 +129,15 @@ func (d *DB) fetchMessageRow(ctx context.Context, q, id string) (*models.Message
 		t := parseTime(edited.String)
 		m.EditedAt = &t
 	}
-	m.Deleted = deleted == 1
+	if deletedAt.Valid && deletedAt.String != "" {
+		t := parseTime(deletedAt.String)
+		m.DeletedAt = &t
+		m.Content = ""
+	}
 	m.AttachmentCount = attCnt
 	m.MentionCount = mentCnt
 	m.ReactionCount = rxnCnt
 	m.Author = &author
-	if m.Deleted {
-		m.Content = ""
-	}
 	return &m, nil
 }
 
@@ -175,7 +176,7 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 	)
 	if before == "" {
 		rows, err = d.QueryContext(ctx,
-			`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted,
+			`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted_at,
 			        m.attachment_count, m.mention_count, m.reaction_count,
 			        u.id, u.username, u.avatar_color, u.status
 			 FROM messages m JOIN users u ON u.id = m.user_id
@@ -185,7 +186,7 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 		)
 	} else {
 		rows, err = d.QueryContext(ctx,
-			`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted,
+			`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted_at,
 			        m.attachment_count, m.mention_count, m.reaction_count,
 			        u.id, u.username, u.avatar_color, u.status
 			 FROM messages m JOIN users u ON u.id = m.user_id
@@ -204,17 +205,17 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 	out := []models.Message{}
 	for rows.Next() {
 		var (
-			m       models.Message
-			author  models.User
-			edited  sql.NullString
-			created string
-			deleted int
-			attCnt  int
-			mentCnt int
-			rxnCnt  int
+			m         models.Message
+			author    models.User
+			edited    sql.NullString
+			deletedAt sql.NullString
+			created   string
+			attCnt    int
+			mentCnt   int
+			rxnCnt    int
 		)
 		if err := rows.Scan(
-			&m.ID, &m.ChatID, &m.UserID, &m.Content, &created, &edited, &deleted,
+			&m.ID, &m.ChatID, &m.UserID, &m.Content, &created, &edited, &deletedAt,
 			&attCnt, &mentCnt, &rxnCnt,
 			&author.ID, &author.Username, &author.AvatarColor, &author.Status,
 		); err != nil {
@@ -225,14 +226,15 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 			t := parseTime(edited.String)
 			m.EditedAt = &t
 		}
-		m.Deleted = deleted == 1
+		if deletedAt.Valid && deletedAt.String != "" {
+			t := parseTime(deletedAt.String)
+			m.DeletedAt = &t
+			m.Content = ""
+		}
 		m.AttachmentCount = attCnt
 		m.MentionCount = mentCnt
 		m.ReactionCount = rxnCnt
 		m.Author = &author
-		if m.Deleted {
-			m.Content = ""
-		}
 		out = append(out, m)
 	}
 	if err := rows.Err(); err != nil {
@@ -254,7 +256,7 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 
 func (d *DB) LastMessage(ctx context.Context, chatID string) (*models.Message, error) {
 	m, err := d.fetchMessageRow(ctx,
-		`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted,
+		`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted_at,
 		        m.attachment_count, m.mention_count, m.reaction_count,
 		        u.id, u.username, u.avatar_color, u.status
 		 FROM messages m JOIN users u ON u.id = m.user_id
@@ -273,7 +275,7 @@ func (d *DB) UnreadCount(ctx context.Context, chatID, lastReadID string) (int, e
 	var n int
 	if lastReadID == "" {
 		err := d.QueryRowContext(ctx,
-			`SELECT COUNT(*) FROM messages WHERE chat_id = ? AND deleted = 0`,
+			`SELECT COUNT(*) FROM messages WHERE chat_id = ? AND deleted_at IS NULL`,
 			chatID,
 		).Scan(&n)
 		return n, err
@@ -299,7 +301,7 @@ func (d *DB) UpdateMessage(ctx context.Context, id, userID, content string) (*mo
 		content = content[:4000]
 	}
 	res, err := d.ExecContext(ctx,
-		`UPDATE messages SET content = ?, edited_at = ? WHERE id = ? AND user_id = ? AND deleted = 0`,
+		`UPDATE messages SET content = ?, edited_at = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL`,
 		content, time.Now().UTC().Format(time.RFC3339Nano), id, userID,
 	)
 	if err != nil {
@@ -313,14 +315,15 @@ func (d *DB) UpdateMessage(ctx context.Context, id, userID, content string) (*mo
 }
 
 func (d *DB) DeleteMessage(ctx context.Context, id, userID string, allowAny bool) error {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
 	var q string
 	var args []interface{}
 	if allowAny {
-		q = `UPDATE messages SET deleted = 1, content = '' WHERE id = ?`
-		args = []interface{}{id}
+		q = `UPDATE messages SET deleted_at = ?, content = '' WHERE id = ?`
+		args = []interface{}{now, id}
 	} else {
-		q = `UPDATE messages SET deleted = 1, content = '' WHERE id = ? AND user_id = ?`
-		args = []interface{}{id, userID}
+		q = `UPDATE messages SET deleted_at = ?, content = '' WHERE id = ? AND user_id = ?`
+		args = []interface{}{now, id, userID}
 	}
 	res, err := d.ExecContext(ctx, q, args...)
 	if err != nil {

@@ -25,10 +25,11 @@ func PickColor(seed string) string {
 	if seed == "" {
 		return palette[0]
 	}
-	h := 0
-	for _, r := range seed {
-		h = (h*31 + int(r)) & 0x7fffffff
+	id, err := uuid.Parse(seed)
+	if err != nil {
+		return palette[0]
 	}
+	h := int(id.ID())
 	return palette[h%len(palette)]
 }
 
