@@ -44,9 +44,9 @@ type Message struct {
 	CreatedAt       time.Time    `json:"created_at"`
 	EditedAt        *time.Time   `json:"edited_at,omitempty"`
 	Deleted         bool         `json:"deleted"`
-	AttachmentCount int          `json:"-"`
-	MentionCount    int          `json:"-"`
-	ReactionCount   int          `json:"-"`
+	AttachmentCount int `json:"attachment_count"`
+	MentionCount    int `json:"mention_count"`
+	ReactionCount   int `json:"reaction_count"`
 	Attachments     []Attachment `json:"attachments,omitempty"`
 	Reactions       []Reaction   `json:"reactions,omitempty"`
 	Mentions        []string     `json:"mentions,omitempty"`
