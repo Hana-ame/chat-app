@@ -28,7 +28,7 @@ func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, 
 	defer tx.Rollback()
 
 	id := NewID()
-	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	now := time.Now().UTC().Format(time.RFC3339Nano)
 	_, err = tx.ExecContext(ctx,
 		`INSERT INTO messages (id, chat_id, user_id, content, created_at) VALUES (?,?,?,?,?)`,
 		id, chatID, userID, content, now,
@@ -273,7 +273,7 @@ func (d *DB) UpdateMessage(ctx context.Context, id, userID, content string) (*mo
 	}
 	res, err := d.ExecContext(ctx,
 		`UPDATE messages SET content = ?, edited_at = ? WHERE id = ? AND user_id = ? AND deleted = 0`,
-		content, time.Now().UTC().Format("2006-01-02T15:04:05.000Z"), id, userID,
+		content, time.Now().UTC().Format(time.RFC3339Nano), id, userID,
 	)
 	if err != nil {
 		return nil, err
