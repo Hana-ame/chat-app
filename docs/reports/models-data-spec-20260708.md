@@ -224,8 +224,8 @@ func PickColor(seed string) string {
 | 位置 | 精度 | 格式 |
 |------|------|------|
 | SQL 默认值（migration） | 微秒 | `strftime('%Y-%m-%dT%H:%M:%fZ','now')` |
-| Go `CreateMessage` | 毫秒 | `"2006-01-02T15:04:05.000Z"` |
-| Go `UpdateMessage` | 毫秒 | 同上 |
+| Go `CreateMessage` | 纳秒 | `time.RFC3339Nano` |
+| Go `UpdateMessage` | 纳秒 | `time.RFC3339Nano` |
 | Go `DeleteMessage` | 纳秒 | `time.RFC3339Nano` |
 | Go `AddReaction` | 纳秒 | SQLite default |
 | Go `CreateRefreshToken` | 纳秒 | `time.RFC3339Nano` |
