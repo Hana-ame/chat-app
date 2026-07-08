@@ -40,6 +40,7 @@ type Chat struct {
     OwnerID         string     `json:"owner_id,omitempty"`
     CreatedAt       time.Time  `json:"created_at"`
     LastMessageAt   time.Time  `json:"last_message_at"`
+    LastMessageID   string     `json:"last_message_id"`
     MemberCount     int        `json:"member_count"`
     UnreadCount     int        `json:"unread_count"`
     PinnedMessage   *PinnedContent `json:"pinned_message,omitempty"`
@@ -129,7 +130,7 @@ type RefreshToken struct {
 | MemberCount | `int` | `"member_count"` | 服务端计算 | 子查询 `(SELECT COUNT(*) FROM chat_members WHERE chat_id = c.id)` |
 | UnreadCount | `int` | `"unread_count"` | (Deprecated) 服务端计算 | `COUNT(messages) WHERE deleted_at IS NULL AND (created_at,id) > lastReadID` |
 | PinnedMessage | `*PinnedContent` | `"pinned_message"` | 用户动作 | JSON 对象 `{"content","pinned_at"}`；由 `SetPinnedMessage` 写入 |
-| LastMessageID | `string` | `"last_message_id"` | 服务端查询 | 最后一条消息的 ID |
+| LastMessageID | `string` | `"last_message_id"` | 服务端缓存 | 存储在 `chats` 表中，由发送消息时更新 |
 | LastMessage | `*Message` | `"last_message"` | (Deprecated) 服务端查询 | `fetchMessageRow(chat_id, LIMIT 1)`·无 `attachExtras` |
 
 ### ChatMember
