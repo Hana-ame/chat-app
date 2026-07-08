@@ -94,6 +94,10 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "bad_request", "attachment missing url/filename")
 			return
 		}
+		if !strings.HasPrefix(a.URL, "https://upload.moonchan.xyz/") {
+			writeError(w, http.StatusBadRequest, "bad_request", "attachment url must be on upload.moonchan.xyz")
+			return
+		}
 		if a.MimeType == "" {
 			req.Attachments[i].MimeType = "application/octet-stream"
 		}
