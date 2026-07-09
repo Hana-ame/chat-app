@@ -44,8 +44,8 @@ func (s *Service) IssueAccessToken(userID string) (string, time.Time, error) {
 		},
 	}
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	s.lock()
-	defer s.unlock()
+	// No lock needed: IssueAccessToken is stateless (all inputs/receiver are read-only).
+	// The empty lock/unlock stubs were removed; kept as comment for context.
 	signed, err := tok.SignedString(s.jwtSecret)
 	if err != nil {
 		return "", time.Time{}, err
@@ -53,8 +53,10 @@ func (s *Service) IssueAccessToken(userID string) (string, time.Time, error) {
 	return signed, exp, nil
 }
 
-func (s *Service) lock()   {}
-func (s *Service) unlock() {}
+// lock/unlock were empty stubs that gave a false sense of concurrency safety.
+// IssueAccessToken is stateless — no lock needed. Removed; kept as comment for context.
+// func (s *Service) lock()   {}
+// func (s *Service) unlock() {}
 
 func (s *Service) ParseAccessToken(tokenStr string) (*AccessClaims, error) {
 	if tokenStr == "" {

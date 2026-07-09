@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -50,7 +51,7 @@ func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, 
 		}
 		if len(attachments[i].Filename) > 200 {
 			ext := filepath.Ext(attachments[i].Filename)
-			attachments[i].Filename = "file" + ext
+			attachments[i].Filename = "file-" + strconv.FormatInt(time.Now().Unix(), 10) + ext
 		}
 	}
 	attJSON, _ := json.Marshal(attachments)

@@ -47,3 +47,16 @@ func clearRefreshCookie(w http.ResponseWriter, r *http.Request) {
         MaxAge:   -1,
     })
 }
+
+func clearAccessTokenCookie(w http.ResponseWriter, r *http.Request) {
+    secure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+    http.SetCookie(w, &http.Cookie{
+        Name:     "access_token",
+        Value:    "",
+        Path:     "/",
+        HttpOnly: true,
+        Secure:   secure,
+        SameSite: http.SameSiteLaxMode,
+        MaxAge:   -1,
+    })
+}

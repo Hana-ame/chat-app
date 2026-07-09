@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimid "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/go-chi/httprate"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
@@ -59,8 +60,10 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 
 	r.Route("/api", func(r chi.Router) {
 		r.Use(chimid.Timeout(30 * time.Second))
-		r.Post("/auth/register", s.Register)
-		r.Post("/auth/login", s.Login)
+		r.Use(httprate.LimitByIP(120, 1*time.Minute))
+
+		r.With(httprate.LimitByIP(10, 1*time.Minute)).Post("/auth/login", s.Login)
+		r.With(httprate.LimitByIP(5, 1*time.Minute)).Post("/auth/register", s.Register)
 		r.Post("/auth/refresh", s.Refresh)
 
 		r.Group(func(r chi.Router) {
@@ -68,7 +71,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 			r.Post("/auth/logout", s.Logout)
 			r.Get("/users/me", s.Me)
 			r.Patch("/users/me", s.UpdateMe)
-			r.Get("/users", s.SearchUsers)
+			r.With(rateLimitByUser(30, 1*time.Minute)).Get("/users", s.SearchUsers)
 
 			r.Get("/chats/my", s.ListChats)
 			r.Get("/chats/public", s.ListPublicChats)
@@ -83,7 +86,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 				r.Delete("/members/{userID}", s.RemoveMember)
 				r.Post("/read", s.MarkRead)
 				r.Get("/messages", s.ListMessages)
-				r.Post("/messages", s.SendMessage)
+				r.With(rateLimitByUser(30, 1*time.Minute)).Post("/messages", s.SendMessage)
 				r.Patch("/messages/{messageID}", s.EditMessage)
 				r.Delete("/messages/{messageID}", s.DeleteMessage)
 				r.Put("/messages/{messageID}/reactions/{emoji}", s.AddReaction)
@@ -129,6 +132,17 @@ func (s *Server) serveUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "public, max-age=2592000")
 	http.ServeFile(w, r, p)
+}
+
+// rateLimitByUser returns an httprate middleware that keys on the authenticated
+// user ID. Falls back to IP for unauthenticated requests.
+func rateLimitByUser(limit int, window time.Duration) func(http.Handler) http.Handler {
+	return httprate.Limit(limit, window, httprate.WithKeyFuncs(func(r *http.Request) (string, error) {
+		if u := userFrom(r.Context()); u != nil {
+			return "user:" + u.ID, nil
+		}
+		return "ip:" + r.RemoteAddr, nil
+	}))
 }
 
 func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) {

@@ -176,6 +176,7 @@ func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	clearRefreshCookie(w, r)
+	clearAccessTokenCookie(w, r)
 	// NOTE: see Refresh for the known Logout-vs-Refresh race.
 	// DeleteUserRefreshTokens does not hold refreshMu, so a concurrent
 	// Refresh's CreateRefreshToken may insert a new token after this deletion.
