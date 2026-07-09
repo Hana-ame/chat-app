@@ -20,17 +20,10 @@ function getDMName(chat, currentUserId) {
 
 export default function ChatListItem({ chat, activeId, onSelectChat, contextMenu, onContextMenu }) {
   const { user, accessToken } = useAuthStore();
-  const { pinChat, unpinChat } = useChatStore();
 
   const name = chat.type === 'dm' ? getDMName(chat, user.id) : chat.name;
   const avatar = chat.type === 'dm' ? (chat.members?.find(m => m.id !== user.id)?.avatar_color || chat.icon_color) : chat.icon_color;
   const unread = chat.unread_count || 0;
-
-  const handlePin = async (e, chatId, pinned) => {
-    e.stopPropagation();
-    try { if (pinned) await unpinChat(accessToken, chatId); else await pinChat(accessToken, chatId); } catch (e) { console.error('Pin chat error:', e); }
-    onContextMenu(null);
-  };
 
   const handleDelete = async (e, chatId) => {
     e.stopPropagation();
@@ -59,9 +52,6 @@ export default function ChatListItem({ chat, activeId, onSelectChat, contextMenu
             onClick={(e) => { e.stopPropagation(); onContextMenu(chat.id); }}>⋮</button>
           {contextMenu === chat.id && (
             <div className="context-menu">
-              {chat.pinned
-                ? <button className="context-menu-item" onClick={(e) => handlePin(e, chat.id, true)}>Unpin</button>
-                : <button className="context-menu-item" onClick={(e) => handlePin(e, chat.id, false)}>Pin</button>}
               {chat.owner_id === user.id && (
                 <button className="context-menu-item danger" onClick={(e) => handleDelete(e, chat.id)}>Delete</button>
               )}

@@ -14,9 +14,8 @@ function timeFormat(t) {
 
 export default function MessageItem({ msg, sameAuthor, chatId }) {
   const { user, accessToken } = useAuthStore();
-  const { pinMessage, unpinMessage, pinnedMessages, chats } = useChatStore();
+  const { pinnedMessage, chats } = useChatStore();
   const isMe = msg.user_id === user.id;
-  const isPinned = pinnedMessages[chatId]?.some(p => p.id === msg.id);
   const [showEmoji, setShowEmoji] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(msg.content);
@@ -120,16 +119,14 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
               ))}
             </div>
           )}
-          {!msg.deleted && (
-             <div className="msg-actions">
-               <button className="msg-btn" onClick={() => setShowEmoji(!showEmoji)} disabled={opPending}>😀</button>
-               <button className="msg-btn" onClick={() => isPinned ? unpinMessage(chatId, msg.id) : pinMessage(chatId, { id: msg.id, content: msg.content, type: 'message' })} disabled={opPending}>
-                 {isPinned ? 'Unpin' : 'Pin'}
-               </button>
-               {isMe && <button className="msg-btn" onClick={() => { setEditing(true); setEditText(msg.content); }} disabled={opPending}>Edit</button>}
-               {isMe && <button className="msg-btn" onClick={handleDelete} disabled={opPending}>Delete</button>}
-             </div>
-          )}
+           {!msg.deleted && (
+              <div className="msg-actions">
+                <button className="msg-btn" onClick={() => setShowEmoji(!showEmoji)} disabled={opPending}>😀</button>
+                {isMe && <button className="msg-btn" onClick={() => { setEditing(true); setEditText(msg.content); }} disabled={opPending}>Edit</button>}
+                {isMe && <button className="msg-btn" onClick={handleDelete} disabled={opPending}>Delete</button>}
+              </div>
+           )}
+
           {showEmoji && (
             <div className="emoji-picker">
               {COMMON_EMOJI.map(e => (

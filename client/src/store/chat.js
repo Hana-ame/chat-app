@@ -6,7 +6,7 @@ export const useChatStore = create((set, get) => ({
   chats: [],
   activeChatId: null,
   messages: [],
-  pinnedMessages: {}, // { chatId: [{ id, content, type }] }
+  pinnedMessage: {}, // { chatId: content }
   onlineUserIds: [],
 
   mode: 'ws',
@@ -184,7 +184,10 @@ export const useChatStore = create((set, get) => ({
         const db = b.last_message_at || b.created_at;
         return new Date(db) - new Date(da);
       });
-      return { chats: n };
+      return { 
+        chats: n,
+        pinnedMessage: { ...s.pinnedMessage, [chat.id]: chat.pinned_message?.content || null }
+      };
     });
   },
 
@@ -306,33 +309,20 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  pinMessage(chatId, pinItem) {
+  async setPinnedMessage(token, chatId, content) {
+    await api.setPinnedMessage(token, chatId, content);
+    set(s => ({
+      pinnedMessage: { ...s.pinnedMessage, [chatId]: content }
+    }));
+  },
+
+  async clearPinnedMessage(token, chatId) {
+    await api.clearPinnedMessage(token, chatId);
     set(s => {
-      const pinned = s.pinnedMessages[chatId] || [];
-      if (pinned.find(p => p.id === pinItem.id)) return { pinnedMessages: s.pinnedMessages };
-      return {
-        pinnedMessages: { ...s.pinnedMessages, [chatId]: [...pinned, pinItem] }
-      };
+      const next = { ...s.pinnedMessage };
+      delete next[chatId];
+      return { pinnedMessage: next };
     });
-  },
-
-  unpinMessage(chatId, pinId) {
-    set(s => {
-      const pinned = s.pinnedMessages[chatId] || [];
-      return {
-        pinnedMessages: { ...s.pinnedMessages, [chatId]: pinned.filter(p => p.id !== pinId) }
-      };
-    });
-  },
-
-  async pinChat(token, chatId) {
-    await api.pinChat(token, chatId);
-    set(s => ({ chats: s.chats.map(c => c.id === chatId ? { ...c, pinned: true } : c) }));
-  },
-
-  async unpinChat(token, chatId) {
-    await api.unpinChat(token, chatId);
-    set(s => ({ chats: s.chats.map(c => c.id === chatId ? { ...c, pinned: false } : c) }));
   },
 
   disconnect() {

@@ -51,6 +51,9 @@ async function request(method, path, token, body) {
     }
     window.dispatchEvent(new CustomEvent('auth:unauthorized'));
   }
+  if (res.status === 429) {
+    throw { status: 429, error: 'too_many_requests', message: 'Too many requests, please try again later' };
+  }
   if (!res.ok) throw { status: res.status, ...data };
   return data;
 }
@@ -81,8 +84,8 @@ export const api = {
   createDM: (token, userId) =>
     request('POST', '/api/dms', token, { user_id: userId }),
   joinChat: (token, chatId) => request('POST', '/api/chats/' + chatId + '/join', token),
-  pinChat: (token, chatId) => request('POST', '/api/chats/' + chatId + '/pin', token),
-  unpinChat: (token, chatId) => request('POST', '/api/chats/' + chatId + '/unpin', token),
+  setPinnedMessage: (token, chatId, content) => request('POST', '/api/chats/' + chatId + '/pin', token, { content }),
+  clearPinnedMessage: (token, chatId) => request('DELETE', '/api/chats/' + chatId + '/pin', token),
 
   // ── Members ──
   addMember: (token, chatId, userId) =>
