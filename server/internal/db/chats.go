@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/Hana-ame/chat-app/server/internal/models"
-	"github.com/Hana-ame/chat-app/server/internal/sanitize"
 )
 
 // ── Refresh Tokens ───────────────────────────────────────────────────
@@ -79,7 +78,7 @@ func (d *DB) CreateChat(ctx context.Context, typ, name, visibility, ownerID stri
 	if typ != "dm" && typ != "group" {
 		return nil, errors.New("invalid chat type")
 	}
-	name = sanitize.StripHTML(strings.TrimSpace(name))
+	name = strings.TrimSpace(name)
 	if typ == "group" && name == "" {
 		return nil, errors.New("group chat requires name")
 	}
@@ -405,7 +404,7 @@ func (d *DB) DeleteChat(ctx context.Context, chatID string) error {
 }
 
 func (d *DB) RenameChat(ctx context.Context, chatID, name string) error {
-	name = sanitize.StripHTML(strings.TrimSpace(name))
+	name = strings.TrimSpace(name)
 	if name == "" {
 		return errors.New("name required")
 	}

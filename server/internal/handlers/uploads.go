@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Hana-ame/chat-app/server/internal/sanitize"
 )
 
 var allowedMime = map[string]bool{
@@ -31,7 +30,6 @@ func randomKey(n int) string {
 func sanitizeFilename(name string) string {
 	name = filepath.Base(name)
 	name = strings.ReplaceAll(name, "..", "_")
-	name = sanitize.StripHTML(name)
 	if len(name) > 200 {
 		name = name[len(name)-200:]
 	}

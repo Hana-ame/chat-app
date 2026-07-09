@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Hana-ame/chat-app/server/internal/sanitize"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -123,9 +122,5 @@ func NormalizeEmail(email string) string {
 
 func ValidateUsername(username string) (string, error) {
 	username = strings.TrimSpace(username)
-	username = sanitize.StripHTML(username)
-	if username == "" {
-		return "", errors.New("username required")
-	}
 	return username, nil
 }
