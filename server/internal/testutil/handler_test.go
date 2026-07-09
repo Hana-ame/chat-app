@@ -1,9 +1,11 @@
 package testutil_test
 
 import (
+	"bufio"
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -765,6 +767,479 @@ func TestSearchUsersExcludesSelf(t *testing.T) {
 		if u["id"] == s.UserID {
 			t.Fatal("search returned self")
 		}
+	}
+}
+
+func TestEditMessageNonAuthor(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "edita@e.t", "AliceE", "password123")
+	bob := f.Register(t, "editb@e.t", "BobE", "password123")
+
+	var chatID, msgID string
+	{
+		res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+			"type": "group", "name": "EditTest", "member_ids": []string{bob.UserID},
+		})
+		var c map[string]any
+		json.NewDecoder(res.Body).Decode(&c)
+		res.Body.Close()
+		chatID = c["id"].(string)
+	}
+	{
+		res := f.Do(t, "POST", "/api/chats/"+chatID+"/messages", alice.AccessToken, map[string]string{
+			"content": "alice message",
+		})
+		var m map[string]any
+		json.NewDecoder(res.Body).Decode(&m)
+		res.Body.Close()
+		msgID = m["id"].(string)
+	}
+
+	t.Run("non-author cannot edit", func(t *testing.T) {
+		res := f.Do(t, "PATCH", "/api/chats/"+chatID+"/messages/"+msgID, bob.AccessToken, map[string]string{
+			"content": "bob edit",
+		})
+		defer res.Body.Close()
+		if res.StatusCode != 404 {
+			t.Fatalf("non-author edit: want 404 got %d", res.StatusCode)
+		}
+	})
+
+	t.Run("message not found", func(t *testing.T) {
+		res := f.Do(t, "PATCH", "/api/chats/"+chatID+"/messages/nonexistent-id", alice.AccessToken, map[string]string{
+			"content": "edited",
+		})
+		defer res.Body.Close()
+		if res.StatusCode != 404 {
+			t.Fatalf("edit nonexistent: want 404 got %d", res.StatusCode)
+		}
+	})
+
+	t.Run("chat mismatch", func(t *testing.T) {
+		res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+			"type": "group", "name": "OtherChat", "member_ids": []string{},
+		})
+		var c2 map[string]any
+		json.NewDecoder(res.Body).Decode(&c2)
+		res.Body.Close()
+		otherChatID := c2["id"].(string)
+		res2 := f.Do(t, "PATCH", "/api/chats/"+otherChatID+"/messages/"+msgID, alice.AccessToken, map[string]string{
+			"content": "wrong chat",
+		})
+		defer res2.Body.Close()
+		if res2.StatusCode != 400 {
+			t.Fatalf("chat mismatch: want 400 got %d", res2.StatusCode)
+		}
+	})
+}
+
+func TestSendMessageWithAttachments(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "att@a.t", "AttAlice", "password123")
+
+	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+		"type": "group", "name": "AttTest", "member_ids": []string{},
+	})
+	var chat struct{ ID string `json:"id"` }
+	json.NewDecoder(res.Body).Decode(&chat)
+	res.Body.Close()
+
+	t.Run("attachment missing url", func(t *testing.T) {
+		res := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", alice.AccessToken, map[string]any{
+			"content": "bad attach",
+			"attachments": []map[string]any{
+				{"filename": "test.txt"},
+			},
+		})
+		defer res.Body.Close()
+		if res.StatusCode != 400 {
+			t.Fatalf("missing url: want 400 got %d", res.StatusCode)
+		}
+	})
+
+	t.Run("attachment missing filename", func(t *testing.T) {
+		res := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", alice.AccessToken, map[string]any{
+			"content": "bad attach",
+			"attachments": []map[string]any{
+				{"url": "https://upload.moonchan.xyz/file.png"},
+			},
+		})
+		defer res.Body.Close()
+		if res.StatusCode != 400 {
+			t.Fatalf("missing filename: want 400 got %d", res.StatusCode)
+		}
+	})
+
+	t.Run("attachment invalid url prefix", func(t *testing.T) {
+		res := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", alice.AccessToken, map[string]any{
+			"content": "bad attach",
+			"attachments": []map[string]any{
+				{"url": "https://evil.com/virus.exe", "filename": "virus.exe"},
+			},
+		})
+		defer res.Body.Close()
+		if res.StatusCode != 400 {
+			t.Fatalf("invalid url: want 400 got %d", res.StatusCode)
+		}
+	})
+
+	t.Run("attachment mime auto-filled", func(t *testing.T) {
+		res := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", alice.AccessToken, map[string]any{
+			"content": "with attach",
+			"attachments": []map[string]any{
+				{"url": "https://upload.moonchan.xyz/foo.png", "filename": "foo.png"},
+			},
+		})
+		defer res.Body.Close()
+		if res.StatusCode != 201 {
+			b, _ := io.ReadAll(res.Body)
+			t.Fatalf("send with attach: want 201 got %d body=%s", res.StatusCode, string(b))
+		}
+	})
+}
+
+func TestMessageContentTooLong(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "long@l.t", "LongAlice", "password123")
+
+	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+		"type": "group", "name": "LongTest", "member_ids": []string{},
+	})
+	var chat struct{ ID string `json:"id"` }
+	json.NewDecoder(res.Body).Decode(&chat)
+	res.Body.Close()
+
+	longContent := string(make([]byte, 4001))
+	res2 := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", alice.AccessToken, map[string]string{
+		"content": longContent,
+	})
+	defer res2.Body.Close()
+	if res2.StatusCode != 403 {
+		t.Fatalf("long content: want 403 got %d", res2.StatusCode)
+	}
+	var errResp struct{ Error string `json:"error"` }
+	json.NewDecoder(res2.Body).Decode(&errResp)
+	if errResp.Error != "content_too_long" {
+		t.Fatalf("want error='content_too_long' got '%s'", errResp.Error)
+	}
+}
+
+func TestPinMessage(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "pin@a.t", "PinAlice", "password123")
+	bob := f.Register(t, "pin@b.t", "PinBob", "password123")
+	carol := f.Register(t, "pin@c.t", "PinCarol", "password123")
+
+	var chatID string
+	{
+		res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+			"type": "group", "name": "PinTest", "member_ids": []string{bob.UserID, carol.UserID},
+		})
+		var c map[string]any
+		json.NewDecoder(res.Body).Decode(&c)
+		res.Body.Close()
+		chatID = c["id"].(string)
+	}
+
+	t.Run("owner can pin", func(t *testing.T) {
+		res := f.Do(t, "POST", "/api/chats/"+chatID+"/pin", alice.AccessToken, map[string]string{
+			"content": "pinned message",
+		})
+		defer res.Body.Close()
+		if res.StatusCode != 200 {
+			b, _ := io.ReadAll(res.Body)
+			t.Fatalf("owner pin: want 200 got %d body=%s", res.StatusCode, string(b))
+		}
+	})
+
+	t.Run("non-owner cannot pin", func(t *testing.T) {
+		res := f.Do(t, "POST", "/api/chats/"+chatID+"/pin", bob.AccessToken, map[string]string{
+			"content": "non-owner pin",
+		})
+		defer res.Body.Close()
+		if res.StatusCode != 403 {
+			t.Fatalf("non-owner pin: want 403 got %d", res.StatusCode)
+		}
+	})
+
+	t.Run("not enough members", func(t *testing.T) {
+		res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+			"type": "group", "name": "SmallChat", "member_ids": []string{},
+		})
+		var small struct{ ID string `json:"id"` }
+		json.NewDecoder(res.Body).Decode(&small)
+		res.Body.Close()
+
+		res2 := f.Do(t, "POST", "/api/chats/"+small.ID+"/pin", alice.AccessToken, map[string]string{
+			"content": "should fail",
+		})
+		defer res2.Body.Close()
+		if res2.StatusCode != 400 {
+			t.Fatalf("small group pin: want 400 got %d", res2.StatusCode)
+		}
+	})
+}
+
+func TestDeletePinnedChat(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "delpin@a.t", "DelPinA", "password123")
+	bob := f.Register(t, "delpin@b.t", "DelPinB", "password123")
+	carol := f.Register(t, "delpin@c.t", "DelPinC", "password123")
+
+	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+		"type": "group", "name": "PinDelTest", "member_ids": []string{bob.UserID, carol.UserID},
+	})
+	var c map[string]any
+	json.NewDecoder(res.Body).Decode(&c)
+	res.Body.Close()
+	chatID := c["id"].(string)
+
+	f.Do(t, "POST", "/api/chats/"+chatID+"/pin", alice.AccessToken, map[string]string{
+		"content": "to delete",
+	})
+
+	t.Run("owner can clear pin", func(t *testing.T) {
+		res2 := f.Do(t, "DELETE", "/api/chats/"+chatID+"/pin", alice.AccessToken, nil)
+		defer res2.Body.Close()
+		if res2.StatusCode != 200 {
+			t.Fatalf("owner clear pin: want 200 got %d", res2.StatusCode)
+		}
+	})
+
+	f.Do(t, "POST", "/api/chats/"+chatID+"/pin", alice.AccessToken, map[string]string{
+		"content": "pin again",
+	})
+
+	t.Run("non-member cannot clear pin", func(t *testing.T) {
+		dave := f.Register(t, "delpin@d.t", "DelPinD", "password123")
+		res3 := f.Do(t, "DELETE", "/api/chats/"+chatID+"/pin", dave.AccessToken, nil)
+		defer res3.Body.Close()
+		if res3.StatusCode != 403 {
+			t.Fatalf("non-member clear pin: want 403 got %d", res3.StatusCode)
+		}
+	})
+
+	t.Run("regular member cannot clear pin", func(t *testing.T) {
+		res4 := f.Do(t, "DELETE", "/api/chats/"+chatID+"/pin", bob.AccessToken, nil)
+		defer res4.Body.Close()
+		if res4.StatusCode != 403 {
+			t.Fatalf("member clear pin: want 403 got %d", res4.StatusCode)
+		}
+	})
+}
+
+func TestChatVisibilityAndPublicList(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "vis@a.t", "VisAlice", "password123")
+
+	var publicID, privateID string
+	{
+		res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+			"type": "group", "name": "PublicChat", "visibility": "public", "member_ids": []string{},
+		})
+		var c map[string]any
+		json.NewDecoder(res.Body).Decode(&c)
+		res.Body.Close()
+		publicID = c["id"].(string)
+	}
+	{
+		res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+			"type": "group", "name": "UnlistedChat", "visibility": "unlisted", "member_ids": []string{},
+		})
+		var c map[string]any
+		json.NewDecoder(res.Body).Decode(&c)
+		res.Body.Close()
+		_ = c["id"].(string)
+	}
+	{
+		res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+			"type": "group", "name": "PrivateChat", "visibility": "private", "member_ids": []string{},
+		})
+		var c map[string]any
+		json.NewDecoder(res.Body).Decode(&c)
+		res.Body.Close()
+		privateID = c["id"].(string)
+	}
+
+	publicRes := f.Do(t, "GET", "/api/chats/public", alice.AccessToken, nil)
+	defer publicRes.Body.Close()
+	if publicRes.StatusCode != 200 {
+		t.Fatalf("public list: want 200 got %d", publicRes.StatusCode)
+	}
+	var listResp struct {
+		Chats []struct {
+			ID         string `json:"id"`
+			Name       string `json:"name"`
+			Visibility string `json:"visibility"`
+		} `json:"chats"`
+	}
+	json.NewDecoder(publicRes.Body).Decode(&listResp)
+	foundPublic := false
+	foundPrivate := false
+	for _, ch := range listResp.Chats {
+		if ch.ID == publicID {
+			foundPublic = true
+		}
+		if ch.ID == privateID {
+			foundPrivate = true
+		}
+	}
+	if !foundPublic {
+		t.Fatal("public chat not in public list")
+	}
+	if foundPrivate {
+		t.Fatal("private chat should not be in public list")
+	}
+}
+
+func TestJoinPublicChat(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "join@a.t", "JoinAlice", "password123")
+	bob := f.Register(t, "join@b.t", "JoinBob", "password123")
+
+	var publicChatID string
+	{
+		res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+			"type": "group", "name": "Joinable", "visibility": "public", "member_ids": []string{},
+		})
+		var c map[string]any
+		json.NewDecoder(res.Body).Decode(&c)
+		res.Body.Close()
+		publicChatID = c["id"].(string)
+	}
+
+	t.Run("join public chat", func(t *testing.T) {
+		res := f.Do(t, "POST", "/api/chats/"+publicChatID+"/join", bob.AccessToken, nil)
+		defer res.Body.Close()
+		if res.StatusCode != 200 {
+			b, _ := io.ReadAll(res.Body)
+			t.Fatalf("join public: want 200 got %d body=%s", res.StatusCode, string(b))
+		}
+	})
+
+	t.Run("appears in member list after join", func(t *testing.T) {
+		memRes := f.Do(t, "GET", "/api/chats/"+publicChatID+"/members", bob.AccessToken, nil)
+		defer memRes.Body.Close()
+		if memRes.StatusCode != 200 {
+			t.Fatal("list members after join failed")
+		}
+		var memResp struct {
+			Members []map[string]any `json:"members"`
+		}
+		json.NewDecoder(memRes.Body).Decode(&memResp)
+		found := false
+		for _, m := range memResp.Members {
+			if m["id"] == bob.UserID {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("bob not in member list after join")
+		}
+	})
+}
+
+func TestReactionErrors(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "rxerr@a.t", "RxAlice", "password123")
+	bob := f.Register(t, "rxerr@b.t", "RxBob", "password123")
+
+	var chatID, msgID string
+	{
+		res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+			"type": "group", "name": "RxnErr", "member_ids": []string{bob.UserID},
+		})
+		var c map[string]any
+		json.NewDecoder(res.Body).Decode(&c)
+		res.Body.Close()
+		chatID = c["id"].(string)
+
+		res2 := f.Do(t, "POST", "/api/chats/"+chatID+"/messages", alice.AccessToken, map[string]string{
+			"content": "reaction test",
+		})
+		var m map[string]any
+		json.NewDecoder(res2.Body).Decode(&m)
+		res2.Body.Close()
+		msgID = m["id"].(string)
+	}
+
+	t.Run("reaction on nonexistent message", func(t *testing.T) {
+		res := f.Do(t, "PUT", "/api/chats/"+chatID+"/messages/nonexistent-id/reactions/%F0%9F%91%8D", alice.AccessToken, nil)
+		defer res.Body.Close()
+		if res.StatusCode != 404 {
+			t.Fatalf("reaction on missing msg: want 404 got %d", res.StatusCode)
+		}
+	})
+
+	t.Run("non-member cannot react", func(t *testing.T) {
+		carol := f.Register(t, "rxerr@c.t", "RxCarol", "password123")
+		res := f.Do(t, "PUT", "/api/chats/"+chatID+"/messages/"+msgID+"/reactions/%F0%9F%91%8D", carol.AccessToken, nil)
+		defer res.Body.Close()
+		if res.StatusCode != 403 {
+			t.Fatalf("non-member react: want 403 got %d", res.StatusCode)
+		}
+	})
+
+	t.Run("remove nonexistent reaction", func(t *testing.T) {
+		res := f.Do(t, "DELETE", "/api/chats/"+chatID+"/messages/"+msgID+"/reactions/%E2%9D%A4", alice.AccessToken, nil)
+		defer res.Body.Close()
+		if res.StatusCode != 200 && res.StatusCode != 400 && res.StatusCode != 404 {
+			t.Fatalf("remove nonexistent reaction: unexpected %d", res.StatusCode)
+		}
+	})
+}
+
+func TestSSEConnection(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "sse@t.t", "SSEUser", "password123")
+
+	req, _ := http.NewRequest("GET", f.HTTP.URL+"/api/events?access_token="+alice.AccessToken, nil)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("sse connect: %v", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatalf("sse: want 200 got %d", res.StatusCode)
+	}
+	if ct := res.Header.Get("Content-Type"); ct != "text/event-stream" {
+		t.Fatalf("expected text/event-stream, got %s", ct)
+	}
+
+	scanner := bufio.NewScanner(res.Body)
+	gotReady := false
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "event: ready") {
+			gotReady = true
+			break
+		}
+		if strings.HasPrefix(line, "event: ") {
+			break
+		}
+	}
+	if !gotReady {
+		t.Fatal("did not receive ready event")
+	}
+}
+
+func TestSSEInvalidToken(t *testing.T) {
+	f := testutil.New(t)
+
+	res := f.Do(t, "GET", "/api/events?access_token=invalid-jwt", "", nil)
+	defer res.Body.Close()
+	if res.StatusCode != 401 {
+		t.Fatalf("sse invalid token: want 401 got %d", res.StatusCode)
+	}
+}
+
+func TestSSEMissingToken(t *testing.T) {
+	f := testutil.New(t)
+
+	res := f.Do(t, "GET", "/api/events", "", nil)
+	defer res.Body.Close()
+	if res.StatusCode != 401 {
+		t.Fatalf("sse no token: want 401 got %d", res.StatusCode)
 	}
 }
 

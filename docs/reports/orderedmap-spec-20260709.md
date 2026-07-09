@@ -99,7 +99,7 @@ func (o OrderedMap) Reader() (io.Reader, error)
 
 ## 四、MarshalJSON 行为
 
-```
+```go
 buf.WriteByte('{')
 for i, k := range o.keys:
   if i > 0: buf.WriteByte(',')
