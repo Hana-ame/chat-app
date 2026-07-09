@@ -202,7 +202,7 @@ func TestReactionsFlow(t *testing.T) {
 		t.Fatalf("remove reaction: %d", delRes.StatusCode)
 	}
 
-	listRes := f.Do(t, "GET", "/api/chats/"+chatID+"/messages?limit=5&details=true", alice.AccessToken, nil)
+	listRes := f.Do(t, "GET", "/api/chats/"+chatID+"/messages?limit=5", alice.AccessToken, nil)
 	defer listRes.Body.Close()
 	var listResp struct {
 		Messages []struct {
@@ -554,30 +554,38 @@ func TestDeleteChatOnlyOwner(t *testing.T) {
 
 func TestConcurrentRegister(t *testing.T) {
 	f := testutil.New(t)
-	done := make(chan error, 5)
+	results := make(chan int, 5)
 	for i := 0; i < 5; i++ {
-		go func(n int) {
+		go func() {
 			res := f.Do(t, "POST", "/api/auth/register", "", map[string]string{
 				"email":    "concurrent@t.com",
 				"username": "ConcurrentUser",
 				"password": "testtest123",
 			})
 			res.Body.Close()
-			if res.StatusCode == 409 {
-				done <- nil
-			} else if res.StatusCode == 200 {
-				done <- nil
-			} else {
-				done <- nil
-			}
-		}(i)
+			results <- res.StatusCode
+		}()
 	}
+	ok := 0
+	conflict := 0
+	other := 0
 	for i := 0; i < 5; i++ {
 		select {
-		case <-done:
+		case code := <-results:
+			switch code {
+			case 200:
+				ok++
+			case 409:
+				conflict++
+			default:
+				other++
+			}
 		case <-time.After(5 * time.Second):
 			t.Fatal("timeout waiting for concurrent register")
 		}
+	}
+	if ok != 1 {
+		t.Fatalf("exactly 1 should succeed, got %d (conflict=%d other=%d)", ok, conflict, other)
 	}
 }
 
@@ -1271,5 +1279,327 @@ func TestCreateOrGetDM(t *testing.T) {
 	defer res3.Body.Close()
 	if res3.StatusCode == 201 || res3.StatusCode == 200 {
 		t.Fatal("self dm should fail")
+	}
+}
+
+func TestGetChat_AsMemberAndNonMember(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "gca@t.t", "GCA", "password123")
+	bob := f.Register(t, "gcb@t.t", "GCB", "password123")
+
+	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+		"type": "group", "name": "GetChatTest", "member_ids": []string{},
+	})
+	var chat struct{ ID string `json:"id"` }
+	json.NewDecoder(res.Body).Decode(&chat)
+	res.Body.Close()
+
+	getRes := f.Do(t, "GET", "/api/chats/"+chat.ID, alice.AccessToken, nil)
+	defer getRes.Body.Close()
+	if getRes.StatusCode != 200 {
+		t.Fatalf("member get chat: want 200 got %d", getRes.StatusCode)
+	}
+
+	getRes2 := f.Do(t, "GET", "/api/chats/"+chat.ID, bob.AccessToken, nil)
+	defer getRes2.Body.Close()
+	if getRes2.StatusCode != 403 {
+		t.Fatalf("non-member get chat: want 403 got %d", getRes2.StatusCode)
+	}
+}
+
+func TestGetChat_NotFound(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "gcnf@t.t", "GCNF", "password123")
+	res := f.Do(t, "GET", "/api/chats/nonexistent", alice.AccessToken, nil)
+	defer res.Body.Close()
+	if res.StatusCode != 403 {
+		t.Fatalf("nonexistent chat: want 403 got %d (IsChatMember returns false)", res.StatusCode)
+	}
+}
+
+func TestRenameDelete_DMNotAllowed(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "rddm1@t.t", "RD_DM_A", "password123")
+	bob := f.Register(t, "rddm2@t.t", "RD_DM_B", "password123")
+
+	res := f.Do(t, "POST", "/api/dms", alice.AccessToken, map[string]string{
+		"user_id": bob.UserID,
+	})
+	var dm struct{ ID string `json:"id"` }
+	json.NewDecoder(res.Body).Decode(&dm)
+	res.Body.Close()
+
+	t.Run("rename dm → 400", func(t *testing.T) {
+		res2 := f.Do(t, "PATCH", "/api/chats/"+dm.ID, alice.AccessToken, map[string]string{
+			"name": "new name",
+		})
+		defer res2.Body.Close()
+		if res2.StatusCode != 400 {
+			t.Fatalf("rename dm: want 400 got %d", res2.StatusCode)
+		}
+	})
+
+	t.Run("delete dm → 400", func(t *testing.T) {
+		res2 := f.Do(t, "DELETE", "/api/chats/"+dm.ID, alice.AccessToken, nil)
+		defer res2.Body.Close()
+		if res2.StatusCode != 400 {
+			t.Fatalf("delete dm: want 400 got %d", res2.StatusCode)
+		}
+	})
+}
+
+func TestDeleteMessage_NonAuthor(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "dmn1@t.t", "DelMsgA", "password123")
+	bob := f.Register(t, "dmn2@t.t", "DelMsgB", "password123")
+
+	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+		"type": "group", "name": "DelMsgTest", "member_ids": []string{bob.UserID},
+	})
+	var chat struct{ ID string `json:"id"` }
+	json.NewDecoder(res.Body).Decode(&chat)
+	res.Body.Close()
+
+	msgRes := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", bob.AccessToken, map[string]string{
+		"content": "bob's msg",
+	})
+	var msg struct{ ID string `json:"id"` }
+	json.NewDecoder(msgRes.Body).Decode(&msg)
+	msgRes.Body.Close()
+
+	t.Run("non-owner member cannot delete other's message → 403", func(t *testing.T) {
+		carol := f.Register(t, "dmn3@t.t", "DelMsgC", "password123")
+		res2 := f.Do(t, "POST", "/api/chats/"+chat.ID+"/members", alice.AccessToken, map[string]string{
+			"user_id": carol.UserID,
+		})
+		res2.Body.Close()
+
+		delRes := f.Do(t, "DELETE", "/api/chats/"+chat.ID+"/messages/"+msg.ID, carol.AccessToken, nil)
+		defer delRes.Body.Close()
+		if delRes.StatusCode != 403 {
+			t.Fatalf("non-owner delete others msg: want 403 got %d", delRes.StatusCode)
+		}
+	})
+
+	t.Run("chat mismatch → 400", func(t *testing.T) {
+		res2 := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+			"type": "group", "name": "OtherChat2", "member_ids": []string{},
+		})
+		var otherChat struct{ ID string `json:"id"` }
+		json.NewDecoder(res2.Body).Decode(&otherChat)
+		res2.Body.Close()
+
+		delRes := f.Do(t, "DELETE", "/api/chats/"+otherChat.ID+"/messages/"+msg.ID, alice.AccessToken, nil)
+		defer delRes.Body.Close()
+		if delRes.StatusCode != 400 {
+			t.Fatalf("chat mismatch: want 400 got %d", delRes.StatusCode)
+		}
+	})
+}
+
+func TestListMembers_NonMember(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "lm1@t.t", "ListMemA", "password123")
+	bob := f.Register(t, "lm2@t.t", "ListMemB", "password123")
+
+	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+		"type": "group", "name": "ListMemTest", "member_ids": []string{},
+	})
+	var chat struct{ ID string `json:"id"` }
+	json.NewDecoder(res.Body).Decode(&chat)
+	res.Body.Close()
+
+	memRes := f.Do(t, "GET", "/api/chats/"+chat.ID+"/members", bob.AccessToken, nil)
+	defer memRes.Body.Close()
+	if memRes.StatusCode != 403 {
+		t.Fatalf("non-member list members: want 403 got %d", memRes.StatusCode)
+	}
+}
+
+func TestAddMember_DMAndDuplicate(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "adm1@t.t", "AddMemA", "password123")
+	bob := f.Register(t, "adm2@t.t", "AddMemB", "password123")
+	carol := f.Register(t, "adm3@t.t", "AddMemC", "password123")
+
+	res := f.Do(t, "POST", "/api/dms", alice.AccessToken, map[string]string{
+		"user_id": bob.UserID,
+	})
+	var dm struct{ ID string `json:"id"` }
+	json.NewDecoder(res.Body).Decode(&dm)
+	res.Body.Close()
+
+	t.Run("add member to dm → 400", func(t *testing.T) {
+		res2 := f.Do(t, "POST", "/api/chats/"+dm.ID+"/members", alice.AccessToken, map[string]string{
+			"user_id": carol.UserID,
+		})
+		defer res2.Body.Close()
+		if res2.StatusCode != 400 {
+			t.Fatalf("add to dm: want 400 got %d", res2.StatusCode)
+		}
+	})
+
+	t.Run("add already member → 409", func(t *testing.T) {
+		res3 := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+			"type": "group", "name": "AddDup", "member_ids": []string{bob.UserID},
+		})
+		var c struct{ ID string `json:"id"` }
+		json.NewDecoder(res3.Body).Decode(&c)
+		res3.Body.Close()
+
+		res4 := f.Do(t, "POST", "/api/chats/"+c.ID+"/members", alice.AccessToken, map[string]string{
+			"user_id": bob.UserID,
+		})
+		defer res4.Body.Close()
+		if res4.StatusCode != 409 {
+			t.Fatalf("add already member: want 409 got %d", res4.StatusCode)
+		}
+	})
+
+	t.Run("add nonexistent user → 404", func(t *testing.T) {
+		res5 := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+			"type": "group", "name": "AddNoUser", "member_ids": []string{},
+		})
+		var c2 struct{ ID string `json:"id"` }
+		json.NewDecoder(res5.Body).Decode(&c2)
+		res5.Body.Close()
+
+		res6 := f.Do(t, "POST", "/api/chats/"+c2.ID+"/members", alice.AccessToken, map[string]string{
+			"user_id": "nonexistent-user-id",
+		})
+		defer res6.Body.Close()
+		if res6.StatusCode != 404 {
+			t.Fatalf("add nonexistent user: want 404 got %d", res6.StatusCode)
+		}
+	})
+}
+
+func TestRemoveMember_DMAndOwner(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "rm1@t.t", "RemMemA", "password123")
+	bob := f.Register(t, "rm2@t.t", "RemMemB", "password123")
+	carol := f.Register(t, "rm3@t.t", "RemMemC", "password123")
+
+	res := f.Do(t, "POST", "/api/dms", alice.AccessToken, map[string]string{
+		"user_id": bob.UserID,
+	})
+	var dm struct{ ID string `json:"id"` }
+	json.NewDecoder(res.Body).Decode(&dm)
+	res.Body.Close()
+
+	t.Run("remove from dm → 400", func(t *testing.T) {
+		res2 := f.Do(t, "DELETE", "/api/chats/"+dm.ID+"/members/"+bob.UserID, alice.AccessToken, nil)
+		defer res2.Body.Close()
+		if res2.StatusCode != 400 {
+			t.Fatalf("remove from dm: want 400 got %d", res2.StatusCode)
+		}
+	})
+
+	t.Run("non-admin kick owner → 403", func(t *testing.T) {
+		res3 := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+			"type": "group", "name": "KickOwner", "member_ids": []string{bob.UserID, carol.UserID},
+		})
+		var c struct{ ID string `json:"id"` }
+		json.NewDecoder(res3.Body).Decode(&c)
+		res3.Body.Close()
+
+		res4 := f.Do(t, "DELETE", "/api/chats/"+c.ID+"/members/"+alice.UserID, bob.AccessToken, nil)
+		defer res4.Body.Close()
+		if res4.StatusCode != 403 {
+			t.Fatalf("kick owner: want 403 got %d", res4.StatusCode)
+		}
+	})
+}
+
+func TestSendMessage_BadJSON(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "smbj@t.t", "SmBadJSON", "password123")
+
+	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+		"type": "group", "name": "BadJSON", "member_ids": []string{},
+	})
+	var chat struct{ ID string `json:"id"` }
+	json.NewDecoder(res.Body).Decode(&chat)
+	res.Body.Close()
+
+	req, _ := http.NewRequest("POST", f.HTTP.URL+"/api/chats/"+chat.ID+"/messages", strings.NewReader("not json"))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+alice.AccessToken)
+	res2, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res2.Body.Close()
+	if res2.StatusCode != 400 {
+		t.Fatalf("bad json: want 400 got %d", res2.StatusCode)
+	}
+}
+
+func TestMarkRead_EmptyMessageID(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "mrempty@t.t", "MrEmpty", "password123")
+
+	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+		"type": "group", "name": "MarkReadEmpty", "member_ids": []string{},
+	})
+	var chat struct{ ID string `json:"id"` }
+	json.NewDecoder(res.Body).Decode(&chat)
+	res.Body.Close()
+
+	readRes := f.Do(t, "POST", "/api/chats/"+chat.ID+"/read", alice.AccessToken, map[string]string{
+		"message_id": "",
+	})
+	defer readRes.Body.Close()
+	if readRes.StatusCode != 400 {
+		t.Fatalf("empty message_id: want 400 got %d", readRes.StatusCode)
+	}
+}
+
+func TestUpdateMe_EmptyBody(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "emptyup@t.t", "EmptyUp", "password123")
+
+	req, _ := http.NewRequest("PATCH", f.HTTP.URL+"/api/users/me", strings.NewReader("not json"))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+alice.AccessToken)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 400 {
+		t.Fatalf("bad json: want 400 got %d", res.StatusCode)
+	}
+}
+
+func TestUpload_MissingFile(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "nofile@t.t", "NoFile", "password123")
+
+	res := f.DoMultipart(t, "POST", "/api/uploads", alice.AccessToken, nil, "other", "ignored.txt", []byte("x"), "text/plain")
+	defer res.Body.Close()
+	if res.StatusCode != 400 {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("missing file field: want 400 got %d body=%s", res.StatusCode, string(b))
+	}
+}
+
+func TestSendMessage_EmptyContentNoAttachments(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "emptymsgh@t.t", "EmptyMsgH", "password123")
+
+	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+		"type": "group", "name": "EmptyMsgH", "member_ids": []string{},
+	})
+	var chat struct{ ID string `json:"id"` }
+	json.NewDecoder(res.Body).Decode(&chat)
+	res.Body.Close()
+
+	res2 := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", alice.AccessToken, map[string]string{
+		"content": "",
+	})
+	defer res2.Body.Close()
+	if res2.StatusCode != 400 {
+		t.Fatalf("empty msg no attach: want 400 got %d", res2.StatusCode)
 	}
 }

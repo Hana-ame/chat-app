@@ -28,6 +28,6 @@ if visibility == "private" {
 ## 前端入口
 
 `client/src/components/ChatList.jsx`:
-- **Public 搜索**: 搜索栏切换到 🌐 Public tab，输入关键词搜索
+- **Public 频道搜索**：在搜索框输入后出现按钮 “Search “{term}” in public channels”，点击后调用 `GET /api/chats/public` 并显示匹配的公开频道，可点击加入
 - **ID 加入**: 搜索栏下方的 "Join by chat ID..." 输入框
 - **建群**: "Create Group" 弹窗的三个 radio 选项

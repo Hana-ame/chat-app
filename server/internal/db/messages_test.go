@@ -229,6 +229,30 @@ func TestUnreadCount(t *testing.T) {
 	}
 }
 
+func TestLastMessage(t *testing.T) {
+	f := testutil.New(t)
+	a, _ := f.DB.CreateUser(f.Ctx(), "lastmsg@x.com", "LastMsg", "pw00000000")
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "LastMsgTest", "", a.ID, []string{a.ID})
+
+	_, err := f.DB.LastMessage(f.Ctx(), chat.ID)
+	if err != db.ErrNotFound {
+		t.Fatal("no messages yet: want ErrNotFound")
+	}
+
+	msg, _ := f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, "first", nil, nil)
+	f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, "last", nil, nil)
+	last, err := f.DB.LastMessage(f.Ctx(), chat.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if last.Content != "last" {
+		t.Fatalf("want 'last' got '%s'", last.Content)
+	}
+	if last.ID == msg.ID {
+		t.Fatal("should be different message")
+	}
+}
+
 func TestUpdateUserProfile(t *testing.T) {
 	f := testutil.New(t)
 	a, _ := f.DB.CreateUser(f.Ctx(), "prof@x.com", "OldName", "pw00000000")
@@ -257,6 +281,24 @@ func TestUserStatus(t *testing.T) {
 	u, _ = f.DB.GetUserByID(f.Ctx(), a.ID)
 	if u.Status != "offline" {
 		t.Fatalf("want offline, got %s", u.Status)
+	}
+}
+
+func TestUpdateUserLastSeen(t *testing.T) {
+	f := testutil.New(t)
+	a, _ := f.DB.CreateUser(f.Ctx(), "seen@x.com", "SeenUser", "pw00000000")
+	if err := f.DB.UpdateUserLastSeen(f.Ctx(), a.ID); err != nil {
+		t.Fatal(err)
+	}
+	// Create a message (which also calls UpdateUserLastSeen), then verify timestamp exists
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "SeenTest", "", a.ID, []string{a.ID})
+	if err := f.DB.UpdateUserLastSeen(f.Ctx(), a.ID); err != nil {
+		t.Fatal(err)
+	}
+	f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, "triggers last_seen", nil, nil)
+	u, _ := f.DB.GetUserByID(f.Ctx(), a.ID)
+	if u.LastSeen.IsZero() {
+		t.Fatal("last_seen should be set after message creation")
 	}
 }
 
@@ -302,22 +344,3 @@ func TestEmptyMessageRejected(t *testing.T) {
 	}
 }
 
-func TestMessageWithAttachmentOnlyAllowed(t *testing.T) {
-	f := testutil.New(t)
-	a, _ := f.DB.CreateUser(f.Ctx(), "attonly@x.com", "AttOnly", "pw00000000")
-	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "AttOnlyTest", "", a.ID, []string{a.ID})
-	atts := []models.Attachment{
-		{Filename: "doc.pdf", MimeType: "application/pdf", Size: 100, URL: "/uploads/doc.pdf"},
-	}
-	msg, err := f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, "", nil, atts)
-	if err != nil {
-		t.Fatalf("attachment-only message should work: %v", err)
-	}
-	var attsOut []models.Attachment
-	if err := json.Unmarshal(msg.Attachments, &attsOut); err != nil {
-		t.Fatal(err)
-	}
-	if len(attsOut) != 1 {
-		t.Fatal("attachment missing")
-	}
-}

@@ -68,4 +68,4 @@ createChat: (token, name, memberIds, visibility) =>
 | Handler | `server/internal/handlers/chats.go:45-84` |
 | DB 逻辑 | `server/internal/db/chats.go:76-146` |
 | ID 生成 | `server/internal/db/users.go:17` |
-| 可见性规则 | `docs/visibility.md` |
+| 可见性规则 | `docs/features/visibility.md` |

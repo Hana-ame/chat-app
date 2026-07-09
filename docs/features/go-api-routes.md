@@ -70,7 +70,7 @@
 | 19 | `DELETE` | `/api/chats/{chatID}` | `s.DeleteChat` | `chatID` |
 | 20 | `POST` | `/api/chats/{chatID}/join` | `s.JoinChat` | `chatID` |
 | 21 | `POST` | `/api/chats/{chatID}/pin` | `s.PinChat` | `chatID` |
-| 22 | `POST` | `/api/chats/{chatID}/unpin` | `s.UnpinChat` | `chatID` |
+
 
 ### Members
 

@@ -21,7 +21,7 @@ chats.filter(c => {
 
 ### 2. 公开频道搜索
 
-每次输入变化调用 `searchPublic()`：
+当用户点击搜索按钮时调用 `searchPublic()`：
 
 ```js
 const searchPublic = async (q) => {

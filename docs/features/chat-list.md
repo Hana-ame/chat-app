@@ -4,7 +4,7 @@
 
 `chats` 数组来自 `useChatStore`，通过 WebSocket `ready` 事件或 `loadChats()` 填充。
 
-## 排序规则（`store/chat.js:157-165`）
+## 排序规则（`client/src/store/chat.js:157-165`）
 
 ```js
 const sorted = (chats || []).sort((a, b) => {
@@ -25,7 +25,7 @@ const sorted = (chats || []).sort((a, b) => {
 | 私聊 DM | `'dm'` | 对方 `username` | 对方 `avatar_color` |
 | 群组 Group | `'group'` | `chat.name` | `chat.icon_color` |
 
-判断方式 (`ChatList.jsx:227-228`):
+判断方式 (`ChatListItem.jsx:25-26`):
 
 ```js
 const name = c.type === 'dm' ? getDMName(c, user.id) : c.name;
@@ -34,7 +34,7 @@ const avatar = c.type === 'dm'
   : c.icon_color;
 ```
 
-## 样式决定（`ChatList.jsx:231`）
+## 样式决定（`ChatListItem.jsx:42`）
 
 ```jsx
 className={'chat-item'
