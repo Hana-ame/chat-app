@@ -18,7 +18,10 @@ func (d *DB) syncReactionsColumn(ctx context.Context, messageID string) error {
 	if err != nil {
 		return err
 	}
-	data, _ := json.Marshal(rxs)
+	data, err := json.Marshal(rxs)
+	if err != nil {
+		data = []byte("[]")
+	}
 	_, err = d.ExecContext(ctx,
 		`UPDATE messages SET reactions = ? WHERE id = ?`,
 		string(data), messageID,
@@ -54,8 +57,14 @@ func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, 
 			attachments[i].Filename = "file-" + strconv.FormatInt(time.Now().Unix(), 10) + ext
 		}
 	}
-	attJSON, _ := json.Marshal(attachments)
-	mentJSON, _ := json.Marshal(dedupe(mentions))
+	attJSON, err := json.Marshal(attachments)
+	if err != nil {
+		attJSON = []byte("[]")
+	}
+	mentJSON, err := json.Marshal(dedupe(mentions))
+	if err != nil {
+		mentJSON = []byte("[]")
+	}
 	_, err = tx.ExecContext(ctx,
 		`INSERT INTO messages (id, chat_id, user_id, content, created_at, attachment_count, mention_count, attachments, mentions) VALUES (?,?,?,?,?,?,?,?,?)`,
 		id, chatID, userID, content, now, len(attachments), len(dedupe(mentions)), string(attJSON), string(mentJSON),
@@ -119,13 +128,12 @@ func (d *DB) GetMessage(ctx context.Context, id string) (*models.Message, error)
 	if err != nil {
 		return nil, err
 	}
-	if err := d.attachExtras(ctx, m, ""); err != nil {
-		return nil, err
-	}
 	return m, nil
 }
 
-func (d *DB) fetchMessageRow(ctx context.Context, q, id string) (*models.Message, error) {
+type scanner interface{ Scan(dest ...interface{}) error }
+
+func scanMessage(s scanner) (*models.Message, error) {
 	var (
 		m         models.Message
 		author    models.User
@@ -139,14 +147,11 @@ func (d *DB) fetchMessageRow(ctx context.Context, q, id string) (*models.Message
 		mentCnt   int
 		rxnCnt    int
 	)
-	err := d.QueryRowContext(ctx, q, id).Scan(
+	err := s.Scan(
 		&m.ID, &m.ChatID, &m.UserID, &m.Content, &created, &edited, &deletedAt,
 		&attCnt, &mentCnt, &rxnCnt, &rxnJSON, &attJSON, &mentJSON,
 		&author.ID, &author.Username, &author.AvatarColor, &author.Status,
 	)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -176,17 +181,22 @@ func (d *DB) fetchMessageRow(ctx context.Context, q, id string) (*models.Message
 	return &m, nil
 }
 
-func (d *DB) attachExtras(ctx context.Context, m *models.Message, viewerID string) error {
-	// Attachments loaded from column m.attachments in the main query.
-	if m.MentionCount > 0 {
-		// Mentions loaded from column m.mentions in the main query.
+func (d *DB) fetchMessageRow(ctx context.Context, q, id string) (*models.Message, error) {
+	m, err := scanMessage(d.QueryRowContext(ctx, q, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
 	}
-	// Reactions loaded from column m.reactions in the main query.
-	// me is excluded from the API; clients check user_ids for self.
-	return nil
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
-func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, limit int, details bool) ([]models.Message, error) {
+// Attachments, mentions, and reactions are loaded from JSON columns
+// (m.attachments, m.mentions, m.reactions) in the main SELECT query.
+// The legacy attachExtras hook that fetched them via N+1 subqueries
+// has been removed — all data is now in the row.
+func (d *DB) GetMessages(ctx context.Context, chatID, before string, limit int) ([]models.Message, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
@@ -224,61 +234,14 @@ func (d *DB) GetMessages(ctx context.Context, chatID, viewerID, before string, l
 
 	out := []models.Message{}
 	for rows.Next() {
-		var (
-			m         models.Message
-			author    models.User
-			edited    sql.NullString
-			deletedAt sql.NullString
-			rxnJSON   sql.NullString
-			attJSON   sql.NullString
-			mentJSON  sql.NullString
-			created   string
-			attCnt    int
-			mentCnt   int
-			rxnCnt    int
-		)
-		if err := rows.Scan(
-			&m.ID, &m.ChatID, &m.UserID, &m.Content, &created, &edited, &deletedAt,
-			&attCnt, &mentCnt, &rxnCnt, &rxnJSON, &attJSON, &mentJSON,
-			&author.ID, &author.Username, &author.AvatarColor, &author.Status,
-		); err != nil {
+		m, err := scanMessage(rows)
+		if err != nil {
 			return nil, err
 		}
-		m.CreatedAt = parseTime(created)
-		if edited.Valid && edited.String != "" {
-			t := parseTime(edited.String)
-			m.EditedAt = &t
-		}
-		if deletedAt.Valid && deletedAt.String != "" {
-			t := parseTime(deletedAt.String)
-			m.DeletedAt = &t
-			m.Content = ""
-		}
-		m.AttachmentCount = attCnt
-		m.MentionCount = mentCnt
-		m.ReactionCount = rxnCnt
-		if rxnJSON.Valid && rxnJSON.String != "" {
-			m.Reactions = json.RawMessage(rxnJSON.String)
-		}
-		if attJSON.Valid && attJSON.String != "" {
-			m.Attachments = json.RawMessage(attJSON.String)
-		}
-		if mentJSON.Valid && mentJSON.String != "" {
-			m.Mentions = json.RawMessage(mentJSON.String)
-		}
-		// Deprecated.
-		m.Author = &author
-		out = append(out, m)
+		out = append(out, *m)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
-	}
-	if details {
-		for i := range out {
-			if err := d.attachExtras(ctx, &out[i], viewerID); err != nil {
-				return nil, err
-			}
-		}
 	}
 	// Reverse to chronological ascending order for client
 	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
@@ -300,7 +263,6 @@ func (d *DB) LastMessage(ctx context.Context, chatID string) (*models.Message, e
 	if err != nil {
 		return nil, err
 	}
-	// No attachExtras — chat list only needs content preview and counts.
 	return m, nil
 }
 

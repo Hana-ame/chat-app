@@ -70,8 +70,11 @@ func (d *DB) JoinChatByID(ctx context.Context, chatID, userID string) error {
 func (d *DB) SetPinnedMessage(ctx context.Context, chatID, content string) error {
 	now := time.Now().UTC()
 	pc := models.PinnedContent{Content: content, PinnedAt: now}
-	data, _ := json.Marshal(pc)
-	_, err := d.ExecContext(ctx,
+	data, err := json.Marshal(pc)
+	if err != nil {
+		data = []byte("{}")
+	}
+	_, err = d.ExecContext(ctx,
 		`UPDATE chats SET pinned_message = ?, pinned_updated_at = ? WHERE id = ?`,
 		string(data), now.Format(time.RFC3339Nano), chatID,
 	)

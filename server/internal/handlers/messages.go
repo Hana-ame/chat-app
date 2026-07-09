@@ -57,8 +57,7 @@ func (s *Server) ListMessages(w http.ResponseWriter, r *http.Request) {
 	}
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	before := r.URL.Query().Get("before")
-	details := r.URL.Query().Get("details") == "true"
-	msgs, err := s.DB.GetMessages(r.Context(), id, u.ID, before, limit, details)
+	msgs, err := s.DB.GetMessages(r.Context(), id, before, limit)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
