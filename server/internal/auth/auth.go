@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"fmt"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -124,5 +125,8 @@ func NormalizeEmail(email string) string {
 
 func ValidateUsername(username string) (string, error) {
 	username = strings.TrimSpace(username)
+	if username == "" {
+		return "", fmt.Errorf("username cannot be empty")
+	}
 	return username, nil
 }

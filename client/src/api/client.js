@@ -1,4 +1,14 @@
-import {\n  mockRegister, mockLogin, mockRefresh, mockLogout, mockMe,\n  mockListChats, mockListPublicChats, mockCreateChat, mockGetChat,\n  mockDeleteChat, mockRenameChat, mockCreateDM, mockJoinChat,\n  mockSetPinnedMessage, mockClearPinnedMessage,\n  mockAddMember, mockRemoveMember, mockSearchUsers, mockUpdateProfile,\n  mockListMessages, mockSendMessage, mockEditMessage, mockDeleteMessage,\n  mockMarkRead, mockAddReaction, mockRemoveReaction,\n  mockUpload, mockUploadAvatar,\n  resetMockData,\n} from './mock';
+import {
+  mockRegister, mockLogin, mockRefresh, mockLogout, mockMe,
+  mockListChats, mockListPublicChats, mockCreateChat, mockGetChat,
+  mockDeleteChat, mockRenameChat, mockCreateDM, mockJoinChat,
+  mockSetPinnedMessage, mockClearPinnedMessage,
+  mockAddMember, mockRemoveMember, mockSearchUsers, mockUpdateProfile,
+  mockListMessages, mockSendMessage, mockEditMessage, mockDeleteMessage,
+  mockMarkRead, mockAddReaction, mockRemoveReaction,
+  mockUpload, mockUploadAvatar,
+  resetMockData,
+} from './mock';
 import { createStreamSource } from '../dev/stream-source';
 import { useAuthStore } from '../store/auth';
 
