@@ -56,7 +56,6 @@ func NewHub(database *db.DB) *Hub {
 
 func (h *Hub) register(c *Client) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	set, ok := h.clients[c.userID]
 	if !ok {
 		set = map[*Client]struct{}{}
@@ -64,10 +63,11 @@ func (h *Hub) register(c *Client) {
 	}
 	set[c] = struct{}{}
 	wasOffline := len(set) == 1
+	h.mu.Unlock()
 	if wasOffline && h.db != nil {
 		_ = h.db.UpdateUserStatus(context.Background(), c.userID, "online")
 		_ = h.db.UpdateUserLastSeen(context.Background(), c.userID)
-		go h.broadcastPresence(c.userID, "online")
+		h.broadcastPresence(c.userID, "online")
 	}
 }
 

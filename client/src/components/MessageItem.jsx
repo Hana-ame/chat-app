@@ -1,9 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { renderContent } from './renderContent';
 
 const COMMON_EMOJI = ['👍','❤️','😂','🎉','😢','😡','👀','🔥','✅','❌'];
 
@@ -15,7 +14,7 @@ function timeFormat(t) {
 
 export default function MessageItem({ msg, sameAuthor, chatId }) {
   const { user, accessToken } = useAuthStore();
-  const { pinMessage, unpinMessage, pinnedMessages } = useChatStore();
+  const { pinMessage, unpinMessage, pinnedMessages, chats } = useChatStore();
   const isMe = msg.user_id === user.id;
   const isPinned = pinnedMessages[chatId]?.some(p => p.id === msg.id);
   const [showEmoji, setShowEmoji] = useState(false);
@@ -23,9 +22,18 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
   const [editText, setEditText] = useState(msg.content);
   const [opPending, setOpPending] = useState(false);
 
-  const chatStore = useChatStore();
   const author = msg.author || { username: 'Unknown', avatar_color: '#5865F2', id: msg.user_id };
   const initials = author.username ? author.username[0].toUpperCase() : '?';
+
+  const userMap = useMemo(() => {
+    const chat = chats.find(c => c.id === chatId);
+    if (!chat?.members) return {};
+    const map = {};
+    for (const m of chat.members) {
+      map[m.id] = m.username;
+    }
+    return map;
+  }, [chats, chatId]);
 
   const handleReaction = async (emoji) => {
     const has = msg.reactions?.find(r => r.emoji === emoji && r.me);
@@ -90,27 +98,13 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
             </div>
           ) : (
             <div className="msg-content">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  a: ({ href, children }) =>
-                    <a href={href} target="_blank" rel="noreferrer">{children}</a>,
-                   img: ({ src, alt }) =>
-                     <a href={src} target="_blank" rel="noreferrer">
-                       <img src={src} alt={alt} className="msg-inline-img" loading="lazy" />
-                     </a>,
-                  h1: 'p', h2: 'p', h3: 'p', h4: 'p', h5: 'p', h6: 'p',
-                  blockquote: 'p',
-                  table: ({ children }) => <>{children}</>,
-                  input: () => null,
-                }}
-              >{msg.content}</ReactMarkdown>
+              {renderContent(msg.content, userMap)}
             </div>
           )}
            {msg.attachments?.map(a => (
              <div key={a.id} className="file-attach">
                {a.mime_type?.startsWith('image/')
-                 ? <a href={a.url} target="_blank" rel="noreferrer"><img src={a.url} alt={a.filename} loading="lazy" /></a>
+                 ? <a href={a.url} target="_blank" rel="noreferrer"><img src={a.url} alt={a.filename} loading="lazy" className="file-attach-img" /></a>
                  : <div className="file-pill"><a href={a.url} target="_blank" rel="noreferrer" style={{fontSize:13}}>{a.filename}</a></div>
                }
              </div>

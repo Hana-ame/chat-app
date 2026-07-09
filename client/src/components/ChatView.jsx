@@ -4,8 +4,7 @@ import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 import MessageItem from './MessageItem';
 import Composer from './Composer';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { renderContent } from './renderContent';
 
 function getDMName(chat, currentUserId) {
   if (chat.type !== 'dm') return chat.name;
@@ -79,6 +78,14 @@ export default function ChatView({ chatId, onBack }) {
   const name = chat ? getDMName(chat, user.id) : 'Loading...';
   const memberCount = chat?.members?.length || 0;
   const onlineCount = chat?.members?.filter(m => m.status === 'online')?.length || 0;
+  const userMap = useMemo(() => {
+    if (!chat?.members) return {};
+    const map = {};
+    for (const m of chat.members) {
+      map[m.id] = m.username;
+    }
+    return map;
+  }, [chat?.members]);
 
   const addCustomPin = () => {
     const text = prompt('Enter text to pin:');
@@ -125,12 +132,12 @@ export default function ChatView({ chatId, onBack }) {
            {!pinnedCollapsed && (
              <div style={{padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: 4}}>
                {pinnedMessages[chatId].map(p => (
-                 <div key={p.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8}}>
-                   <div style={{flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                     <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ p: 'span' }}>{p.content}</ReactMarkdown>
-                   </div>
-                   <button className="btn-ghost" style={{fontSize: 11, padding: '2px 6px'}} onClick={() => unpinMessage(chatId, p.id)}>Remove</button>
-                 </div>
+                   <div key={p.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8}}>
+                    <div style={{flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
+                      {renderContent(p.content, userMap)}
+                    </div>
+                    <button className="btn-ghost" style={{fontSize: 11, padding: '2px 6px'}} onClick={() => unpinMessage(chatId, p.id)}>Remove</button>
+                  </div>
                ))}
                <button className="btn-ghost" style={{fontSize: 11, textAlign: 'left', padding: '4px 0', color: 'var(--accent)'}} onClick={addCustomPin}>
                  + Add custom pin

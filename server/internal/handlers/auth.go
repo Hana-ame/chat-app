@@ -152,6 +152,13 @@ func (s *Server) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.refreshMu.Unlock()
+	// NOTE: issueSession creates a new refresh token outside refreshMu.
+	// Race: a concurrent Logout may delete all tokens (DeleteUserRefreshTokens)
+	// before CreateRefreshToken inserts the new one, making the logout incomplete.
+	// This is intentionally accepted — the timing window is tiny and the impact
+	// is a stale cookie that the user's browser already discarded.
+	// If this becomes a problem, move CreateRefreshToken inside refreshMu
+	// and also acquire refreshMu in Logout.
 	s.issueSession(w, r, rt.UserID)
 }
 
@@ -169,6 +176,11 @@ func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	clearRefreshCookie(w, r)
+	// NOTE: see Refresh for the known Logout-vs-Refresh race.
+	// DeleteUserRefreshTokens does not hold refreshMu, so a concurrent
+	// Refresh's CreateRefreshToken may insert a new token after this deletion.
+	// Accepted as low-risk. If it becomes a problem, acquire refreshMu here
+	// and move CreateRefreshToken inside refreshMu in Refresh.
 	_ = s.DB.DeleteUserRefreshTokens(r.Context(), u.ID)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }

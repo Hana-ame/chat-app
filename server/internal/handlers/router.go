@@ -22,6 +22,19 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 	r.Use(chimid.RealIP)
 	r.Use(chimid.RequestID)
 	r.Use(chimid.Recoverer)
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Security-Policy",
+				"default-src 'self'; "+
+					"script-src 'self' 'unsafe-inline'; "+
+					"style-src 'self' 'unsafe-inline'; "+
+					"img-src 'self' https://upload.moonchan.xyz data:; "+
+					"connect-src 'self' wss://wsl-8080.moonchan.xyz https://upload.moonchan.xyz; "+
+					"font-src 'self' data:;")
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			next.ServeHTTP(w, r)
+		})
+	})
 	r.Use(cors.Handler(cors.Options{
 		AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
 		AllowedMethods:   []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
