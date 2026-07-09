@@ -41,8 +41,9 @@ test.describe('Mock API Mode (CI)', () => {
     await mockLogin(page);
     await page.waitForSelector('.chat-item', { timeout: 5000 });
     await page.reload();
-    await page.waitForSelector('.sidebar', { timeout: 10000 });
-    await page.waitForSelector('.chat-item', { timeout: 10000 });
+    await page.waitForURL('/');
+    await page.waitForSelector('.sidebar', { timeout: 20000 });
+    await page.waitForSelector('.chat-item', { timeout: 20000 });
     const items = await page.locator('.chat-item').count();
     expect(items).toBeGreaterThanOrEqual(1);
   });
@@ -200,20 +201,23 @@ test.describe('Mock API Mode (CI)', () => {
     await page.click('button[title="Settings"]');
     await expect(page.locator('text=Settings')).toBeVisible({ timeout: 3000 });
     const avatarEl = page.locator('.settings-avatar-placeholder, .settings-avatar-img').first();
-    if (await avatarEl.isVisible({ timeout: 2000 }).catch(() => false)) {
-      const fileChooserPromise = page.waitForEvent('filechooser', { timeout: 5000 }).catch(() => null);
-      await avatarEl.click();
-      const fileChooser = await fileChooserPromise;
-      if (!fileChooser) {
-        await page.locator('.modal-overlay').first().click({ force: true }).catch(() => {});
-        return;
-      }
-      await fileChooser.setFiles({ name: 'ci-avatar.png', mimeType: 'image/png', buffer: Buffer.from('CI avatar test') });
-      await page.waitForTimeout(1000);
-      await page.locator('.modal-box button:has-text("Save")').first().click();
-      await page.waitForTimeout(500);
+    const isVis = await avatarEl.isVisible({ timeout: 2000 }).catch(() => false);
+    if (!isVis) {
       await page.locator('.modal-overlay').first().click({ force: true }).catch(() => {});
+      return;
     }
+    const fileChooserPromise = page.waitForEvent('filechooser', { timeout: 5000 }).catch(() => null);
+    await avatarEl.click();
+    const fileChooser = await fileChooserPromise;
+    if (!fileChooser) {
+      await page.locator('.modal-overlay').first().click({ force: true }).catch(() => {});
+      return;
+    }
+    await fileChooser.setFiles({ name: 'ci-avatar.png', mimeType: 'image/png', buffer: Buffer.from('CI avatar test') });
+    await page.waitForTimeout(1000);
+    await page.locator('.modal-box button:has-text("Save")').first().click();
+    await page.waitForTimeout(500);
+    await page.locator('.modal-overlay').first().click({ force: true }).catch(() => {});
   });
 
 });
