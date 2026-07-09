@@ -1,1 +1,0 @@
-opencode  --model nvidia/openai/gpt-oss-120b  run "git status to see what is happened. read the diff, write the message in detail. commit all files."
