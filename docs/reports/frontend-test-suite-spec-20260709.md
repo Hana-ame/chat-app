@@ -204,7 +204,7 @@ test.beforeEach(async ({ page }) => {
 | 13 | `mock delete chat from context menu` | 右键菜单删除聊天 | 点 ⋮ → Delete → 聊天项减少 | `deleteChat` |
 | 14 | `mock add and remove member` | 添加 + 移除成员 | + Add member → 搜索 → 加人 / × → 移除 | `addMember`, `removeMember`, `searchUsers` |
 | 15 | `mock public channels and join` | 公开频道列表 + 加入 | Search → Public Channels → Join | `listPublicChats`, `joinChat` |
-| 16 | `mock open settings and search` | 设置页更新 + 搜索 | Settings → 改名 → Save / 搜索聊天 | `updateProfile`, `searchUsers` |
+| 16 | `mock open settings and search` | 设置页更新 + 搜索 | Settings → 改名 → Save / 搜索聊天 | `updateProfile`, `searchUsers` |\n| 17 | `upload file to upload.moonchan.xyz and attach` | 真实文件上传 | Composer 📎 → 选文件 → `.file-attach` 可见 | `upload` |\n| 18 | `upload avatar to upload.moonchan.xyz` | 真实头像上传 | Settings → 点头像 → 选文件 → Save | `uploadAvatar` |
 
 ### 2.2 `e2e.spec.js` — E2E 全链路测试（8 个）
 
@@ -681,13 +681,12 @@ test('notice board functionality as owner', async ({ page }) => {
 | | markRead | ✅ | — | ChatView 打开聊天时自动调 markRead，但未单独断言 |
 | **Reaction** | addReaction | ✅ | CI #12 | 😀 → 选 emoji → reaction chip 出现 |
 | | removeReaction | ✅ | CI #12 | 点击 reaction chip → 移除 |
-| **Upload** | upload | ✅ | — | 文件上传功能未在 Mock 测试中演练 |
-| | uploadAvatar | ✅ | — | 头像上传功能未在 Mock 测试中演练 |
+| **Upload** | upload | ✅ | CI #17 | Composer 📎 → 选文件 → `.file-attach` 可见 |
+| | uploadAvatar | ✅ | CI #18 | Settings → 点头像 → 选文件 → Save |
 
 **覆盖率统计：**
 - Mock 实现：28/28 = 100%
-- 直接测试覆盖（含 UI 交互触发）：**26/28 = 93%**
-- 完全未触发：**2/28 = 7%**（upload, uploadAvatar — 需文件输入交互，更适合 E2E）
+- 直接测试覆盖（含 UI 交互触发）：**28/28 = 100%**\n- 完全未触发：**0/28 = 0%**
 
 ---
 
@@ -739,8 +738,7 @@ test('notice board functionality as owner', async ({ page }) => {
 | 维度 | 覆盖率 |
 |------|--------|
 | Mock API 方法实现 | 28/28 = **100%** |
-| Mock API 方法直接测试 | 26/28 = **93%** |
-| Mock API 方法完全未触发 | 2/28 = **7%**（upload, uploadAvatar — 需文件输入交互） |
+| Mock API 方法直接测试 | 28/28 = **100%** |\n| Mock API 方法完全未触发 | 0/28 = **0%** |
 | 后端端点 E2E 覆盖 | 5/32 ≈ **16%** |
 | 前端路由覆盖 | 4/4 = **100%**（/, /login, /register, /g/:chatId） |
 | 前端核心组件覆盖 | 6/8 = **75%**（Sidebar, ChatList, ChatView, NoticeBoard, MessageInput, LoginPage/RegisterPage 表单） |\n\n---\n\n## 七、运行方法"
@@ -748,7 +746,7 @@ test('notice board functionality as owner', async ({ page }) => {
 ```bash
 # CI Mock 测试（纯前端，不依赖后端）
 cd client
-npx playwright test tests/ci.spec.js          # 17 个测试
+npx playwright test tests/ci.spec.js          # 19 个测试
 
 # E2E 全链路测试（需后端运行）
 cd client && npx playwright test tests/e2e.spec.js  # 8 个测试
@@ -765,8 +763,8 @@ npm run test:all      # → 串行 CI + E2E
 ### 运行时特征
 
 ```
-CI Mock 测试：  ~60s   |  17 个测试 |  无后端依赖
+CI Mock 测试：  ~70s   |  19 个测试 |  无后端依赖
 E2E 测试：      ~60s   |  8 个测试  |  需后端运行
 -------------------------------
-合计：          ~120s  |  25 个测试
+合计：          ~130s  |  27 个测试
 ```

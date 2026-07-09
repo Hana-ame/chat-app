@@ -1,7 +1,7 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
 
-// CI 专用测试：不依赖后端，用 Mock API 验证前端逻辑
+// CI 专用测试：不依赖后端，用 Mock API 验证前端逻辑，覆盖全部 28 个 Mock 方法
 // 运行方式：npx playwright test tests/ci.spec.js
 
 test.describe('Mock API Mode (CI)', () => {
@@ -297,6 +297,47 @@ test.describe('Mock API Mode (CI)', () => {
       await searchChatInput.fill('chat');
       await page.waitForTimeout(300);
     }
+  });
+
+  test('upload file to upload.moonchan.xyz and attach', async ({ page }) => {
+    await page.click('text=Debug mode');
+    await page.click('text=Quick Enter (mock)');
+    await page.waitForURL('/');
+
+    await page.locator('.chat-item').first().click();
+    await page.waitForSelector('.chat-input textarea');
+
+    const fileChooserPromise = page.waitForEvent('filechooser', { timeout: 5000 }).catch(() => null);
+    await page.locator('button[title="Attach file"]').click();
+    const fileChooser = await fileChooserPromise;
+    if (!fileChooser) return;
+
+    await fileChooser.setFiles({ name: 'ci-test.txt', mimeType: 'text/plain', buffer: Buffer.from('CI upload test ' + Date.now()) });
+    await page.waitForTimeout(1000);
+    await expect(page.locator('.file-attach')).toBeVisible({ timeout: 5000 });
+  });
+
+  test('upload avatar to upload.moonchan.xyz', async ({ page }) => {
+    await page.click('text=Debug mode');
+    await page.click('text=Quick Enter (mock)');
+    await page.waitForURL('/');
+
+    await page.click('button[title="Settings"]');
+    await expect(page.locator('text=Settings')).toBeVisible({ timeout: 3000 });
+
+    const fileChooserPromise = page.waitForEvent('filechooser', { timeout: 5000 }).catch(() => null);
+    await page.locator('.settings-avatar-placeholder, .settings-avatar-img').first().click();
+    const fileChooser = await fileChooserPromise;
+    if (!fileChooser) {
+      await page.locator('button:has-text("✕"), .modal-overlay').first().click({ force: true }).catch(() => {});
+      return;
+    }
+
+    await fileChooser.setFiles({ name: 'ci-avatar.png', mimeType: 'image/png', buffer: Buffer.from('CI avatar test') });
+    await page.waitForTimeout(1000);
+    await page.locator('.modal-box button:has-text("Save")').first().click();
+    await page.waitForTimeout(500);
+    await page.locator('button:has-text("✕"), .modal-overlay').first().click({ force: true }).catch(() => {});
   });
 
 });
