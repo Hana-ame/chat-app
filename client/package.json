@@ -7,8 +7,8 @@
     "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "playwright test tests/ci.spec.cjs",
-    "test:full": "playwright test tests/e2e.spec.cjs",
+    "test": "playwright test tests/ci.spec.mjs",
+    "test:full": "playwright test tests/e2e.spec.mjs",
     "test:all": "playwright test"
   },
   "dependencies": {

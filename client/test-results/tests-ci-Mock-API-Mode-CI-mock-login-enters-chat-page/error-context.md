@@ -6,8 +6,8 @@
 
 # Test info
 
-- Name: tests/ci.spec.cjs >> Mock API Mode (CI) >> mock login enters chat page
-- Location: tests/ci.spec.cjs:19:3
+- Name: tests/ci.spec.mjs >> Mock API Mode (CI) >> mock login enters chat page
+- Location: tests/ci.spec.mjs:19:3
 
 # Error details
 

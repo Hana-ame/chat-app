@@ -6,8 +6,8 @@
 
 # Test info
 
-- Name: tests/ci.spec.cjs >> Mock API Mode (CI) >> debug mode toggle shows mock button
-- Location: tests/ci.spec.cjs:14:3
+- Name: tests/ci.spec.mjs >> Mock API Mode (CI) >> debug mode toggle shows mock button
+- Location: tests/ci.spec.mjs:14:3
 
 # Error details
 

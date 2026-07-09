@@ -1,5 +1,5 @@
 // @ts-check
-const { test, expect } = require('@playwright/test');
+import { test, expect } from '@playwright/test';
 
 // CI 专用测试：不依赖后端，用 Mock API 验证前端逻辑，覆盖全部 28 个 Mock 方法
 // 运行方式：npx playwright test tests/ci.spec.js
