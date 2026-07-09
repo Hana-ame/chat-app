@@ -6,6 +6,4 @@ client/dist/
 uploads/*
 !uploads/.gitkeep
 .env
-*.log
-opencode.sh
-.last_upload_url
+*.log\nopencode.sh\n.last_upload_url\nclient/test-results/
