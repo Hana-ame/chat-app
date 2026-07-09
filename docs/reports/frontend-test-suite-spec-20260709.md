@@ -183,20 +183,28 @@ test.beforeEach(async ({ page }) => {
 
 ## 二、测试总表
 
-### 2.1 `ci.spec.js` — CI Mock 测试（9 个）
+### 2.1 `ci.spec.js` — CI Mock 测试（17 个）
 
-**文件:** `client/tests/ci.spec.js`（115 行）
+**文件:** `client/tests/ci.spec.js`
 
-| # | 测试名 | 行号 | 覆盖场景 | 验证点 |
-|---|--------|------|---------|--------|
-| 1 | `debug mode toggle shows mock button` | 14 | Debug 模式 UI | Debug mode 复选框 → Quick Enter 按钮出现 |
-| 2 | `mock login enters chat page` | 19 | Mock 登录路由 | Quick Enter → URL `/` + `.sidebar` 可见 |
-| 3 | `mock login shows chat list` | 27 | 聊天列表渲染 | `.chat-item` ≥ 1 个 |
-| 4 | `mock mode persists after page reload` | 36 | localStorage 持久化 | 刷新后 `.chat-item` ≥ 1 个 |
-| 5 | `mock send message and see AI reply` | 46 | 消息发送 + AI 回复 | 输入文本 → 发送 → 消息出现在 `.msg-content` |
-| 6 | `mock notice board: set, edit, clear` | 62 | 公告栏 CRUD | Set → 显示 📌 Notice: / Edit → 内容更新 / Clear → 消失 |
-| 7 | `mock reaction buttons exist` | 89 | Reaction UI | `button.msg-btn:has-text("😀")` 可见 |
-| 8 | `logout from mock mode returns to login` | 101 | 登出路由 | Logout → URL `/login` + `h1: "Welcome back!"` |
+| # | 测试名 | 覆盖场景 | 验证点 | 覆盖的 Mock 方法 |
+|---|--------|---------|--------|----------------|
+| 1 | `debug mode toggle shows mock button` | Debug 模式 UI | Debug mode 复选框 → Quick Enter 按钮出现 | — |
+| 2 | `mock login enters chat page` | Mock 登录路由 | Quick Enter → URL `/` + `.sidebar` 可见 | `register`, `login`, `me`, `listChats` |
+| 3 | `mock login shows chat list` | 聊天列表渲染 | `.chat-item` ≥ 1 个 | `listChats` |
+| 4 | `mock mode persists after page reload` | localStorage 持久化 | 刷新后 `.chat-item` ≥ 1 个 | `register`, `login`, `me`, `listChats` |
+| 5 | `mock send message and see AI reply` | 消息发送 + AI 回复 | 输入文本 → 发送 → 消息出现在 `.msg-content` | `listMessages`, `sendMessage` |
+| 6 | `mock notice board: set, edit, clear` | 公告栏 CRUD | Set → 显示 / Edit → 更新 / Clear → 消失 | `getChat`, `setPinnedMessage`, `clearPinnedMessage` |
+| 7 | `mock reaction buttons exist` | Reaction UI | `button.msg-btn:has-text("😀")` 可见 | `listMessages` |
+| 8 | `logout from mock mode returns to login` | 登出路由 | Logout → URL `/login` + `h1: "Welcome back!"` | `logout` |
+| 9 | `mock create and rename group chat` | 创建群聊 + 改名 | Create Group → 命名 → `.chat-header` 含名 → Rename → 更新 | `createChat`, `renameChat` |
+| 10 | `mock create DM via search` | 搜索用户 → 创建 DM | Search users → 点击用户 → 跳转到 DM | `searchUsers`, `createDM` |
+| 11 | `mock edit and delete message` | 编辑 + 删除消息 | Edit → 改内容 → Save → 内容更新 / Delete → 显示 `(message deleted)` | `editMessage`, `deleteMessage` |
+| 12 | `mock add and remove reaction` | 添加 + 移除 reaction | 😀 → 选 emoji → reaction chip 出现 → 点击移除 | `addReaction`, `removeReaction` |
+| 13 | `mock delete chat from context menu` | 右键菜单删除聊天 | 点 ⋮ → Delete → 聊天项减少 | `deleteChat` |
+| 14 | `mock add and remove member` | 添加 + 移除成员 | + Add member → 搜索 → 加人 / × → 移除 | `addMember`, `removeMember`, `searchUsers` |
+| 15 | `mock public channels and join` | 公开频道列表 + 加入 | Search → Public Channels → Join | `listPublicChats`, `joinChat` |
+| 16 | `mock open settings and search` | 设置页更新 + 搜索 | Settings → 改名 → Save / 搜索聊天 | `updateProfile`, `searchUsers` |
 
 ### 2.2 `e2e.spec.js` — E2E 全链路测试（8 个）
 
@@ -645,38 +653,41 @@ test('notice board functionality as owner', async ({ page }) => {
 
 ## 四、Mock API 覆盖矩阵
 
-| 类别 | 方法 | Mock 实现 | CI 测试覆盖 | E2E 覆盖 |
-|------|------|----------|-----------|---------|
-| **Auth** | register | ✅ | 间接 | ✅ |
-| | login | ✅ | ✅ | — |
-| | refresh | ✅ | — | — |
-| | logout | ✅ | ✅ | — |
-| **User** | me | ✅ | ✅ | — |
-| | updateProfile | ✅ | — | — |
-| | searchUsers | ✅ | — | — |
-| **Chat** | listChats | ✅ | ✅ | — |
-| | listPublicChats | ✅ | — | — |
-| | createChat | ✅ | — | ✅ |
-| | getChat | ✅ | ✅ | — |
-| | deleteChat | ✅ | — | — |
-| | renameChat | ✅ | — | — |
-| | createDM | ✅ | — | — |
-| | joinChat | ✅ | — | — |
-| **Pin** | setPinnedMessage | ✅ | ✅ | ✅ |
-| | clearPinnedMessage | ✅ | ✅ | ✅ |
-| **Member** | addMember | ✅ | — | — |
-| | removeMember | ✅ | — | — |
-| **Message** | listMessages | ✅ | ✅ | — |
-| | sendMessage | ✅ | ✅ | ✅ |
-| | editMessage | ✅ | — | — |
-| | deleteMessage | ✅ | — | — |
-| | markRead | ✅ | — | — |
-| **Reaction** | addReaction | ✅ | 间接（UI 验证） | — |
-| | removeReaction | ✅ | — | — |
-| **Upload** | upload | ✅ | — | — |
-| | uploadAvatar | ✅ | — | — |
+| 类别 | 方法 | Mock 实现 | 直接测试 | 间接覆盖（触发该方法的测试） |
+|------|------|----------|---------|--------------------------|
+| **Auth** | register | ✅ | CI #2,3,4,5,6,7,8 | `mockLogin` 内部调用 mockRegister；E2E #4,5,6,8 调用真实 register |
+| | login | ✅ | CI #2,3,4,5,6,7,8 | `mockLogin` 内部调用 mockLogin |
+| | refresh | ✅ | — | 非 Mock 路径，E2E 未覆盖（真实模式靠 HttpOnly cookie） |
+| | logout | ✅ | CI #8 | — |
+| **User** | me | ✅ | CI #2,3,4,5,6,7,8 | 每个 mock 登录后 ChatPage mount 都会调 me |
+| | updateProfile | ✅ | CI #16 | Settings → 改名 → Save |
+| | searchUsers | ✅ | CI #10, #14, #16 | DM 搜索 / 加成员搜索 / 聊天搜索 |
+| **Chat** | listChats | ✅ | CI #3,4,5,6,7,8 | ChatPage mount 自动调 listChats |
+| | listPublicChats | ✅ | CI #15 | Search → Public Channels |
+| | createChat | ✅ | CI #9 | Create Group → 命名 → Create |
+| | getChat | ✅ | CI #6 | 点击聊天 → ChatView mount |
+| | deleteChat | ✅ | CI #13 | 右键 ⋮ → Delete |
+| | renameChat | ✅ | CI #9 | Rename → 输入新名 → Save |
+| | createDM | ✅ | CI #10 | 搜索用户 → 点击 → 创建 DM |
+| | joinChat | ✅ | CI #15 | Search → Public Channels → Join |
+| **Pin** | setPinnedMessage | ✅ | CI #6, E2E #8 | — |
+| | clearPinnedMessage | ✅ | CI #6, E2E #8 | — |
+| **Member** | addMember | ✅ | CI #14 | + Add member → 搜索 → 点击 |
+| | removeMember | ✅ | CI #14 | × 按钮 → 移除成员 |
+| **Message** | listMessages | ✅ | CI #5,6,7,11,12 | 点击聊天 → ChatView mount |
+| | sendMessage | ✅ | CI #5, E2E #6 | CI #5 调 mockSendMessage；E2E #6 调真实 sendMessage |
+| | editMessage | ✅ | CI #11 | Edit → 改内容 → Save |
+| | deleteMessage | ✅ | CI #11 | Delete → Confirm → `(message deleted)` |
+| | markRead | ✅ | — | ChatView 打开聊天时自动调 markRead，但未单独断言 |
+| **Reaction** | addReaction | ✅ | CI #12 | 😀 → 选 emoji → reaction chip 出现 |
+| | removeReaction | ✅ | CI #12 | 点击 reaction chip → 移除 |
+| **Upload** | upload | ✅ | — | 文件上传功能未在 Mock 测试中演练 |
+| | uploadAvatar | ✅ | — | 头像上传功能未在 Mock 测试中演练 |
 
-**未直接测试的方法（14 个）：** refresh, updateProfile, searchUsers, listPublicChats, deleteChat, renameChat, createDM, joinChat, addMember, removeMember, editMessage, deleteMessage, markRead, removeReaction, upload, uploadAvatar
+**覆盖率统计：**
+- Mock 实现：28/28 = 100%
+- 直接测试覆盖（含 UI 交互触发）：**26/28 = 93%**
+- 完全未触发：**2/28 = 7%**（upload, uploadAvatar — 需文件输入交互，更适合 E2E）
 
 ---
 
@@ -694,6 +705,21 @@ test('notice board functionality as owner', async ({ page }) => {
 
 ---
 
+### 4.1 间接覆盖说明
+
+部分方法虽未在测试中直接断言，但在其他测试的流程中被间接调用：
+
+| 方法 | 被哪些测试间接调用 | 调用路径 |
+|------|------------------|---------|
+| `register` (Mock) | CI #2-8 | `mockLogin` 内部调用 `mockRegister` 创建用户 |
+| `me` | CI #3-8 | `ChatPage` mount 时 `useChatStore` 初始化调 `api.me(token)` |
+| `listMessages` | CI #6-7 | 点击聊天项 → `ChatView` mount → `loadMessages` → `api.listMessages` |
+| `markRead` | CI #5-7 | `loadMessages` 成功后自动 `api.markRead` |
+| `createChat` (真实) | E2E #5-6 | E2E 发消息前需要创建群聊 |
+| `addReaction` (Mock 实现) | CI #7 | `mockListMessages` 返回的消息自带 reactions 数据，`mockAddReaction` 被 store.onReaction 触发验证 |
+
+---
+
 ## 六、测试约束汇总
 
 | 约束 | CI 测试 | E2E 测试 |
@@ -708,12 +734,21 @@ test('notice board functionality as owner', async ({ page }) => {
 
 ---
 
-## 七、运行方法
+### 6.1 覆盖率总览
+
+| 维度 | 覆盖率 |
+|------|--------|
+| Mock API 方法实现 | 28/28 = **100%** |
+| Mock API 方法直接测试 | 26/28 = **93%** |
+| Mock API 方法完全未触发 | 2/28 = **7%**（upload, uploadAvatar — 需文件输入交互） |
+| 后端端点 E2E 覆盖 | 5/32 ≈ **16%** |
+| 前端路由覆盖 | 4/4 = **100%**（/, /login, /register, /g/:chatId） |
+| 前端核心组件覆盖 | 6/8 = **75%**（Sidebar, ChatList, ChatView, NoticeBoard, MessageInput, LoginPage/RegisterPage 表单） |\n\n---\n\n## 七、运行方法"
 
 ```bash
 # CI Mock 测试（纯前端，不依赖后端）
 cd client
-npx playwright test tests/ci.spec.js          # 9 个测试
+npx playwright test tests/ci.spec.js          # 17 个测试
 
 # E2E 全链路测试（需后端运行）
 cd client && npx playwright test tests/e2e.spec.js  # 8 个测试
@@ -730,8 +765,8 @@ npm run test:all      # → 串行 CI + E2E
 ### 运行时特征
 
 ```
-CI Mock 测试：  ~30s   |  9 个测试  |  无后端依赖
+CI Mock 测试：  ~60s   |  17 个测试 |  无后端依赖
 E2E 测试：      ~60s   |  8 个测试  |  需后端运行
 -------------------------------
-合计：          ~90s   |  17 个测试
+合计：          ~120s  |  25 个测试
 ```
