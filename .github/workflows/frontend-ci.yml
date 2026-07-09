@@ -20,8 +20,11 @@ jobs:
       - run: npm ci
       - run: npx playwright install chromium --with-deps
       - run: npm run build
-      - run: npx vite --port 5173 &
-      - run: npx playwright test tests/ci.spec.mjs --reporter=list
+      - name: Start Vite and run tests
+        run: |
+          npx vite --port 5173 &
+          sleep 3
+          npx playwright test tests/ci.spec.mjs --reporter=list 2>&1
 
   full-e2e:
     needs: mock-test
@@ -40,6 +43,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23'
-      - run: cd server && go mod download && go run ./cmd/server/ &
-      - run: npx vite --port 5173 &
-      - run: npx playwright test tests/e2e.spec.mjs --reporter=list
+      - name: Start servers and run tests
+        run: |
+          cd server && go mod download && go run ./cmd/server/ &
+          cd ../client && npx vite --port 5173 &
+          sleep 3
+          npx playwright test tests/e2e.spec.mjs --reporter=list 2>&1
