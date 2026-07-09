@@ -45,7 +45,7 @@ jobs:
           go-version: '1.23'
       - name: Start servers and run tests
         run: |
-          cd server && go mod download && go run ./cmd/chatd/ &
+          cd server && go mod download && go build -o /tmp/chatd ./cmd/chatd/ && /tmp/chatd &
           cd ../client && npx vite --port 5173 &
-          sleep 3
+          sleep 10
           npx playwright test tests/e2e.spec.mjs --reporter=list 2>&1
