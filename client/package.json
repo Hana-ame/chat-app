@@ -7,7 +7,9 @@
     "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "playwright test"
+    "test": "playwright test tests/ci.spec.js",
+    "test:full": "playwright test tests/e2e.spec.js",
+    "test:all": "playwright test"
   },
   "dependencies": {
     "react": "^19.0.0",
