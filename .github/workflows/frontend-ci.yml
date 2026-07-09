@@ -20,7 +20,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install chromium --with-deps
       - run: npm run build
-      - run: npx playwright test tests/ci.spec.mjs --reporter=line 2>&1 || true
+      - run: npx playwright test tests/ci.spec.mjs --project=chromium --reporter=list 2>&1; echo \"EXIT_CODE=$?\"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -52,4 +52,4 @@ jobs:
           cd ../client
           npx vite --port 5173 &
           sleep 3
-      - run: npx playwright test tests/e2e.spec.mjs --reporter=line 2>&1
+      - run: npx playwright test tests/e2e.spec.mjs --project=chromium --reporter=list 2>&1; echo "EXIT_CODE=$?"
