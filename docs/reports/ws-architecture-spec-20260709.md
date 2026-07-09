@@ -89,6 +89,19 @@
 
 ---
 
+## 四、约束汇总
+
+| 约束 | 说明 |
+|------|------|
+| 传输 | `gorilla/websocket`，WSS |
+| 认证 | `access_token` URL 参数 |
+| 订阅 | 连接时自动订阅用户所有聊天 |
+| 读超时 | 60s 无消息断开 |
+| Ping | 服务端每 50s 发 ping |
+| 背压 | `send` channel buffer=64，满则关闭 |
+| 并发 | `sync.Once` 确保 close 一次，`sync.RWMutex` 保护 subs |
+| 禁用开关 | 环境变量 `WS_ENABLED=false` 可禁用 |
+
 ## 四、广播机制（Hub）
 
 ### 4.1 发送到用户（sendToUser）

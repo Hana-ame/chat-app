@@ -209,3 +209,18 @@ SSE 本身内置 TCP keepalive。如需应用层心跳，可通过 `BroadcastTyp
 : heartbeat
 
 ```
+
+---
+
+## 五、约束汇总
+
+| 约束 | 说明 |
+|------|------|
+| 传输 | SSE over HTTP（`text/event-stream`） |
+| 认证 | 手动验证 JWT，不经过 authMiddleware |
+| 注册 | `Hub.SSERegister` 追加到 `sseClients[userID]` slice |
+| 注销 | `Hub.SSEUnregister` 删除整个 userID 条目 |
+| 发送 | `sseSend` 非阻塞写 channel，channel 满则丢弃 |
+| 就绪 | 连接建立立即发送 `ready` 事件 |
+| 断开 | 客户端断开由 `r.Context().Done()` 检测 |
+| 心跳 | 依赖 TCP keepalive，无应用层心跳 |
