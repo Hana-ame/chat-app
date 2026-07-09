@@ -46,7 +46,15 @@ jobs:
       - name: Start servers and run tests
         shell: bash
         run: |
-          cd ${{ github.workspace }}/server && go mod download && go build -o /tmp/chatd ./cmd/chatd/ && /tmp/chatd &
-          cd ${{ github.workspace }}/client && npx vite --port 5173 &
-          sleep 15
+          cd ${{ github.workspace }}/server
+          go mod download
+          go build -o /tmp/chatd ./cmd/chatd/
+          /tmp/chatd &
+          cd ${{ github.workspace }}/client
+          npx vite --port 5173 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8080/healthz >/dev/null 2>&1 && echo "backend ready" && break
+            sleep 1
+          done
+          echo "starting tests..."
           npx playwright test tests/e2e.spec.mjs --reporter=list 2>&1
