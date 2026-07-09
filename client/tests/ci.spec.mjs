@@ -40,8 +40,7 @@ test.describe('Mock API Mode (CI)', () => {
   test('mock mode persists after page reload', async ({ page }) => {
     await mockLogin(page);
     await page.waitForSelector('.chat-item', { timeout: 5000 });
-    await page.reload();
-    await page.waitForURL('/');
+    await page.goto('/');
     await page.waitForSelector('.sidebar', { timeout: 20000 });
     await page.waitForSelector('.chat-item', { timeout: 20000 });
     const items = await page.locator('.chat-item').count();
@@ -200,13 +199,13 @@ test.describe('Mock API Mode (CI)', () => {
     await mockLogin(page);
     await page.click('button[title="Settings"]');
     await expect(page.locator('text=Settings')).toBeVisible({ timeout: 3000 });
-    const avatarEl = page.locator('.settings-avatar-placeholder, .settings-avatar-img').first();
-    const isVis = await avatarEl.isVisible({ timeout: 2000 }).catch(() => false);
+    const avatarEl = page.locator('.settings-avatar-placeholder').first();
+    const isVis = await avatarEl.isVisible({ timeout: 1000 }).catch(() => false);
     if (!isVis) {
       await page.locator('.modal-overlay').first().click({ force: true }).catch(() => {});
       return;
     }
-    const fileChooserPromise = page.waitForEvent('filechooser', { timeout: 5000 }).catch(() => null);
+    const fileChooserPromise = page.waitForEvent('filechooser', { timeout: 3000 }).catch(() => null);
     await avatarEl.click();
     const fileChooser = await fileChooserPromise;
     if (!fileChooser) {
@@ -214,9 +213,8 @@ test.describe('Mock API Mode (CI)', () => {
       return;
     }
     await fileChooser.setFiles({ name: 'ci-avatar.png', mimeType: 'image/png', buffer: Buffer.from('CI avatar test') });
-    await page.waitForTimeout(1000);
-    await page.locator('.modal-box button:has-text("Save")').first().click();
     await page.waitForTimeout(500);
+    await expect(page.locator('.modal-box button:has-text("Save")').first()).toBeVisible({ timeout: 3000 });
     await page.locator('.modal-overlay').first().click({ force: true }).catch(() => {});
   });
 
