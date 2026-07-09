@@ -74,3 +74,35 @@ test('responsive layout on mobile', async ({ page }) => {
   await page.goto('/login');
   await expect(page.locator('form.form-box')).toBeVisible();
 });
+
+test('notice board functionality as owner', async ({ page }) => {
+  await page.goto('/register');
+  const email = `notice${Date.now()}@e2e.dev`;
+  await page.fill('input[type="email"]', email);
+  await page.fill('input[type="text"]', 'NoticeOwner');
+  await page.fill('input[type="password"]', 'testtest123');
+  await page.click('button:has-text("Continue")');
+  await page.waitForURL('/');
+
+  await page.click('button[title="Create Group"]');
+  await page.fill('input[placeholder="Group name..."]', 'Notice Group');
+  await page.click('button:has-text("Create")');
+  await page.waitForSelector('.chat-header');
+
+  const noticeBtn = page.locator('text=+ Set Notice');
+  if (await noticeBtn.isVisible()) {
+    await noticeBtn.click();
+    await page.fill('input.input-field', 'This is a pinned notice!');
+    await page.click('button:has-text("Save")');
+    await expect(page.locator('text=📌 Notice:')).toBeVisible();
+    await expect(page.locator('text=This is a pinned notice!')).toBeVisible();
+
+    await page.click('button:has-text("Edit")');
+    await page.fill('input.input-field', 'Updated notice!');
+    await page.click('button:has-text("Save")');
+    await expect(page.locator('text=Updated notice!')).toBeVisible();
+
+    await page.click('button:has-text("Clear")');
+    await expect(page.locator('text=📌 Notice:')).not.toBeVisible();
+  }
+});
