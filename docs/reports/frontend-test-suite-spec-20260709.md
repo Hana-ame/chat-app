@@ -746,7 +746,7 @@ test('notice board functionality as owner', async ({ page }) => {
 ```bash
 # CI Mock 测试（纯前端，不依赖后端）
 cd client
-npx playwright test tests/ci.spec.js          # 19 个测试
+npx playwright test tests/ci.spec.js          # 19 个 CI + 8 个 E2E = 27 个总测试
 
 # E2E 全链路测试（需后端运行）
 cd client && npx playwright test tests/e2e.spec.js  # 8 个测试
@@ -763,7 +763,7 @@ npm run test:all      # → 串行 CI + E2E
 ### 运行时特征
 
 ```
-CI Mock 测试：  ~70s   |  19 个测试 |  无后端依赖
+CI Mock 测试：  ~70s   |  19 个 CI + 8 个 E2E = 27 个总测试 |  无后端依赖
 E2E 测试：      ~60s   |  8 个测试  |  需后端运行
 -------------------------------
 合计：          ~130s  |  27 个测试
