@@ -248,3 +248,55 @@ export function mockJoinChat(_token, chatId) {
   }
   return { ok: true };
 }
+
+export function mockRegister(_token, email, username, password) {
+  return {
+    user: { id: 'mock-' + Date.now(), username, email, avatar_color: '#5865F2' },
+    access_token: 'mock-token',
+    expires_in: 3600,
+  };
+}
+
+export function mockLogin(_token, email, password) {
+  return {
+    user: { id: 'mock-' + Date.now(), username: email.split('@')[0], email, avatar_color: '#5865F2' },
+    access_token: 'mock-token',
+    expires_in: 3600,
+  };
+}
+
+export function mockRefresh() {
+  return {
+    user: { id: 'dev-self', username: 'Alice', email: 'alice@test.com', avatar_color: '#5865F2' },
+    access_token: 'mock-token',
+    expires_in: 3600,
+  };
+}
+
+export function mockLogout() {
+  return { ok: true };
+}
+
+export function mockMe() {
+  return { id: 'dev-self', username: 'Alice', email: 'alice@test.com', avatar_color: '#5865F2' };
+}
+
+export function mockListPublicChats() {
+  const d = ensureData();
+  return { chats: d.chats.filter(c => c.visibility === 'public') };
+}
+
+export function mockRenameChat(_token, _id, name) {
+  const d = ensureData();
+  const chat = d.chats.find(c => c.id === _id);
+  if (chat) chat.name = name;
+  return { ok: true };
+}
+
+export function mockUpload(file) {
+  return { id: 'mock-upload-' + Date.now() };
+}
+
+export function mockUploadAvatar(_token, file) {
+  return { url: 'https://upload.moonchan.xyz/mock/avatar.png' };
+}

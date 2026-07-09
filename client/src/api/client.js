@@ -1,4 +1,4 @@
-import {\n  mockListChats, mockListMessages, mockSendMessage, mockGetChat,\n  mockCreateChat, mockDeleteChat, mockCreateDM,\n  mockAddMember, mockRemoveMember, mockSearchUsers, mockUpdateProfile,\n  mockEditMessage, mockDeleteMessage, mockAddReaction, mockRemoveReaction,\n  mockSetPinnedMessage, mockClearPinnedMessage, mockMarkRead, mockJoinChat,\n  resetMockData,\n} from './mock';
+import {\n  mockRegister, mockLogin, mockRefresh, mockLogout, mockMe,\n  mockListChats, mockListPublicChats, mockCreateChat, mockGetChat,\n  mockDeleteChat, mockRenameChat, mockCreateDM, mockJoinChat,\n  mockSetPinnedMessage, mockClearPinnedMessage,\n  mockAddMember, mockRemoveMember, mockSearchUsers, mockUpdateProfile,\n  mockListMessages, mockSendMessage, mockEditMessage, mockDeleteMessage,\n  mockMarkRead, mockAddReaction, mockRemoveReaction,\n  mockUpload, mockUploadAvatar,\n  resetMockData,\n} from './mock';
 import { createStreamSource } from '../dev/stream-source';
 import { useAuthStore } from '../store/auth';
 
@@ -165,25 +165,34 @@ function save(key, fn) { _originals[key] = fn; }
 function swap(key, mock) { api[key] = mock; }
 
 const MOCKABLE = [
-  ['listChats', mockListChats],
-  ['listMessages', mockListMessages],
-  ['sendMessage', mockSendMessage],
-  ['getChat', mockGetChat],
-  ['createChat', mockCreateChat],
-  ['deleteChat', mockDeleteChat],
-  ['createDM', mockCreateDM],
-  ['addMember', mockAddMember],
-  ['removeMember', mockRemoveMember],
-  ['searchUsers', mockSearchUsers],
+  ['register', mockRegister],
+  ['login', mockLogin],
+  ['refresh', mockRefresh],
+  ['logout', mockLogout],
+  ['me', mockMe],
   ['updateProfile', mockUpdateProfile],
-  ['editMessage', mockEditMessage],
-  ['deleteMessage', mockDeleteMessage],
-  ['addReaction', mockAddReaction],
-  ['removeReaction', mockRemoveReaction],
+  ['searchUsers', mockSearchUsers],
+  ['listChats', mockListChats],
+  ['listPublicChats', mockListPublicChats],
+  ['createChat', mockCreateChat],
+  ['getChat', mockGetChat],
+  ['deleteChat', mockDeleteChat],
+  ['renameChat', mockRenameChat],
+  ['createDM', mockCreateDM],
+  ['joinChat', mockJoinChat],
   ['setPinnedMessage', mockSetPinnedMessage],
   ['clearPinnedMessage', mockClearPinnedMessage],
+  ['addMember', mockAddMember],
+  ['removeMember', mockRemoveMember],
+  ['listMessages', mockListMessages],
+  ['sendMessage', mockSendMessage],
+  ['editMessage', mockEditMessage],
+  ['deleteMessage', mockDeleteMessage],
   ['markRead', mockMarkRead],
-  ['joinChat', mockJoinChat],
+  ['addReaction', mockAddReaction],
+  ['removeReaction', mockRemoveReaction],
+  ['upload', mockUpload],
+  ['uploadAvatar', mockUploadAvatar],
 ];
 
 api.enableMock = () => {

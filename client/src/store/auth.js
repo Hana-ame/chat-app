@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
+import { useChatStore } from './chat';
 
 const storage = {
   get: () => { try { return JSON.parse(localStorage.getItem('auth') || '{}'); } catch { return {}; } },
@@ -9,6 +10,9 @@ const storage = {
 
 export const useAuthStore = create((set, get) => {
   const saved = storage.get();
+  if (saved.accessToken === 'mock-token') {
+    api.enableMock();
+  }
   return {
     user: saved.user || null,
     loading: false,
@@ -18,7 +22,7 @@ export const useAuthStore = create((set, get) => {
       set({ loading: true, error: null });
       try {
         const data = await api.register(email, username, password);
-        const payload = { user: data.user || data };
+        const payload = { user: data.user, accessToken: data.access_token };
         storage.set(payload);
         set({ ...payload, loading: false });
       } catch (e) {
@@ -31,7 +35,7 @@ export const useAuthStore = create((set, get) => {
       set({ loading: true, error: null });
       try {
         const data = await api.login(email, password);
-        const payload = { user: data.user || data };
+        const payload = { user: data.user, accessToken: data.access_token };
         storage.set(payload);
         set({ ...payload, loading: false });
       } catch (e) {
@@ -43,7 +47,7 @@ export const useAuthStore = create((set, get) => {
     refreshAuth: async () => {
       try {
         const data = await api.refresh();
-        const payload = { user: data.user };
+        const payload = { user: data.user, accessToken: data.access_token };
         storage.set(payload);
         set(payload);
       } catch {
@@ -76,8 +80,10 @@ export const useAuthStore = create((set, get) => {
 
     mockLogin: () => {
       api.enableMock();
+      useChatStore.getState().setMode('poll');
       const payload = {
         user: { id: 'mock-' + Date.now(), username: 'DebugUser', email: 'debug@test.com', avatar_color: '#5865F2' },
+        accessToken: 'mock-token',
       };
       storage.set(payload);
       set({ ...payload, loading: false, error: null });
