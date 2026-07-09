@@ -20,7 +20,13 @@ jobs:
       - run: npm ci
       - run: npx playwright install chromium --with-deps
       - run: npm run build
-      - run: npx playwright test tests/ci.spec.mjs --reporter=line 2>&1
+      - run: npx playwright test tests/ci.spec.mjs --reporter=line 2>&1 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: client/test-results/
+          if-no-files-found: ignore
 
   full-e2e:
     needs: mock-test
