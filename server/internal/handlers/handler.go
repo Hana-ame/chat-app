@@ -74,6 +74,9 @@ func bearerToken(r *http.Request) string {
 	if strings.HasPrefix(h, "Bearer ") {
 		return strings.TrimSpace(h[7:])
 	}
+	// Deprecated: URL query token leaks via server logs, browser history, and Referer headers.
+	// Frontend should use Authorization header or cookie. This path is kept for backward compatibility
+	// with existing SSE clients and will be removed in a future version.
 	if t := r.URL.Query().Get("access_token"); t != "" {
 		return t
 	}
