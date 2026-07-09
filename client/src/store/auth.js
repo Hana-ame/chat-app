@@ -53,6 +53,7 @@ export const useAuthStore = create((set, get) => {
     },
 
     logout: async () => {
+      api.disableMock();
       try { await api.logout(); } catch (e) { console.error('Logout error:', e); }
       storage.clear();
       set({ user: null });
@@ -74,6 +75,7 @@ export const useAuthStore = create((set, get) => {
     },
 
     mockLogin: () => {
+      api.enableMock();
       const payload = {
         user: { id: 'mock-' + Date.now(), username: 'DebugUser', email: 'debug@test.com', avatar_color: '#5865F2' },
       };

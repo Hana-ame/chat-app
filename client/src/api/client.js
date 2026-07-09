@@ -1,4 +1,4 @@
-import { mockListChats, mockListMessages, mockSendMessage, resetMockData } from './mock';
+import {\n  mockListChats, mockListMessages, mockSendMessage, mockGetChat,\n  mockCreateChat, mockDeleteChat, mockCreateDM,\n  mockAddMember, mockRemoveMember, mockSearchUsers, mockUpdateProfile,\n  mockEditMessage, mockDeleteMessage, mockAddReaction, mockRemoveReaction,\n  mockSetPinnedMessage, mockClearPinnedMessage, mockMarkRead, mockJoinChat,\n  resetMockData,\n} from './mock';
 import { createStreamSource } from '../dev/stream-source';
 import { useAuthStore } from '../store/auth';
 
@@ -159,25 +159,49 @@ api.startStreaming = (source) => {
 };
 
 let _mockEnabled = false;
-const _origListChats = api.listChats;
-const _origListMessages = api.listMessages;
-const _origSendMessage = api.sendMessage;
+const _originals = {};
+
+function save(key, fn) { _originals[key] = fn; }
+function swap(key, mock) { api[key] = mock; }
+
+const MOCKABLE = [
+  ['listChats', mockListChats],
+  ['listMessages', mockListMessages],
+  ['sendMessage', mockSendMessage],
+  ['getChat', mockGetChat],
+  ['createChat', mockCreateChat],
+  ['deleteChat', mockDeleteChat],
+  ['createDM', mockCreateDM],
+  ['addMember', mockAddMember],
+  ['removeMember', mockRemoveMember],
+  ['searchUsers', mockSearchUsers],
+  ['updateProfile', mockUpdateProfile],
+  ['editMessage', mockEditMessage],
+  ['deleteMessage', mockDeleteMessage],
+  ['addReaction', mockAddReaction],
+  ['removeReaction', mockRemoveReaction],
+  ['setPinnedMessage', mockSetPinnedMessage],
+  ['clearPinnedMessage', mockClearPinnedMessage],
+  ['markRead', mockMarkRead],
+  ['joinChat', mockJoinChat],
+];
 
 api.enableMock = () => {
   if (_mockEnabled) return;
   _mockEnabled = true;
   resetMockData();
-  api.listChats = mockListChats;
-  api.listMessages = mockListMessages;
-  api.sendMessage = mockSendMessage;
+  for (const [key, mock] of MOCKABLE) {
+    save(key, api[key]);
+    swap(key, mock);
+  }
 };
 
 api.disableMock = () => {
   if (!_mockEnabled) return;
   _mockEnabled = false;
-  api.listChats = _origListChats;
-  api.listMessages = _origListMessages;
-  api.sendMessage = _origSendMessage;
+  for (const [key] of MOCKABLE) {
+    api[key] = _originals[key];
+  }
 };
 
 api.isMockEnabled = () => _mockEnabled;
