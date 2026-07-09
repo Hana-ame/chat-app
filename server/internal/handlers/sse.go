@@ -15,10 +15,10 @@ import (
 // @Success      200  {string}  string  "text/event-stream"
 // @Router       /api/events [get]
 func (s *Server) SSE(w http.ResponseWriter, r *http.Request) {
+	// Deprecated: URL query token leaks via server logs, browser history, and Referer headers.
+	// Frontend should use Authorization header or cookie for the initial request.
+	// Query string fallback is kept for EventSource API compatibility and will be removed in a future version.
 	tok := bearerToken(r)
-	if tok == "" {
-		tok = r.URL.Query().Get("access_token")
-	}
 	if tok == "" {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "missing token")
 		return
