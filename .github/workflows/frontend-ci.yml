@@ -7,95 +7,43 @@ on:
     branches: [ main ]
 
 jobs:
-  # Step 1: 纯前端 Mock API 测试（不依赖后端，快）
   mock-test:
     runs-on: ubuntu-latest
-
+    defaults:
+      run:
+        working-directory: client
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: 'client/package-lock.json'
+          node-version: '22'
+      - run: npm ci
+      - run: npx playwright install chromium --with-deps
+      - run: npm run build
+      - run: npx playwright test tests/ci.spec.mjs --reporter=line 2>&1
 
-      - name: Install Frontend Dependencies
-        run: npm install
-        working-directory: client
-
-      - name: Install Playwright Browsers
-        run: npx playwright install chromium
-        working-directory: client
-
-      - name: Build Frontend
-        run: npm run build
-        working-directory: client
-
-      - name: Start Vite Dev Server
-        run: |
-          npx vite --host 0.0.0.0 --port 5173 &
-          sleep 2
-        working-directory: client
-
-      - name: Wait for Dev Server
-        run: npx wait-on http://localhost:5173 --timeout 15000
-
-      - name: Run Mock API Tests (No Backend Needed)
-        run: npm test 2>&1
-        working-directory: client
-
-  # Step 2: 全链路 E2E 测试（需要后端）
   full-e2e:
     needs: mock-test
     runs-on: ubuntu-latest
-
+    defaults:
+      run:
+        working-directory: client
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: 'client/package-lock.json'
-
-      - name: Install Frontend Dependencies
-        run: npm install
-        working-directory: client
-
-      - name: Install Playwright Browsers
-        run: npx playwright install chromium
-        working-directory: client
-
-      - name: Build Frontend
-        run: npm run build
-        working-directory: client
-
-      - name: Start Vite Dev Server
-        run: |
-          npx vite --host 0.0.0.0 --port 5173 &
-          sleep 2
-        working-directory: client
-
-      - name: Wait for Dev Server
-        run: npx wait-on http://localhost:5173 --timeout 15000
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
+          node-version: '22'
+      - run: npm ci
+      - run: npx playwright install chromium --with-deps
+      - run: npm run build
+      - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
-
-      - name: Start Backend Server
-        run: |
+          go-version: '1.23'
+      - run: |
+          cd server
           go mod download
-          go run ./server/cmd/server/ &
-        shell: bash
-
-      - name: Wait for Backend
-        run: npx wait-on http://localhost:8080/healthz
-
-      - name: Run Full E2E Tests
-        run: npm run test:full 2>&1
-        working-directory: client
+          go run ./cmd/server/ &
+          cd ../client
+          npx vite --port 5173 &
+          sleep 3
+      - run: npx playwright test tests/e2e.spec.mjs --reporter=line 2>&1
