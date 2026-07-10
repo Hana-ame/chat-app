@@ -1149,15 +1149,29 @@ export default function UserProfileModal({ user: profileUser, onClose }) {
 
 ---
 
-### 6-5: Chat list 排序问题（数据同步修复）
+### 6-5: Chat list 排序问题（数据同步 + 排序 comparator 修复）
 
 **反馈**: 排序有问题，新创建的 chat 和有回复的 chat 交错排列不符合预期。
 
-**根因**: 排序算法 `a.last_message_at || a.created_at` 正确。问题出在数据同步：
-1. `mockCreateChat`/`mockCreateDM` 仅写入 `d.chats`，不通知 Store，新 chat 在下次轮询前不出现
-2. `setChats` 合并时 `...c` 将 Store 中已有的 `last_message_at` 覆盖为 `null`（来自 API 的无消息 chat），排序瞬间失效
+**根因**: 两层问题叠加：
 
-**代码变更** (`client/src/api/mock.js` — 创建后同步):
+**第一层（数据同步）**: `mockCreateChat`/`mockCreateDM` 仅写入 `d.chats`，不通知 Store，新 chat 在下次轮询前不出现；`setChats` 合并时 `...c` 将 Store 中已有的 `last_message_at` 覆盖为 `null`。
+
+**第二层（排序 comparator 不一致）**: 更隐蔽。sort comparator:
+
+```js
+if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+```
+
+新创建的 chat 没有 `pinned` 属性（值为 `undefined`），而数据库里的 chat 有 `pinned: false`。当 comparator 遭遇 `undefined` vs `false`：
+
+- `undefined !== false` → `true`
+- `undefined ? -1 : 1` → `1`（b 在前）
+- `false ? -1 : 1` → `1`（也是 b 在前）
+
+**两边都返回 "对方排前面"**，违反了排序 comparator 的契约（`compare(a,b)` 应与 `-compare(b,a)` 相反）。这导致 sort 的排序行为未定义——具体表现取决于 JS 引擎的实现和数组初始顺序，用户观察到的"在 pin 后面、其他 chat 前面"正是这个 undefined behavior 的外显。
+
+**修复 1 — 数据同步** (`client/src/api/mock.js`):
 
 ```diff
    d.chats.unshift(newChat);
@@ -1171,7 +1185,7 @@ export default function UserProfileModal({ user: profileUser, onClose }) {
    return newDM;
 ```
 
-**代码变更** (`client/src/store/chat.js` — `setChats` 合并保护):
+**修复 2 — `setChats` 合并保护** (`client/src/store/chat.js`):
 
 ```diff
 -      if (!old) return c;
@@ -1185,6 +1199,8 @@ export default function UserProfileModal({ user: profileUser, onClose }) {
 +      const lma = c.last_message_at || old.last_message_at || c.created_at;
 +      return { ...c, last_message_at: lma, last_message: lm, unread_count: old.unread_count || 0 };
 ```
+
+**修复 3 — 统一 `!!` 转换 + 显式 `pinned: false`**: 所有三处 sort（`setChats`/`onChatUpdate`/`onMessageCreate`）的 pinned 比较由 `a.pinned ? -1 : 1` 改为 `!!a.pinned ? -1 : 1`；`mockCreateChat` 新增 `pinned: false` 显式字段。（第 7 轮补充修正）
 
 **验证**: 集成测试模拟完整流程通过 ✅
 
