@@ -1213,6 +1213,87 @@ export default function UserProfileModal({ user: profileUser, onClose }) {
 
 ---
 
-## 前一次会话（历史）
+## 2026-07-10 第 7 轮 — Mock 重写回退 + 排序修复 + 测试数据增强
 
-*（此处记录此前已归档的 CI/CD、审计、验证手册等工作）*
+---
+
+### 背景
+
+Go API 1:1 重写 mock.js 引入大量回归 bug。决定回退到 5f951ba 基线，保留原有 dummy.js + generateDummyData 方案，仅叠加定向修复。
+
+### 修复内容
+
+#### 7-1: Reaction 归属硬编码 `dev-self`
+- **根因**: `mockAddReaction`/`mockRemoveReaction` 硬编码 `user_id: 'dev-self'`，无论当前登录用户是谁
+- **修复**: 改为 `currentUser().id`
+- **文件**: `client/src/api/mock.js:304-338`
+
+#### 7-2: ID 前缀 `mock-xxx-` 与真实后端格式不一致
+- **根因**: 新建 chat/message/reaction 的 ID 使用 `mock-chat-`/`mock-msg-`/`mock-upload-` 前缀
+- **修复**: 改用 `crypto.randomUUID()`
+- **文件**: `client/src/api/mock.js:3-11`
+
+#### 7-3: `mockUpdateProfile` 不同步 chat members
+- **根因**: Settings 改用户名后只有 store 的 `user` 更新，`d.chats` 中 members 仍是旧名
+- **修复**: 遍历所有 chat 更新 `members[mi]` 后逐 chat 调用 `onChatUpdate`
+- **文件**: `client/src/api/mock.js:198-211`
+
+#### 7-4: `mockLogin`/`mockRegister`/`mockMe`/`mockRefresh` 固定返回 `dev-self`
+- **根因**: 多用户查找使用 `userById('dev-self')` 而非 `currentUser()`
+- **修复**: 统一使用 `currentUser()` 读取 localStorage auth
+- **文件**: `client/src/api/mock.js:382-411`
+
+#### 7-5: MemberPanel 点击成员行无反应
+- **根因**: 缺少 profile 弹窗入口
+- **修复**: 成员行 onClick 打开 `UserProfileModal`
+- **文件**: `client/src/components/MemberPanel.jsx:72-73`
+
+#### 7-6: CI 测试 `text=Quick Enter (mock)` 选择器不匹配
+- **根因**: 5f951ba 将按钮文字从 `⚡ Quick Enter (mock)` 改为 `⚡ Quick Enter`
+- **修复**: 测试选择器改为 `text=Quick Enter`
+- **文件**: `client/tests/ci.spec.mjs`, `client/tests/real-time.spec.mjs`
+
+#### 7-7: `mockDeleteChat` 不通知 Store
+- **根因**: 仅从 `d.chats` 中删除，sidebar 不刷新
+- **修复**: 添加 `_store.getState().onChatDelete({ chat_id: id })`
+- **文件**: `client/src/api/mock.js:143-148`
+
+#### 7-8: `mockRenameChat` 不通知 Store
+- **根因**: 仅改 `d.chats` 中 chat.name，sidebar 不刷新
+- **修复**: 添加 `_store.getState().onChatUpdate({ id: _id, name })`
+- **文件**: `client/src/api/mock.js:418-425`
+
+#### 7-9: `mockCreateChat` 缺少 `pinned` 字段导致排序异常
+- **根因**: 新 chat 无 `pinned` 属性（`undefined`），sort comparator `a.pinned ? -1 : 1` 中 `undefined` 与 `false` 比较结果不一致，违反 comparator 契约
+  - `compare(undefined, false)` → 1（false 在前）
+  - `compare(false, undefined)` → 1（undefined 在前）
+  - 两边都说"对方先排"，导致 undefined behavior
+- **修复**:
+  - `store/chat.js` 三处 sort（`setChats`/`onChatUpdate`/`onMessageCreate`）改用 `!!a.pinned`，`undefined` 统一转为 `false`
+  - `mockCreateChat` 显式设置 `pinned: false`
+- **文件**:
+  - `client/src/store/chat.js:173-178`
+  - `client/src/store/chat.js:195-200`
+  - `client/src/store/chat.js:234-235`
+  - `client/src/api/mock.js:133`
+
+#### 7-10: Dummy 数据非确定性导致 CI 不一致
+- **根因**: `expandMessages` 中的 `Math.random()` 每次生成不同数据
+- **修复**: 全部移除 randomness，纯确定性生成；DM 改为 `pinned: false` 使首条 `.chat-item` 为群聊（MemberPanel 测试可用）；首群聊添加 `me: true` 反应数据
+- **文件**: `client/src/dev/dummy.js`
+
+#### 7-11: `mockSendMessage` AI 回复随机触发
+- **根因**: `Math.random() < 0.5` 导致 AI 回复不可预期
+- **修复**: 固定第一条 AI 回复文本，移除 `Math.random()`
+- **文件**: `client/src/api/mock.js:233-281`
+
+#### 7-12: DM 创建测试已废弃
+- **根因**: `button[title="New DM"]` 在 UI 重构（5f951ba）中移除
+- **修复**: `test.skip`
+- **文件**: `client/tests/ci.spec.mjs:97-99`
+
+### 验证
+- CI (Go 后端 + 构建): ✅
+- Frontend CI (mock 测试 27/27 + e2e 8/8): ✅
+
+---
