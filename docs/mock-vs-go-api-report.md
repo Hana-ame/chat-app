@@ -87,6 +87,87 @@
 - `GET /uploads/*` — 废弃
 - `GET /` (静态文件) — Go 有 SPA fallback
 
+## 实现细节与逻辑区别分析
+
+> 本节从内部实现角度，剖析 mock API（内存态 JS）与 Go 真实 API（Postgres + WS hub）的深层逻辑差异。源码：`server/internal/handlers/*.go`、`server/internal/models/models.go`、`client/src/api/mock.js`、`client/src/store/chat.js`。
+
+### 1. 身份与鉴权模型（根本差异）
+
+| 维度 | Go 真实 API | Mock API |
+|------|------------|----------|
+| "当前用户"来源 | `userFrom(r.Context())` —— 从 JWT access token 解析 | `currentUser()` —— 读 `localStorage.auth.user`，**失败则 fallback 到 `userById('dev-self')`（Alice）** |
+| 密码 | `HashPassword` + `VerifyPassword`（bcrypt 类哈希） | **完全忽略密码**，注册/登录只比对 email |
+| Token | 真实 JWT（`IssueAccessToken`）+ httpOnly refresh cookie，DB 存 refresh hash | 返回字符串 `'mock-token-' + id`，无 cookie、无过期校验 |
+| Refresh | 校验 refresh cookie 哈希、过期时间、删旧发新 | 直接拿 localStorage 的 user 发新 token，**任何调用都成功** |
+| 未登录 | 中间件 401 | 静默伪装成 dev-self（等同于"无需登录"） |
+
+**逻辑后果**：mock 模式下"你是谁"由 localStorage 决定，缺失时恒为 Alice；Go 由 token 决定。任何依赖"多用户隔离"的测试在 mock 下失真（如 A 用户看不到 B 的私有 chat —— mock 靠 `c.members` 数组模拟，但 AI 回复、广播都只针对单客户端）。
+
+### 2. 数据持久化与状态表示
+
+- **Go**：单一事实源 = Postgres（`users` / `chats` / `chat_members` / `messages` / `reactions` / `refresh_tokens` 表）。每次写都走 DB，多客户端可见。
+- **Mock**：内存 JS 对象 `data = { users, chats, messages, reactions, chatMembers }`，进程重启即丢（但 `ensureData()` 每次重新 `generateDummyData` 生成 10 chat × 150 消息的假数据）。
+
+**双数据源问题**：Mock 的 chat 成员同时存在于两处——
+1. `c.members`（chat 对象上的数组，`buildChatResponse` 用它算 `member_count`、`isMember`）
+2. `d.chatMembers`（扁平 `{chat_id,user_id,role,joined_at}`，`mockListChats` / `mockAddMember` / `mockRemoveMember` 用它）
+
+二者靠手写同步，易不一致。例如 `mockCreateChat` 只往 `chatMembers` push owner，但 `buildChatResponse` 的 `member_count` 优先取 `c.members.length`（新建时 `c.members` 是 `{id, role}` 数组，长度=成员数，暂时一致；但后续 `mockAddMember` 同时改两处，若某路径漏改就会偏离）。**Go 只有 `chat_members` 一张表，无此风险。**
+
+### 3. 错误模型（对齐较好）
+
+双方错误码字符串基本一致：`already_taken` / `invalid_credentials` / `forbidden` / `not_found` / `bad_request` / `content_too_long` / `user_not_found` / `already_member`。Mock `throw {status,error,message}`，Go `writeError(w,status,code,msg)`，前端应统一映射。✅ 这点做得好。
+
+### 4. 响应字段形状
+
+对照 `models.Chat` / `models.Message`：
+
+- **Chat**：mock `buildChatResponse` 产出的字段（`id,type,name,icon_color,visibility,owner_id,created_at,last_message_at,member_count,unread_count,pinned_message,last_message_id,last_message`）与 Go `Chat` 结构体高度一致，包括已废弃的 `unread_count` / `last_message`。⚠️ 但 mock 的 `unread_count` **恒为 0**（data 从不设置），Go 虽 deprecated 但可能有值；且 mock 的 `member_count` 来自易失的 `c.members` 数组。
+- **Message**：Go `Message` 把 `author` / `attachments` / `reactions` / `mentions` 存为 JSON 列（`author` 已废弃）。Mock 在 `mockListMessages` 里**实时**给每条补 `author`（调用 `userById`）、`reactions.me`（按 `user_ids.includes(cu.id)`）、`deleted` 布尔。形状兼容，但 mock 额外注入 `me` / `deleted` 等前端友好字段。
+
+### 5. 分页 / 游标语义
+
+- Go：`GetMessages(id, before, limit)` —— DB 做基于 `before` 的游标分页，`limit` 默认 50。
+- Mock：`messagesFor` 按 `created_at` 升序后：
+  - 有 `before`：找该消息 index，`slice(start, idx)`；**若 idx<=0（消息不存在或是第一条）直接返回空数组**。
+  - 无 `before`：取最后 `min(limit,100)` 条（cap 100 与 Go 对齐）。
+- ⚠️ 差异：mock 的游标"上一页"边界处理（找不到 before 即空）与 Go 的 DB `< created_at` 语义不同；且 mock 排序依赖 JS `new Date()` 字符串比较，时区/精度不如 DB。
+
+### 6. 副作用：AI 自动回复（最大行为差异）
+
+`mockSendMessage` 在用户发消息后，用 `setTimeout` 注入一条 `user_id:'ai'` 的流式回复（`streaming:true` + `source` 异步 emit）。**Go 完全没有这层逻辑**（真实后端不会自言自语）。这导致：
+- mock 下消息列表 / 未读 / `last_message_at` 会被 AI 消息改动；
+- 流式消息的 `source` 闭包只在内存生效，Go 无对应概念。
+
+### 7. 实时广播语义（单客户端 vs 多客户端）
+
+- **Go**：`s.Hub` WS hub，`BroadcastMessageCreate` 等推给**所有**连上该 chat 的客户端；`BroadcastUserUpdate` **全局**广播（含其他用户的会话）。
+- **Mock**：`mockSendMessage` 等直接调 `_store.getState().onMessageCreate(...)` —— **只更新当前这个浏览器客户端**。
+- `user_update` 尤甚：Go 全局广播，mock 仅遍历"当前用户已加入的 chat"逐个 `onChatUpdate({id,members})`，且只改当前用户自己的 member 对象。其他"用户"在 mock 里根本不存在第二客户端。
+- ❌ `presence_update`：Go 由 WS 连接/断开产生 online/offline；mock 完全没有。
+
+### 8. 缺失 / 不对称的业务校验
+
+| 校验 | Go | Mock |
+|------|----|------|
+| 密码强度 (`weak_password`) | ✅ | ❌ 忽略 |
+| 登录密码比对 | ✅ `VerifyPassword` | ❌ 任意密码 |
+| 附件 URL 必须在 `upload.moonchan.xyz` + url/filename 必填 | ✅ 400 | ❌ 直接透传 blob URL |
+| `MarkRead` 的 membership + `message_id` 必填 | ✅ 403/400 | ❌ 直接 `{ok:true}` |
+| `AddReaction` emoji 空 / ≤32 字 + URL unescape | ❌ Go 不校验（mock 反而更严） | ✅ 校验 |
+| `Register` username 格式 (`ValidateUsername`) | ✅ | ❌ 忽略 |
+
+值得注意：**有一处 mock 比 Go 更严格** —— `AddReaction` 的 emoji 长度 / 空校验，Go 端缺失（潜在不一致，若前端依赖 Go 拒绝超长 emoji 则会失败）。
+
+### 9. 并发 / 竞态
+
+- Go 在 `Refresh` / `Logout` 有文档化的 `refreshMu` 竞态（注释已说明为 low-risk 接受）。
+- Mock 是单线程 JS 事件循环，`ensureData` 内数组操作无锁也安全，但代价是**没有真正的并发语义**，无法验证 Go 的竞态处理。
+
+### 一句话总结
+
+Mock 是"单用户、内存态、无鉴权、带 AI 彩蛋"的**行为近似器**：权限分支（owner/admin/DM/成员）和错误码基本对齐，但**身份来源、密码校验、附件校验、MarkRead 校验、多客户端实时广播、presence** 这几处真实后端的核心逻辑在 mock 中要么被简化、要么缺失。它适合跑 UI / 交互，不适合验证安全边界与多用户一致性。
+
 ## 总结
 
 Go API 与 Mock API 已逐一对照（共 21 个 handler + 9 类实时事件）。**绝大多数权限校验、数据格式、错误码、排序、分页、软删除、reactions JSON cache 逻辑均已对齐**。但检查暴露出以下需关注项：

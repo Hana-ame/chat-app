@@ -7,7 +7,7 @@ test.describe('Mock API Mode (CI)', () => {
     await page.goto('/login');
     await page.waitForSelector('.form-box');
     await page.click('text=Debug mode');
-    await page.click('text=Quick Enter (mock)');
+    await page.click('text=Quick Enter');
     await page.waitForURL('/');
     await page.waitForSelector('.sidebar');
   }
@@ -22,7 +22,7 @@ test.describe('Mock API Mode (CI)', () => {
     await page.goto('/login');
     await page.waitForSelector('.form-box');
     await page.click('text=Debug mode');
-    await expect(page.locator('text=Quick Enter (mock)')).toBeVisible();
+    await expect(page.locator('text=Quick Enter')).toBeVisible();
   });
 
   test('mock login shows sidebar', async ({ page }) => {

@@ -228,8 +228,9 @@ export function mockSendMessage(_token, chatId, content, attachments) {
   d.messages.push(userMsg);
   if (_store) _store.getState().onMessageCreate(userMsg);
 
-  const text = AI_RESPONSES[Math.floor(Math.random() * AI_RESPONSES.length)];
-  const aiId = randid();
+  if (Math.random() < 0.5) {
+    const text = AI_RESPONSES[Math.floor(Math.random() * AI_RESPONSES.length)];
+    const aiId = randid();
   const aiCreatedAt = new Date(Date.now() + 1).toISOString();
 
   const aiStoreMsg = {
@@ -272,10 +273,11 @@ export function mockSendMessage(_token, chatId, content, attachments) {
     streaming: true,
   };
 
-  setTimeout(() => {
-    d.messages.push(aiDataMsg);
-    if (_store) _store.getState().onMessageCreate(aiStoreMsg);
-  }, 500 + Math.random() * 800);
+    setTimeout(() => {
+      d.messages.push(aiDataMsg);
+      if (_store) _store.getState().onMessageCreate(aiStoreMsg);
+    }, 500 + Math.random() * 800);
+  }
 
   return userMsg;
 }
