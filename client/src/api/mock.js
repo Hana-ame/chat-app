@@ -136,6 +136,7 @@ export function mockCreateChat(_token, name, memberIds, visibility) {
     members: [{ id: cu.id, ...userById(cu.id), role: 'owner' }, ...(memberIds || []).map(id => ({ id, ...userById(id), role: 'member' }))],
   };
   d.chats.unshift(newChat);
+  if (_store) _store.getState().onChatUpdate(newChat);
   return newChat;
 }
 
