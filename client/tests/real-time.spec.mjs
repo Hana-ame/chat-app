@@ -72,6 +72,8 @@ test.describe('Real-time Events (WS / SSE / Polling)', () => {
   test('adding reaction updates UI', async ({ page }) => {
     await openFirstChat(page);
     await page.waitForSelector('.msg-content', { timeout: 5000 });
+    const msgContent = page.locator('.msg-content').first();
+    await msgContent.hover();
     const reactionBtn = page.locator('button.msg-btn:has-text("😀")').first();
     await expect(reactionBtn).toBeVisible({ timeout: 5000 });
   });
