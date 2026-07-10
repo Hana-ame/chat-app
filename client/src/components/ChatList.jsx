@@ -218,6 +218,9 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
         </div>
       )}
 
+      {showChatInfo && (
+        <ChatInfoModal chatId={showChatInfo} onClose={() => setShowChatInfo(null)} />
+      )}
       {showSettings && (
         <SettingsModal user={user} onClose={() => setShowSettings(false)} onSave={handleSaveSettings} />
       )}

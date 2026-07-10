@@ -1,9 +1,17 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useChatStore } from '../store/chat';
+import UserProfileModal from './UserProfileModal';
+
+function fmtTime(t) {
+  if (!t) return '-';
+  return new Date(t).toLocaleString();
+}
 
 export default function ChatInfoModal({ chatId, onClose }) {
   const { chats } = useChatStore();
   const chat = chats.find(c => c.id === chatId);
+
+  const [profileUser, setProfileUser] = useState(null);
 
   const { owner, admins, members } = useMemo(() => {
     if (!chat?.members) return { owner: null, admins: [], members: [] };
@@ -28,20 +36,26 @@ export default function ChatInfoModal({ chatId, onClose }) {
           <div>{chat.name || chat.id}</div>
         </div>
 
+        <InfoRow label="Created at" value={fmtTime(chat.created_at)} />
+        <InfoRow label="Last message" value={fmtTime(chat.last_message_at)} />
+
         <Section title={`Owner`}>
-          {owner && <MemberRow member={owner} />}
+          {owner && <MemberRow member={owner} onProfile={setProfileUser} />}
         </Section>
 
         {admins.length > 0 && (
           <Section title={`Admin — ${admins.length}`}>
-            {admins.map(m => <MemberRow key={m.id} member={m} />)}
+            {admins.map(m => <MemberRow key={m.id} member={m} onProfile={setProfileUser} />)}
           </Section>
         )}
 
         <Section title={`Member — ${members.length}`}>
-          {members.map(m => <MemberRow key={m.id} member={m} />)}
+          {members.map(m => <MemberRow key={m.id} member={m} onProfile={setProfileUser} />)}
         </Section>
       </div>
+      {profileUser && (
+        <UserProfileModal user={profileUser} onClose={() => setProfileUser(null)} />
+      )}
     </div>
   );
 }
@@ -57,13 +71,22 @@ function Section({ title, children }) {
   );
 }
 
-function MemberRow({ member }) {
+function MemberRow({ member, onProfile }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', fontSize: 14 }}>
+    <div onClick={() => onProfile?.(member)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', fontSize: 14, cursor: 'pointer' }}>
       <div className="msg-avatar" style={{ width: 26, height: 26, fontSize: 11, background: member.avatar_color || '#5865F2' }}>
         {member.username ? member.username[0].toUpperCase() : '?'}
       </div>
       <span>{member.username}</span>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }) {
+  return (
+    <div style={{ fontSize: 13, marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+      <span style={{ color: 'var(--text-muted)' }}>{label}</span>
+      <span>{value}</span>
     </div>
   );
 }

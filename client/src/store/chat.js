@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
 import { __setStoreRef } from '../api/mock';
+import { useAuthStore } from './auth';
 
 export const useChatStore = create((set, get) => ({
   chats: [],
@@ -159,11 +160,15 @@ export const useChatStore = create((set, get) => ({
   setChats(chats) {
     set(s => {
       const existing = new Map(s.chats.map(c => [c.id, c]));
-    const merged = (chats || []).map(c => {
+      const merged = (chats || []).map(c => {
       const old = existing.get(c.id);
-      if (!old) return c;
+      if (!old) {
+        const lma = c.last_message_at || c.created_at;
+        return { ...c, last_message_at: lma };
+      }
       const lm = (c.last_message?.content?.trim() ? c.last_message : null) || (old.last_message?.content?.trim() ? old.last_message : null);
-      return { ...c, last_message: lm, unread_count: old.unread_count || 0 };
+      const lma = c.last_message_at || old.last_message_at || c.created_at;
+      return { ...c, last_message_at: lma, last_message: lm, unread_count: old.unread_count || 0 };
     });
       const sorted = merged.sort((a, b) => {
         if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
@@ -225,7 +230,7 @@ export const useChatStore = create((set, get) => ({
         messages: s.activeChatId === msg.chat_id ? [...s.messages, msg] : s.messages,
         chats: s.chats.map(c => c.id === msg.chat_id ? { ...c, last_message: msg, last_message_at: msg.created_at, unread_count: s.activeChatId === msg.chat_id ? 0 : (c.unread_count || 0) + 1 } : c).sort((a,b) => {
           if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-          return new Date(b.last_message_at||b.created_at) - new Date(a.last_message_at||a.created_at);
+          return new Date(b.last_message_at || b.created_at) - new Date(a.last_message_at || a.created_at);
         }),
       };
     });
@@ -257,6 +262,7 @@ export const useChatStore = create((set, get) => ({
   },
 
   onReaction(payload, added) {
+    const myId = useAuthStore.getState().user?.id;
     set(s => ({ messages: s.messages.map(m => {
       if (m.id !== payload.message_id) return m;
       const rxs = m.reactions || [];
@@ -267,10 +273,10 @@ export const useChatStore = create((set, get) => ({
           if (existing.user_ids?.includes(payload.user_id)) return m;
           return {
             ...m,
-            reactions: rxs.map((r, i) => i === idx ? { ...r, count: r.count + 1, user_ids: [...(r.user_ids || []), payload.user_id], me: payload.user_id === 'dev-self' } : r),
+            reactions: rxs.map((r, i) => i === idx ? { ...r, count: r.count + 1, user_ids: [...(r.user_ids || []), payload.user_id], me: payload.user_id === myId } : r),
           };
         }
-        return { ...m, reactions: [...rxs, { emoji: payload.emoji, count: 1, user_ids: [payload.user_id], me: payload.user_id === 'dev-self' }] };
+        return { ...m, reactions: [...rxs, { emoji: payload.emoji, count: 1, user_ids: [payload.user_id], me: payload.user_id === myId }] };
       } else {
         return { ...m, reactions: rxs.map(r => r.emoji === payload.emoji ? { ...r, count: r.count - 1, user_ids: (r.user_ids || []).filter(id => id !== payload.user_id), me: false } : r).filter(r => r.count > 0) };
       }

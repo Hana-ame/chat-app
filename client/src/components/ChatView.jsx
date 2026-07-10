@@ -73,8 +73,8 @@ export default function ChatView({ chatId, onBack }) {
     if (filtered.length > 0 && bodyRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = bodyRef.current;
       const isNewChat = prevChatIdRef.current !== chatId;
-      
-      if (isNewChat || (scrollHeight - scrollTop - clientHeight < 100)) {
+
+      if (isNewChat || (scrollHeight - scrollTop - clientHeight < 300)) {
         requestAnimationFrame(() => {
           if (bodyRef.current) {
             bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
@@ -83,7 +83,7 @@ export default function ChatView({ chatId, onBack }) {
         prevChatIdRef.current = chatId;
       }
     }
-  }, [chatId, filtered.length]);
+  }, [chatId, messages]);
 
   const name = chat ? getDMName(chat, user.id) : 'Loading...';
   const memberCount = chat?.members?.length || 0;

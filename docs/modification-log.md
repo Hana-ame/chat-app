@@ -979,8 +979,240 @@ const handleTogglePin = async (chatId) => {
 
 ### 验证
 - Build 通过：`npm run build` → 67 modules transformed, no errors
+---
+
+## 2026-07-10 第 6 轮（6-1 ~ 6-5）
 
 ---
+
+### 6-1: 修改名称不反映到历史消息
+
+**反馈**: 在 Settings 修改用户名后，历史消息的 author 仍是旧用户名。
+
+**根因**: `MessageItem` 直接从 `msg.author`（消息发送时的快照）读取显示，不改数据库。`mockUpdateProfile` 只更新了 store 的 `user` 对象，未更新 `d.chats` 中 members 成员信息。
+
+**代码变更** (`client/src/api/mock.js` — `mockUpdateProfile`):
+
+```diff
+ export function mockUpdateProfile(_token, data) {
+   const cu = currentUser();
+   const updated = { ...cu, username: data.username || cu.username, ... };
++  const d = ensureData();
++  d.chats.forEach(chat => {
++    const mi = chat.members?.findIndex(m => m.id === updated.id);
++    if (mi !== -1 && mi !== undefined) {
++      chat.members[mi] = { ...chat.members[mi], ...updated };
++      if (_store) _store.getState().onChatUpdate({ id: chat.id, members: [...chat.members] });
++    }
++  });
+   if (_store) _store.setState({ user: updated });
+```
+
+**代码变更** (`client/src/components/MessageItem.jsx` — 改用 live data):
+
+```diff
+-  const author = msg.author || { username: 'Unknown', avatar_color: '#5865F2', id: msg.user_id };
++  const author = useMemo(() => {
++    const chat = chats.find(c => c.id === chatId);
++    if (msg.user_id === user.id) return user;
++    return chat?.members?.find(m => m.id === msg.user_id) || msg.author || { ... };
++  }, [chats, chatId, msg.user_id, msg.author, user]);
+```
+
+关键改动：
+- `mockUpdateProfile` 遍历所有 chat，更新成员信息后调用 `onChatUpdate` 同步 store
+- `MessageItem` 优先从 `chat.members`（live data）查找作者，而非 `msg.author` 快照
+- 自己的消息直接使用 `useAuthStore` 的 `user`（已在 `mockUpdateProfile` 中更新）
+
+---
+
+### 6-2: "View Info" 不弹出任何内容
+
+**反馈**: 右键菜单点击 "View Info" 无反应。
+
+**根因**: `ChatInfoModal` 已导入、`showChatInfo` state 已声明，但组件未被渲染到 JSX 中。
+
+**代码变更** (`client/src/components/ChatList.jsx`):
+
+```diff
++      {showChatInfo && (
++        <ChatInfoModal chatId={showChatInfo} onClose={() => setShowChatInfo(null)} />
++      )}
+       {showSettings && (
+         <SettingsModal user={user} onClose={() => setShowSettings(false)} onSave={handleSaveSettings} />
+       )}
+```
+
+### 验证
+- Build: ✓
+
+---
+
+### 6-3: 发送多行消息后不自动滚动到底部
+
+**反馈**: 输入多行消息发送后，消息列表未自动滚动到最新消息。
+
+**根因**: 多行文本发送后 Composer textarea 高度骤降（从多行回缩到单行），引起 `.chat-body` 容器布局变化，浏览器 auto-anchor 调整 scrollTop，导致距底部 <100px 的判断条件不满足。
+
+**代码变更** (`client/src/components/ChatView.jsx` — scroll `useEffect`):
+
+```diff
+-  }, [chatId, filtered.length]);
++  }, [chatId, messages]);
+```
+
+```diff
+-      if (isNewChat || (scrollHeight - scrollTop - clientHeight < 100)) {
++      if (isNewChat || (scrollHeight - scrollTop - clientHeight < 300)) {
+```
+
+关键改动：
+- 依赖改为 `messages`（完整数组），覆盖流式更新 content 变化
+- 阈值从 100px → 300px，抵消 textarea 高度变化引起的 scrollTop 偏移
+
+---
+
+### 6-4: 其他用户的 profile 可以点击查看
+
+**反馈**: 消息中其他人的头像和用户名无法点击查看详情。
+
+**实现**: 新增 `UserProfileModal` 组件，MessageItem 和 ChatInfoModal 中点击用户头像/名称弹出。
+
+**新增文件** (`client/src/components/UserProfileModal.jsx`):
+
+```jsx
+export default function UserProfileModal({ user: profileUser, onClose }) {
+  if (!profileUser) return null;
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 360, textAlign: 'center' }}>
+        {/* ✕ close button */}
+        {/* avatar (img or colored letter) */}
+        {/* username, status (● Online / ○ Offline) */}
+        {/* Email, ID */}
+      </div>
+    </div>
+  );
+}
+```
+
+**代码变更** (`client/src/components/MessageItem.jsx`):
+
+```diff
++import UserProfileModal from './UserProfileModal';
++
+   const [opPending, setOpPending] = useState(false);
++  const [profileUser, setProfileUser] = useState(null);
+
+   // avatar wrapper → clickable
+-  author.avatar_url
+-    ? <img ... />
+-    : <div className="msg-avatar" ... />
++  <div onClick={() => setProfileUser(author)} style={{ cursor: 'pointer' }}>
++    {author.avatar_url ? <img ... /> : <div className="msg-avatar" ... />}
++  </div>
+
+   // username → clickable
+-  <span className="msg-author">{author.username}</span>
++  <span className="msg-author" onClick={() => setProfileUser(author)} style={{cursor:'pointer'}}>{author.username}</span>
+
+   // render modal
++  {profileUser && (
++    <UserProfileModal user={profileUser} onClose={() => setProfileUser(null)} />
++  )}
+```
+
+**代码变更** (`client/src/components/ChatInfoModal.jsx`):
+
+```diff
+-import { useMemo } from 'react';
++import { useMemo, useState } from 'react';
++import UserProfileModal from './UserProfileModal';
+
++  const [profileUser, setProfileUser] = useState(null);
+
+   // MemberRow 增加 onProfile 回调
+-  {owner && <MemberRow member={owner} />}
++  {owner && <MemberRow member={owner} onProfile={setProfileUser} />}
+
+   // render modal
++  {profileUser && (
++    <UserProfileModal user={profileUser} onClose={() => setProfileUser(null)} />
++  )}
+
+   // MemberRow 定义
+-  function MemberRow({ member }) {
+-    <div style={{ ... }}>
++  function MemberRow({ member, onProfile }) {
++    <div onClick={() => onProfile?.(member)} style={{ ..., cursor: 'pointer' }}>
+```
+
+---
+
+### 6-5: Chat list 排序问题（数据同步修复）
+
+**反馈**: 排序有问题，新创建的 chat 和有回复的 chat 交错排列不符合预期。
+
+**根因**: 排序算法 `a.last_message_at || a.created_at` 正确。问题出在数据同步：
+1. `mockCreateChat`/`mockCreateDM` 仅写入 `d.chats`，不通知 Store，新 chat 在下次轮询前不出现
+2. `setChats` 合并时 `...c` 将 Store 中已有的 `last_message_at` 覆盖为 `null`（来自 API 的无消息 chat），排序瞬间失效
+
+**代码变更** (`client/src/api/mock.js` — 创建后同步):
+
+```diff
+   d.chats.unshift(newChat);
++  if (_store) _store.getState().onChatUpdate(newChat);
+   return newChat;
+```
+
+```diff
+   d.chats.unshift(newDM);
++  if (_store) _store.getState().onChatUpdate(newDM);
+   return newDM;
+```
+
+**代码变更** (`client/src/store/chat.js` — `setChats` 合并保护):
+
+```diff
+-      if (!old) return c;
+-      const lm = (c.last_message?.content?.trim() ? c.last_message : null) || (old.last_message?.content?.trim() ? old.last_message : null);
+-      return { ...c, last_message: lm, unread_count: old.unread_count || 0 };
++      if (!old) {
++        const lma = c.last_message_at || c.created_at;
++        return { ...c, last_message_at: lma };
++      }
++      const lm = (c.last_message?.content?.trim() ? c.last_message : null) || (old.last_message?.content?.trim() ? old.last_message : null);
++      const lma = c.last_message_at || old.last_message_at || c.created_at;
++      return { ...c, last_message_at: lma, last_message: lm, unread_count: old.unread_count || 0 };
+```
+
+**验证**: 集成测试模拟完整流程通过 ✅
+
+---
+
+### 6-6: ChatInfoModal 显示时间信息
+
+**反馈**: Chat Info 面板缺少 Created at 和 Last message 时间。
+
+**代码变更** (`client/src/components/ChatInfoModal.jsx`):
+
+```diff
++function fmtTime(t) {
++  if (!t) return '-';
++  return new Date(t).toLocaleString();
++}
+
++<InfoRow label="Created at" value={fmtTime(chat.created_at)} />
++<InfoRow label="Last message" value={fmtTime(chat.last_message_at)} />
+```
+
+---
+
+### 验证
+- Build: ✓ 2.17s
+
+---
+
 ## 前一次会话（历史）
 
 *（此处记录此前已归档的 CI/CD、审计、验证手册等工作）*

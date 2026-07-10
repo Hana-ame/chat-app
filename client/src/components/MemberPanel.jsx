@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
+import UserProfileModal from './UserProfileModal';
 
 export default function MemberPanel({ chatId }) {
   const { user, accessToken } = useAuthStore();
@@ -10,6 +11,7 @@ export default function MemberPanel({ chatId }) {
   const [adding, setAdding] = useState(false);
   const [search, setSearch] = useState('');
   const [results, setResults] = useState([]);
+  const [profileUser, setProfileUser] = useState(null);
 
   const chat = chats.find(c => c.id === chatId);
 
@@ -67,7 +69,8 @@ export default function MemberPanel({ chatId }) {
         const ob = onlineUserIds.includes(b.id) ? 0 : 1;
         return oa - ob;
       }).map(m => (
-          <div key={m.id} style={{display:'flex',alignItems:'center',gap:8,padding:'4px 0',fontSize:14}}>
+          <div key={m.id} style={{display:'flex',alignItems:'center',gap:8,padding:'4px 0',fontSize:14,cursor:'pointer'}}
+            onClick={() => setProfileUser(m)}>
             <span className={'status-dot ' + (isOnline(m.id) ? 'online' : 'offline')} />
             {m.avatar_url
               ? <img src={m.avatar_url} style={{width:28,height:28,borderRadius:'50%',objectFit:'cover',flexShrink:0}} alt={m.username} />
@@ -75,10 +78,13 @@ export default function MemberPanel({ chatId }) {
             }
           <span style={{flex:1}}>{m.username}</span>
           {chat?.owner_id === user.id && m.id !== user.id && chat?.type !== 'dm' && (
-            <button className="btn-ghost" style={{fontSize:12}} onClick={() => removeUser(m.id)}>×</button>
+            <button className="btn-ghost" style={{fontSize:12}} onClick={(e) => { e.stopPropagation(); removeUser(m.id); }}>×</button>
           )}
         </div>
       ))}
+      {profileUser && (
+        <UserProfileModal user={profileUser} onClose={() => setProfileUser(null)} />
+      )}
     </div>
   );
 }

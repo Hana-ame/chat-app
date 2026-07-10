@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 import { renderContent } from './renderContent';
+import UserProfileModal from './UserProfileModal';
 
 const COMMON_EMOJI = ['👍','❤️','😂','🎉','😢','😡','👀','🔥','✅','❌'];
 
@@ -20,8 +21,13 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(msg.content);
   const [opPending, setOpPending] = useState(false);
+  const [profileUser, setProfileUser] = useState(null);
 
-  const author = msg.author || { username: 'Unknown', avatar_color: '#5865F2', id: msg.user_id };
+  const author = useMemo(() => {
+    const chat = chats.find(c => c.id === chatId);
+    if (msg.user_id === user.id) return user;
+    return chat?.members?.find(m => m.id === msg.user_id) || msg.author || { username: 'Unknown', avatar_color: '#5865F2', id: msg.user_id };
+  }, [chats, chatId, msg.user_id, msg.author, user]);
   const initials = author.username ? author.username[0].toUpperCase() : '?';
 
   const userMap = useMemo(() => {
@@ -68,14 +74,17 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
     <div className="msg-group">
       <div className={'msg-row' + (sameAuthor ? ' msg-continuation' : '')}>
         {!sameAuthor && (
-          author.avatar_url
-            ? <img src={author.avatar_url} className="msg-avatar-img" alt={author.username} />
-            : <div className="msg-avatar" style={{background:author.avatar_color}}>{initials}</div>
+          <div onClick={() => setProfileUser(author)} style={{ cursor: 'pointer' }}>
+            {author.avatar_url
+              ? <img src={author.avatar_url} className="msg-avatar-img" alt={author.username} />
+              : <div className="msg-avatar" style={{background:author.avatar_color}}>{initials}</div>
+            }
+          </div>
         )}
         <div style={{flex:1,minWidth:0}}>
           {!sameAuthor && (
             <div style={{display:'flex',alignItems:'baseline'}}>
-              <span className="msg-author">{author.username}</span>
+              <span className="msg-author" onClick={() => setProfileUser(author)} style={{cursor:'pointer'}}>{author.username}</span>
               <span className="msg-time">{timeFormat(msg.created_at)}</span>
               {msg.edited_at && <span className="msg-time">(edited)</span>}
             </div>
@@ -136,6 +145,9 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
           )}
         </div>
       </div>
+      {profileUser && (
+        <UserProfileModal user={profileUser} onClose={() => setProfileUser(null)} />
+      )}
     </div>
   );
 }
