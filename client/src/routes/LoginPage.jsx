@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
+import { api } from '../api/client';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -36,8 +37,14 @@ export default function LoginPage() {
             <input type="checkbox" checked={debugMode} onChange={e => setDebugMode(e.target.checked)} />
             Debug mode
           </label>
+          <label style={{display:'flex',alignItems:'center',gap:4,cursor:'pointer'}}>
+            <input type="checkbox" checked={api.isMockEnabled()} onChange={e => {
+              if (e.target.checked) api.enableMock(); else api.disableMock();
+            }} />
+            Mock API
+          </label>
           {debugMode && <button type="button" className="btn-ghost" style={{fontSize:12}} onClick={quickEnter}>
-            ⚡ Quick Enter (mock)
+            ⚡ Quick Enter
           </button>}
         </div>
         <p style={{marginTop:12,fontSize:13,color:'var(--text-muted)'}}>

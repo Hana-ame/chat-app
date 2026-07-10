@@ -82,7 +82,7 @@ export const useAuthStore = create((set, get) => {
       api.enableMock();
       useChatStore.getState().setMode('poll');
       const payload = {
-        user: { id: 'mock-' + Date.now(), username: 'DebugUser', email: 'debug@test.com', avatar_color: '#5865F2' },
+        user: { id: 'dev-self', username: 'Alice', email: 'alice@test.com', avatar_color: '#5865F2' },
         accessToken: 'mock-token',
       };
       storage.set(payload);

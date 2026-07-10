@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
@@ -11,6 +11,16 @@ export default function Composer({ chatId }) {
   const [attachments, setAttachments] = useState([]);
   const fileInput = useRef(null);
   const typingTimer = useRef(null);
+  const textRef = useRef(null);
+
+  const autoResize = useCallback(() => {
+    const el = textRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }, []);
+
+  useEffect(() => { autoResize(); }, [text, autoResize]);
 
   const handleTyping = () => {
     sendTyping(chatId);
@@ -65,9 +75,16 @@ export default function Composer({ chatId }) {
         </div>
       )}
       <div className="chat-input">
-        <textarea rows={1} placeholder={'Message #chat'} value={text}
-          onChange={e => { setText(e.target.value); handleTyping(); }}
-          onKeyDown={handleKey} />
+        <div style={{display:'flex',gap:6,alignItems:'stretch'}}>
+          <textarea rows={1} placeholder={'Message #chat'} value={text}
+            ref={textRef}
+            onChange={e => { setText(e.target.value); handleTyping(); autoResize(); }}
+            onKeyDown={handleKey}
+            style={{flex:1,resize:'none',overflow:'hidden',minHeight:36}} />
+          <button className="btn btn-primary" style={{whiteSpace:'nowrap',padding:'4px 14px'}}
+            disabled={(!text.trim() && attachments.length === 0) || uploading}
+            onClick={handleSend}>{uploading ? '...' : 'Send'}</button>
+        </div>
         <div style={{display:'flex',gap:4,marginTop:6,alignItems:'center'}}>
           <input type="file" ref={fileInput} onChange={handleFile} style={{display:'none'}} multiple />
           <button className="btn-ghost" style={{fontSize:18}} onClick={() => fileInput.current?.click()} title="Attach file">📎</button>
@@ -76,8 +93,6 @@ export default function Composer({ chatId }) {
             const content = text.trim() || 'Tell me something interesting';
             sendMessage(accessToken, chatId, content, []).catch(console.error);
           }} title="Send to AI (mock only)">🤖</button>
-          <button className="btn-ghost" style={{fontSize:13}} disabled={(!text.trim() && attachments.length === 0) || uploading}
-            onClick={handleSend}>{uploading ? 'Uploading...' : 'Send'}</button>
         </div>
       </div>
     </div>

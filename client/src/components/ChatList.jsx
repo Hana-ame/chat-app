@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 import ChatListItem from './ChatListItem';
 import PublicChannelList from './PublicChannelList';
 import CreateGroupForm from './CreateGroupForm';
-import DmSearchPanel from './DmSearchPanel';
 import SettingsModal from './SettingsModal';
+import ChatInfoModal from './ChatInfoModal';
 import ScrollArea from './ScrollArea';
 import EmptyState from './EmptyState';
 
@@ -16,34 +16,29 @@ const MODES = [
   { key: 'poll', label: 'Poll' },
 ];
 
-function getDMName(chat, currentUserId) {
-  const other = chat.members?.find(m => m.id !== currentUserId);
-  return other ? other.username : 'Unknown';
-}
-
 export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const { user, accessToken } = useAuthStore();
   const { chats, mode, setMode } = useChatStore();
   const [showCreate, setShowCreate] = useState(false);
   const [newChatName, setNewChatName] = useState('');
   const [newChatVisibility, setNewChatVisibility] = useState('private');
-  const [showDmSearch, setShowDmSearch] = useState(false);
-  const [dmSearch, setDmSearch] = useState('');
-  const [dmResults, setDmResults] = useState([]);
   const [chatSearch, setChatSearch] = useState('');
   const [publicResults, setPublicResults] = useState(null);
   const [publicSearching, setPublicSearching] = useState(false);
-  const [contextMenu, setContextMenu] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null); // { chatId, x, y }
   const [showSettings, setShowSettings] = useState(false);
+  const [showChatInfo, setShowChatInfo] = useState(null); // chatId
 
   const joinAction = chatSearch.trim() && /^\d{1,2}-\d{1,2}$/.test(chatSearch.trim()) ? 'join'
     : chatSearch.trim() && /^\d+$/.test(chatSearch.trim()) ? 'join'
       : chatSearch.trim() && /^(join|create)\s/i.test(chatSearch.trim()) ? chatSearch.trim().startsWith('join') ? 'join' : 'create'
         : null;
 
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+
   useEffect(() => {
     if (!contextMenu) return;
-    const close = () => setContextMenu(null);
+    const close = (e) => { if (!e.target.closest('.context-menu')) setContextMenu(null); };
     document.addEventListener('click', close);
     return () => document.removeEventListener('click', close);
   }, [contextMenu]);
@@ -58,23 +53,10 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     } catch (e) { alert(e.message); }
   };
 
-  const handleDM = async (u) => {
-    try {
-      const data = await api.createDM(accessToken, u.id);
-      setDmSearch('');
-      setDmResults([]);
-      setShowDmSearch(false);
-      onSelectChat(data.id);
-    } catch (e) { alert(e.message); }
-  };
-
-  const searchUser = async (q) => {
-    setDmSearch(q);
-    if (q.length < 1) { setDmResults([]); return; }
-    try {
-      const data = await api.searchUsers(accessToken, q);
-      setDmResults(data.users || []);
-    } catch (e) { console.error('Search users error:', e); }
+  const handleDeleteChat = async (chatId) => {
+    if (!confirm('Delete this chat?')) return;
+    try { await api.deleteChat(accessToken, chatId); } catch (e) { console.error('Delete chat error:', e); }
+    setContextMenu(null);
   };
 
   const searchPublic = async (q) => {
@@ -121,13 +103,6 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     setShowSettings(false);
   };
 
-  const handleGenerateDummy = async () => {
-    api.enableMock();
-    await useChatStore.getState().loadChats(accessToken);
-    const firstChat = useChatStore.getState().chats[0];
-    if (firstChat) onSelectChat(firstChat.id);
-  };
-
   const [buildCount] = useState(() => {
     const n = parseInt(localStorage.getItem('build_count') || '0') + 1;
     localStorage.setItem('build_count', String(n));
@@ -135,9 +110,10 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   });
 
   const filteredChats = chats.filter(c => {
+    if (c.type === 'dm') return false;
     if (!chatSearch.trim()) return true;
     const q = chatSearch.toLowerCase();
-    const name = c.type === 'dm' ? getDMName(c, user.id) : c.name || '';
+    const name = c.name || '';
     return name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q);
   });
 
@@ -151,7 +127,6 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
             {mode.toUpperCase()}
           </button>
           <button className={'btn-ghost' + (showCreate ? ' active-mode' : '')} style={{ minWidth: 34 }} title="Create Group" onClick={() => setShowCreate(v => !v)}>+</button>
-          <button className={'btn-ghost' + (showDmSearch ? ' active-mode' : '')} style={{ minWidth: 34, fontWeight: 700 }} title="New DM" onClick={() => { setShowDmSearch(v => !v); if (!showDmSearch) { setDmSearch(''); setDmResults([]); } }}>@</button>
         </div>
       </div>
 
@@ -186,10 +161,6 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       </div>
 
       <ScrollArea className="sidebar-body">
-        {showDmSearch && (
-          <DmSearchPanel query={dmSearch} results={dmResults} onSearch={searchUser} onSelect={handleDM} />
-        )}
-
         {showCreate && (
           <CreateGroupForm name={newChatName} visibility={newChatVisibility}
             onVisibilityChange={setNewChatVisibility}
@@ -202,16 +173,16 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
 
         {filteredChats.map(c => (
           <ChatListItem key={c.id} chat={c} activeId={activeId} onSelectChat={onSelectChat}
-            contextMenu={contextMenu} onContextMenu={setContextMenu} />
+            onContextMenu={setContextMenu} />
         ))}
 
         {chats.length === 0 && (
-          <EmptyState message="No conversations yet. Create a group or DM someone!" />
+          <EmptyState message="No conversations yet. Create a new group!" />
         )}
       </ScrollArea>
 
       <div className="sidebar-footer">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={() => setShowSettings(true)}>
           {user.avatar_url
             ? <img src={user.avatar_url} className="user-avatar-img" alt="" />
             : <div className="chat-item-avatar" style={{ width: 32, height: 32, fontSize: 13, background: user.avatar_color }}>
@@ -222,13 +193,23 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
             <div style={{ fontSize: 14, fontWeight: 600 }}>{user.username}</div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Online</div>
           </div>
-          <button className="btn-ghost" onClick={() => { setShowSettings(true); }} title="Settings">⚙</button>
+          <button className="btn-ghost" onClick={(e) => { e.stopPropagation(); setShowSettings(true); }} title="Settings">⚙</button>
           <button className="btn-ghost" onClick={onLogout}>↪</button>
         </div>
-        <div style={{ marginTop: 4, borderTop: '1px solid var(--border)', paddingTop: 4 }}>
-          <button className="btn-ghost" style={{ fontSize: 11, width: '100%' }} onClick={handleGenerateDummy}>🧪 Generate test data</button>
-        </div>
+        {api.isMockEnabled() && (
+          <div style={{ marginTop: 4, borderTop: '1px solid var(--border)', paddingTop: 4 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', padding: '4px 0' }}>
+              ⚡ Using Mock API
+            </div>
+          </div>
+        )}
       </div>
+
+      {contextMenu && (
+        <div className="context-menu" style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 1000, right: 'auto', width: 140 }}>
+          <button className="context-menu-item danger" onClick={() => handleDeleteChat(contextMenu.chatId)}>Delete</button>
+        </div>
+      )}
 
       {showSettings && (
         <SettingsModal user={user} onClose={() => setShowSettings(false)} onSave={handleSaveSettings} />

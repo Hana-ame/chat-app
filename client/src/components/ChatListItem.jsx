@@ -1,5 +1,4 @@
-import { useChatStore } from '../store/chat';
-import { api } from '../api/client';
+import { useRef } from 'react';
 import { useAuthStore } from '../store/auth';
 
 function timeAgo(t) {
@@ -13,33 +12,33 @@ function timeAgo(t) {
   return d.toLocaleDateString();
 }
 
-function getDMName(chat, currentUserId) {
-  const other = chat.members?.find(m => m.id !== currentUserId);
-  return other ? other.username : 'Unknown';
-}
+export default function ChatListItem({ chat, activeId, onSelectChat, onContextMenu }) {
+  const { user } = useAuthStore();
+  const btnRef = useRef(null);
 
-export default function ChatListItem({ chat, activeId, onSelectChat, contextMenu, onContextMenu }) {
-  const { user, accessToken } = useAuthStore();
-
-  const name = chat.type === 'dm' ? getDMName(chat, user.id) : chat.name;
-  const avatar = chat.type === 'dm' ? (chat.members?.find(m => m.id !== user.id)?.avatar_color || chat.icon_color) : chat.icon_color;
+  const name = chat.name || chat.id;
+  const avatar = chat.icon_color || '#5865F2';
   const unread = chat.unread_count || 0;
 
-  const handleDelete = async (e, chatId) => {
+  const handleMenu = (e) => {
     e.stopPropagation();
-    if (!confirm('Delete this chat?')) return;
-    try { await api.deleteChat(accessToken, chatId); } catch (e) { console.error('Delete chat error:', e); }
-    onContextMenu(null);
+    const rect = btnRef.current?.getBoundingClientRect();
+    onContextMenu({ chatId: chat.id, x: rect?.right || 0, y: rect?.bottom || 0 });
   };
 
   return (
-    <div key={chat.id} className={'chat-item' + (chat.id === activeId ? ' active' : '') + (chat.pinned ? ' pinned' : '') + (chat.visibility === 'public' ? ' public' : '')}
+    <div key={chat.id} className={'chat-item' + (chat.id === activeId ? ' active' : '') + (chat.pinned ? ' pinned' : '') + (chat.visibility === 'public' ? ' public' : '') + (chat.owner_id === user.id ? ' owner' : '')}
       onClick={() => onSelectChat(chat.id)}>
       <div className="chat-item-avatar" style={{ background: avatar }}>
         {name ? name[0].toUpperCase() : '?'}
       </div>
       <div className="chat-item-info">
-        <div className="chat-item-name">{name || getDMName(chat, user.id)}</div>
+        <div style={{display:'flex',alignItems:'center',gap:4}}>
+          <div className="chat-item-name">{name}</div>
+          <span style={{fontSize:10,padding:'0 5px',borderRadius:3,fontWeight:500,background: chat.visibility === 'public' ? 'rgba(35,165,89,0.15)' : chat.visibility === 'unlisted' ? 'rgba(88,101,242,0.15)' : 'rgba(128,132,142,0.15)', color: chat.visibility === 'public' ? '#23a559' : chat.visibility === 'unlisted' ? '#5865F2' : 'var(--text-muted)'}}>
+            {chat.visibility || 'private'}
+          </span>
+        </div>
         <div className="chat-item-preview">
           {chat.last_message ? (chat.last_message.deleted ? '(message deleted)' : chat.last_message.author?.username + ': ' + chat.last_message.content) : ''}
         </div>
@@ -48,15 +47,7 @@ export default function ChatListItem({ chat, activeId, onSelectChat, contextMenu
         <div className="chat-item-time">{timeAgo(chat.last_message_at)}</div>
         {unread > 0 ? <div className="unread-badge">{unread}</div> : <div style={{ height: 18 }} />}
         <div className="chat-item-menu-wrap">
-          <button className="btn-ghost chat-item-menu-btn" title="More"
-            onClick={(e) => { e.stopPropagation(); onContextMenu(chat.id); }}>⋮</button>
-          {contextMenu === chat.id && (
-            <div className="context-menu">
-              {chat.owner_id === user.id && (
-                <button className="context-menu-item danger" onClick={(e) => handleDelete(e, chat.id)}>Delete</button>
-              )}
-            </div>
-          )}
+          <button ref={btnRef} className="btn-ghost chat-item-menu-btn" title="More" onClick={handleMenu}>⋮</button>
         </div>
       </div>
     </div>

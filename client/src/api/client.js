@@ -172,7 +172,17 @@ let _mockEnabled = false;
 const _originals = {};
 
 function save(key, fn) { _originals[key] = fn; }
-function swap(key, mock) { api[key] = mock; }
+function swap(key, mock) {
+  api[key] = (...args) => {
+    console.log(`[Mock API] ${key}(`, ...args, ')');
+    const result = mock(...args);
+    if (result && typeof result.then === 'function') {
+      return result.then(v => { console.log(`[Mock API] ${key} =>`, v); return v; });
+    }
+    console.log(`[Mock API] ${key} =>`, result);
+    return Promise.resolve(result);
+  };
+}
 
 const MOCKABLE = [
   ['register', mockRegister],

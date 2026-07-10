@@ -10,3 +10,4 @@ uploads/*
 opencode.sh
 .last_upload_url
 client/test-results/
+server/chatd

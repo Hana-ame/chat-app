@@ -157,13 +157,20 @@ export const useChatStore = create((set, get) => ({
   },
 
   setChats(chats) {
-    const sorted = (chats || []).sort((a, b) => {
-      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-      const da = a.last_message_at || a.created_at;
-      const db = b.last_message_at || b.created_at;
-      return new Date(db) - new Date(da);
+    set(s => {
+      const existing = new Map(s.chats.map(c => [c.id, c]));
+    const merged = (chats || []).map(c => {
+      const old = existing.get(c.id);
+      return old ? { ...c, last_message: old.last_message || c.last_message, unread_count: old.unread_count || 0 } : c;
     });
-    set({ chats: sorted });
+      const sorted = merged.sort((a, b) => {
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+        const da = a.last_message_at || a.created_at;
+        const db = b.last_message_at || b.created_at;
+        return new Date(db) - new Date(da);
+      });
+      return { chats: sorted };
+    });
   },
 
   onChatUpdate(chat) {
@@ -253,10 +260,17 @@ export const useChatStore = create((set, get) => ({
       const rxs = m.reactions || [];
       const idx = rxs.findIndex(r => r.emoji === payload.emoji);
       if (added) {
-        if (idx >= 0) return m;
-        return { ...m, reactions: [...rxs, { emoji: payload.emoji, count: 1, user_ids: [payload.user_id], me: payload.user_id === s.messages.find(x=>x.id===m.id)?.user_id }] };
+        if (idx >= 0) {
+          const existing = rxs[idx];
+          if (existing.user_ids?.includes(payload.user_id)) return m;
+          return {
+            ...m,
+            reactions: rxs.map((r, i) => i === idx ? { ...r, count: r.count + 1, user_ids: [...(r.user_ids || []), payload.user_id], me: payload.user_id === 'dev-self' } : r),
+          };
+        }
+        return { ...m, reactions: [...rxs, { emoji: payload.emoji, count: 1, user_ids: [payload.user_id], me: payload.user_id === 'dev-self' }] };
       } else {
-        return { ...m, reactions: rxs.map(r => r.emoji === payload.emoji ? { ...r, count: r.count - 1 } : r).filter(r => r.count > 0) };
+        return { ...m, reactions: rxs.map(r => r.emoji === payload.emoji ? { ...r, count: r.count - 1, user_ids: (r.user_ids || []).filter(id => id !== payload.user_id), me: false } : r).filter(r => r.count > 0) };
       }
     }) }));
   },
@@ -271,16 +285,15 @@ export const useChatStore = create((set, get) => ({
   async loadChats(token) {
     try {
       const data = await api.listChats(token);
-      set({ chats: data.chats || [] });
+      get().setChats(data.chats || []);
     } catch (e) { console.error('loadChats error:', e); }
   },
 
   async loadMessages(token, chatId, before) {
     try {
       const data = await api.listMessages(token, chatId, before);
-      const msgs = data.messages || [];
       set(s => ({
-        messages: before ? [...msgs, ...s.messages] : msgs,
+        messages: before ? [...(data.messages || []), ...s.messages] : (data.messages || []),
       }));
     } catch (e) { console.error('loadMessages error:', e); }
   },
