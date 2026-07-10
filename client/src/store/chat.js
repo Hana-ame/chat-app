@@ -161,7 +161,9 @@ export const useChatStore = create((set, get) => ({
       const existing = new Map(s.chats.map(c => [c.id, c]));
     const merged = (chats || []).map(c => {
       const old = existing.get(c.id);
-      return old ? { ...c, last_message: old.last_message || c.last_message, unread_count: old.unread_count || 0 } : c;
+      if (!old) return c;
+      const lm = (c.last_message?.content?.trim() ? c.last_message : null) || (old.last_message?.content?.trim() ? old.last_message : null);
+      return { ...c, last_message: lm, unread_count: old.unread_count || 0 };
     });
       const sorted = merged.sort((a, b) => {
         if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;

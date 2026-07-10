@@ -760,6 +760,227 @@ icon_color: CHAT_COLORS[d.chats.length % CHAT_COLORS.length],
 
 ---
 
+## 2026-07-10 第 5 轮修复（5-1 ~ 5-9）
+
+---
+
+### 5-1: 取消 reaction 会误删别人的
+
+**反馈**: 取消自己的 reaction 时，`mockRemoveReaction` 对整个 reaction 做 `count - 1`，如果别人也点过同样的 emoji，别人的记录被移除。
+
+**根因**: `mockRemoveReaction` 按 emoji 整体递减 count，未按 user_id 过滤。
+
+**代码变更** (`client/src/api/mock.js` — `mockRemoveReaction`):
+
+```js
+// 之前：全局递减，可能误删别人的 reaction
+msg.reactions = (msg.reactions || []).map(r =>
+  r.emoji === emoji ? { ...r, count: r.count - 1 } : r
+).filter(r => r.count > 0);
+
+// 之后：按 user_id 过滤，仅移除自己的记录
+const rxs = (msg.reactions || []).map(r => {
+  if (r.emoji !== emoji) return r;
+  const filtered = (r.user_ids || []).filter(id => id !== 'dev-self');
+  return { ...r, count: filtered.length, user_ids: filtered };
+}).filter(r => r.count > 0);
+```
+
+同步修复 `mockAddReaction` 的 `existing` 判断逻辑 — 改为查找 `emoji + user_ids.includes('dev-self')`，避免重复添加：
+
+```js
+const existing = rxs.find(r => r.emoji === emoji && r.user_ids?.includes('dev-self'));
+if (!existing) {
+  const byEmoji = rxs.find(r => r.emoji === emoji);
+  if (byEmoji) {
+    byEmoji.count += 1;
+    byEmoji.user_ids = [...(byEmoji.user_ids || []), 'dev-self'];
+  } else {
+    rxs.push({ emoji, count: 1, user_ids: ['dev-self'] });
+  }
+}
+```
+
+---
+
+### 5-2: 消息与输入框间距过大
+
+**反馈**: 消息区域底部与输入框之间的空白太大。
+
+**代码变更** (`client/src/styles/global.css`):
+
+```css
+/* 之前 */
+.chat-body { padding: 16px 16px 120px; }
+
+/* 之后 */
+.chat-body { padding: 16px 16px 40px; }
+```
+
+---
+
+### 5-3: 查看 Chat Info 入口
+
+**反馈**: 聊天缺少信息面板入口，不知道群成员有哪些。
+
+**代码变更** (`client/src/components/ChatList.jsx` — context 菜单):
+
+```jsx
+<button className="context-menu-item"
+  onClick={() => { setShowChatInfo(contextMenu.chatId); setContextMenu(null); }}>
+  View Info
+</button>
+```
+
+**新增 ChatInfoModal** (`client/src/components/ChatInfoModal.jsx`): 按 Owner / Admin / Member 分组显示群成员。
+
+---
+
+### 5-4: 头像全同色（已有代码但初始数据无）
+
+**反馈**: 所有 group 头像都是 `#5865F2`，无法区分。
+
+**根因**: `CHAT_COLORS` 调色板已存在，但 `dummy.js` 初始数据和 `mockListChats` 未分配 `icon_color`。
+
+**代码变更** (`client/src/api/mock.js` — `mockListChats`):
+
+```js
+const enriched = d.chats.map((c, i) => ({
+  ...c,
+  icon_color: c.icon_color || CHAT_COLORS[i % CHAT_COLORS.length],
+  // ...
+}));
+```
+
+---
+
+### 5-5: 修改名称不反映到消息
+
+**反馈**: 在 Settings 改用户名后，新发消息的 author 仍是旧用户名。
+
+**根因**: `mockSendMessage` 硬编码 `user_id: 'dev-self'` + `author: userById('dev-self')`，未读取 localStorage 中的最新用户信息。
+
+**代码变更** (`client/src/api/mock.js`):
+
+```js
+// 新增 currentUser() 从 localStorage auth 读取
+function currentUser() {
+  try {
+    const raw = localStorage.getItem('auth');
+    if (raw) {
+      const u = JSON.parse(raw).user;
+      if (u) return u;
+    }
+  } catch {}
+  return userById('dev-self');
+}
+
+// mockSendMessage 改用 currentUser()
+user_id: currentUser().id,
+author: currentUser(),
+
+// mockUpdateProfile 同时更新 store 中的 user
+export function mockUpdateProfile(_token, data) {
+  const cu = currentUser();
+  const updated = { ...cu, username: data.username || cu.username, avatar_color: data.avatar_color || cu.avatar_color, avatar_url: data.avatar_url || cu.avatar_url || '' };
+  if (_store) _store.setState({ user: updated });
+  return updated;
+}
+```
+
+---
+
+### 5-6: 头像上传问题 → 已确认正常工作
+
+**反馈**: 上传头像后头像不变。
+
+**修复**: `mockUploadAvatar` 返回 `URL.createObjectURL(file)` 生成本地 Blob URL。
+
+**确认**: 用户测试后确认已正常工作。
+
+---
+
+### 5-7: 上传慢但能用 → 确认
+
+**反馈**: 上传文件响应较慢。
+
+**说明**: Mock API 使用 `URL.createObjectURL` 生成本地 URL，无需后端。慢是由于真实文件读取 + Blob 创建开销。
+
+**确认**: 用户确认可用。
+
+---
+
+### 5-8: Chat list 显示 AI 消息内容
+
+**反馈**: Chat list 预览中 AI Bot 回复显示为空白。
+
+**根因**: `mockListChats` 取最后一条消息时 AI 消息 `content` 为空字符串（streaming 初始状态）；`setChats` 中 `old.last_message || c.last_message` 优先保留旧的空内容。
+
+**代码变更** (`client/src/api/mock.js` — `mockListChats`):
+
+```js
+const msgs = messagesFor(c.id);
+const last = msgs.filter(m => m.content?.trim()).length > 0
+  ? msgs.filter(m => m.content?.trim()).pop()
+  : msgs[msgs.length - 1];
+```
+
+**代码变更** (`client/src/store/chat.js` — `setChats`):
+
+```js
+const lm = (c.last_message?.content?.trim() ? c.last_message : null)
+  || (old.last_message?.content?.trim() ? old.last_message : null);
+return { ...c, last_message: lm, unread_count: old.unread_count || 0 };
+```
+
+---
+
+### 5-9: Pin/Unpin 顶置功能
+
+**反馈**: 右键菜单需要 Pin/Unpin 将聊天顶置到列表最前。
+
+**代码变更** (`client/src/api/mock.js` — 新增 `mockTogglePin`):
+
+```js
+export function mockTogglePin(_token, chatId) {
+  const d = ensureData();
+  const chat = d.chats.find(c => c.id === chatId);
+  if (!chat) return { ok: false };
+  chat.pinned = !chat.pinned;
+  if (_store) _store.getState().onChatUpdate({ id: chatId, pinned: chat.pinned });
+  return { ok: true, pinned: chat.pinned };
+}
+```
+
+**代码变更** (`client/src/api/client.js`):
+
+```js
+togglePin: (_token, chatId) => request('POST', '/api/chats/' + chatId + '/pin', _token),
+['togglePin', mockTogglePin],
+```
+
+**代码变更** (`client/src/components/ChatList.jsx`):
+
+```jsx
+const handleTogglePin = async (chatId) => {
+  try { await api.togglePin(accessToken, chatId); } catch (e) { console.error('Toggle pin error:', e); }
+  setContextMenu(null);
+};
+
+<button className="context-menu-item"
+  onClick={() => handleTogglePin(contextMenu.chatId)}>
+  {chats.find(c => c.id === contextMenu.chatId)?.pinned ? 'Unpin' : 'Pin'}
+</button>
+```
+
+`onChatUpdate` 已有 pinned 排序逻辑（`setChats`/`onChatUpdate` 按 `a.pinned ? -1 : 1` 排序）。
+
+---
+
+### 验证
+- Build 通过：`npm run build` → 67 modules transformed, no errors
+
+---
 ## 前一次会话（历史）
 
 *（此处记录此前已归档的 CI/CD、审计、验证手册等工作）*

@@ -59,6 +59,11 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     setContextMenu(null);
   };
 
+  const handleTogglePin = async (chatId) => {
+    try { await api.togglePin(accessToken, chatId); } catch (e) { console.error('Toggle pin error:', e); }
+    setContextMenu(null);
+  };
+
   const searchPublic = async (q) => {
     if (!q.trim()) { setPublicResults(null); setPublicSearching(false); return; }
     setPublicSearching(true);
@@ -207,6 +212,8 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
 
       {contextMenu && (
         <div className="context-menu" style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 1000, right: 'auto', width: 140 }}>
+          <button className="context-menu-item" onClick={() => handleTogglePin(contextMenu.chatId)}>{chats.find(c => c.id === contextMenu.chatId)?.pinned ? 'Unpin' : 'Pin'}</button>
+          <button className="context-menu-item" onClick={() => { setShowChatInfo(contextMenu.chatId); setContextMenu(null); }}>View Info</button>
           <button className="context-menu-item danger" onClick={() => handleDeleteChat(contextMenu.chatId)}>Delete</button>
         </div>
       )}

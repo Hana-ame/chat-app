@@ -6,6 +6,17 @@ const CHAT_COLORS = [
   '#f39c12', '#1dd1a1', '#a29bfe', '#fd79a8', '#00cec9',
 ];
 
+function currentUser() {
+  try {
+    const raw = localStorage.getItem('auth');
+    if (raw) {
+      const u = JSON.parse(raw).user;
+      if (u) return u;
+    }
+  } catch {}
+  return userById('dev-self');
+}
+
 const AI_RESPONSES = [
   "That's an interesting thought! Let me add my perspective here.",
   "I agree with you. Building on what you said, there's more to consider.",
@@ -23,6 +34,13 @@ let data = null;
 let _store = null;
 
 export function __setStoreRef(store) { _store = store; }
+export function __getAuthUser() {
+  try {
+    const raw = localStorage.getItem('auth');
+    if (raw) return JSON.parse(raw).user || null;
+  } catch {}
+  return null;
+}
 
 const MOCK_USERS = [
   { id: 'dev-self', username: 'Alice', avatar_color: '#5865F2', email: 'alice@test.com', status: 'online' },
@@ -58,11 +76,12 @@ function messagesFor(chatId) {
 
 export function mockListChats() {
   const d = ensureData();
-  const enriched = d.chats.map(c => {
+  const enriched = d.chats.map((c, i) => {
     const msgs = messagesFor(c.id);
-    const last = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+    const last = msgs.filter(m => m.content?.trim()).length > 0 ? msgs.filter(m => m.content?.trim()).pop() : msgs[msgs.length - 1];
     return {
       ...c,
+      icon_color: c.icon_color || CHAT_COLORS[i % CHAT_COLORS.length],
       last_message: last ? { id: last.id, content: last.content, deleted: last.deleted, author: last.author, created_at: last.created_at } : c.last_message,
       last_message_at: last?.created_at || c.last_message_at,
       members: c.members?.map(m => ({ ...m, ...(MOCK_USERS.find(u => u.id === m.id) || {}) })) || [],
@@ -163,7 +182,10 @@ export function mockSearchUsers(_token, q) {
 }
 
 export function mockUpdateProfile(_token, data) {
-  return { ...userById('dev-self'), username: data.username || 'Alice', avatar_color: data.avatar_color || '#5865F2', avatar_url: data.avatar_url || '' };
+  const cu = currentUser();
+  const updated = { ...cu, username: data.username || cu.username, avatar_color: data.avatar_color || cu.avatar_color, avatar_url: data.avatar_url || cu.avatar_url || '' };
+  if (_store) _store.setState({ user: updated });
+  return updated;
 }
 
 export function mockSendMessage(_token, chatId, content, attachments) {
@@ -174,8 +196,8 @@ export function mockSendMessage(_token, chatId, content, attachments) {
     id: 'mock-msg-' + Date.now(),
     chat_id: chatId,
     content,
-    user_id: 'dev-self',
-    author: userById('dev-self'),
+    user_id: currentUser().id,
+    author: currentUser(),
     created_at: now,
     edited_at: null,
     deleted: false,
@@ -260,15 +282,15 @@ export function mockAddReaction(_token, _chatId, msgId, emoji) {
   const msg = d.messages.find(m => m.id === msgId);
   if (msg) {
     const rxs = msg.reactions || [];
-    const existing = rxs.find(r => r.emoji === emoji);
-    if (existing) {
-      if (!existing.user_ids?.includes('dev-self')) {
-        existing.count += 1;
-        existing.user_ids = [...(existing.user_ids || []), 'dev-self'];
-        existing.me = true;
+    const existing = rxs.find(r => r.emoji === emoji && r.user_ids?.includes('dev-self'));
+    if (!existing) {
+      const byEmoji = rxs.find(r => r.emoji === emoji);
+      if (byEmoji) {
+        byEmoji.count += 1;
+        byEmoji.user_ids = [...(byEmoji.user_ids || []), 'dev-self'];
+      } else {
+        rxs.push({ emoji, count: 1, user_ids: ['dev-self'] });
       }
-    } else {
-      rxs.push({ emoji, count: 1, user_ids: ['dev-self'], me: true });
     }
   }
   if (_store) _store.getState().onReaction({ message_id: msgId, emoji, user_id: 'dev-self' }, true);
@@ -279,9 +301,11 @@ export function mockRemoveReaction(_token, _chatId, msgId, emoji) {
   const d = ensureData();
   const msg = d.messages.find(m => m.id === msgId);
   if (msg) {
-    const rxs = (msg.reactions || []).map(r =>
-      r.emoji === emoji ? { ...r, count: r.count - 1 } : r
-    ).filter(r => r.count > 0);
+    const rxs = (msg.reactions || []).map(r => {
+      if (r.emoji !== emoji) return r;
+      const filtered = (r.user_ids || []).filter(id => id !== 'dev-self');
+      return { ...r, count: filtered.length, user_ids: filtered };
+    }).filter(r => r.count > 0);
     msg.reactions = rxs;
   }
   if (_store) _store.getState().onReaction({ message_id: msgId, emoji, user_id: 'dev-self' }, false);
@@ -371,4 +395,13 @@ export function mockUpload(file) {
 
 export function mockUploadAvatar(_token, file) {
   return { url: URL.createObjectURL(file) };
+}
+
+export function mockTogglePin(_token, chatId) {
+  const d = ensureData();
+  const chat = d.chats.find(c => c.id === chatId);
+  if (!chat) return { ok: false };
+  chat.pinned = !chat.pinned;
+  if (_store) _store.getState().onChatUpdate({ id: chatId, pinned: chat.pinned });
+  return { ok: true, pinned: chat.pinned };
 }

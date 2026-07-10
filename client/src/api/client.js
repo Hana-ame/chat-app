@@ -7,6 +7,7 @@ import {
   mockListMessages, mockSendMessage, mockEditMessage, mockDeleteMessage,
   mockMarkRead, mockAddReaction, mockRemoveReaction,
   mockUpload, mockUploadAvatar,
+  mockTogglePin,
   resetMockData,
 } from './mock';
 import { createStreamSource } from '../dev/stream-source';
@@ -124,6 +125,8 @@ export const api = {
   removeReaction: (token, chatId, msgId, emoji) =>
     request('DELETE', '/api/chats/' + chatId + '/messages/' + msgId + '/reactions/' + encodeURIComponent(emoji), token),
 
+  togglePin: (_token, chatId) => request('POST', '/api/chats/' + chatId + '/pin', _token),
+
   // ── Uploads (external upload.moonchan.xyz) ──
   upload: async (file) => {
     const res = await fetch(UPLOAD_BASE + '/api/upload', {
@@ -213,6 +216,7 @@ const MOCKABLE = [
   ['removeReaction', mockRemoveReaction],
   ['upload', mockUpload],
   ['uploadAvatar', mockUploadAvatar],
+  ['togglePin', mockTogglePin],
 ];
 
 api.enableMock = () => {
