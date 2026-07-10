@@ -26,9 +26,12 @@ const API_BASE = IS_PAGES ? 'https://wsl-8080.moonchan.xyz' : '';
 - **Payload**: Raw binary stream
 - **Return URL**: `https://upload.moonchan.xyz/api/{id}/{filename}`
 
-## 📡 SSE (Real-time Events)
+## 📡 实时通信
 
-`api.sseUrl(token)` → `API_BASE + '/api/events?access_token={token}'`
+**主协议:** WebSocket (`ws://` / `wss://`) — `GET /ws?access_token={token}`
+**降级协议:** SSE — `api.sseUrl(token)` → `API_BASE + '/api/events?access_token={token}'`
+
+> 前端优先使用 WebSocket；仅在 mock 模式或 WS 不可用时降级到 SSE。
 
 ---
 
@@ -57,13 +60,13 @@ All standard API calls pass through the `request(method, path, token, body?)` he
 
 | Method | Endpoint | Parameters | Token | Body |
 |---|---|---|---|---|
-| `GET` | `/api/chats` | — | `token` | — |
+| `GET` | `/api/chats/my` | — | `token` | — |
 | `GET` | `/api/chats/public` | — | `token` | — |
 | `POST` | `/api/chats` | — | `token` | `{ type: "group", name, member_ids[], visibility: "public" \| "unlisted" \| "private" }` |
 | `GET` | `/api/chats/{id}` | `id`: chat ID | `token` | — |
 | `DELETE` | `/api/chats/{id}` | `id`: chat ID | `token` | — |
 | `PATCH` | `/api/chats/{id}` | `id`: chat ID | `token` | `{ name }` |
-| `POST` | `/api/dms` | — | `token` | `{ user_id }` | (Deprecated) |
+| `POST` | `/api/dms` | — | `token` | `{ user_id }` | ⚠️ Deprecated |
 | `POST` | `/api/chats/{id}/join` | `id`: chat ID | `token` | — |
 | `POST` | `/api/chats/{id}/pin` | `id`: chat ID | `token` | `{ content: "..." }` |
 | `PATCH` | `/api/chats/{id}/pin` | `id`: chat ID | `token` | `{ content: "..." }` |
@@ -80,11 +83,11 @@ All standard API calls pass through the `request(method, path, token, body?)` he
 
 | Method | Endpoint | Parameters | Token | Body |
 |---|---|---|---|---|
-| `GET` | `/api/chats/{chatId}/messages?limit={n}&before={msgId}` | `limit` (default 50), `before` (cursor) | `token` | — |
-| `POST` | `/api/chats/{chatId}/messages` | `chatId` | `token` | `{ content, attachments[] }` |
+| `GET` | `/api/chats/{chatId}/messages` | `limit` (default 50), `before` (cursor), `details` (bool) | `token` | — |
+| `POST` | `/api/chats/{chatId}/messages` | `chatId` | `token` | `{ content, attachments[] }` ⚠️ 附件 URL 必须在 `upload.moonchan.xyz`，否则 400；返回 **201** |
 | `PATCH` | `/api/chats/{chatId}/messages/{msgId}` | `chatId`, `msgId` | `token` | `{ content }` |
 | `DELETE` | `/api/chats/{chatId}/messages/{msgId}` | `chatId`, `msgId` | `token` | — |
-| `POST` | `/api/chats/{chatId}/read` | `chatId` | `token` | `{ message_id }` |
+| `POST` | `/api/chats/{chatId}/read` | `chatId` | `token` | `{ message_id }` ⚠️ Deprecated |
 
 ### Reactions
 
@@ -98,7 +101,7 @@ All standard API calls pass through the `request(method, path, token, body?)` he
 | Method | Endpoint | Parameters | Token | Body |
 |---|---|---|---|---|
 | `PUT` | `https://upload.moonchan.xyz/api/upload` | — | — | Raw binary (`file`) |
-| (calls `api.upload` internally) | — | `_token` (ignored), `file` | — | — |
+| `POST` | `/api/uploads` | — | `token` | multipart `file` ⚠️ Deprecated（Go 端保留，前端不再调用） |
 
 ### Application API (non-HTTP)
 

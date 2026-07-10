@@ -9,7 +9,8 @@ const USERS = [
 ];
 
 let seqId = Date.now();
-const id = (t) => `${t}-${seqId++}`;
+function id() { return `chat-${seqId++}`; }
+function mid() { return `msg-${seqId++}`; }
 
 function timeAgo(seconds) {
   return new Date(Date.now() - seconds * 1000).toISOString();
@@ -60,7 +61,6 @@ const GROUP_TOPICS = {
     ['Looks clean! Maybe add more comments', 'ME'],
     ['Will there be pizza at the next event?', 'dev-eve'],
     ['Always pizza 🍕', 'dev-carol'],
-    ['This is a very long message that goes on and on and should wrap to multiple lines to test text wrapping behavior in the chat view with long unbroken strings or many words repeated over and over again to fill up the space properly.', 'dev-dave'],
   ],
   'Dev Team': [
     ['PR is ready for review: `feat/add-dark-mode`', 'ME'],
@@ -104,7 +104,6 @@ const GROUP_TOPICS = {
     ['I\'ll bring snacks', 'dev-carol'],
     ['**sign me up**', 'ME'],
     ['~~bot Bob~~ just kidding', 'dev-dave'],
-    ['This is a very long message that goes on and on and should wrap to multiple lines to test text wrapping behavior in the chat view with long unbroken strings or many words repeated over and over again to fill up the space properly.', 'dev-frank'],
   ],
   'Music Club': [
     ['New album dropped today!', 'dev-eve'],
@@ -169,7 +168,6 @@ const GROUP_TOPICS = {
     ['I\'m going there tomorrow', 'dev-carol'],
     ['Get the fried chicken too', 'dev-bob'],
     ['~~skip the kimchi~~ EVERYONE GET THE KIMCHI', 'dev-dave'],
-    ['This is a very long message that goes on and on and should wrap to multiple lines to test text wrapping behavior in the chat view with long unbroken strings or many words repeated over and over again to fill up the space properly.', 'dev-frank'],
     ['Let\'s do a potluck next week!', 'dev-carol'],
   ],
   'Travel Pics': [
@@ -192,7 +190,6 @@ const GROUP_TOPICS = {
     ['Adding to my bucket list', 'dev-carol'],
     ['Let\'s plan a group trip!', 'dev-dave'],
     ['That would be epic', 'ME'],
-    ['This is a very long message that goes on and on and should wrap to multiple lines to test text wrapping behavior in the chat view with long unbroken strings or many words repeated over and over again to fill up the space properly.', 'dev-frank'],
   ],
   'Pet Lovers': [
     ['Look at my new puppy!', 'dev-carol'],
@@ -214,50 +211,40 @@ const GROUP_TOPICS = {
     ['Perfect name', 'dev-frank'],
     ['I\'m thinking of adopting from the shelter', 'ME'],
     ['Do it! Rescue animals are the best', 'dev-carol'],
-    ['This is a very long message that goes on and on and should wrap to multiple lines to test text wrapping behavior in the chat view with long unbroken strings or many words repeated over and over again to fill up the space properly.', 'dev-eve'],
   ],
 };
-
 const GROUP_NAMES = Object.keys(GROUP_TOPICS);
 
 const REACTION_EMOJIS = ['👍','❤️','😂','🎉','😢','😡','👀'];
 
-function pick(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
 function expandMessages(topicMsgs) {
   const result = [];
   for (const [content, userId] of topicMsgs) {
-    const isSystem = userId === 'GM';
-    const replies = Math.random() > 0.7 ? Math.floor(Math.random() * 3) + 1 : 0;
-    result.push({ content, userId, isSystem });
-    for (let r = 0; r < replies; r++) {
-      const replyUser = pick(USERS.filter(u => u.id !== userId));
-      const replyContents = [
-        '+1', 'Agreed!', '😂', '👍', 'Interesting...',
-        'No way!', 'I knew it!', 'totally', '💯',
-        'Can you elaborate?', 'Hmm', 'Sure!', 'Not bad',
-      ];
-      result.push({ content: pick(replyContents), userId: replyUser.id, isSystem: false });
-    }
+    result.push({ content, userId, isSystem: userId === 'GM' });
   }
   return result;
 }
+
+const aliceImgUrl = 'https://proxy.moonchan.xyz/mw2000/78318f19gy1id3yg7ubx0j20k00hkdhr.jpg?proxy_host=wx2.sinaimg.cn&proxy_referer=https%3A%2F%2Fweibo.com%2F';
+const dummyFiles = [
+  { name: 'project-spec.pdf', mime: 'application/pdf', size: 512000, url: 'https://upload.moonchan.xyz/api/test/spec.pdf' },
+  { name: 'archive.zip', mime: 'application/zip', size: 2048000, url: 'https://upload.moonchan.xyz/api/test/arc.zip' },
+  { name: 'meeting-notes.txt', mime: 'text/plain', size: 10240, url: 'https://upload.moonchan.xyz/api/test/notes.txt' },
+  { name: 'budget.xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', size: 307200, url: 'https://upload.moonchan.xyz/api/test/budget.xlsx' },
+];
 
 export function generateDummyData({ chatCount = 10, msgPerChat = 65 } = {}) {
   const chats = [];
   const allMessages = [];
 
-  // DM first
-  const dmChatId = id('chat');
-  const dmMembers = [ME, pick(USERS.filter(u => u.id !== ME.id))];
+  const dmChatId = id();
+  const dmMembers = [ME, USERS[4]];
   chats.push({
     id: dmChatId,
     name: null,
     type: 'dm',
     visibility: 'private',
-    pinned: true,
+    pinned: false,
     members: dmMembers,
     owner_id: ME.id,
     created_at: timeAgo(86400 * 10),
@@ -266,7 +253,7 @@ export function generateDummyData({ chatCount = 10, msgPerChat = 65 } = {}) {
     last_message: null,
   });
   for (let mi = 0; mi < msgPerChat; mi++) {
-    const author = pick(dmMembers);
+    const author = dmMembers[mi % 2];
     const contents = [
       'Hey! How are you?', 'Good, you?', 'Busy with work', 'Same here',
       'Wanna grab lunch?', 'Sure!', 'Meet at 12?', 'Perfect',
@@ -275,63 +262,36 @@ export function generateDummyData({ chatCount = 10, msgPerChat = 65 } = {}) {
     ];
     const isDeleted = mi === 2;
     const msg = {
-      id: id('msg'),
+      id: mid(),
       chat_id: dmChatId,
-      content: isDeleted ? '' : pick(contents),
+      content: isDeleted ? '' : contents[mi % contents.length],
       user_id: author.id,
       author: { ...author },
       created_at: timeAgo((msgPerChat - mi) * 120 + 3600),
       edited_at: mi === 5 ? timeAgo((msgPerChat - mi) * 120 + 3600) : null,
       deleted: isDeleted,
       attachments: [],
-      reactions: mi > 10 && mi % 5 === 0 ? (() => {
-        const set = new Set();
-        for (let i = 0; i < Math.floor(Math.random() * 2); i++) set.add(pick(REACTION_EMOJIS));
-        return [...set].map(e => ({ emoji: e, count: Math.floor(Math.random() * 2) + 1, me: Math.random() > 0.7 }));
-      })() : [],
+      reactions: mi > 10 && mi % 5 === 0 ? [{ emoji: '👍', count: 2, user_ids: [ME.id, USERS[4].id], me: true }] : [],
     };
     allMessages.push(msg);
     if (mi === msgPerChat - 1) chats[0].last_message = msg;
   }
 
-  const aliceImgUrl = 'https://proxy.moonchan.xyz/mw2000/78318f19gy1id3yg7ubx0j20k00hkdhr.jpg?proxy_host=wx2.sinaimg.cn&proxy_referer=https%3A%2F%2Fweibo.com%2F';
-  const dummyFiles = [
-    { name: 'project-spec.pdf', mime: 'application/pdf', size: 512000, url: 'https://upload.moonchan.xyz/api/test/spec.pdf' },
-    { name: 'archive.zip', mime: 'application/zip', size: 2048000, url: 'https://upload.moonchan.xyz/api/test/arc.zip' },
-    { name: 'meeting-notes.txt', mime: 'text/plain', size: 10240, url: 'https://upload.moonchan.xyz/api/test/notes.txt' },
-    { name: 'budget.xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', size: 307200, url: 'https://upload.moonchan.xyz/api/test/budget.xlsx' },
-  ];
-
-  let attachedCount = 0;
-  for (let mi = allMessages.length - 1; mi >= 0 && attachedCount < 15; mi--) {
+  for (let mi = allMessages.length - 1, c = 0; mi >= 0 && c < 15; mi--, c++) {
     const msg = allMessages[mi];
     if (msg.chat_id === dmChatId && msg.user_id === 'dev-self' && !msg.deleted) {
       msg.attachments = msg.attachments || [];
-      if (attachedCount % 2 === 0) {
-        msg.attachments.push({
-          id: id('att'),
-          filename: 'alice-photo.jpg',
-          mime_type: 'image/jpeg',
-          size: 102400,
-          url: aliceImgUrl,
-        });
+      if (c % 2 === 0) {
+        msg.attachments.push({ id: id(), filename: 'alice-photo.jpg', mime_type: 'image/jpeg', size: 102400, url: aliceImgUrl });
       } else {
-        const file = pick(dummyFiles);
-        msg.attachments.push({
-          id: id('att'),
-          filename: file.name,
-          mime_type: file.mime,
-          size: file.size,
-          url: file.url,
-        });
+        const file = dummyFiles[mi % dummyFiles.length];
+        msg.attachments.push({ id: id(), filename: file.name, mime_type: file.mime, size: file.size, url: file.url });
       }
-      attachedCount++;
     }
   }
 
-  // Group chats
   for (let ci = 0; ci < chatCount - 1; ci++) {
-    const chatId = id('chat');
+    const chatId = id();
     const groupName = GROUP_NAMES[ci % GROUP_NAMES.length];
     const topicMembers = GROUP_TOPICS[groupName].map(([, uid]) => USERS.find(u => u.id === uid)).filter(Boolean);
     const members = [...new Map(topicMembers.map(m => [m.id, m])).values()].slice(0, Math.min(topicMembers.length, 6));
@@ -355,11 +315,11 @@ export function generateDummyData({ chatCount = 10, msgPerChat = 65 } = {}) {
     for (let mi = 0; mi < msgPerChat; mi++) {
       const src = expandedTopics[mi % expandedTopics.length];
       const { content, userId, isSystem } = src;
-      const author = isSystem ? GM : USERS.find(u => u.id === userId) || pick(members);
+      const author = isSystem ? GM : USERS.find(u => u.id === userId) || members[0];
       const createdAt = timeAgo((msgPerChat - mi) * 180 + ci * 3600);
       const isDeleted = mi === 1;
       const msg = {
-        id: id('msg'),
+        id: mid(),
         chat_id: chatId,
         content: isDeleted ? '' : content,
         user_id: author.id,
@@ -368,15 +328,19 @@ export function generateDummyData({ chatCount = 10, msgPerChat = 65 } = {}) {
         edited_at: !isDeleted && mi === 3 ? createdAt : null,
         deleted: isDeleted,
         attachments: mi === 4 ? [
-          { id: id('att'), filename: 'photo.png', mime_type: 'image/png', size: 204800, url: 'https://upload.moonchan.xyz/api/test/photo.png' },
-          { id: id('att'), filename: 'document.pdf', mime_type: 'application/pdf', size: 1024000, url: 'https://upload.moonchan.xyz/api/test/doc.pdf' },
+          { id: id(), filename: 'photo.png', mime_type: 'image/png', size: 204800, url: 'https://upload.moonchan.xyz/api/test/photo.png' },
+          { id: id(), filename: 'document.pdf', mime_type: 'application/pdf', size: 1024000, url: 'https://upload.moonchan.xyz/api/test/doc.pdf' },
         ] : [],
-        reactions: !isDeleted && mi > 5 && mi % 3 === 0 ? (() => {
-          const set = new Set();
-          for (let i = 0; i < Math.floor(Math.random() * 3); i++) set.add(pick(REACTION_EMOJIS));
-          return [...set].map(e => ({ emoji: e, count: Math.floor(Math.random() * 2) + 1, me: Math.random() > 0.7 }));
-        })() : [],
+        reactions: [],
       };
+      if (!isDeleted && ci === 0 && mi > 5 && mi % 3 === 0) {
+        msg.reactions = [
+          { emoji: '👍', count: 2, user_ids: [ME.id, 'dev-bob'], me: true },
+          { emoji: '🎉', count: 1, user_ids: [ME.id], me: true },
+        ];
+      } else if (!isDeleted && mi > 5 && mi % 3 === 0) {
+        msg.reactions = [{ emoji: '😂', count: 1, user_ids: [ME.id], me: true }];
+      }
       allMessages.push(msg);
       if (mi === msgPerChat - 1) chat.last_message = msg;
     }

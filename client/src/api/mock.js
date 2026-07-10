@@ -143,6 +143,7 @@ export function mockCreateChat(_token, name, memberIds, visibility) {
 export function mockDeleteChat(_token, id) {
   const d = ensureData();
   d.chats = d.chats.filter(c => c.id !== id);
+  if (_store) _store.getState().onChatDelete({ chat_id: id });
   return { ok: true };
 }
 
@@ -229,9 +230,8 @@ export function mockSendMessage(_token, chatId, content, attachments) {
   d.messages.push(userMsg);
   if (_store) _store.getState().onMessageCreate(userMsg);
 
-  if (Math.random() < 0.5) {
-    const text = AI_RESPONSES[Math.floor(Math.random() * AI_RESPONSES.length)];
-    const aiId = randid();
+  const text = AI_RESPONSES[0];
+  const aiId = randid();
   const aiCreatedAt = new Date(Date.now() + 1).toISOString();
 
   const aiStoreMsg = {
@@ -249,7 +249,7 @@ export function mockSendMessage(_token, chatId, content, attachments) {
     source: async (emit) => {
       let acc = '';
       for (let i = 0; i < text.length; i++) {
-        await new Promise(r => setTimeout(r, 25 + Math.random() * 30));
+        await new Promise(r => setTimeout(r, 25 + 10 * i));
         emit(text[i]);
         acc += text[i];
         const m = d.messages.find(m => m.id === aiId);
@@ -274,11 +274,10 @@ export function mockSendMessage(_token, chatId, content, attachments) {
     streaming: true,
   };
 
-    setTimeout(() => {
-      d.messages.push(aiDataMsg);
-      if (_store) _store.getState().onMessageCreate(aiStoreMsg);
-    }, 500 + Math.random() * 800);
-  }
+  setTimeout(() => {
+    d.messages.push(aiDataMsg);
+    if (_store) _store.getState().onMessageCreate(aiStoreMsg);
+  }, 500);
 
   return userMsg;
 }
@@ -419,6 +418,7 @@ export function mockRenameChat(_token, _id, name) {
   const d = ensureData();
   const chat = d.chats.find(c => c.id === _id);
   if (chat) chat.name = name;
+  if (_store) _store.getState().onChatUpdate({ id: _id, name });
   return { ok: true };
 }
 
