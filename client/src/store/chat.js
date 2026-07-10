@@ -171,7 +171,8 @@ export const useChatStore = create((set, get) => ({
       return { ...c, last_message_at: lma, last_message: lm, unread_count: old.unread_count || 0 };
     });
       const sorted = merged.sort((a, b) => {
-        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+        const pa = !!a.pinned, pb = !!b.pinned;
+        if (pa !== pb) return pa ? -1 : 1;
         const da = a.last_message_at || a.created_at;
         const db = b.last_message_at || b.created_at;
         return new Date(db) - new Date(da);
@@ -193,7 +194,8 @@ export const useChatStore = create((set, get) => ({
         n = [updated, ...s.chats];
       }
       n.sort((a, b) => {
-        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+        const pa = !!a.pinned, pb = !!b.pinned;
+        if (pa !== pb) return pa ? -1 : 1;
         const da = a.last_message_at || a.created_at;
         const db = b.last_message_at || b.created_at;
         return new Date(db) - new Date(da);
@@ -229,7 +231,8 @@ export const useChatStore = create((set, get) => ({
       return {
         messages: s.activeChatId === msg.chat_id ? [...s.messages, msg] : s.messages,
         chats: s.chats.map(c => c.id === msg.chat_id ? { ...c, last_message: msg, last_message_at: msg.created_at, unread_count: s.activeChatId === msg.chat_id ? 0 : (c.unread_count || 0) + 1 } : c).sort((a,b) => {
-          if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+          const pa = !!a.pinned, pb = !!b.pinned;
+          if (pa !== pb) return pa ? -1 : 1;
           return new Date(b.last_message_at || b.created_at) - new Date(a.last_message_at || a.created_at);
         }),
       };

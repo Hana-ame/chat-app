@@ -19,6 +19,7 @@
 ## Authentication
 
 - **Header:** `Authorization: Bearer <token>` (primary)
+- **Cookie fallback:** `access_token` httpOnly cookie
 - **Query fallback:** `?access_token=<token>` (for SSE/WS)
 - **Algorithm:** HS256 (`github.com/golang-jwt/jwt/v5`)
 - **Context injection:** `*models.User` under key `"user"`, raw token under key `"token"`
@@ -61,15 +62,17 @@
 
 | # | Method | Path | Handler | Path Params |
 |---|--------|------|---------|-------------|
-| 13 | `GET` | `/api/chats` | `s.ListChats` | — |
+| 13 | `GET` | `/api/chats/my` | `s.ListChats` | — |
 | 14 | `GET` | `/api/chats/public` | `s.ListPublicChats` | — |
 | 15 | `POST` | `/api/chats` | `s.CreateChat` | — |
-| 16 | `POST` | `/api/dms` | `s.CreateOrGetDM` | — |
+| 16 | `POST` | `/api/dms` | `s.CreateOrGetDM` | ⚠️ Deprecated |
 | 17 | `GET` | `/api/chats/{chatID}` | `s.GetChat` | `chatID` |
 | 18 | `PATCH` | `/api/chats/{chatID}` | `s.RenameChat` | `chatID` |
 | 19 | `DELETE` | `/api/chats/{chatID}` | `s.DeleteChat` | `chatID` |
 | 20 | `POST` | `/api/chats/{chatID}/join` | `s.JoinChat` | `chatID` |
 | 21 | `POST` | `/api/chats/{chatID}/pin` | `s.PinChat` | `chatID` |
+| 21a | `PATCH` | `/api/chats/{chatID}/pin` | `s.UpdatePinnedChat` | `chatID` |
+| 21b | `DELETE` | `/api/chats/{chatID}/pin` | `s.DeletePinnedChat` | `chatID` |
 
 
 ### Members
@@ -88,7 +91,7 @@
 | 27 | `POST` | `/api/chats/{chatID}/messages` | `s.SendMessage` | `chatID` | — |
 | 28 | `PATCH` | `/api/chats/{chatID}/messages/{messageID}` | `s.EditMessage` | `chatID`, `messageID` | — |
 | 29 | `DELETE` | `/api/chats/{chatID}/messages/{messageID}` | `s.DeleteMessage` | `chatID`, `messageID` | — |
-| 30 | `POST` | `/api/chats/{chatID}/read` | `s.MarkRead` | `chatID` | — |
+| 30 | `POST` | `/api/chats/{chatID}/read` | `s.MarkRead` | `chatID` | ⚠️ Deprecated |
 
 ### Reactions
 
@@ -101,6 +104,6 @@
 
 | # | Method | Path | Handler | Auth | Input |
 |---|--------|------|---------|------|-------|
-| 33 | `POST` | `/api/uploads` | `s.Upload` | Required | multipart form, field `"file"`, max 20 MiB |
+| 33 | `POST` | `/api/uploads` | `s.Upload` | Required | ⚠️ Deprecated（前端直传 `upload.moonchan.xyz`） |
 
 Upload constraints: PNG, JPEG, GIF, WebP, MP4, WebM, MP3, OGG, WAV, PDF, plain text, ZIP, octet-stream.

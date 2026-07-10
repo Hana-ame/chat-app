@@ -131,6 +131,7 @@ export function mockCreateChat(_token, name, memberIds, visibility) {
     icon_color: CHAT_COLORS[d.chats.length % CHAT_COLORS.length],
     owner_id: cu.id,
     visibility: visibility || 'private',
+    pinned: false,
     created_at: new Date().toISOString(),
     last_message_at: null,
     members: [{ id: cu.id, ...userById(cu.id), role: 'owner' }, ...(memberIds || []).map(id => ({ id, ...userById(id), role: 'member' }))],

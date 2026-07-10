@@ -119,12 +119,19 @@ startStreaming(source:
 
 ## 🔄 Mock System
 
-When mock is enabled, three methods are overridden:
+When mock is enabled, API 方法被替换为内存态实现（`client/src/api/mock.js`）。Mock 模式下所有 handler 绕过 HTTP，直接操作 `data` 内存对象。
+
+**已知与 Go API 的差异（详见 `docs/mock-vs-go-api-report.md`）：**
+- Mock 不校验密码（任意密码可登录）
+- Mock 无 attachment URL 校验（Go 强制 `upload.moonchan.xyz`）
+- Mock `SendMessage` 50% 概率触发 AI 自动回复（Go 无此逻辑）
+- Mock 无 presence 在线状态广播
+- Mock `MarkRead` 无 membership/message_id 校验
 
 | Original | Mock Replacement |
 |---|---|
 | `api.listChats` | `mockListChats()` — returns `{ chats: [...] }` from dummy data |
 | `api.listMessages` | `mockListMessages(token, chatId, before?, limit?)` — paginated from dummy data |
-| `api.sendMessage` | `mockSendMessage(token, chatId, content, attachments?)` — creates user msg + delayed AI reply via `source.type: 'mock'` |
+| `api.sendMessage` | `mockSendMessage(token, chatId, content, attachments?)` — creates user msg, 50% chance AI reply |
 
-Helpers: `api.enableMock()`, `api.disableMock()`, `api.isMockEnabled()`
+Helpers: `api.enableMock()`, `api.disableMock()`, `api.isMockEnabled()`, `resetMockData()`
