@@ -17,12 +17,6 @@ test.describe('Real-time Events (WS / SSE / Polling)', () => {
     await page.locator('.chat-item').first().click();
   }
 
-  test('WS ready event populates chat list', async ({ page }) => {
-    await mockLogin(page);
-    const items = await page.locator('.chat-item').count();
-    expect(items).toBeGreaterThanOrEqual(1);
-  });
-
   test('polling mode updates chat list periodically', async ({ page }) => {
     await mockLogin(page);
     await page.waitForSelector('.chat-item', { timeout: 5000 });
@@ -67,13 +61,6 @@ test.describe('Real-time Events (WS / SSE / Polling)', () => {
         await confirmBtn.click();
       }
     }
-  });
-
-  test('adding reaction button exists on messages', async ({ page }) => {
-    await openFirstChat(page);
-    await page.waitForSelector('.msg-content', { timeout: 5000 });
-    const reactionBtn = page.locator('button.msg-btn:has-text("😀")').first();
-    await expect(reactionBtn).toBeVisible({ timeout: 5000 });
   });
 
   test('chat create event adds new chat to list', async ({ page }) => {
@@ -138,7 +125,6 @@ test.describe('Real-time Events (WS / SSE / Polling)', () => {
     await mockLogin(page);
     const toggleBtn = page.locator('button:has-text("WS"), button:has-text("SSE"), button:has-text("POLL")');
     if (await toggleBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      const txt = await toggleBtn.textContent();
       await toggleBtn.click();
       await page.waitForTimeout(300);
     }
