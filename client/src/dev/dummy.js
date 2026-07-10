@@ -237,60 +237,7 @@ export function generateDummyData({ chatCount = 10, msgPerChat = 65 } = {}) {
   const chats = [];
   const allMessages = [];
 
-  const dmChatId = id();
-  const dmMembers = [ME, USERS[4]];
-  chats.push({
-    id: dmChatId,
-    name: null,
-    type: 'dm',
-    visibility: 'private',
-    pinned: false,
-    members: dmMembers,
-    owner_id: ME.id,
-    created_at: timeAgo(86400 * 10),
-    last_message_at: timeAgo(60),
-    unread_count: 2,
-    last_message: null,
-  });
-  for (let mi = 0; mi < msgPerChat; mi++) {
-    const author = dmMembers[mi % 2];
-    const contents = [
-      'Hey! How are you?', 'Good, you?', 'Busy with work', 'Same here',
-      'Wanna grab lunch?', 'Sure!', 'Meet at 12?', 'Perfect',
-      'Did you see that movie?', 'Not yet', 'We should go', 'Definitely',
-      'I\'ll send you the link', 'Thanks!', '👍', 'Talk later!',
-    ];
-    const isDeleted = mi === 2;
-    const msg = {
-      id: mid(),
-      chat_id: dmChatId,
-      content: isDeleted ? '' : contents[mi % contents.length],
-      user_id: author.id,
-      author: { ...author },
-      created_at: timeAgo((msgPerChat - mi) * 120 + 3600),
-      edited_at: mi === 5 ? timeAgo((msgPerChat - mi) * 120 + 3600) : null,
-      deleted: isDeleted,
-      attachments: [],
-      reactions: mi > 10 && mi % 5 === 0 ? [{ emoji: '👍', count: 2, user_ids: [ME.id, USERS[4].id], me: true }] : [],
-    };
-    allMessages.push(msg);
-    if (mi === msgPerChat - 1) chats[0].last_message = msg;
-  }
-
-  for (let mi = allMessages.length - 1, c = 0; mi >= 0 && c < 15; mi--, c++) {
-    const msg = allMessages[mi];
-    if (msg.chat_id === dmChatId && msg.user_id === 'dev-self' && !msg.deleted) {
-      msg.attachments = msg.attachments || [];
-      if (c % 2 === 0) {
-        msg.attachments.push({ id: id(), filename: 'alice-photo.jpg', mime_type: 'image/jpeg', size: 102400, url: aliceImgUrl });
-      } else {
-        const file = dummyFiles[mi % dummyFiles.length];
-        msg.attachments.push({ id: id(), filename: file.name, mime_type: file.mime, size: file.size, url: file.url });
-      }
-    }
-  }
-
-  for (let ci = 0; ci < chatCount - 1; ci++) {
+  for (let ci = 0; ci < chatCount; ci++) {
     const chatId = id();
     const groupName = GROUP_NAMES[ci % GROUP_NAMES.length];
     const topicMembers = GROUP_TOPICS[groupName].map(([, uid]) => USERS.find(u => u.id === uid)).filter(Boolean);
@@ -334,12 +281,23 @@ export function generateDummyData({ chatCount = 10, msgPerChat = 65 } = {}) {
         reactions: [],
       };
       if (!isDeleted && ci === 0 && mi > 5 && mi % 3 === 0) {
-        msg.reactions = [
-          { emoji: '👍', count: 2, user_ids: [ME.id, 'dev-bob'], me: true },
-          { emoji: '🎉', count: 1, user_ids: [ME.id], me: true },
-        ];
+        if (mi % 6 === 0) {
+          msg.reactions = [
+            { emoji: '👍', count: 2, user_ids: [ME.id, 'dev-bob'] },
+            { emoji: '🎉', count: 2, user_ids: ['dev-carol', 'dev-dave'] },
+          ];
+        } else {
+          msg.reactions = [
+            { emoji: '👍', count: 2, user_ids: [ME.id, 'dev-bob'] },
+            { emoji: '🎉', count: 1, user_ids: [ME.id] },
+          ];
+        }
       } else if (!isDeleted && mi > 5 && mi % 3 === 0) {
-        msg.reactions = [{ emoji: '😂', count: 1, user_ids: [ME.id], me: true }];
+        if (mi % 6 === 0) {
+          msg.reactions = [{ emoji: '😂', count: 3, user_ids: ['dev-bob', 'dev-carol', 'dev-dave'] }];
+        } else {
+          msg.reactions = [{ emoji: '😂', count: 1, user_ids: [ME.id] }];
+        }
       }
       allMessages.push(msg);
       if (mi === msgPerChat - 1) chat.last_message = msg;

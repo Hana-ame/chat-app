@@ -240,54 +240,56 @@ export function mockSendMessage(_token, chatId, content, attachments) {
   d.messages.push(userMsg);
   if (_store) _store.getState().onMessageCreate(userMsg);
 
-  const text = AI_RESPONSES[0];
-  const aiId = randid();
-  const aiCreatedAt = new Date(Date.now() + 1).toISOString();
+  if (Math.random() < 0.5) {
+    const text = AI_RESPONSES[0];
+    const aiId = randid();
+    const aiCreatedAt = new Date(Date.now() + 1).toISOString();
 
-  const aiStoreMsg = {
-    id: aiId,
-    chat_id: chatId,
-    content: '',
-    user_id: 'ai',
-    author: userById('ai'),
-    created_at: aiCreatedAt,
-    edited_at: null,
-    deleted: false,
-    attachments: [],
-    reactions: [],
-    streaming: true,
-    source: async (emit) => {
-      let acc = '';
-      for (let i = 0; i < text.length; i++) {
-        await new Promise(r => setTimeout(r, 25 + 10 * i));
-        emit(text[i]);
-        acc += text[i];
+    const aiStoreMsg = {
+      id: aiId,
+      chat_id: chatId,
+      content: '',
+      user_id: 'ai',
+      author: userById('ai'),
+      created_at: aiCreatedAt,
+      edited_at: null,
+      deleted: false,
+      attachments: [],
+      reactions: [],
+      streaming: true,
+      source: async (emit) => {
+        let acc = '';
+        for (let i = 0; i < text.length; i++) {
+          await new Promise(r => setTimeout(r, 25 + 10 * i));
+          emit(text[i]);
+          acc += text[i];
+          const m = d.messages.find(m => m.id === aiId);
+          if (m) m.content = acc;
+        }
         const m = d.messages.find(m => m.id === aiId);
-        if (m) m.content = acc;
-      }
-      const m = d.messages.find(m => m.id === aiId);
-      if (m) m.streaming = false;
-    },
-  };
+        if (m) m.streaming = false;
+      },
+    };
 
-  const aiDataMsg = {
-    id: aiId,
-    chat_id: chatId,
-    content: '',
-    user_id: 'ai',
-    author: userById('ai'),
-    created_at: aiCreatedAt,
-    edited_at: null,
-    deleted: false,
-    attachments: [],
-    reactions: [],
-    streaming: true,
-  };
+    const aiDataMsg = {
+      id: aiId,
+      chat_id: chatId,
+      content: '',
+      user_id: 'ai',
+      author: userById('ai'),
+      created_at: aiCreatedAt,
+      edited_at: null,
+      deleted: false,
+      attachments: [],
+      reactions: [],
+      streaming: true,
+    };
 
-  setTimeout(() => {
-    d.messages.push(aiDataMsg);
-    if (_store) _store.getState().onMessageCreate(aiStoreMsg);
-  }, 500);
+    setTimeout(() => {
+      d.messages.push(aiDataMsg);
+      if (_store) _store.getState().onMessageCreate(aiStoreMsg);
+    }, 500);
+  }
 
   return userMsg;
 }

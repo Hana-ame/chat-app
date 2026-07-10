@@ -62,7 +62,7 @@ main.jsx → App.jsx → routes/* → store/* → api/*
 
 ## API 层
 
-> **功能概述：** API 层封装前端与后端之间的所有 HTTP 通信。它负责请求构造、响应解析、token 自动刷新、错误统一处理，以及 Mock 模式的无缝切换。整个前端（Store 层、组件层）只通过此层访问后端，不允许直接 `fetch`。
+> **功能概述：** API 层封装前端与后端之间的所有 HTTP 通信。它负责请求构造、响应解析、token 自动刷新、错误统一处理，以及 Mock 模式运行时切换。整个前端（Store 层、组件层）只通过此层访问后端，不允许直接 `fetch`。
 >
 > **使用场景：** 用户登录、发送消息、上传文件、搜索用户、切换聊天——所有需要与服务器交互的操作都经过 API 层。Mock 模式下，API 层将所有调用重定向到内存态实现，无需后端即可完整运行前端。
 
@@ -74,7 +74,7 @@ main.jsx → App.jsx → routes/* → store/* → api/*
 
 **内部组合：** `api` 对象（29 个方法 + `startStreaming`）→ `request()` 统一 fetch 入口 → `MOCKABLE` 数组映射 29 个 mock 函数 + `enableMock/disableMock` 运行时替换逻辑
 
-**功能概述：** `client.js` 是整个前端的 HTTP 通信中枢。它对外暴露一个 `api` 对象，包含所有 API 方法（login、listChats、sendMessage 等）。每个方法内部统一调用 `request()`，由 `request()` 处理 fetch 构造、JSON 解析、401 自动刷新、429 限流提示、错误抛出。此外，它提供 `enableMock()`/`disableMock()` 机制，在运行时将所有 API 方法替换为 `mock.js` 中的内存态实现，使前端无需后端即可运行。
+**功能概述：** `client.js` 对外暴露 `api` 对象，包含所有 API 方法（login、listChats、sendMessage 等）。每个方法内部统一调用 `request()`，由 `request()` 处理 fetch 构造、JSON 解析、401 自动刷新、429 限流提示、错误抛出。此外，它提供 `enableMock()`/`disableMock()` 机制，在运行时将所有 API 方法替换为 `mock.js` 中的内存态实现，使前端无需后端即可运行。
 
 **使用场景：**
 - 开发环境：Vite proxy 将 `/api/*` 转发到 `localhost:8080`，`client.js` 直接请求相对路径
@@ -256,9 +256,9 @@ export function mockSendMessage(_token, chatId, content, attachments) {
 
 ## Store 层
 
-> **功能概述：** Store 层是前端的状态管理中心，使用 Zustand 实现。它分为两个独立的 store：`auth.js` 管理用户身份（登录态、token、当前用户信息），`chat.js` 管理聊天数据（聊天列表、消息、实时连接）。Store 层是 API 层和 UI 组件之间的桥梁——API 层获取数据后写入 Store，组件从 Store 读取数据渲染，用户交互后组件调用 Store 方法触发 API 调用。
+> **功能概述：** Store 层是前端的状态管理中心，使用 Zustand 实现。它分为两个独立的 store：`auth.js` 管理用户身份（登录态、token、当前用户信息），`chat.js` 管理聊天数据（聊天列表、消息、实时连接）。数据流：API 层获取数据后写入 Store，组件从 Store 读取数据渲染，用户交互后组件调用 Store 方法触发 API 调用。
 >
-> **使用场景：** 用户登录后，`auth.js` 持久化 token 到 localStorage；`chat.js` 建立 WebSocket/SSE/Polling 连接接收实时消息；用户发送消息时，`chat.js` 调用 API 层发送，成功后将消息追加到本地状态；其他用户发来消息时，`chat.js` 的事件处理函数即时更新 Store，组件自动重渲染。
+> **使用场景：** 用户登录后，`auth.js` 持久化 token 到 localStorage；`chat.js` 建立 WebSocket/SSE/Polling 连接接收实时消息；用户发送消息时，`chat.js` 调用 API 层发送，成功后将消息追加到本地状态；接收到实时事件时，`chat.js` 的事件处理函数更新 Store，触发组件重渲染。
 
 ---
 
@@ -325,7 +325,7 @@ mockLogin: () => {
 
 **内部组合：** `connectWS/connectSSE/connectPolling` → 原生 WebSocket/EventSource/fetch 轮询；`disconnect` → 清理连接+定时器；事件处理（`onMessageCreate/Update/Delete`、`onReaction`、`onChatUpdate/Delete`）；`startConsumingStream/finishStreaming` → 流式消费；`setActiveChat/loadChats/loadMessages/sendMessage` → `api/client.js`
 
-**功能概述：** `chat.js` 是整个前端最核心的 Store，管理聊天列表、当前消息、实时连接（WS/SSE/Polling）、用户在线状态。它是实时通信的中枢——建立连接、解析事件、分发到对应的处理函数、更新状态、触发组件重渲染。所有实时事件（新消息、编辑、删除、reaction、聊天更新、成员变动、在线状态）都由它处理。此外，它负责消息的流式消费（AI 打字效果）和自动滚动触发。
+**功能概述：** `chat.js` 管理聊天列表、消息、实时连接（WS/SSE/Polling）、用户在线状态。它负责建立连接、解析事件、分发到对应的处理函数、更新状态。所有实时事件（新消息、编辑、删除、reaction、聊天更新、成员变动、在线状态）都由它处理。此外，它负责消息的流式消费（AI 打字效果）和自动滚动触发。
 
 **使用场景：**
 - 页面加载：`connectWS()`/`connectSSE()`/`connectPolling()` 建立实时连接，接收初始数据
@@ -441,7 +441,7 @@ disconnect() {
 
 > **功能概述：** Dev 层是前端的开发辅助工具集，包含三个模块：假数据生成器（`dummy.js`）为 Mock 模式提供初始数据；异步流封装（`stream-source.js`）为 AI 打字效果提供流式输出接口；模拟 WebSocket（`mock-ws.js`）在 Mock 模式下模拟实时连接的 `ready` 事件和消息轮询。这些模块仅在开发/Mock 模式下使用，生产环境不加载。
 >
-> **使用场景：** 开发者在登录页点击「Quick Enter」，`dummy.js` 生成 10 个聊天（9 群组 + 1 个已废弃 DM）× 65 条消息的假数据；用户发送消息后，`mockSendMessage` 通过 `stream-source.js` 流式输出 AI 回复；`mock-ws.js` 模拟 WebSocket 的 `ready` 事件，使聊天列表即时加载。
+> **使用场景：** 开发者在登录页点击「Quick Enter」，`dummy.js` 生成 10 个聊天（9 群组 + 1 个已废弃 DM）× 65 条消息的假数据；用户发送消息后，`mockSendMessage` 通过 `stream-source.js` 流式输出 AI 回复；`mock-ws.js` 模拟 WebSocket 的 `ready` 事件，触发聊天列表加载。
 
 ---
 
@@ -508,7 +508,7 @@ export function createStreamSource(asyncFn) {
 
 **内部组合：** `GROUP_TOPICS`（9 个群组主题预设）→ `generateDummyData({chatCount, msgPerChat})` → `{chats, messages, activeChatId, onlineUserIds}`；内部循环分别处理 DM 模式（10 条简短对话 + 末 15 条附件）和群组模式（18-20 条主题对话 + reactions）
 
-**功能概述：** `dummy.js` 为 Mock 模式提供完整的初始数据集。`generateDummyData()` 函数生成一套贴近真实使用场景的假数据：9 个命名群组 + 1 个已废弃的 DM 聊天（General、Random、Dev Team、Gaming 等），每个群组预设 18-20 条符合该主题的对话内容。数据包含已删除消息、已编辑消息、附件消息、reactions 等边界情况，确保 Mock 模式下能覆盖各种 UI 状态。ID 生成使用固定起始值（`seqId = 1`），保证每次运行生成相同的数据，CI 测试结果可复现。
+**功能概述：** `dummy.js` 为 Mock 模式提供初始数据集。`generateDummyData()` 函数生成 9 个命名群组 + 1 个已废弃 DM 聊天（General、Random、Dev Team、Gaming 等）的数据，每个群组预设 18-20 条对话内容。数据包含已删除消息、已编辑消息、附件消息、reactions 等多类消息形态。ID 生成使用固定起始值（`seqId = 1`），每次运行生成相同数据，CI 测试结果可复现。
 
 **使用场景：**
 - Mock 模式初始化：`mock.js` 的 `ensureData()` 调用 `generateDummyData()` 生成初始数据
@@ -540,9 +540,9 @@ export function createStreamSource(asyncFn) {
 
 ## 路由层
 
-> **功能概述：** 路由层使用 React Router v6 管理页面导航和权限控制。`App.jsx` 定义路由表并处理全局认证事件（token 过期时强制登出）；`ChatPage.jsx` 是主页面，管理三栏布局和实时连接的生命周期；`LoginPage.jsx` 和 `RegisterPage.jsx` 提供认证表单和开发者快捷入口。路由层还负责 URL 与 Store 状态的同步（如 `/g/:chatId` 对应 `activeChatId`）。
+> **功能概述：** 路由层使用 React Router v6 管理页面导航和权限控制。`App.jsx` 定义路由表并处理全局认证事件（token 过期时触发登出）；`ChatPage.jsx` 是主页面，管理三栏布局和实时连接的生命周期；`LoginPage.jsx` 和 `RegisterPage.jsx` 提供认证表单和开发者快捷入口。路由层还负责 URL 与 Store 状态的同步（如 `/g/:chatId` 对应 `activeChatId`）。
 >
-> **使用场景：** 用户访问 `/login` 看到登录表单，登录成功后跳转到 `/`（ChatPage）；用户点击聊天，URL 变为 `/g/:chatId`，ChatPage 加载对应聊天的消息；token 过期时，`client.js` 触发 `auth:unauthorized` 事件，App.jsx 捕获后强制跳转回 `/login`。
+> **使用场景：** 用户访问 `/login` 看到登录表单，登录成功后跳转到 `/`（ChatPage）；用户点击聊天，URL 变为 `/g/:chatId`，ChatPage 加载对应聊天的消息；token 过期时，`client.js` 触发 `auth:unauthorized` 事件，App.jsx 捕获后跳转回 `/login`。
 
 ---
 
@@ -665,7 +665,7 @@ useEffect(() => {
 
 ### `LoginPage.jsx` / `RegisterPage.jsx`
 
-**功能概述：** 登录和注册页面，提供用户认证表单。`LoginPage.jsx` 包含一个「Quick Enter」按钮（一键 Mock 登录），内部依次调用 `api.enableMock()`、`setDebugMode(true)`、`mockLogin()`。`RegisterPage.jsx` 有「Debug mode」复选框，勾选后显示「Quick Enter (mock)」按钮。
+**功能概述：** 登录和注册页面，提供用户认证表单。`LoginPage.jsx` 包含一个「Quick Enter」按钮，内部依次调用 `api.enableMock()`、`setDebugMode(true)`、`mockLogin()`。`RegisterPage.jsx` 仅包含注册表单，无 mock 入口。
 
 **使用场景：**
 - 新用户：访问 `/register`，填写邮箱/用户名/密码注册，成功后自动登录跳转到 `/`
@@ -685,15 +685,15 @@ useEffect(() => {
 
 ## 跨模块问题汇总
 
-| # | 问题 | 位置 | 严重性 | 状态 |
-|---|------|------|--------|------|
-| 1 | `/g/:chatId` 路由被 `/*` 吞掉 | App.jsx | 低 | ⏭️ 功能正常 |
-| 2 | `messages.length === 0` 检查全局而非当前 chat | ChatPage.jsx | 中 | ⏭️ 首次加载有影响 |
-| 3 | `api.markRead` 失败静默吞掉 | ChatPage.jsx | 低 | ⏭️ 可接受 |
-| 4 | ~~Mock 双数据源（c.members vs d.chatMembers）~~ | — | — | ❌ 幻觉已删除 |
-| 5 | `DmSearchPanel` 未被引用 | DmSearchPanel.jsx | 低 | ⏭️ 死代码 |
-| 6 | 无顶层 Error Boundary | main.jsx | 高 | ⏭️ 生产风险 |
-| 7 | HTTP 429 用 `alert()` 处理 | ChatView.jsx | 中 | ⏭️ 体验差 |
-| 8 | `#avatar-file-input` DOM 耦合 | SettingsModal / ChatList | 低 | ⏭️ 可用 |
-| 9 | Mock 模式无 presence | mock.js | 低 | ⏭️ 预期行为 |
-| 10 | 无 i18n，中英文混用 | PublicChannelList | 低 | ⏭️ |
+| # | 问题 | 位置 |
+|---|------|------|
+| 1 | `/g/:chatId` 路由被 `/*` 吞掉 | App.jsx |
+| 2 | `messages.length === 0` 检查全局而非当前 chat | ChatPage.jsx |
+| 3 | `api.markRead` 失败被 `.catch(()=>{})` 静默吞掉 | ChatPage.jsx |
+| 4 | ~~Mock 双数据源（c.members vs d.chatMembers）~~ | — |
+| 5 | `DmSearchPanel` 未被任何组件引用 | DmSearchPanel.jsx |
+| 6 | 无顶层 Error Boundary | main.jsx |
+| 7 | HTTP 429 用 `alert()` 处理 | ChatView.jsx |
+| 8 | `#avatar-file-input` 通过 id 跨组件耦合 | SettingsModal / ChatList |
+| 9 | Mock 模式无 presence | mock.js |
+| 10 | 无 i18n，中英文混用 | PublicChannelList |
