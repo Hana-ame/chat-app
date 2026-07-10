@@ -24,7 +24,7 @@ jobs:
         run: |
           npx vite --port 5173 &
           sleep 3
-          npx playwright test tests/ci.spec.mjs --reporter=list 2>&1
+          npx playwright test tests/ci.spec.mjs tests/real-time.spec.mjs --reporter=list 2>&1
 
   full-e2e:
     needs: mock-test
