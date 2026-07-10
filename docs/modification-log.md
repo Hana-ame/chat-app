@@ -1540,3 +1540,24 @@ compare(false, undefined)  → false !== undefined → true → false?     → 1
 - CI Frontend 测试选择器同步更新（去除 `text=Debug mode` 点击和 `text=Quick Enter (mock)` 选择器）
 
 ---
+
+### 8-3: AI 生成报告存在多处幻觉
+
+**反馈**: 两份自动生成的规范报告（`frontend-logic-spec-20260710.md`、`frontend-ui-spec-20260710.md`）包含不存在的概念。
+
+**根因**: AI 生成过程中产生了幻觉（hallucination），引入了代码库中根本不存在的标识符和依赖。
+
+**发现的问题**:
+
+| 报告 | 幻觉 | 实际 |
+|------|------|------|
+| `logic-spec` | `d.chatMembers` 扁平数组成员数据源 | 仅 `d.chats[].members` 单一内联数组 |
+| `logic-spec` | `buildChatResponse` 函数 | 不存在，chat 响应由 `mockListChats`/`mockGetChat` 直接构造 |
+| `logic-spec` | 注释 `// { users, chats, messages, reactions, chatMembers }` | `ensureData()` 实际只创建 `{ chats, messages }` |
+| `ui-spec` | 依赖 `Tailwind CSS` | 无 tailwind 配置，纯 CSS custom properties + inline styles |
+| `ui-spec` | 依赖 `Lucide Icons` | 全局搜索 0 匹配，使用 unicode emoji |
+| `ui-spec` | 依赖 `React 18` | `package.json` → `"react": "^19.0.0"` |
+
+**修正文档**: `docs/reports/frontend-logic-correction-20260710.md`
+
+---
