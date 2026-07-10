@@ -6,8 +6,7 @@ test.describe('Boundary & Security Tests', () => {
   async function mockLogin(page) {
     await page.goto('/login');
     await page.waitForSelector('.form-box');
-    await page.click('text=Debug mode');
-    await page.click('text=Quick Enter (mock)');
+    await page.click('text=Quick Enter');
     await page.waitForURL('/');
     await page.waitForSelector('.sidebar');
   }

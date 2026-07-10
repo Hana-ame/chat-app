@@ -1478,3 +1478,65 @@ compare(false, undefined)  → false !== undefined → true → false?     → 1
 - Frontend CI (mock 测试 27/27 + e2e 8/8): ✅
 
 ---
+
+## 2026-07-10 第 8 轮 — Reaction me 动态计算 + 登录页简化
+
+---
+
+### 8-1: Reaction `me` 字段从硬编码改为动态计算
+
+**反馈**: 修改名称后，reaction 的 `me` 归属显示不正确（连是不是自己的都显示错误）。
+
+**根因**: `mockListMessages` 返回的消息中的 `reactions[].me` 来自 `generateDummyData` 的硬编码 `me: true`。轮询刷新（`connectPolling`）定期调用 `mockListMessages`，原始硬编码 `me` 覆盖掉 `onReaction` 正确设置的 `me`。
+
+**代码变更** (`client/src/api/mock.js` — `mockListMessages`):
+
+```diff
+ export function mockListMessages(_token, chatId, before, limit) {
+   const all = messagesFor(chatId);
++  const cu = currentUser();
++  const mapped = all.map(msg => ({
++    ...msg,
++    reactions: (msg.reactions || []).map(r => ({
++      ...r,
++      me: r.user_ids?.includes(cu.id) || false,
++    })),
++  }));
+   if (before) {
+-    const idx = all.findIndex(m => m.id === before);
++    const idx = mapped.findIndex(m => m.id === before);
+     if (idx <= 0) return { messages: [] };
+-    const start = Math.max(0, idx - (limit || 50));
+-    return { messages: all.slice(start, idx) };
++    return { messages: mapped.slice(start, idx) };
+   }
+-  const total = all.length;
+-  return { messages: all.slice(start, total) };
++  return { messages: mapped.slice(start, total) };
+```
+
+`me` 改为 `r.user_ids?.includes(cu.id) || false`，确保每次返回的消息中 reaction 归属与当前用户一致。
+
+---
+
+### 8-2: 登录页简化 — 单一 Quick Enter 按钮
+
+**反馈**: Debug 模式开关 + Mock API 复选框 + Quick Enter 按钮三个控件操作繁琐；默认不应勾选 Mock API。
+
+**代码变更** (`client/src/routes/LoginPage.jsx`):
+
+```diff
+-  <label><input type="checkbox" checked={debugMode} onChange={...} /> Debug mode</label>
+-  <label><input type="checkbox" checked={api.isMockEnabled()} onChange={...} /> Mock API</label>
+-  {debugMode && <button ...>⚡ Quick Enter</button>}
++  <button ...>⚡ Quick Enter</button>
+```
+
+`quickEnter` 函数整合：`api.enableMock()` + `setDebugMode(true)` + `mockLogin()` + `nav('/')`，去除独立的 debugMode 和 Mock API 控件。
+
+---
+
+### 验证
+- CI Frontend 测试选择器同步更新（去除 `text=Debug mode` 点击和 `text=Quick Enter (mock)` 选择器）
+
+---

@@ -102,16 +102,24 @@ export function mockListChats() {
 
 export function mockListMessages(_token, chatId, before, limit) {
   const all = messagesFor(chatId);
+  const cu = currentUser();
+  const mapped = all.map(msg => ({
+    ...msg,
+    reactions: (msg.reactions || []).map(r => ({
+      ...r,
+      me: r.user_ids?.includes(cu.id) || false,
+    })),
+  }));
   if (before) {
-    const idx = all.findIndex(m => m.id === before);
+    const idx = mapped.findIndex(m => m.id === before);
     if (idx <= 0) return { messages: [] };
     const start = Math.max(0, idx - (limit || 50));
-    return { messages: all.slice(start, idx) };
+    return { messages: mapped.slice(start, idx) };
   }
-  const total = all.length;
+  const total = mapped.length;
   const pageSize = limit || 50;
   const start = Math.max(0, total - pageSize);
-  return { messages: all.slice(start, total) };
+  return { messages: mapped.slice(start, total) };
 }
 
 export function mockGetChat(_token, id) {
@@ -167,6 +175,7 @@ export function mockCreateDM(_token, userId) {
     ],
   };
   d.chats.unshift(newDM);
+  if (_store) _store.getState().onChatUpdate(newDM);
   return newDM;
 }
 

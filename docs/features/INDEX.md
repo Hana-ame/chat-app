@@ -13,3 +13,6 @@
 | [api-endpoints.md](./api-endpoints.md) | 前端使用的 API 高层概览 |
 | [ai-stream.md](./ai-stream.md) | AI 打字机的流式架构 |
 | [add-member.md](./add-member.md) | 向群组添加和移除成员 |
+| **审计报告** | |
+| [frontend-logic-spec-20260710.md](../reports/frontend-logic-spec-20260710.md) | 前端逻辑层规范（API层、Store层、Dev层、路由层） |
+| [frontend-ui-spec-20260710.md](../reports/frontend-ui-spec-20260710.md) | 前端 UI 层规范（组件架构、样式系统、组件关系图） |

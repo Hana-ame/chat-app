@@ -6,7 +6,7 @@ import { api } from '../api/client';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, debugMode, setDebugMode, mockLogin, loading, error } = useAuthStore();
+  const { login, setDebugMode, mockLogin, loading, error } = useAuthStore();
   const nav = useNavigate();
 
   const handle = async (e) => {
@@ -15,6 +15,8 @@ export default function LoginPage() {
   };
 
   const quickEnter = () => {
+    api.enableMock();
+    setDebugMode(true);
     mockLogin();
     nav('/');
   };
@@ -33,19 +35,9 @@ export default function LoginPage() {
           {loading ? 'Logging in...' : 'Log In'}
         </button>
         <div style={{display:'flex',alignItems:'center',gap:8,marginTop:12,fontSize:12,color:'var(--text-muted)'}}>
-          <label style={{display:'flex',alignItems:'center',gap:4,cursor:'pointer'}}>
-            <input type="checkbox" checked={debugMode} onChange={e => setDebugMode(e.target.checked)} />
-            Debug mode
-          </label>
-          <label style={{display:'flex',alignItems:'center',gap:4,cursor:'pointer'}}>
-            <input type="checkbox" checked={api.isMockEnabled()} onChange={e => {
-              if (e.target.checked) api.enableMock(); else api.disableMock();
-            }} />
-            Mock API
-          </label>
-          {debugMode && <button type="button" className="btn-ghost" style={{fontSize:12}} onClick={quickEnter}>
+          <button type="button" className="btn-ghost" style={{fontSize:12}} onClick={quickEnter}>
             ⚡ Quick Enter
-          </button>}
+          </button>
         </div>
         <p style={{marginTop:12,fontSize:13,color:'var(--text-muted)'}}>
           Need an account? <Link to="/register">Register</Link>

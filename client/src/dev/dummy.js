@@ -8,7 +8,7 @@ const USERS = [
   { id: 'dev-frank', username: 'Frank', avatar_color: '#1abc9c' },
 ];
 
-let seqId = Date.now();
+let seqId = 1;
 function id() { return `chat-${seqId++}`; }
 function mid() { return `msg-${seqId++}`; }
 

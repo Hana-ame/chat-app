@@ -6,7 +6,6 @@ test.describe('Mock API Mode (CI)', () => {
   async function mockLogin(page) {
     await page.goto('/login');
     await page.waitForSelector('.form-box');
-    await page.click('text=Debug mode');
     await page.click('text=Quick Enter');
     await page.waitForURL('/');
     await page.waitForSelector('.sidebar');
@@ -18,10 +17,9 @@ test.describe('Mock API Mode (CI)', () => {
     await page.locator('.chat-item').first().click();
   }
 
-  test('debug mode toggle shows mock button', async ({ page }) => {
+  test('mock login button visible on login page', async ({ page }) => {
     await page.goto('/login');
     await page.waitForSelector('.form-box');
-    await page.click('text=Debug mode');
     await expect(page.locator('text=Quick Enter')).toBeVisible();
   });
 
