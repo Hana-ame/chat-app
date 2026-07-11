@@ -17,6 +17,7 @@ jobs:
       - uses: actions/setup-go@v5
         with: { go-version: '1.23' }
       - run: go vet ./...
+      # WS tests 为后续版本预备，当前版本不启用（需设置 WS_ENABLED=1）
       - run: go test ./... -cover -coverprofile=coverage.out -count=1 -timeout 120s
       - uses: actions/upload-artifact@v4
         if: always()
@@ -104,6 +105,9 @@ jobs:
         with:
           name: chatd-release
           path: release/**
+      - name: Package client dist
+        run: |
+          tar -czf release/client-dist.tar.gz -C client-dist .
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -116,4 +120,5 @@ jobs:
             release/chatd-linux-amd64 \
             release/chatd-linux-arm64 \
             release/chatd-windows-amd64.exe \
+            release/client-dist.tar.gz \
             || echo "::warning::Release creation skipped (may already exist)"
