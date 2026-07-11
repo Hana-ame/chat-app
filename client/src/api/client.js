@@ -5,7 +5,7 @@ import {
   mockSetPinnedMessage, mockClearPinnedMessage,
   mockAddMember, mockRemoveMember, mockSearchUsers, mockUpdateProfile,
   mockListMessages, mockSendMessage, mockEditMessage, mockDeleteMessage,
-  mockMarkRead, mockAddReaction, mockRemoveReaction,
+  mockMarkRead, mockAddReaction, mockRemoveReaction, mockGetReactions,
   mockUpload, mockUploadAvatar,
   mockTogglePin, mockMarkPinnedRead,
   resetMockData,
