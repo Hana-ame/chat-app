@@ -20,7 +20,7 @@ func (d *DB) ListPublicChats(ctx context.Context, page, limit int) ([]models.Cha
 	rows, err := d.QueryContext(ctx,
 		`SELECT c.id, c.type, c.name, c.icon_color, COALESCE(c.visibility,'private'), c.owner_id, c.created_at, c.last_message_at, c.pinned_message, c.pinned_updated_at,
 		        (SELECT COUNT(*) FROM chat_members WHERE chat_id = c.id) AS member_count,
-		        (SELECT content FROM messages WHERE chat_id = c.id AND deleted = 0 ORDER BY created_at DESC LIMIT 1) AS last_message_content
+		        (SELECT content FROM messages WHERE chat_id = c.id AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1) AS last_message_content
 		 FROM chats c WHERE c.type = 'group' AND c.visibility = 'public'
 		 ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
 		 LIMIT ? OFFSET ?`, limit, offset,
