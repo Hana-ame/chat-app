@@ -32,28 +32,32 @@ type PinnedContent struct {
 }
 
 type Chat struct {
-    ID              string     `json:"id"`
-    Type            string     `json:"type"`
-    Name            string     `json:"name,omitempty"`
-    IconColor       string     `json:"icon_color,omitempty"`
-    Visibility      string     `json:"visibility,omitempty"`
-    OwnerID         string     `json:"owner_id,omitempty"`
-    CreatedAt       time.Time  `json:"created_at"`
-    LastMessageAt   time.Time  `json:"last_message_at"`
-    LastMessageID   string     `json:"last_message_id"`
-    MemberCount     int        `json:"member_count"`
-    UnreadCount     int        `json:"unread_count"`
+    ID              string         `json:"id"`
+    Type            string         `json:"type"`
+    Name            string         `json:"name,omitempty"`
+    IconColor       string         `json:"icon_color,omitempty"`
+    Visibility      string         `json:"visibility,omitempty"`
+    OwnerID         string         `json:"owner_id,omitempty"`
+    CreatedAt       time.Time      `json:"created_at"`
+    LastMessageAt   time.Time      `json:"last_message_at"`
+    MemberCount     int            `json:"member_count"`
+    UnreadCount     int            `json:"unread_count"`
     PinnedMessage   *PinnedContent `json:"pinned_message,omitempty"`
-    LastMessage     *Message   `json:"last_message,omitempty"`
+    PinnedUpdatedAt  *time.Time    `json:"pinned_updated_at,omitempty"`
+    PinnedLastReadAt *time.Time   `json:"pinned_last_read_at,omitempty"`
+    LastMessageID   string         `json:"last_message_id,omitempty"`
+    // Deprecated.
+    LastMessage     *Message       `json:"last_message,omitempty"`
 }
 
 type ChatMember struct {
-    ChatID            string    `json:"chat_id"`
-    UserID            string    `json:"user_id"`
-    Role              string    `json:"role"`
-    LastSeen          time.Time `json:"last_seen,omitempty"`
-    JoinedAt          time.Time `json:"joined_at"`
-    LastReadMessageID string    `json:"last_read_message_id,omitempty"`
+    ChatID            string     `json:"chat_id"`
+    UserID            string     `json:"user_id"`
+    Role              string     `json:"role"`
+    LastSeen          time.Time  `json:"last_seen,omitempty"`
+    JoinedAt          time.Time  `json:"joined_at"`
+    LastReadMessageID string     `json:"last_read_message_id,omitempty"`
+    PinnedLastReadAt  *time.Time `json:"pinned_last_read_at,omitempty"`
 }
 
 type Message struct {
@@ -130,6 +134,8 @@ type RefreshToken struct {
 | MemberCount | `int` | `"member_count"` | 服务端缓存 | 存储于 `chats` 表，`CreateChat`/`AddChatMember`/`RemoveChatMember` 时更新 |
 | UnreadCount | `int` | `"unread_count"` | (Deprecated) 服务端计算 | `COUNT(messages) WHERE deleted_at IS NULL AND (created_at,id) > lastReadID` |
 | PinnedMessage | `*PinnedContent` | `"pinned_message"` | 用户动作 | JSON 对象 `{"content","pinned_at"}`；由 `SetPinnedMessage` 写入 |
+| PinnedUpdatedAt | `*time.Time` | `"pinned_updated_at"` | 服务端更新 | `SetPinnedMessage` 写入当前时间；`ClearPinnedMessage` 清为 NULL |
+| PinnedLastReadAt | `*time.Time` | `"pinned_last_read_at"` | 服务端更新 | 每个成员独立；调用 `UpdatePinnedLastReadAt` 时写入当前时间 |
 | LastMessageID | `string` | `"last_message_id"` | 服务端缓存 | 存储在 `chats` 表中，由发送消息时更新 |
 | LastMessage | `*Message` | `"last_message"` | (Deprecated) 服务端查询 | `fetchMessageRow(chat_id, LIMIT 1)`·无 `attachExtras` |
 
@@ -143,6 +149,7 @@ type RefreshToken struct {
 | LastSeen | `time.Time` | `"last_seen"` | 服务端更新 | WS 连接/断开 及 发消息时更新为 `now` |
 | JoinedAt | `time.Time` | `"joined_at"` | 服务端生成 | SQLite default |
 | LastReadMessageID | `string` | `"last_read_message_id"` | (Deprecated) 用户动作 | 调用 `POST /read` 时更新 |
+| PinnedLastReadAt | `*time.Time` | `"pinned_last_read_at"` | 服务端更新 | 调用 `UpdatePinnedLastReadAt` 时写入；初始化未读为 NULL |
 
 ### Message
 

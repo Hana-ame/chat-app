@@ -347,6 +347,12 @@ func (s *Server) PinChat(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	if s.Hub != nil {
+		updated, _ := s.DB.GetChat(r.Context(), id)
+		if updated != nil {
+			s.Hub.BroadcastChatUpdated(updated)
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
@@ -385,6 +391,12 @@ func (s *Server) DeletePinnedChat(w http.ResponseWriter, r *http.Request) {
 	if err := s.DB.ClearPinnedMessage(r.Context(), id); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
+	}
+	if s.Hub != nil {
+		updated, _ := s.DB.GetChat(r.Context(), id)
+		if updated != nil {
+			s.Hub.BroadcastChatUpdated(updated)
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }

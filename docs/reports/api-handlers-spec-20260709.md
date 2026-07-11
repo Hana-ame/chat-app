@@ -1625,11 +1625,17 @@ func (s *Server) PinChat(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	if s.Hub != nil {
+		updated, _ := s.DB.GetChat(r.Context(), id)
+		if updated != nil {
+			s.Hub.BroadcastChatUpdated(updated)
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 ```
 
-**依赖链:** `userFrom → chi.URLParam → DB.GetChat → DB.ChatMemberCount → decodeJSON → DB.SetPinnedMessage → writeJSON`
+**依赖链:** `userFrom → chi.URLParam → DB.GetChat → DB.ChatMemberCount → decodeJSON → DB.SetPinnedMessage → DB.GetChat → Hub.BroadcastChatUpdated → writeJSON`
 
 **`requireOwnerOrAdmin` 依赖链:** `DB.GetChat → DB.GetChatMemberRole`
 
@@ -1641,6 +1647,7 @@ func (s *Server) PinChat(w http.ResponseWriter, r *http.Request) {
 - `n < 3` → `400 {"error":"bad_request","message":"need at least 3 members to pin"}`
 - `decodeJSON` 失败 → `400`
 - `DB.SetPinnedMessage` 失败 → `500`
+- `s.Hub != nil` → `DB.GetChat` → `Hub.BroadcastChatUpdated(updated)`
 
 **`requireOwnerOrAdmin` 条件分支:**
 - `DB.GetChat` 失败 → 透传 err
@@ -1693,16 +1700,23 @@ func (s *Server) DeletePinnedChat(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	if s.Hub != nil {
+		updated, _ := s.DB.GetChat(r.Context(), id)
+		if updated != nil {
+			s.Hub.BroadcastChatUpdated(updated)
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 ```
 
-**依赖链:** `userFrom → chi.URLParam → requireOwnerOrAdmin → DB.ClearPinnedMessage → writeJSON`
+**依赖链:** `userFrom → chi.URLParam → requireOwnerOrAdmin → DB.ClearPinnedMessage → DB.GetChat → Hub.BroadcastChatUpdated → writeJSON`
 
 **条件分支:**
 - `userFrom(ctx) == nil` → `401`
 - `requireOwnerOrAdmin` 失败 → `403`
 - `DB.ClearPinnedMessage` 失败 → `500`
+- `s.Hub != nil` → `DB.GetChat` → `Hub.BroadcastChatUpdated(updated)`
 
 **Response 200:** `{"ok":true}`
 

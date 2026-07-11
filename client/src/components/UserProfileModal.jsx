@@ -1,4 +1,9 @@
+import { useState } from 'react';
+import ImagePreviewModal from './ImagePreviewModal';
+
 export default function UserProfileModal({ user: profileUser, onClose }) {
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [avatarError, setAvatarError] = useState(false);
   if (!profileUser) return null;
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -7,8 +12,8 @@ export default function UserProfileModal({ user: profileUser, onClose }) {
           <button className="btn-ghost" onClick={onClose}>✕</button>
         </div>
 
-        {profileUser.avatar_url
-          ? <img src={profileUser.avatar_url} alt="" style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', margin: '8px auto' }} />
+        {profileUser.avatar_url && !avatarError
+          ? <img src={profileUser.avatar_url} alt="" style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', margin: '8px auto', cursor: 'pointer' }} onClick={() => setPreviewUrl(profileUser.avatar_url)} onError={() => setAvatarError(true)} />
           : <div className="msg-avatar" style={{ width: 64, height: 64, fontSize: 28, background: profileUser.avatar_color || '#5865F2', margin: '8px auto' }}>
               {profileUser.username ? profileUser.username[0].toUpperCase() : '?'}
             </div>
@@ -35,6 +40,9 @@ export default function UserProfileModal({ user: profileUser, onClose }) {
           </div>
         </div>
       </div>
+      {previewUrl && (
+        <ImagePreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
+      )}
     </div>
   );
 }

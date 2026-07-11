@@ -4,6 +4,7 @@ import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 import { renderContent } from './renderContent';
 import UserProfileModal from './UserProfileModal';
+import ImagePreviewModal from './ImagePreviewModal';
 
 const COMMON_EMOJI = ['👍','❤️','😂','🎉','😢','😡','👀','🔥','✅','❌'];
 
@@ -22,6 +23,8 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
   const [editText, setEditText] = useState(msg.content);
   const [opPending, setOpPending] = useState(false);
   const [profileUser, setProfileUser] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [avatarError, setAvatarError] = useState(false);
 
   const author = useMemo(() => {
     const chat = chats.find(c => c.id === chatId);
@@ -87,8 +90,8 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
       <div className={'msg-row' + (sameAuthor ? ' msg-continuation' : '')}>
         {!sameAuthor && (
           <div onClick={() => setProfileUser(author)} style={{ cursor: 'pointer' }}>
-            {author.avatar_url
-              ? <img src={author.avatar_url} className="msg-avatar-img" alt={author.username} />
+            {author.avatar_url && !avatarError
+              ? <img src={author.avatar_url} className="msg-avatar-img" alt={author.username} onClick={e => { e.stopPropagation(); setPreviewUrl(author.avatar_url); }} onError={() => setAvatarError(true)} />
               : <div className="msg-avatar" style={{background:author.avatar_color}}>{initials}</div>
             }
           </div>
@@ -160,6 +163,9 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
       </div>
       {profileUser && (
         <UserProfileModal user={profileUser} onClose={() => setProfileUser(null)} />
+      )}
+      {previewUrl && (
+        <ImagePreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
       )}
     </div>
   );

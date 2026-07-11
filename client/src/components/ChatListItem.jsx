@@ -34,7 +34,6 @@ export default function ChatListItem({ chat, activeId, onSelectChat, onContextMe
       </div>
       <div className="chat-item-info">
         <div style={{display:'flex',alignItems:'center',gap:4}}>
-          {chat.pinned && <span style={{fontSize:12}}>📌</span>}
           <div className="chat-item-name">{name}</div>
           <span style={{fontSize:10,padding:'0 5px',borderRadius:3,fontWeight:500,background: chat.visibility === 'public' ? 'rgba(35,165,89,0.15)' : chat.visibility === 'unlisted' ? 'rgba(88,101,242,0.15)' : 'rgba(128,132,142,0.15)', color: chat.visibility === 'public' ? '#23a559' : chat.visibility === 'unlisted' ? '#5865F2' : 'var(--text-muted)'}}>
             {chat.visibility || 'private'}

@@ -1,8 +1,11 @@
 import { useState } from 'react';
+import ImagePreviewModal from './ImagePreviewModal';
 
 export default function SettingsModal({ user, onClose, onSave }) {
   const [name, setName] = useState(user.username);
   const [saving, setSaving] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [avatarError, setAvatarError] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
@@ -20,14 +23,17 @@ export default function SettingsModal({ user, onClose, onSave }) {
           <button className="btn-ghost" onClick={onClose}>✕</button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-          {user.avatar_url
-            ? <img src={user.avatar_url} className="settings-avatar-img" alt="" onClick={() => document.getElementById('avatar-file-input')?.click()} style={{ cursor: 'pointer' }} />
-            : <div className="settings-avatar-placeholder" style={{ background: user.avatar_color }}
-              onClick={() => document.getElementById('avatar-file-input')?.click()}>
+          {user.avatar_url && !avatarError
+            ? <img src={user.avatar_url} className="settings-avatar-img" alt="" onClick={() => setPreviewUrl(user.avatar_url)} style={{ cursor: 'pointer' }} onError={() => setAvatarError(true)} />
+            : <div className="settings-avatar-placeholder" style={{ background: user.avatar_color }}>
               {user.username[0].toUpperCase()}
             </div>
           }
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Click to upload</div>
+          {user.avatar_url ? (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => document.getElementById('avatar-file-input')?.click()}>Change avatar</div>
+          ) : (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => document.getElementById('avatar-file-input')?.click()}>Click to upload</div>
+          )}
           <input id="avatar-file-input" type="file" accept="image/*" style={{ display: 'none' }} />
         </div>
         <label className="form-label">Display Name</label>
@@ -40,6 +46,9 @@ export default function SettingsModal({ user, onClose, onSave }) {
           </button>
         </div>
       </div>
+      {previewUrl && (
+        <ImagePreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
+      )}
     </div>
   );
 }

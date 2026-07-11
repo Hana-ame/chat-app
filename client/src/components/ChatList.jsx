@@ -9,6 +9,7 @@ import SettingsModal from './SettingsModal';
 import ChatInfoModal from './ChatInfoModal';
 import ScrollArea from './ScrollArea';
 import EmptyState from './EmptyState';
+import ImagePreviewModal from './ImagePreviewModal';
 
 const MODES = [
   { key: 'ws', label: 'WS' },
@@ -28,6 +29,8 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const [contextMenu, setContextMenu] = useState(null); // { chatId, x, y }
   const [showSettings, setShowSettings] = useState(false);
   const [showChatInfo, setShowChatInfo] = useState(null); // chatId
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [avatarError, setAvatarError] = useState(false);
 
   const joinAction = chatSearch.trim() && /^\d{1,2}-\d{1,2}$/.test(chatSearch.trim()) ? 'join'
     : chatSearch.trim() && /^\d+$/.test(chatSearch.trim()) ? 'join'
@@ -189,10 +192,10 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       </ScrollArea>
 
       <div className="sidebar-footer">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={() => setShowSettings(true)}>
-          {user?.avatar_url
-            ? <img src={user.avatar_url} className="user-avatar-img" alt="" />
-            : <div className="chat-item-avatar" style={{ width: 32, height: 32, fontSize: 13, background: user?.avatar_color || '#5865F2' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={(e) => { if (!e.target.closest('img')) setShowSettings(true); }}>
+          {user?.avatar_url && !avatarError
+            ? <img src={user.avatar_url} className="user-avatar-img" alt="" onClick={e => { e.stopPropagation(); setPreviewUrl(user.avatar_url); }} onError={() => setAvatarError(true)} />
+            : <div className="chat-item-avatar" style={{ width: 32, height: 32, fontSize: 13, background: user?.avatar_color || '#5865F2' }} onClick={() => setShowSettings(true)}>
               {(user?.username?.[0] || '?').toUpperCase()}
             </div>
           }
@@ -225,6 +228,9 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       )}
       {showSettings && (
         <SettingsModal user={user} onClose={() => setShowSettings(false)} onSave={handleSaveSettings} />
+      )}
+      {previewUrl && (
+        <ImagePreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
       )}
     </div>
   );

@@ -87,6 +87,7 @@ CREATE INDEX IF NOT EXISTS idx_chat_members_user ON chat_members(user_id);
 ALTER TABLE chat_members ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE chat_members ADD COLUMN role TEXT NOT NULL DEFAULT '';
 ALTER TABLE chat_members ADD COLUMN last_seen TEXT;
+ALTER TABLE chat_members ADD COLUMN pinned_last_read_at TEXT;
 
 -- ── Messages ─────────────────────────────────────────────────────────────────
 

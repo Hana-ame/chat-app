@@ -302,12 +302,136 @@ func TestSetAndClearPinnedMessage(t *testing.T) {
 	if c.PinnedMessage == nil || c.PinnedMessage.Content != "pinned!" {
 		t.Fatal("pinned message not set")
 	}
+	if c.PinnedUpdatedAt == nil || c.PinnedUpdatedAt.IsZero() {
+		t.Fatal("pinned_updated_at should be set")
+	}
 	if err := f.DB.ClearPinnedMessage(f.Ctx(), chat.ID); err != nil {
 		t.Fatal(err)
 	}
 	c, _ = f.DB.GetChat(f.Ctx(), chat.ID)
 	if c.PinnedMessage != nil {
 		t.Fatal("pinned message not cleared")
+	}
+	if c.PinnedUpdatedAt != nil {
+		t.Fatal("pinned_updated_at should be nil after clear")
+	}
+}
+
+func TestSetPinnedMessage_MultipleUpdates(t *testing.T) {
+	f := testutil.New(t)
+	a, _ := f.DB.CreateUser(f.Ctx(), "pinmulti@x.com", "PinMulti", "pw")
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "PinMulti", "", a.ID, []string{a.ID})
+
+	f.DB.SetPinnedMessage(f.Ctx(), chat.ID, "v1")
+	c, _ := f.DB.GetChat(f.Ctx(), chat.ID)
+	v1t := *c.PinnedUpdatedAt
+
+	f.DB.SetPinnedMessage(f.Ctx(), chat.ID, "v2")
+	c, _ = f.DB.GetChat(f.Ctx(), chat.ID)
+	if c.PinnedMessage.Content != "v2" {
+		t.Fatal("content not updated")
+	}
+	if !c.PinnedUpdatedAt.After(v1t) {
+		t.Fatal("pinned_updated_at should advance")
+	}
+}
+
+func TestUpdatePinnedLastReadAt(t *testing.T) {
+	f := testutil.New(t)
+	a, _ := f.DB.CreateUser(f.Ctx(), "pread@x.com", "PRead", "pw")
+	b, _ := f.DB.CreateUser(f.Ctx(), "pread2@x.com", "PRead2", "pw")
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "PReadTest", "", a.ID, []string{a.ID, b.ID})
+
+	f.DB.SetPinnedMessage(f.Ctx(), chat.ID, "notice")
+	if err := f.DB.UpdatePinnedLastReadAt(f.Ctx(), chat.ID, a.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.DB.UpdatePinnedLastReadAt(f.Ctx(), chat.ID, b.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	chats, err := f.DB.ListUserChats(f.Ctx(), a.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found *models.Chat
+	for _, c := range chats {
+		if c.ID == chat.ID {
+			found = &c
+			break
+		}
+	}
+	if found == nil {
+		t.Fatal("chat not found in list")
+	}
+	if found.PinnedLastReadAt == nil || found.PinnedLastReadAt.IsZero() {
+		t.Fatal("pinned_last_read_at should be set for user a")
+	}
+
+	chats, _ = f.DB.ListUserChats(f.Ctx(), b.ID)
+	found = nil
+	for _, c := range chats {
+		if c.ID == chat.ID {
+			found = &c
+			break
+		}
+	}
+	if found == nil {
+		t.Fatal("chat not found for user b")
+	}
+	if found.PinnedLastReadAt == nil || found.PinnedLastReadAt.IsZero() {
+		t.Fatal("pinned_last_read_at should be set for user b")
+	}
+}
+
+func TestUpdatePinnedLastReadAt_Nonexistent(t *testing.T) {
+	f := testutil.New(t)
+	err := f.DB.UpdatePinnedLastReadAt(f.Ctx(), "nochat", "nouser")
+	if err != nil {
+		t.Fatal("updating on nonexistent data should not error")
+	}
+}
+
+func TestPinnedLastReadAt_NotSet(t *testing.T) {
+	f := testutil.New(t)
+	a, _ := f.DB.CreateUser(f.Ctx(), "pnil@x.com", "PNil", "pw")
+	b, _ := f.DB.CreateUser(f.Ctx(), "pnil2@x.com", "PNil2", "pw")
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "PNil", "", a.ID, []string{a.ID, b.ID})
+
+	chats, _ := f.DB.ListUserChats(f.Ctx(), a.ID)
+	var found *models.Chat
+	for _, c := range chats {
+		if c.ID == chat.ID {
+			found = &c
+			break
+		}
+	}
+	if found.PinnedLastReadAt != nil {
+		t.Fatal("pinned_last_read_at should be nil before any read")
+	}
+}
+
+func TestPinnedUpdatedAt_NotSet(t *testing.T) {
+	f := testutil.New(t)
+	a, _ := f.DB.CreateUser(f.Ctx(), "punset@x.com", "PUnset", "pw")
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "PUnset", "", a.ID, []string{a.ID})
+
+	c, _ := f.DB.GetChat(f.Ctx(), chat.ID)
+	if c.PinnedMessage != nil {
+		t.Fatal("no pinned message expected")
+	}
+	if c.PinnedUpdatedAt != nil {
+		t.Fatal("pinned_updated_at should be nil when no pin set")
+	}
+}
+
+func TestSetPinnedMessage_ThreeMembers(t *testing.T) {
+	// PinChat handler requires ≥3 members, test that DB layer allows it with 1
+	f := testutil.New(t)
+	a, _ := f.DB.CreateUser(f.Ctx(), "pin3@x.com", "Pin3", "pw")
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "Pin3", "", a.ID, []string{a.ID})
+	if err := f.DB.SetPinnedMessage(f.Ctx(), chat.ID, "works"); err != nil {
+		t.Fatal("DB layer should allow pin with any member count")
 	}
 }
 

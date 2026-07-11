@@ -2144,4 +2144,257 @@ reset() {
 ### 验证
 - Build: ✓
 
+---
 
+## 2026-07-11 第 11 轮 — Notice bar 折叠 + Pinned 字段重构
+
+---
+
+### 11-1: Notice bar 折叠按钮移入标题栏
+
+**反馈**: collapse/expand 按钮应在标题栏右侧，不在 notice bar 内。
+
+**代码变更** (`client/src/components/ChatView.jsx`):
+```diff
+- <div className="chat-header">
+-   <button>←</button>
+-   <div style={{flex:1}}>...</div>
++ <div className="chat-header">
++   <button>←</button>
++   <div style={{flex:1}}>...</div>
++   {pinnedMessage[chatId] && (
++     <button className="btn-ghost" onClick={() => setShowNotice(!showNotice)}>
++       {showNotice ? '▲' : '▼'}
++     </button>
++   )}
+  </div>
+```
+
+同时 notice bar 整体隐藏逻辑：
+```diff
+- {(pinnedMessage[chatId] || isEditingNotice) && (
++ {((showNotice && pinnedMessage[chatId]) || isEditingNotice) && (
+```
+
+---
+
+### 11-2: Pinned 字段重构 — last_update 为 Chat 属性, last_read 为 Member 属性
+
+**反馈**: `last_update` 和 `last_read` 不应放在 `pinned_message` 对象中。`last_update` 是 chat 级属性（`pinned_updated_at`），`last_read` 是 user 级属性（`pinned_last_read_at`），存储在 chat_member 记录中。
+
+**代码变更**:
+
+**Go model** (`server/internal/models/models.go`):
+```go
+type Chat struct {
+    PinnedMessage    *PinnedContent `json:"pinned_message,omitempty"`
+    PinnedUpdatedAt  *time.Time     `json:"pinned_updated_at,omitempty"`
+    PinnedLastReadAt *time.Time     `json:"pinned_last_read_at,omitempty"`
+}
+type ChatMember struct {
+    PinnedLastReadAt *time.Time `json:"pinned_last_read_at,omitempty"`
+}
+```
+
+**Go DB** (`server/internal/db/`):
+- `migrations/init.sql` — 新增 `chat_members.pinned_last_read_at TEXT`
+- `chats.go` — `GetChat`/`ListUserChats` SELECT `pinned_updated_at`, `cm.pinned_last_read_at`; 新增 `UpdatePinnedLastReadAt()`
+- `chats_ext.go` — `ListPublicChats` SELECT `pinned_updated_at`
+
+**Go handler** (`server/internal/handlers/chat.go`):
+- `PinChat`/`DeletePinnedChat` 现在通过 Hub 广播 chat 更新
+
+**Mock data** (`client/src/dev/dummy.js`):
+```diff
+- pinned_message: { content, pinned_at, last_update, last_read }
++ pinned_message: { content, pinned_at }
++ pinned_updated_at: ci < 2 ? timeAgo(1800) : null
++ members[meIdx].pinned_last_read_at = ci < 2 ? timeAgo(1200) : null
+```
+
+**Mock API** (`client/src/api/mock.js`):
+```diff
+- onChatUpdate({ ..., pinned_message: { content, pinned_at, last_update, last_read } });
++ onChatUpdate({ ..., pinned_message: { content, pinned_at }, pinned_updated_at: now });
+```
+
+**Store** (`client/src/store/chat.js`):
+- `pinnedMessage` 注释更新: `{ chatId: { id, content, pinned_at } }`
+- `onChatUpdate`/`setChats` 透传 `pinned_updated_at`/`pinned_last_read_at` 到 chat 对象
+
+---
+
+### 验证
+- Go build + vet: ✓
+- Client build: ✓
+
+---
+
+## 2026-07-11 第 12 轮 — Go 后端测试 + 文档更新
+
+---
+
+### 12-1: 新增 7 个 Pinned 字段相关 DB 测试
+
+**文件**: `server/internal/db/db_test.go`
+
+| 测试名 | 验证点 |
+|--------|--------|
+| `TestSetAndClearPinnedMessage` | 扩展 — 验证 `PinnedUpdatedAt` 在 set 后被设置、clear 后被清空 |
+| `TestSetPinnedMessage_MultipleUpdates` | 多次更新 pin，`PinnedUpdatedAt` 应递增 |
+| `TestUpdatePinnedLastReadAt` | `UpdatePinnedLastReadAt` 写入后，`ListUserChats` 返回 `PinnedLastReadAt` |
+| `TestUpdatePinnedLastReadAt_Nonexistent` | 不存在的 chat/user 不报错 |
+| `TestPinnedLastReadAt_NotSet` | 未读 pin 时 `PinnedLastReadAt` 为 nil |
+| `TestPinnedUpdatedAt_NotSet` | 无 pin 时 `PinnedUpdatedAt` 为 nil |
+| `TestSetPinnedMessage_ThreeMembers` | DB 层允许 1 人 chat 设置 pin（handler 层限制 ≥3） |
+
+---
+
+### 12-2: 更新 4 个后端文档
+
+**文件** (`docs/reports/`):
+- `models-data-spec-20260708.md` — Chat/PinnedContent/ChatMember 模型字段新增 `PinnedUpdatedAt`/`PinnedLastReadAt`
+- `db-spec-20260710.md` — DB migration、GetChat/ListUserChats/ListPublicChats 新增字段、SetPinnedMessage/ClearPinnedMessage 更新 `pinned_updated_at`、新增 `UpdatePinnedLastReadAt` 方法
+- `api-handlers-spec-20260709.md` — PinChat/DeletePinnedChat handler 新增 Hub broadcast
+- `test-suite-spec-20260709.md` — db_test.go 测试表新增 7 项
+
+---
+
+### 验证
+- Go all tests: `ok  internal/db 3.53s` + `testutil 11.02s` + `auth 0.50s` + `ws 0.02s`
+- Client build: ✓
+
+---
+
+## 2026-07-11 第 13 轮 — Pinned 按钮美化（喇叭图标 + 选中态 + 红点）
+
+---
+
+### 13-1: Pinned 折叠按钮改用喇叭 SVG 图标 + 选中态背景 + 更新红点
+
+**反馈**: ▲/▼ 文本图标不够直观；选中时应高亮；有更新时应显示红点提示。
+
+**代码变更** (`client/src/components/ChatView.jsx`):
+
+```diff
+- <button className="btn-ghost" style={{fontSize:13,padding:'2px 8px'}}>
+-   {showNotice ? '▲' : '▼'}
+- </button>
++ <button className="btn-ghost" style={{
++   position:'relative', padding:'6px 8px',
++   background: showNotice ? 'var(--bg-tertiary)' : 'transparent',
++   borderRadius:4, lineHeight:0,
++ }}>
++   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
++     strokeLinecap="round" strokeLinejoin="round">
++     <path d="M11 5L6 9H2v6h4l5 4V5z"/>
++     <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
++   </svg>
++   {chat?.pinned_updated_at && (!chat?.pinned_last_read_at || new Date(chat.pinned_updated_at) > new Date(chat.pinned_last_read_at)) && (
++     <span style={{position:'absolute', top:2, right:2, width:8, height:8, borderRadius:'50%', background:'#ed4245'}}/>
++   )}
++ </button>
+```
+
+### 验证
+- Build: ✓
+
+---
+
+## 2026-07-11 第 14 轮 — 红点自动消失（查看后标记已读）
+
+---
+
+### 14-1: 查看 pin 后更新 `pinned_last_read_at` 消除红点
+
+**反馈**: 打开通知栏后红点应消失。
+
+**代码变更** (`client/src/store/chat.js` — 新增 `markPinnedRead`):
+```js
+markPinnedRead(chatId) {
+  set(s => ({
+    chats: s.chats.map(c => c.id === chatId ? { ...c, pinned_last_read_at: new Date().toISOString() } : c),
+  }));
+},
+```
+
+**代码变更** (`client/src/components/ChatView.jsx`):
+```diff
+- const { ... pinnedMessage, setPinnedMessage, clearPinnedMessage } = useChatStore();
++ const { ... pinnedMessage, setPinnedMessage, clearPinnedMessage, markPinnedRead } = useChatStore();
+
++ useEffect(() => {
++   if (showNotice && pinnedMessage[chatId]) {
++     markPinnedRead(chatId);
++   }
++ }, [showNotice, chatId, pinnedMessage[chatId]]);
+```
+
+当 `showNotice` 为 true 且 `pinnedMessage[chatId]` 存在时，自动调用 `markPinnedRead` 将当前 chat 的 `pinned_last_read_at` 设为当前时间，红点条件 `pinned_updated_at > pinned_last_read_at` 不再满足，红点消失。
+
+### 验证
+- Build: ✓
+
+
+
+---
+
+## 2026-07-11 第 15 轮 — 头像大图预览 + 按钮优化
+
+---
+
+### 15-1: 头像点击打开大图预览
+
+**反馈**: 点击头像应打开大图，而非直接上传或跳转到 profile。
+
+**新增文件** (`client/src/components/ImagePreviewModal.jsx`): 全屏暗色遮罩 + 居中大图，点击遮罩关闭。
+
+**代码变更** (`client/src/components/SettingsModal.jsx`):
+- 头像 `<img>` 的 `onClick` 从 `document.getElementById('avatar-file-input').click()` 改为 `setPreviewUrl(user.avatar_url)` → 打开大图预览
+- "Click to upload" 文本保留为上传触发器，有头像时改为 "Change avatar"
+- 无头像时字母占位区不再触发上传（移除 `onClick`）
+
+**代码变更** (`client/src/components/UserProfileModal.jsx`, `MessageItem.jsx`, `ChatList.jsx`, `MemberPanel.jsx`):
+- 头像 `<img>` 点击改为打开大图预览，`stopPropagation` 阻止触发 UserProfileModal/SettingsModal
+- 字母占位区保留原有点击行为（profile / settings）
+
+### 15-2: Pinned 按钮始终可见（无 pin 时 disable）
+
+**代码变更** (`client/src/components/ChatView.jsx`):
+```diff
+- {(pinnedMessage[chatId] || chat?.owner_id === user.id) && <button ...>}
++ <button ... style={{ opacity: pinnedMessage[chatId] ? 1 : 0.4 }}
++   onClick={() => { if (!pinnedMessage[chatId]) return; setShowNotice(!showNotice); }}>
+```
+
+按钮始终渲染，无 pin 时 `opacity: 0.4` 且点击无反应。
+
+### 15-3: Send 按钮改为 SVG + Ghost 样式
+
+**代码变更** (`client/src/components/Composer.jsx`):
+- `className="btn btn-primary"` → `className="btn-ghost"`（无背景）
+- 文本 "Send" → 右箭头 SVG
+
+### 15-4: Send 图标方向修正
+
+**代码变更** (`client/src/components/Composer.jsx`): 原先的纸飞机 SVG 朝向右上，改为标准右箭头。
+
+### 15-5: Disabled pinned 按钮背景固定透明
+
+**代码变更** (`client/src/components/ChatView.jsx`):
+```diff
+- background: showNotice ? 'var(--bg-tertiary)' : 'transparent',
++ background: (showNotice && pinnedMessage[chatId]) ? 'var(--bg-tertiary)' : 'transparent',
+```
+
+禁用状态下始终透明。
+
+### 15-6: 头像链接失效时 fallback 到字母
+
+**代码变更** (`client/src/components/MessageItem.jsx`, `SettingsModal.jsx`, `UserProfileModal.jsx`, `ChatList.jsx`, `MemberPanel.jsx`):
+- 新增 `avatarError` state，`<img onError={() => setAvatarError(true)} />`
+- 渲染条件改为 `avatar_url && !avatarError ? <img /> : <div className="msg-avatar">...</div>`
+- 图片加载失败自动回退到字母占位
+
+### 验证
+- Build: ✓

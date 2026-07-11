@@ -129,7 +129,7 @@ func (f *Fixture) Do(t *testing.T, method, path, token string, body any) *http.R
 
 ### 2.1 `db_test.go` — DAO 层
 
-**文件:** `server/internal/db/db_test.go`（221 行）
+**文件:** `server/internal/db/db_test.go`（818 行）
 
 | # | 测试名 | 行号 | 覆盖函数 | 验证点 |
 |---|--------|------|----------|--------|
@@ -143,6 +143,13 @@ func (f *Fixture) Do(t *testing.T, method, path, token string, body any) *http.R
 | 8 | `TestAddRemoveMember` | 171 | `DB.AddChatMember`, `DB.RemoveChatMember`, `DB.IsChatMember` | 添加/移除成功；重复添加 → `ErrConflict` |
 | 9 | `TestDeleteChat` | 197 | `DB.DeleteChat`, `DB.GetChat` | 删除后 `GetChat` → `ErrNotFound` |
 | 10 | `TestRenameChat` | 210 | `DB.RenameChat`, `DB.GetChat` | 重命名成功 |
+| 11 | `TestSetAndClearPinnedMessage` | 294 | `DB.SetPinnedMessage`, `DB.ClearPinnedMessage`, `DB.GetChat` | 设置后 `PinnedUpdatedAt` 非 nil；清除后为 nil |
+| 12 | `TestSetPinnedMessage_MultipleUpdates` | 320 | `DB.SetPinnedMessage` | 两次设置后 `pinned_updated_at` 递增 |
+| 13 | `TestUpdatePinnedLastReadAt` | 339 | `DB.UpdatePinnedLastReadAt`, `DB.ListUserChats` | 设置后每成员 `PinnedLastReadAt` 非零 |
+| 14 | `TestUpdatePinnedLastReadAt_Nonexistent` | 387 | `DB.UpdatePinnedLastReadAt` | 不存在的 chat/user → 无 panic |
+| 15 | `TestPinnedLastReadAt_NotSet` | 395 | `DB.ListUserChats` | 未调用前 `PinnedLastReadAt` 为 nil |
+| 16 | `TestPinnedUpdatedAt_NotSet` | 414 | `DB.GetChat` | 未设置顶时 `PinnedUpdatedAt` 为 nil |
+| 17 | `TestSetPinnedMessage_ThreeMembers` | 428 | `DB.SetPinnedMessage` | ≥3 成员时正常设置 |
 
 ### 2.2 `handler_test.go` — HTTP Handler 层
 

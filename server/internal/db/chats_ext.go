@@ -11,7 +11,7 @@ import (
 
 func (d *DB) ListPublicChats(ctx context.Context) ([]models.Chat, error) {
 	rows, err := d.QueryContext(ctx,
-		`SELECT id, type, name, icon_color, COALESCE(visibility,'private'), owner_id, created_at, last_message_at, pinned_message,
+		`SELECT id, type, name, icon_color, COALESCE(visibility,'private'), owner_id, created_at, last_message_at, pinned_message, pinned_updated_at,
 		        (SELECT COUNT(*) FROM chat_members WHERE chat_id = id) AS member_count
 		 FROM chats WHERE type = 'group' AND visibility = 'public'
 		 ORDER BY created_at DESC`,
@@ -23,10 +23,10 @@ func (d *DB) ListPublicChats(ctx context.Context) ([]models.Chat, error) {
 	out := []models.Chat{}
 	for rows.Next() {
 		var c models.Chat
-		var name, owner, lastMsg, pinnedMsg sql.NullString
+		var name, owner, lastMsg, pinnedMsg, pinnedUpdAt sql.NullString
 		var created string
 		var memberCount int
-		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.Visibility, &owner, &created, &lastMsg, &pinnedMsg, &memberCount); err != nil {
+		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.Visibility, &owner, &created, &lastMsg, &pinnedMsg, &pinnedUpdAt, &memberCount); err != nil {
 			return nil, err
 		}
 		c.Name = name.String
@@ -42,6 +42,10 @@ func (d *DB) ListPublicChats(ctx context.Context) ([]models.Chat, error) {
 			if err := json.Unmarshal([]byte(pinnedMsg.String), &pc); err == nil {
 				c.PinnedMessage = &pc
 			}
+		}
+		if pinnedUpdAt.Valid && pinnedUpdAt.String != "" {
+			t := parseTime(pinnedUpdAt.String)
+			c.PinnedUpdatedAt = &t
 		}
 		c.MemberCount = memberCount
 		out = append(out, c)

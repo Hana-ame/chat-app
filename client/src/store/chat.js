@@ -7,7 +7,7 @@ export const useChatStore = create((set, get) => ({
   chats: [],
   activeChatId: null,
   messages: [],
-  pinnedMessage: {}, // { chatId: content }
+  pinnedMessage: {}, // { chatId: { id, content, pinned_at } }
   onlineUserIds: [],
 
   mode: 'ws',
@@ -177,7 +177,11 @@ export const useChatStore = create((set, get) => ({
         const db = b.last_message_at || b.created_at;
         return new Date(db) - new Date(da);
       });
-      return { chats: sorted };
+      const pinned = {};
+      for (const c of sorted) {
+        if (c.pinned_message?.content) pinned[c.id] = c.pinned_message;
+      }
+      return { chats: sorted, pinnedMessage: { ...s.pinnedMessage, ...pinned } };
     });
   },
 
@@ -200,10 +204,10 @@ export const useChatStore = create((set, get) => ({
         const db = b.last_message_at || b.created_at;
         return new Date(db) - new Date(da);
       });
-      return { 
-        chats: n,
-        pinnedMessage: { ...s.pinnedMessage, [chat.id]: chat.pinned_message?.content || null }
-      };
+      const next = chat.pinned_message !== undefined
+        ? { ...s.pinnedMessage, [chat.id]: chat.pinned_message || null }
+        : s.pinnedMessage;
+      return { chats: n, pinnedMessage: next };
     });
   },
 
@@ -334,9 +338,10 @@ export const useChatStore = create((set, get) => ({
   },
 
   async setPinnedMessage(token, chatId, content) {
-    await api.setPinnedMessage(token, chatId, content);
+    const res = await api.setPinnedMessage(token, chatId, content);
+    const p = res.pinned_message || { id: '', content, pinned_at: new Date().toISOString() };
     set(s => ({
-      pinnedMessage: { ...s.pinnedMessage, [chatId]: content }
+      pinnedMessage: { ...s.pinnedMessage, [chatId]: p }
     }));
   },
 
@@ -347,6 +352,12 @@ export const useChatStore = create((set, get) => ({
       delete next[chatId];
       return { pinnedMessage: next };
     });
+  },
+
+  markPinnedRead(chatId) {
+    set(s => ({
+      chats: s.chats.map(c => c.id === chatId ? { ...c, pinned_last_read_at: new Date().toISOString() } : c),
+    }));
   },
 
   reset() {

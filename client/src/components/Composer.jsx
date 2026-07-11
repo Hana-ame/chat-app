@@ -81,9 +81,16 @@ export default function Composer({ chatId }) {
             onChange={e => { setText(e.target.value); handleTyping(); autoResize(); }}
             onKeyDown={handleKey}
             style={{flex:1,resize:'none',overflow:'hidden',minHeight:36}} />
-          <button className="btn btn-primary" style={{whiteSpace:'nowrap',padding:'4px 14px'}}
+          <button className="btn-ghost" style={{padding:'4px 10px',lineHeight:0}}
             disabled={(!text.trim() && attachments.length === 0) || uploading}
-            onClick={handleSend}>{uploading ? '...' : 'Send'}</button>
+            onClick={handleSend}>
+            {uploading ? <span style={{fontSize:14}}>...</span> : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"/>
+                <polyline points="12 5 19 12 12 19"/>
+              </svg>
+            )}
+          </button>
         </div>
         <div style={{display:'flex',gap:4,marginTop:6,alignItems:'center'}}>
           <input type="file" ref={fileInput} onChange={handleFile} style={{display:'none'}} multiple />

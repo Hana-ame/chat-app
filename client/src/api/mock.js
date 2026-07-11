@@ -351,12 +351,14 @@ export function mockRemoveReaction(_token, _chatId, msgId, emoji) {
 }
 
 export function mockSetPinnedMessage(_token, chatId, content) {
-  if (_store) _store.getState().onChatUpdate({ id: chatId, pinned_message: { content, pinned_at: new Date().toISOString() } });
-  return { ok: true };
+  const now = new Date().toISOString();
+  const pinned = { id: 'pm-' + randid(), content, pinned_at: now };
+  if (_store) _store.getState().onChatUpdate({ id: chatId, pinned_message: pinned, pinned_updated_at: now });
+  return { ok: true, pinned_message: pinned, pinned_updated_at: now };
 }
 
 export function mockClearPinnedMessage(_token, chatId) {
-  if (_store) _store.getState().onChatUpdate({ id: chatId, pinned_message: null });
+  if (_store) _store.getState().onChatUpdate({ id: chatId, pinned_message: null, pinned_updated_at: null });
   return { ok: true };
 }
 

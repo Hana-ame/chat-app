@@ -14,11 +14,12 @@ function getDMName(chat, currentUserId) {
 
 export default function ChatView({ chatId, onBack }) {
   const { user, accessToken } = useAuthStore();
-  const { chats, messages, loadMessages, subscribe, markRead, pinnedMessage, setPinnedMessage, clearPinnedMessage } = useChatStore();
+  const { chats, messages, loadMessages, subscribe, markRead, pinnedMessage, setPinnedMessage, clearPinnedMessage, markPinnedRead } = useChatStore();
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [noticeInput, setNoticeInput] = useState('');
   const [isEditingNotice, setIsEditingNotice] = useState(false);
+  const [showNotice, setShowNotice] = useState(true);
   const bodyRef = useRef(null);
   const loadingMoreRef = useRef(false);
   const prevChatIdRef = useRef(null);
@@ -32,6 +33,12 @@ export default function ChatView({ chatId, onBack }) {
       setHasMore(true);
     }
   }, [chatId, accessToken]);
+
+  useEffect(() => {
+    if (showNotice && pinnedMessage[chatId]) {
+      markPinnedRead(chatId);
+    }
+  }, [showNotice, chatId, pinnedMessage[chatId]]);
 
   const loadMore = useCallback(async () => {
     if (loading || !hasMore) return;
@@ -130,10 +137,32 @@ export default function ChatView({ chatId, onBack }) {
               {chat?.type !== 'dm' && <>{onlineCount} online</>}
             </div>
           </div>
+          <button className="btn-ghost" style={{
+            position: 'relative',
+            padding: '6px 8px',
+            background: (showNotice && pinnedMessage[chatId]) ? 'var(--bg-tertiary)' : 'transparent',
+            borderRadius: 4,
+            lineHeight: 0,
+            opacity: pinnedMessage[chatId] ? 1 : 0.4,
+          }} onClick={() => {
+            if (!pinnedMessage[chatId]) return;
+            setShowNotice(!showNotice);
+          }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            </svg>
+            {pinnedMessage[chatId] && chat?.pinned_updated_at && (!chat?.pinned_last_read_at || new Date(chat.pinned_updated_at) > new Date(chat.pinned_last_read_at)) && (
+              <span style={{
+                position: 'absolute', top: 2, right: 2,
+                width: 8, height: 8, borderRadius: '50%',
+                background: '#ed4245',
+              }}/>
+            )}
+          </button>
         </div>
 
-        {/* Notice Board */}
-        {(pinnedMessage[chatId] || isEditingNotice) && (
+        {((showNotice && pinnedMessage[chatId]) || isEditingNotice) && (
           <div style={{
             background: 'var(--bg-tertiary)',
             borderBottom: '1px solid var(--border)',
@@ -144,35 +173,29 @@ export default function ChatView({ chatId, onBack }) {
             gap: 8
           }}>
             <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
-              <span style={{fontWeight: 600, fontSize: 12, color: 'var(--text-muted)'}}>📌 Notice:</span>
               {isEditingNotice ? (
                 <div style={{flex: 1, display: 'flex', gap: 8}}>
-                  <input 
-                    className="input-field" 
-                    style={{flex: 1, fontSize: 13, padding: '4px 8px'}} 
-                    value={noticeInput} 
+                  <input
+                    className="input-field"
+                    style={{flex: 1, fontSize: 13, padding: '4px 8px'}}
+                    value={noticeInput}
                     onChange={e => setNoticeInput(e.target.value)}
                     autoFocus
                   />
                   <button className="btn btn-primary" style={{fontSize: 11, padding: '4px 8px'}} onClick={handleSaveNotice}>Save</button>
                   <button className="btn-ghost" style={{fontSize: 11, padding: '4px 8px'}} onClick={() => setIsEditingNotice(false)}>Cancel</button>
                 </div>
-              ) : (
+              ) : showNotice ? (
                 <div style={{flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                  {renderContent(pinnedMessage[chatId], userMap)}
+                  {renderContent(pinnedMessage[chatId]?.content, userMap)}
                 </div>
-              )}
+              ) : null}
             </div>
-            {chat?.owner_id === user.id && !isEditingNotice && (
+            {showNotice && pinnedMessage[chatId] && chat?.owner_id === user.id && !isEditingNotice && (
               <div style={{display: 'flex', justifyContent: 'flex-end', gap: 8}}>
-                <button className="btn-ghost" style={{fontSize: 11, padding: '2px 6px'}} onClick={() => { setNoticeInput(pinnedMessage[chatId]); setIsEditingNotice(true); }}>Edit</button>
+                <button className="btn-ghost" style={{fontSize: 11, padding: '2px 6px'}} onClick={() => { setNoticeInput(pinnedMessage[chatId]?.content); setIsEditingNotice(true); }}>Edit</button>
                 <button className="btn-ghost danger" style={{fontSize: 11, padding: '2px 6px'}} onClick={handleClearNotice}>Clear</button>
               </div>
-            )}
-            {chat?.owner_id === user.id && !pinnedMessage[chatId] && !isEditingNotice && (
-              <button className="btn-ghost" style={{fontSize: 11, textAlign: 'left', color: 'var(--accent)'}} onClick={() => setIsEditingNotice(true)}>
-                + Set Notice
-              </button>
             )}
           </div>
         )}
