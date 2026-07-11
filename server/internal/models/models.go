@@ -36,6 +36,7 @@ type Chat struct {
 	PinnedMessage  *PinnedContent `json:"pinned_message,omitempty"`
 	PinnedUpdatedAt *time.Time    `json:"pinned_updated_at,omitempty"`
 	PinnedLastReadAt *time.Time   `json:"pinned_last_read_at,omitempty"`
+	Pinned          bool          `json:"pinned"`
 	LastMessageID  string         `json:"last_message_id,omitempty"`
 	// Deprecated.
 	LastMessage   *Message   `json:"last_message,omitempty"`
@@ -49,7 +50,6 @@ type ChatMember struct {
 	JoinedAt time.Time `json:"joined_at"`
 	// Deprecated.
 	LastReadMessageID string     `json:"last_read_message_id,omitempty"`
-	// Deprecated.
 	Pinned          bool       `json:"pinned"`
 	PinnedLastReadAt *time.Time `json:"pinned_last_read_at,omitempty"`
 }
@@ -82,8 +82,10 @@ type Attachment struct {
 }
 
 type Reaction struct {
-	Emoji   string `json:"emoji"`
-	Count   int    `json:"count"`
+	Emoji   string   `json:"emoji"`
+	Count   int      `json:"count"`
+	UserIDs []string `json:"user_ids,omitempty"`
+	Me      bool     `json:"me"`
 }
 
 type RefreshToken struct {

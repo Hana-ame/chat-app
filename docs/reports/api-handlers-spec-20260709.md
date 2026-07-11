@@ -1458,6 +1458,9 @@ func (s *Server) AddReaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	updated, _ := s.DB.GetMessage(r.Context(), msgID)
+	if updated != nil {
+		enrichReactions(updated, u.ID)
+	}
 	if s.Hub != nil {
 		s.Hub.BroadcastReaction(chatID, msgID, emoji, u.ID, true)
 	}
@@ -1465,7 +1468,7 @@ func (s *Server) AddReaction(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-**依赖链:** `userFrom → chi.URLParam → url.PathUnescape → DB.IsChatMember → DB.GetMessage → DB.AddReaction → DB.GetMessage → Hub.BroadcastReaction → writeJSON`
+**依赖链:** `userFrom → chi.URLParam → url.PathUnescape → DB.IsChatMember → DB.GetMessage → DB.AddReaction → DB.GetMessage → enrichReactions → Hub.BroadcastReaction → writeJSON`
 
 **条件分支:**
 - `url.PathUnescape` 失败 → `400 {"error":"bad_request","message":"bad emoji encoding"}`
@@ -1508,11 +1511,14 @@ func (s *Server) RemoveReaction(w http.ResponseWriter, r *http.Request) {
 		s.Hub.BroadcastReaction(chatID, msgID, emoji, u.ID, false)
 	}
 	updated, _ := s.DB.GetMessage(r.Context(), msgID)
+	if updated != nil {
+		enrichReactions(updated, u.ID)
+	}
 	writeJSON(w, http.StatusOK, updated)
 }
 ```
 
-**依赖链:** `userFrom → chi.URLParam → url.PathUnescape → DB.IsChatMember → DB.RemoveReaction → Hub.BroadcastReaction → DB.GetMessage → writeJSON`
+**依赖链:** `userFrom → chi.URLParam → url.PathUnescape → DB.IsChatMember → DB.RemoveReaction → Hub.BroadcastReaction → DB.GetMessage → enrichReactions → writeJSON`
 
 **条件分支:**
 - `url.PathUnescape` 失败 → `400`

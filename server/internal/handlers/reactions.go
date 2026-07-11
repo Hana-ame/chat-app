@@ -83,3 +83,29 @@ func (s *Server) RemoveReaction(w http.ResponseWriter, r *http.Request) {
 	updated, _ := s.DB.GetMessage(r.Context(), msgID)
 	writeJSON(w, http.StatusOK, updated)
 }
+
+// ListReactions godoc
+// @Summary      List reactions for a message
+// @Description  Get aggregated reactions with user IDs and me flag for the current user
+// @Tags         reactions
+// @Security     BearerAuth
+// @Param        chatID     path  string  true  "Chat ID"
+// @Param        messageID  path  string  true  "Message ID"
+// @Success      200  {object}  map[string]any
+// @Router       /api/chats/{chatID}/messages/{messageID}/reactions [get]
+func (s *Server) ListReactions(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r.Context())
+	chatID := chi.URLParam(r, "chatID")
+	msgID := chi.URLParam(r, "messageID")
+	ok, _ := s.DB.IsChatMember(r.Context(), chatID, u.ID)
+	if !ok {
+		writeError(w, http.StatusForbidden, "forbidden", "")
+		return
+	}
+	rxs, err := s.DB.ListReactions(r.Context(), msgID, u.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"reactions": rxs})
+}

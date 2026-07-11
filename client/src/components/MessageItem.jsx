@@ -25,6 +25,7 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
   const [profileUser, setProfileUser] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [avatarError, setAvatarError] = useState(false);
+  const [reactions, setReactions] = useState(msg.reactions || []);
 
   const author = useMemo(() => {
     const chat = chats.find(c => c.id === chatId);
@@ -55,11 +56,21 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
     return map;
   }, [chats, chatId]);
 
+  useEffect(() => {
+    if (msg.reaction_count > 0) {
+      api.getReactions(accessToken, chatId, msg.id).then(res => {
+        if (res?.reactions) setReactions(res.reactions);
+      }).catch(() => {});
+    }
+  }, [msg.id, msg.reaction_count, chatId, accessToken]);
+
   const handleReaction = async (emoji) => {
-    const has = msg.reactions?.find(r => r.emoji === emoji && r.me);
+    const has = reactions?.find(r => r.emoji === emoji && r.me);
     try {
       if (has) await api.removeReaction(accessToken, chatId, msg.id, emoji);
       else await api.addReaction(accessToken, chatId, msg.id, emoji);
+      const res = await api.getReactions(accessToken, chatId, msg.id);
+      if (res?.reactions) setReactions(res.reactions);
     } catch (e) { console.error('Reaction error:', e); }
     setShowEmoji(false);
   };
@@ -148,9 +159,9 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
                 }
               </div>
             ))}
-          {msg.reactions?.length > 0 && (
+          {reactions.length > 0 && (
             <div className="reaction-bar">
-              {msg.reactions.map(r => (
+              {reactions.map(r => (
                 <div key={r.emoji} className={'reaction-chip' + (r.me ? ' me' : '')}
                   onClick={() => handleReaction(r.emoji)}>
                   <span>{r.emoji}</span>

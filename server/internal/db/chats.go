@@ -272,7 +272,7 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 	rows, err := d.QueryContext(ctx,
 		`SELECT c.id, c.type, c.name, c.icon_color, c.visibility, c.owner_id, c.created_at, c.last_message_at, c.last_message_id,
 		        cm.last_read_message_id, c.pinned_message, c.pinned_updated_at, c.member_count,
-		        cm.pinned_last_read_at
+		        cm.pinned_last_read_at, cm.pinned
 		 FROM chat_members cm JOIN chats c ON c.id = cm.chat_id
 		 WHERE cm.user_id = ?
 		 ORDER BY COALESCE(c.last_message_at, c.created_at) DESC`,
@@ -296,7 +296,8 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 		var visibility sql.NullString
 		var created string
 		var memberCount int
-		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &visibility, &owner, &created, &lastMsg, &lastMsgID, &lastRead, &pinnedMsg, &pinnedUpdAt, &memberCount, &pinnedLastReadAt); err != nil {
+		var pinnedBool bool
+		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &visibility, &owner, &created, &lastMsg, &lastMsgID, &lastRead, &pinnedMsg, &pinnedUpdAt, &memberCount, &pinnedLastReadAt, &pinnedBool); err != nil {
 			return nil, err
 		}
 		c.Name = name.String
@@ -318,6 +319,7 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 			t := parseTime(pinnedUpdAt.String)
 			c.PinnedUpdatedAt = &t
 		}
+		c.Pinned = pinnedBool
 		c.MemberCount = memberCount
 		c.LastMessageID = lastMsgID.String
 		rows2 = append(rows2, row{chat: c, lastRead: lastRead, pinnedLastReadAt: pinnedLastReadAt})
@@ -427,7 +429,6 @@ func (d *DB) RenameChat(ctx context.Context, chatID, name string) error {
 	return err
 }
 
-// Deprecated.
 func (d *DB) UpdateLastRead(ctx context.Context, chatID, userID, messageID string) error {
 	_, err := d.ExecContext(ctx,
 		`UPDATE chat_members SET last_read_message_id = ? WHERE chat_id = ? AND user_id = ?`,
@@ -441,6 +442,14 @@ func (d *DB) UpdatePinnedLastReadAt(ctx context.Context, chatID, userID string) 
 	_, err := d.ExecContext(ctx,
 		`UPDATE chat_members SET pinned_last_read_at = ? WHERE chat_id = ? AND user_id = ?`,
 		now, chatID, userID,
+	)
+	return err
+}
+
+func (d *DB) TogglePinned(ctx context.Context, chatID, userID string) error {
+	_, err := d.ExecContext(ctx,
+		`UPDATE chat_members SET pinned = CASE WHEN pinned = 0 THEN 1 ELSE 0 END WHERE chat_id = ? AND user_id = ?`,
+		chatID, userID,
 	)
 	return err
 }

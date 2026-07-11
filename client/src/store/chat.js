@@ -354,7 +354,9 @@ export const useChatStore = create((set, get) => ({
     });
   },
 
-  markPinnedRead(chatId) {
+  async markPinnedRead(chatId) {
+    const { accessToken } = useAuthStore.getState();
+    try { await api.markPinnedRead(accessToken, chatId); } catch (e) { console.error('markPinnedRead error:', e); }
     set(s => ({
       chats: s.chats.map(c => c.id === chatId ? { ...c, pinned_last_read_at: new Date().toISOString() } : c),
     }));

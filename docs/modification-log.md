@@ -2398,3 +2398,350 @@ markPinnedRead(chatId) {
 
 ### 验证
 - Build: ✓
+
+---
+
+## 2026-07-11 第 16 轮 — Mock/Go API 对齐（G1 + G2）
+
+---
+
+### 16-1: 前端 listChats 路径修正（G1）
+
+**审计发现**: 前端调 `GET /api/chats`，后端注册 `GET /api/chats/my`，生产环境会 404。
+
+**代码变更** (`client/src/api/client.js:87`):
+```diff
+-  listChats: (token) => request('GET', '/api/chats', token),
++  listChats: (token) => request('GET', '/api/chats/my', token),
+```
+
+---
+
+### 16-2: 后端 Reactions 添加 `me` 字段（G2）
+
+**审计发现**: Go 后端 Reaction 结构体无 `me` 字段，`reactionsFor()` 的 `viewerID` 参数未使用。前端无法高亮自己的 reaction。
+
+**模型变更** (`server/internal/models/models.go:84-87`):
+```diff
+ type Reaction struct {
+-	Emoji   string `json:"emoji"`
+-	Count   int    `json:"count"`
++	Emoji   string   `json:"emoji"`
++	Count   int      `json:"count"`
++	UserIDs []string `json:"user_ids,omitempty"`
++	Me      bool     `json:"me"`
+ }
+```
+
+**DB 变更** (`server/internal/db/messages.go` — `reactionsFor`):
+- 收集每个 reaction 组的 `user_ids` 列表（之前只计数）
+- JSON 缓存列现在包含 `user_ids`（仅在新添加/删除 reaction 时通过 `syncReactionsColumn` 更新，旧数据需手动触发）
+
+**Handler 变更** (`server/internal/handlers/messages.go` — 新增 `enrichReactions`):
+```go
+func enrichReactions(msg *models.Message, viewerID string) {
+	var rxs []models.Reaction
+	json.Unmarshal(msg.Reactions, &rxs)
+	for i := range rxs {
+		for _, uid := range rxs[i].UserIDs {
+			if uid == viewerID { rxs[i].Me = true; break }
+		}
+	}
+	raw, _ := json.Marshal(rxs)
+	msg.Reactions = raw
+}
+```
+
+`enrichReactions` 在以下 handler 中调用：
+- `ListMessages` — 遍历所有返回消息
+- `AddReaction` — 返回更新后的消息前
+- `RemoveReaction` — 返回更新后的消息前
+
+注意: `me` 字段是 per-viewer 的，不注入 WS 广播（广播给其他客户端时会得到错误的 `me`）。客户端通过 store `onReaction` 自行计算 `me`。
+
+### 验证
+- Go build + vet: ✓
+- Go reaction tests: ✓
+- Client build: ✓
+
+---
+
+## 2026-07-12 第 17 轮 — Reaction `me` 改用专用端点（回退 enrichReactions）
+
+---
+
+### 问题
+
+16-2 方案在 `ListMessages` 响应中对每条消息的 JSON 缓存列做 `enrichReactions`（N+1 解析），WS 广播中 `me` 对其他客户端无效。需要更干净的方案。
+
+### 重新设计
+
+- 移除 `enrichReactions` 函数及所有调用
+- 新增 `GET /api/chats/{chatID}/messages/{messageID}/reactions` 端点，查询原始 `reactions` 表，按 `emoji` 分组，返回 `user_ids` 及 per-viewer `me` 标志
+- 前端 `MessageItem` 在 `msg.reaction_count > 0` 时调用 `getReactions` 获取带 `me` 的数据
+
+### 代码变更
+
+#### 后端
+
+**移除 `enrichReactions`** (`server/internal/handlers/messages.go`):
+- 删除完整函数定义（242-262 行）
+- 删除 `encoding/json` 导入（不再使用）
+
+**移除 `enrichReactions` 调用** (`server/internal/handlers/reactions.go`):
+- `AddReaction`: 删除 `enrichReactions(updated, u.ID)` 调用
+- `RemoveReaction`: 删除 `enrichReactions(updated, u.ID)` 及 `!= nil` 检查
+
+**新增 `ListReactions` handler** (`server/internal/handlers/reactions.go`):
+```go
+func (s *Server) ListReactions(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r.Context())
+	chatID := chi.URLParam(r, "chatID")
+	msgID := chi.URLParam(r, "messageID")
+	ok, _ := s.DB.IsChatMember(r.Context(), chatID, u.ID)
+	if !ok {
+		writeError(w, http.StatusForbidden, "forbidden", "")
+		return
+	}
+	rxs, err := s.DB.ListReactions(r.Context(), msgID, u.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"reactions": rxs})
+}
+```
+
+**新增路由** (`server/internal/handlers/router.go`):
+```go
+r.Get("/messages/{messageID}/reactions", s.ListReactions)
+```
+
+**新增 `DB.ListReactions`** (`server/internal/db/messages.go`):
+```go
+func (d *DB) ListReactions(ctx context.Context, messageID, viewerID string) ([]models.Reaction, error) {
+	rows, err := d.QueryContext(ctx,
+		`SELECT emoji, user_id FROM reactions WHERE message_id = ? ORDER BY created_at`,
+		messageID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	type row struct{ emoji, uid string }
+	var all []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.emoji, &r.uid); err != nil {
+			return nil, err
+		}
+		all = append(all, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	grouped := map[string]*models.Reaction{}
+	order := []string{}
+	for _, r := range all {
+		grp, ok := grouped[r.emoji]
+		if !ok {
+			grp = &models.Reaction{Emoji: r.emoji, UserIDs: []string{}}
+			grouped[r.emoji] = grp
+			order = append(order, r.emoji)
+		}
+		grp.Count++
+		grp.UserIDs = append(grp.UserIDs, r.uid)
+	}
+	for _, grp := range grouped {
+		for _, uid := range grp.UserIDs {
+			if uid == viewerID {
+				grp.Me = true
+				break
+			}
+		}
+	}
+	out := make([]models.Reaction, 0, len(order))
+	for _, e := range order {
+		out = append(out, *grouped[e])
+	}
+	return out, nil
+}
+```
+
+#### 前端
+
+**新增 client API** (`client/src/api/client.js`):
+```js
+getReactions: (token, chatId, msgId) =>
+  request('GET', '/api/chats/' + chatId + '/messages/' + msgId + '/reactions', token),
+['getReactions', mockGetReactions],
+```
+
+**新增 mock** (`client/src/api/mock.js`):
+```js
+export function mockGetReactions(_token, _chatId, msgId) {
+  const d = ensureData();
+  const cu = currentUser();
+  const msg = d.messages.find(m => m.id === msgId);
+  if (!msg) return { reactions: [] };
+  const raw = (msg.reactions || []).slice();
+  const grouped = {};
+  const order = [];
+  for (const r of raw) {
+    if (!grouped[r.emoji]) {
+      grouped[r.emoji] = { emoji: r.emoji, count: 0, user_ids: [], me: false };
+      order.push(r.emoji);
+    }
+    grouped[r.emoji].count = r.count;
+    grouped[r.emoji].user_ids = r.user_ids || [];
+  }
+  for (const grp of Object.values(grouped)) {
+    if (grp.user_ids.includes(cu.id)) grp.me = true;
+  }
+  return { reactions: order.map(e => grouped[e]) };
+}
+```
+
+**MessageItem 改用 fetched reactions** (`client/src/components/MessageItem.jsx`):
+- 新增 `reactions` state（初始值 `msg.reactions || []`）
+- `useEffect`: 当 `msg.reaction_count > 0` 时调用 `getReactions` 填充 state
+- `handleReaction`: 从 `reactions` state 读取 `me` 判断 toggle，操作后 refetch
+- 渲染: 使用 `reactions` state 替代 `msg.reactions`
+
+### 验证
+- Go build: ✓
+- Client build: ✓
+
+---
+
+## 2026-07-12 第 19 轮 — README 修正 + 死代码清理 + 审计项关闭
+
+---
+
+### G3/G4: README 文档修正
+
+**G3** — README 说"无 refresh 刷新机制"，实际有完整 refresh_tokens 表 + token rotation。
+
+**代码变更** (`README.md:152`):
+```diff
+- - **JWT 10yr**: access token 10年有效期,无 refresh 刷新机制
++ - **JWT 10yr + refresh rotation**: access token 10年有效期,配套 refresh_tokens 表实现 token rotation,支持 refresh 刷新机制
+```
+
+**G4** — README 列出 `POST /api/chats/:id/unpin` 不存在，实际是 `DELETE /api/chats/:id/pin`。
+
+**代码变更** (`README.md:75`):
+```diff
+- | POST | `/api/chats/:id/unpin` | Bearer | Unpin |
++ | DELETE | `/api/chats/:id/pin` | Bearer | Unpin |
+```
+
+---
+
+### G10: 死代码清理
+
+**CreateMessage 中空循环** (`server/internal/db/messages.go:96-98`):
+```go
+// 删除前
+for range dedupe(mentions) {
+    // Deprecated: mentions are stored as JSON in messages.mentions column.
+}
+// Deprecated: attachments are stored as JSON in messages.mentions column.
+
+// 删除后
+// Deprecated: mentions/attachments are stored as JSON in messages.mentions column.
+```
+
+---
+
+### M1: 侧边栏置顶 Go 端补齐
+
+详见第 18 轮。新增 `POST /api/chats/{chatID}/pin-toggle`，`ListUserChats` 返回 `cm.pinned` 字段。
+
+---
+
+### M2: pinned_last_read_at 持久化
+
+`chat_members.pinned_last_read_at` 列和 `UpdatePinnedLastReadAt` DB 函数已存在，补了 handler 和前端 API 调用。
+
+**后端** — 新增 `MarkPinnedRead` handler (`server/internal/handlers/chat.go`):
+- `POST /api/chats/{chatID}/pin-read` → 调用 `DB.UpdatePinnedLastReadAt`
+
+**前端** (`client/src/store/chat.js`):
+- `markPinnedRead` 改为先调 `api.markPinnedRead` 再更新本地 state
+
+**Mock** (`client/src/api/mock.js`):
+- 新增 `mockMarkPinnedRead`，更新数据层后通过 `onChatUpdate` 同步 store
+
+---
+
+### M3: Login/Register/Me role 字段差异
+
+审计称 mock 返回额外字段 `role`/`last_seen`/`status`。实际 Go `User` 模型已有 `status` 和 `last_seen`，`role` 在 `ChatMember` 上，前端也不从 user 对象读 `role`。**Close，无代码变更。**
+
+---
+
+### M4: Upload 响应格式不一致
+
+审计称 real upload.moonchan.xyz 返回 `{ id }`，mock 返回 `{ filename, mime_type, size, url }`。但 `client.js:141-146` 的 `api.upload` 已从 `File` 对象补充这些字段，真实和 mock 返回同一 shape。**Close，无代码变更。**
+
+---
+
+### 验证
+- Go build: ✓
+- Client build: ✓
+
+---
+
+### 背景
+
+Mock 端 `togglePin` 切换 `chat.pinned`（侧边栏置顶），Go 端 `POST /pin` 是设置公告消息（`{ content }`），两套功能共用一个路由路径冲突。且 Go 后端 `chat_members.pinned` 列从未被 SELECT 或使用。
+
+### 代码变更
+
+#### 后端
+
+**模型** (`server/internal/models/models.go`):
+```diff
++	Pinned          bool          `json:"pinned"`   // Chat 新增
+-	// Deprecated.
+	Pinned          bool       `json:"pinned"`       // ChatMember 移除 Deprecated 注释
+```
+
+**`ListUserChats` SELECT 加入 `cm.pinned`** (`server/internal/db/chats.go:273-278`):
+```diff
+-		        cm.pinned_last_read_at
++		        cm.pinned_last_read_at, cm.pinned
+```
+Scan 新增 `var pinnedBool bool` + `c.Pinned = pinnedBool`。
+
+**新增 `TogglePinned` DB 方法** (`server/internal/db/chats.go`):
+```go
+func (d *DB) TogglePinned(ctx context.Context, chatID, userID string) error {
+	_, err := d.ExecContext(ctx,
+		`UPDATE chat_members SET pinned = CASE WHEN pinned = 0 THEN 1 ELSE 0 END WHERE chat_id = ? AND user_id = ?`,
+		chatID, userID,
+	)
+	return err
+}
+```
+
+**新增 `TogglePin` handler** (`server/internal/handlers/chat.go`):
+- 校验 chat member
+- 调用 `DB.TogglePinned`
+- 广播 `ChatUpdated`
+- 路由: `POST /api/chats/{chatID}/pin-toggle`
+
+#### 前端
+
+**`togglePin` 路径改为 `/pin-toggle`** (`client/src/api/client.js:130`):
+```diff
+-  togglePin: (_token, chatId) => request('POST', '/api/chats/' + chatId + '/pin', _token),
++  togglePin: (_token, chatId) => request('POST', '/api/chats/' + chatId + '/pin-toggle', _token),
+```
+
+`mockTogglePin` 不变（dev 单用户场景等效）。前端 store 已有按 `!!a.pinned` 排序逻辑，Go 返回正确字段后自动生效。
+
+### 验证
+- Go build: ✓
+- Client build: ✓

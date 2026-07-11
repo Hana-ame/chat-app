@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Hana-ame/chat-app/server/internal/models"
+
 	"github.com/go-chi/chi/v5"
 )
 
@@ -397,6 +399,58 @@ func (s *Server) DeletePinnedChat(w http.ResponseWriter, r *http.Request) {
 		if updated != nil {
 			s.Hub.BroadcastChatUpdated(updated)
 		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// TogglePin godoc
+// @Summary      Toggle sidebar pinning
+// @Description  Toggle whether the chat appears at the top of the user's sidebar list
+// @Tags         chats
+// @Security     BearerAuth
+// @Param        chatID  path  string  true  "Chat ID"
+// @Success      200  {object}  map[string]any
+// @Router       /api/chats/{chatID}/pin-toggle [post]
+func (s *Server) TogglePin(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r.Context())
+	if u == nil {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "")
+		return
+	}
+	id := chi.URLParam(r, "chatID")
+	ok, _ := s.DB.IsChatMember(r.Context(), id, u.ID)
+	if !ok {
+		writeError(w, http.StatusForbidden, "forbidden", "")
+		return
+	}
+	if err := s.DB.TogglePinned(r.Context(), id, u.ID); err != nil {
+		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	if s.Hub != nil {
+		s.Hub.BroadcastChatUpdated(&models.Chat{ID: id})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// MarkPinnedRead godoc
+// @Summary      Mark pinned message as read
+// @Description  Update pinned_last_read_at for the current user in the given chat
+// @Tags         chats
+// @Security     BearerAuth
+// @Param        chatID  path  string  true  "Chat ID"
+// @Success      200  {object}  map[string]any
+// @Router       /api/chats/{chatID}/pin-read [post]
+func (s *Server) MarkPinnedRead(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r.Context())
+	if u == nil {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "")
+		return
+	}
+	id := chi.URLParam(r, "chatID")
+	if err := s.DB.UpdatePinnedLastReadAt(r.Context(), id, u.ID); err != nil {
+		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }

@@ -459,3 +459,34 @@ export function mockTogglePin(_token, chatId) {
   if (_store) _store.getState().onChatUpdate({ id: chatId, pinned: chat.pinned });
   return { ok: true, pinned: chat.pinned };
 }
+
+export function mockMarkPinnedRead(_token, chatId) {
+  const d = ensureData();
+  const chat = d.chats.find(c => c.id === chatId);
+  if (!chat) return { ok: true };
+  chat.pinned_last_read_at = new Date().toISOString();
+  if (_store) _store.getState().onChatUpdate({ id: chatId, pinned_last_read_at: chat.pinned_last_read_at });
+  return { ok: true };
+}
+
+export function mockGetReactions(_token, _chatId, msgId) {
+  const d = ensureData();
+  const cu = currentUser();
+  const msg = d.messages.find(m => m.id === msgId);
+  if (!msg) return { reactions: [] };
+  const raw = (msg.reactions || []).slice();
+  const grouped = {};
+  const order = [];
+  for (const r of raw) {
+    if (!grouped[r.emoji]) {
+      grouped[r.emoji] = { emoji: r.emoji, count: 0, user_ids: [], me: false };
+      order.push(r.emoji);
+    }
+    grouped[r.emoji].count = r.count;
+    grouped[r.emoji].user_ids = r.user_ids || [];
+  }
+  for (const grp of Object.values(grouped)) {
+    if (grp.user_ids.includes(cu.id)) grp.me = true;
+  }
+  return { reactions: order.map(e => grouped[e]) };
+}

@@ -87,8 +87,10 @@ type Attachment struct {
 }
 
 type Reaction struct {
-    Emoji string `json:"emoji"`
-    Count int    `json:"count"`
+    Emoji   string   `json:"emoji"`
+    Count   int      `json:"count"`
+    UserIDs []string `json:"user_ids,omitempty"`
+    Me      bool     `json:"me"`
 }
 
 type RefreshToken struct {
@@ -183,12 +185,14 @@ type RefreshToken struct {
 
 ### Reaction（API 响应聚合结构）
 
-**说明**：该结构非数据库原始行，而是基于 `reactions` 表的 `GROUP BY emoji` 聚合结果。
+**说明**：该结构非数据库原始行，而是基于 `reactions` 表的 `GROUP BY emoji` 聚合结果。`user_ids` 列通过 `syncReactionsColumn` 缓存到 `messages.reactions` JSON 列中，`me` 字段由 handler 层的 `enrichReactions` 在 HTTP 响应前根据当前用户设置（不注入 WS 广播）。
 
 | 字段 | 类型 | JSON | 来源 | 生成规则 |
 |------|------|------|------|----------|
 | Emoji | `string` | `"emoji"` | 用户输入 | 最大 32 字符 |
 | Count | `int` | `"count"` | 服务端聚合 | `GROUP BY emoji → COUNT(*)` |
+| UserIDs | `[]string` | `"user_ids"` | 服务端聚合 | 所有添加该 emoji 的用户 ID 列表 |
+| Me | `bool` | `"me"` | handler 注入 | HTTP 响应前由 `enrichReactions` 根据 `viewerID` 设置（WS 广播不含该字段） |
 
 ### RefreshToken
 

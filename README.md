@@ -72,7 +72,7 @@ cd server && go test ./... -cover -count=1 -timeout 120s
 | DELETE | `/api/chats/:id/members/:uid` | Bearer | Kick/Leave |
 | POST | `/api/chats/:id/join` | Bearer | Join a public chat |
 | POST | `/api/chats/:id/pin` | Bearer | Pin to top |
-| POST | `/api/chats/:id/unpin` | Bearer | Unpin |
+| DELETE | `/api/chats/:id/pin` | Bearer | Unpin |
 | GET | `/api/chats/:id/messages` | Bearer | History (before,limit) |
 | POST | `/api/chats/:id/messages` | Bearer | Send message |
 | PATCH | `/api/chats/:id/messages/:mid` | Bearer | Edit |
@@ -149,7 +149,7 @@ git push
 - **chats 表统一 `dm | group`**: 不做 Discord 的 guild → channel 两层,用户说"群聊+私聊放一个list就行"
 - **modernc.org/sqlite**: pure Go, no CGO → CI/CD 零依赖交叉编译,但首次编译慢(生成大量Go代码)
 - **chi router**: 比 gin 更轻量更 Go 原生
-- **JWT 10yr**: access token 10年有效期,无 refresh 刷新机制
+- **JWT 10yr + refresh rotation**: access token 10年有效期,配套 refresh_tokens 表实现 token rotation,支持refresh 刷新机制
 - **外链文件上传**: 客户端走 `PUT upload.moonchan.xyz/api/upload` 上传,下载 URL `https://upload.moonchan.xyz/api/{id}/{filename}`
 
 ### Pitfalls (踩坑记录)

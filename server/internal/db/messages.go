@@ -93,10 +93,7 @@ func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, 
 	if err != nil {
 		return nil, err
 	}
-	for range dedupe(mentions) {
-		// Deprecated: mentions are stored as JSON in messages.mentions column.
-	}
-	// Deprecated: attachments are stored as JSON in messages.attachments column.
+	// Deprecated: mentions/attachments are stored as JSON in messages.mentions column.
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
@@ -449,6 +446,54 @@ func (d *DB) reactionsFor(ctx context.Context, messageID, viewerID string) ([]mo
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+	out := make([]models.Reaction, 0, len(order))
+	for _, e := range order {
+		out = append(out, *grouped[e])
+	}
+	return out, nil
+}
+
+func (d *DB) ListReactions(ctx context.Context, messageID, viewerID string) ([]models.Reaction, error) {
+	rows, err := d.QueryContext(ctx,
+		`SELECT emoji, user_id FROM reactions WHERE message_id = ? ORDER BY created_at`,
+		messageID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	type row struct{ emoji, uid string }
+	var all []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.emoji, &r.uid); err != nil {
+			return nil, err
+		}
+		all = append(all, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	grouped := map[string]*models.Reaction{}
+	order := []string{}
+	for _, r := range all {
+		grp, ok := grouped[r.emoji]
+		if !ok {
+			grp = &models.Reaction{Emoji: r.emoji, UserIDs: []string{}}
+			grouped[r.emoji] = grp
+			order = append(order, r.emoji)
+		}
+		grp.Count++
+		grp.UserIDs = append(grp.UserIDs, r.uid)
+	}
+	for _, grp := range grouped {
+		for _, uid := range grp.UserIDs {
+			if uid == viewerID {
+				grp.Me = true
+				break
+			}
+		}
 	}
 	out := make([]models.Reaction, 0, len(order))
 	for _, e := range order {

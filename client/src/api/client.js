@@ -7,7 +7,7 @@ import {
   mockListMessages, mockSendMessage, mockEditMessage, mockDeleteMessage,
   mockMarkRead, mockAddReaction, mockRemoveReaction,
   mockUpload, mockUploadAvatar,
-  mockTogglePin,
+  mockTogglePin, mockMarkPinnedRead,
   resetMockData,
 } from './mock';
 import { createStreamSource } from '../dev/stream-source';
@@ -84,7 +84,7 @@ export const api = {
   searchUsers: (token, q) => request('GET', '/api/users?q=' + encodeURIComponent(q), token),
 
   // ── Chats ──
-  listChats: (token) => request('GET', '/api/chats', token),
+  listChats: (token) => request('GET', '/api/chats/my', token),
   listPublicChats: (token) => request('GET', '/api/chats/public', token),
   createChat: (token, name, memberIds, visibility) =>
     request('POST', '/api/chats', token, { type: 'group', name, member_ids: memberIds, visibility: visibility || 'private' }),
@@ -124,8 +124,11 @@ export const api = {
     request('PUT', '/api/chats/' + chatId + '/messages/' + msgId + '/reactions/' + encodeURIComponent(emoji), token),
   removeReaction: (token, chatId, msgId, emoji) =>
     request('DELETE', '/api/chats/' + chatId + '/messages/' + msgId + '/reactions/' + encodeURIComponent(emoji), token),
+  getReactions: (token, chatId, msgId) =>
+    request('GET', '/api/chats/' + chatId + '/messages/' + msgId + '/reactions', token),
 
-  togglePin: (_token, chatId) => request('POST', '/api/chats/' + chatId + '/pin', _token),
+  togglePin: (_token, chatId) => request('POST', '/api/chats/' + chatId + '/pin-toggle', _token),
+  markPinnedRead: (token, chatId) => request('POST', '/api/chats/' + chatId + '/pin-read', token, {}),
 
   // ── Uploads (external upload.moonchan.xyz) ──
   upload: async (file) => {
@@ -214,9 +217,11 @@ const MOCKABLE = [
   ['markRead', mockMarkRead],
   ['addReaction', mockAddReaction],
   ['removeReaction', mockRemoveReaction],
+  ['getReactions', mockGetReactions],
   ['upload', mockUpload],
   ['uploadAvatar', mockUploadAvatar],
   ['togglePin', mockTogglePin],
+  ['markPinnedRead', mockMarkPinnedRead],
 ];
 
 api.enableMock = () => {
