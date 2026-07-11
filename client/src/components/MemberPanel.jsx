@@ -15,9 +15,6 @@ export default function MemberPanel({ chatId }) {
     return Date.now() - new Date(m.last_seen).getTime() < ONLINE_THRESHOLD;
   };
   const [members, setMembers] = useState([]);
-  const [adding, setAdding] = useState(false);
-  const [search, setSearch] = useState('');
-  const [results, setResults] = useState([]);
   const [profileUser, setProfileUser] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
 
@@ -27,23 +24,10 @@ export default function MemberPanel({ chatId }) {
     if (chat?.members) setMembers(chat.members);
   }, [chat]);
 
-  const searchUsers = async (q) => {
-    setSearch(q);
-    if (q.length < 1) { setResults([]); return; }
-    const data = await api.searchUsers(accessToken, q);
-    setResults((data.users || []).filter(u => !members.find(m => m.id === u.id)));
-  };
-
-  const addUser = async (userId) => {
-    await api.addMember(accessToken, chatId, userId);
-    setAdding(false);
-    setSearch('');
-    setResults([]);
-  };
-
   const removeUser = async (userId) => {
     if (!confirm('Kick this member?')) return;
     await api.removeMember(accessToken, chatId, userId);
+    setMembers(prev => prev.filter(m => m.id !== userId));
   };
 
   return (
@@ -51,25 +35,7 @@ export default function MemberPanel({ chatId }) {
       <h4 style={{fontSize:12,textTransform:'uppercase',color:'var(--text-muted)',marginBottom:12}}>
         Members — {members.length}
       </h4>
-      {chat?.type !== 'dm' && (
-        <button className="btn-ghost" style={{fontSize:13,marginBottom:8,width:'100%',textAlign:'left'}}
-          onClick={() => setAdding(!adding)}>
-          {adding ? '− Cancel' : '+ Add member'}
-        </button>
-      )}
-      {adding && (
-        <div style={{marginBottom:8}}>
-          <input className="input-field" style={{fontSize:13,padding:'4px 8px'}} placeholder="Search users..."
-            value={search} onChange={e=>searchUsers(e.target.value)} autoFocus />
-          {results.map(u => (
-            <div key={u.id} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 0',cursor:'pointer',fontSize:13}}
-              onClick={() => addUser(u.id)}>
-              <span className="status-dot offline" />
-              {u.username}
-            </div>
-          ))}
-        </div>
-      )}
+
       {(() => {
         const isAdmin = m => m.role === 'admin' || m.id === chat.owner_id;
         return members.map(m => (

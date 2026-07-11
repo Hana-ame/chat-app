@@ -186,6 +186,7 @@ export function mockAddMember(_token, chatId, userId) {
   if (chat && !chat.members?.some(m => m.id === userId)) {
     if (!chat.members) chat.members = [];
     chat.members.push({ id: userId, ...userById(userId), role: '' });
+    if (_store) _store.getState().onChatUpdate({ id: chatId, members: [...chat.members] });
   }
   return chat || { ok: true };
 }
@@ -195,6 +196,7 @@ export function mockRemoveMember(_token, chatId, userId) {
   const chat = d.chats.find(c => c.id === chatId);
   if (chat) {
     chat.members = chat.members?.filter(m => m.id !== userId);
+    if (_store) _store.getState().onChatUpdate({ id: chatId, members: [...(chat.members || [])] });
   }
   return { ok: true };
 }
