@@ -53,13 +53,13 @@ export function __getAuthUser() {
 }
 
 const MOCK_USERS = [
-  { id: 'dev-self', username: 'Alice', avatar_color: '#5865F2', email: 'alice@test.com', status: 'online' },
-  { id: 'dev-bob', username: 'Bob', avatar_color: '#23a559', email: 'bob@test.com', status: 'online' },
-  { id: 'dev-carol', username: 'Carol', avatar_color: '#f0b232', email: 'carol@test.com', status: 'online' },
-  { id: 'dev-dave', username: 'Dave', avatar_color: '#ed4245', email: 'dave@test.com', status: 'offline' },
-  { id: 'dev-eve', username: 'Eve', avatar_color: '#9b59b6', email: 'eve@test.com', status: 'online' },
-  { id: 'dev-frank', username: 'Frank', avatar_color: '#1abc9c', email: 'frank@test.com', status: 'offline' },
-  { id: 'ai', username: 'AI Bot', avatar_color: '#10a37f', email: '', status: 'online' },
+  { id: 'dev-self', username: 'Alice', avatar_color: '#5865F2', email: 'alice@test.com', role: 'owner', last_seen: new Date().toISOString() },
+  { id: 'dev-bob', username: 'Bob', avatar_color: '#23a559', email: 'bob@test.com', role: 'admin', last_seen: new Date().toISOString() },
+  { id: 'dev-carol', username: 'Carol', avatar_color: '#f0b232', email: 'carol@test.com', role: 'admin', last_seen: new Date().toISOString() },
+  { id: 'dev-dave', username: 'Dave', avatar_color: '#ed4245', email: 'dave@test.com', role: '', last_seen: new Date(Date.now() - 60000).toISOString() },
+  { id: 'dev-eve', username: 'Eve', avatar_color: '#9b59b6', email: 'eve@test.com', role: '', last_seen: new Date().toISOString() },
+  { id: 'dev-frank', username: 'Frank', avatar_color: '#1abc9c', email: 'frank@test.com', role: '', last_seen: new Date(Date.now() - 86400000).toISOString() },
+  { id: 'ai', username: 'AI Bot', avatar_color: '#10a37f', email: '', role: '', last_seen: new Date().toISOString() },
 ];
 
 function ensureData() {
@@ -94,7 +94,7 @@ export function mockListChats() {
       icon_color: c.icon_color || CHAT_COLORS[i % CHAT_COLORS.length],
       last_message: last ? { id: last.id, content: last.content, deleted: last.deleted, author: last.author, created_at: last.created_at } : c.last_message,
       last_message_at: last?.created_at || c.last_message_at,
-      members: c.members?.map(m => ({ ...m, ...(MOCK_USERS.find(u => u.id === m.id) || {}) })) || [],
+      members: c.members || [],
     };
   });
   return { chats: enriched };
@@ -126,7 +126,7 @@ export function mockGetChat(_token, id) {
   const d = ensureData();
   const chat = d.chats.find(c => c.id === id);
   if (!chat) return { error: 'not_found' };
-  return { ...chat, members: chat.members?.map(m => ({ ...m, ...userById(m.id) })) || [] };
+  return { ...chat, members: chat.members || [] };
 }
 
 export function mockCreateChat(_token, name, memberIds, visibility) {
@@ -142,7 +142,7 @@ export function mockCreateChat(_token, name, memberIds, visibility) {
     pinned: false,
     created_at: new Date().toISOString(),
     last_message_at: null,
-    members: [{ id: cu.id, ...userById(cu.id), role: 'owner' }, ...(memberIds || []).map(id => ({ id, ...userById(id), role: 'member' }))],
+    members: [{ id: cu.id, ...userById(cu.id), role: 'owner' }, ...(memberIds || []).map(id => ({ id, ...userById(id), role: '' }))],
   };
   d.chats.unshift(newChat);
   if (_store) _store.getState().onChatUpdate(newChat);
@@ -156,6 +156,7 @@ export function mockDeleteChat(_token, id) {
   return { ok: true };
 }
 
+// @deprecated DMs are now handled via createChat with type='dm'
 export function mockCreateDM(_token, userId) {
   const d = ensureData();
   const cu = currentUser();
@@ -170,8 +171,8 @@ export function mockCreateDM(_token, userId) {
     visibility: 'private',
     created_at: new Date().toISOString(),
     members: [
-      { id: cu.id, ...userById(cu.id), role: 'member' },
-      { id: userId, ...userById(userId), role: 'member' },
+      { id: cu.id, ...userById(cu.id), role: '' },
+      { id: userId, ...userById(userId), role: '' },
     ],
   };
   d.chats.unshift(newDM);
@@ -184,7 +185,7 @@ export function mockAddMember(_token, chatId, userId) {
   const chat = d.chats.find(c => c.id === chatId);
   if (chat && !chat.members?.some(m => m.id === userId)) {
     if (!chat.members) chat.members = [];
-    chat.members.push({ id: userId, ...userById(userId), role: 'member' });
+    chat.members.push({ id: userId, ...userById(userId), role: '' });
   }
   return chat || { ok: true };
 }

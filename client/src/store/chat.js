@@ -189,7 +189,7 @@ export const useChatStore = create((set, get) => ({
       let n;
       if (idx >= 0) {
         n = [...s.chats];
-        n[idx] = updated;
+        n[idx] = { ...n[idx], ...updated };
       } else {
         n = [updated, ...s.chats];
       }
@@ -347,6 +347,10 @@ export const useChatStore = create((set, get) => ({
       delete next[chatId];
       return { pinnedMessage: next };
     });
+  },
+
+  reset() {
+    set({ chats: [], activeChatId: null, messages: [], pinnedMessage: {} });
   },
 
   disconnect() {

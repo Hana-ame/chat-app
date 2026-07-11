@@ -135,35 +135,37 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
         </div>
       </div>
 
-      <div className="sidebar-search-row">
-        <input className="input-field" placeholder="Search chats..." value={chatSearch}
-          onChange={e => { setChatSearch(e.target.value); setPublicResults(null); }}
-          style={{ fontSize: 14, padding: '8px 10px' }} />
-        {chatSearch.trim() && publicResults === null && (
-          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-            <button className="btn" style={{ flex: 1, padding: '8px 12px', fontSize: 14, background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius)' }}
-              onClick={() => searchPublic(chatSearch.trim())}>
-              🔍 Search &ldquo;{chatSearch.trim()}&rdquo; in public channels
-            </button>
-          </div>
-        )}
-        {joinAction && (
-          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-            {joinAction === 'join' && (
+      {!showCreate && (
+        <div className="sidebar-search-row">
+          <input className="input-field" placeholder="Search chats..." value={chatSearch}
+            onChange={e => { setChatSearch(e.target.value); setPublicResults(null); }}
+            style={{ fontSize: 14, padding: '8px 10px' }} />
+          {chatSearch.trim() && publicResults === null && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
               <button className="btn" style={{ flex: 1, padding: '8px 12px', fontSize: 14, background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius)' }}
-                onClick={() => joinChatByID(chatSearch.trim())}>
-                Join #{chatSearch.trim()}
+                onClick={() => searchPublic(chatSearch.trim())}>
+                🔍 Search &ldquo;{chatSearch.trim()}&rdquo; in public channels
               </button>
-            )}
-            {joinAction === 'create' && (
-              <button className="btn" style={{ flex: 1, padding: '8px 12px', fontSize: 14, background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius)' }}
-                onClick={() => { setNewChatName(chatSearch.trim()); setShowCreate(true); }}>
-                Create &ldquo;{chatSearch.trim()}&rdquo;
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+          {joinAction && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+              {joinAction === 'join' && (
+                <button className="btn" style={{ flex: 1, padding: '8px 12px', fontSize: 14, background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius)' }}
+                  onClick={() => joinChatByID(chatSearch.trim())}>
+                  Join #{chatSearch.trim()}
+                </button>
+              )}
+              {joinAction === 'create' && (
+                <button className="btn" style={{ flex: 1, padding: '8px 12px', fontSize: 14, background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius)' }}
+                  onClick={() => { setNewChatName(chatSearch.trim()); setShowCreate(true); }}>
+                  Create &ldquo;{chatSearch.trim()}&rdquo;
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <ScrollArea className="sidebar-body">
         {showCreate && (
@@ -188,14 +190,14 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
 
       <div className="sidebar-footer">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={() => setShowSettings(true)}>
-          {user.avatar_url
+          {user?.avatar_url
             ? <img src={user.avatar_url} className="user-avatar-img" alt="" />
-            : <div className="chat-item-avatar" style={{ width: 32, height: 32, fontSize: 13, background: user.avatar_color }}>
-              {user.username[0].toUpperCase()}
+            : <div className="chat-item-avatar" style={{ width: 32, height: 32, fontSize: 13, background: user?.avatar_color || '#5865F2' }}>
+              {(user?.username?.[0] || '?').toUpperCase()}
             </div>
           }
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>{user.username}</div>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{user?.username || 'Unknown'}</div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Online</div>
           </div>
           <button className="btn-ghost" onClick={(e) => { e.stopPropagation(); setShowSettings(true); }} title="Settings">⚙</button>

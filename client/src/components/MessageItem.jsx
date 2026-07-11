@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
@@ -29,6 +29,18 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
     return chat?.members?.find(m => m.id === msg.user_id) || msg.author || { username: 'Unknown', avatar_color: '#5865F2', id: msg.user_id };
   }, [chats, chatId, msg.user_id, msg.author, user]);
   const initials = author.username ? author.username[0].toUpperCase() : '?';
+  const pickerRef = useRef(null);
+
+  useEffect(() => {
+    if (!showEmoji) return;
+    const handler = (e) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) {
+        setShowEmoji(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showEmoji]);
 
   const userMap = useMemo(() => {
     const chat = chats.find(c => c.id === chatId);
@@ -89,34 +101,50 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
               {msg.edited_at && <span className="msg-time">(edited)</span>}
             </div>
           )}
-          {msg.deleted ? (
-            <div className="msg-deleted">(message deleted)</div>
-          ) : editing ? (
-            <div style={{display:'flex',gap:8}}>
-              <input className="input-field" value={editText} onChange={e=>setEditText(e.target.value)}
-                style={{flex:1}} autoFocus onKeyDown={e=>e.key==='Enter'&&handleEdit()} />
-               <button className="btn btn-primary" style={{padding:'4px 12px',fontSize:12}} onClick={handleEdit} disabled={opPending}>
-                 {opPending ? '...' : 'Save'}
-               </button>
-              <button className="btn-ghost" style={{fontSize:12}} onClick={()=>setEditing(false)}>Cancel</button>
-            </div>
-          ) : msg.streaming ? (
-            <div className="msg-content" style={{whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
-              {msg.content}<span className="stream-cursor" />
-            </div>
-          ) : (
-            <div className="msg-content">
-              {renderContent(msg.content, userMap)}
+          <div style={{position:'relative'}}>
+            {msg.deleted ? (
+              <div className="msg-deleted">(message deleted)</div>
+            ) : editing ? (
+              <div style={{display:'flex',gap:8}}>
+                <input className="input-field" value={editText} onChange={e=>setEditText(e.target.value)}
+                  style={{flex:1}} autoFocus onKeyDown={e=>e.key==='Enter'&&handleEdit()} />
+                 <button className="btn btn-primary" style={{padding:'4px 12px',fontSize:12}} onClick={handleEdit} disabled={opPending}>
+                   {opPending ? '...' : 'Save'}
+                 </button>
+                <button className="btn-ghost" style={{fontSize:12}} onClick={()=>setEditing(false)}>Cancel</button>
+              </div>
+            ) : msg.streaming ? (
+              <div className="msg-content" style={{whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
+                {msg.content}<span className="stream-cursor" />
+              </div>
+            ) : (
+              <div className="msg-content">
+                {renderContent(msg.content, userMap)}
+              </div>
+            )}
+            {!msg.deleted && (
+              <div className="msg-actions">
+                <button className="msg-btn" onClick={() => setShowEmoji(!showEmoji)} disabled={opPending}>😀</button>
+                {isMe && <button className="msg-btn" onClick={() => { setEditing(true); setEditText(msg.content); }} disabled={opPending}>Edit</button>}
+                {isMe && <button className="msg-btn" onClick={handleDelete} disabled={opPending}>Delete</button>}
+              </div>
+            )}
+          </div>
+          {showEmoji && (
+            <div className="emoji-picker" ref={pickerRef}>
+              {COMMON_EMOJI.map(e => (
+                <button key={e} className="emoji-btn" onClick={() => handleReaction(e)}>{e}</button>
+              ))}
             </div>
           )}
-           {msg.attachments?.map(a => (
-             <div key={a.id} className="file-attach">
-               {a.mime_type?.startsWith('image/')
-                 ? <a href={a.url} target="_blank" rel="noreferrer"><img src={a.url} alt={a.filename} loading="lazy" className="file-attach-img" /></a>
-                 : <div className="file-pill"><a href={a.url} target="_blank" rel="noreferrer" style={{fontSize:13}}>{a.filename}</a></div>
-               }
-             </div>
-           ))}
+          {msg.attachments?.map(a => (
+              <div key={a.id} className="file-attach">
+                {a.mime_type?.startsWith('image/')
+                  ? <a href={a.url} target="_blank" rel="noreferrer"><img src={a.url} alt={a.filename} loading="lazy" className="file-attach-img" /></a>
+                  : <div className="file-pill"><a href={a.url} target="_blank" rel="noreferrer" style={{fontSize:13}}>{a.filename}</a></div>
+                }
+              </div>
+            ))}
           {msg.reactions?.length > 0 && (
             <div className="reaction-bar">
               {msg.reactions.map(r => (
@@ -125,21 +153,6 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
                   <span>{r.emoji}</span>
                   <span style={{fontSize:12}}>{r.count}</span>
                 </div>
-              ))}
-            </div>
-          )}
-           {!msg.deleted && (
-              <div className="msg-actions">
-                <button className="msg-btn" onClick={() => setShowEmoji(!showEmoji)} disabled={opPending}>😀</button>
-                {isMe && <button className="msg-btn" onClick={() => { setEditing(true); setEditText(msg.content); }} disabled={opPending}>Edit</button>}
-                {isMe && <button className="msg-btn" onClick={handleDelete} disabled={opPending}>Delete</button>}
-              </div>
-           )}
-
-          {showEmoji && (
-            <div className="emoji-picker">
-              {COMMON_EMOJI.map(e => (
-                <button key={e} className="emoji-btn" onClick={() => handleReaction(e)}>{e}</button>
               ))}
             </div>
           )}

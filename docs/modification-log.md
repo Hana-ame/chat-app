@@ -1561,3 +1561,587 @@ compare(false, undefined)  → false !== undefined → true → false?     → 1
 **修正文档**: `docs/reports/frontend-logic-correction-20260710.md`
 
 ---
+
+## 2026-07-10 第 9 轮 — UI 修复
+
+---
+
+### 9-1: 创建 Group 时搜索框未隐藏
+
+**反馈**: 点击 "+" 弹出 GroupName 输入框时，搜索框仍可见，应隐藏。
+
+**根因**: `showCreate` 状态只在 `ScrollArea` 内控制 CreateGroupForm 的显隐，搜索框（`.sidebar-search-row`）独立于该状态，始终渲染。
+
+**代码变更** (`client/src/components/ChatList.jsx`):
+
+```diff
++      {!showCreate && (
+        <div className="sidebar-search-row">
+          ...
+        </div>
++      )}
+```
+
+搜索输入框、搜索按钮、join/create 快捷操作按钮在 `showCreate=true` 时全部隐藏，恢复时重新出现。
+
+---
+
+### 9-2: 消息 hover 菜单位置调整 — 置于文本与 reaction 之间
+
+**反馈**: hover 后的 reaction/edit/delete 菜单在有 reaction 的情况下出现在 reaction 下方，鼠标很难选中。
+
+**根因**: `.msg-actions` 使用 `position:absolute; bottom:-22px` 锚定在 `.msg-row` 底部，reaction 栏扩展了行高，菜单被推得更远。
+
+**首轮尝试**: 用 `position:absolute; z-index:10` 遮住 reaction → 但 reaction 需要点击快速赞同/取消，被菜单挡住不可用。
+
+**最终方案**: 改为正常文档流，菜单在文本与 reaction 之间撑开。
+
+**代码变更** (`client/src/styles/global.css`):
+
+```diff
+- .msg-actions { display:none; gap:4px; position:absolute; bottom:-22px; left:52px; z-index:5; background:...; }
++ .msg-actions { display:none; gap:4px; margin-top:4px; background:var(--bg-primary); padding:2px 6px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.3); }
+```
+
+**代码变更** (`client/src/components/MessageItem.jsx`):
+
+```diff
+  {msg.deleted ? (...) : editing ? (...) : streaming ? (...) : (
+    <div className="msg-content">...</div>
+  )}
++ {!msg.deleted && (
++   <div className="msg-actions">
++     😀 Edit Delete
++   </div>
++ )}
+```
+
+改动要点：
+- 移除 `position:absolute`，菜单恢复正常文档流
+- `margin-top:4px` 与文本保持间距
+- 菜单 DOM 顺序在文本之后、attachments/reactions 之前
+- hover 时菜单展开占位，reaction 保持在下方可点击
+- 鼠标从文本垂直下滑即可到达菜单，无需跨越 reaction
+
+### 9-3: （回退 9-2）消息 hover 菜单改为右上角浮动
+
+**反馈**: 9-2 方案把菜单改为正常文档流，会改变消息布局（hover 时撑开空间），且被驳回。
+
+**根因**: 
+- absolute 遮住 reaction → 无法点击 reaction（rejected）
+- 正常文档流撑开 → 改变布局（rejected）
+
+**最终方案**: 菜单定位到 `.msg-row` 右上角 (`top:-8px; right:8px`)，类似 Slack/Discord 的 hover 菜单。不与底部 reaction 干涉，不改变布局，且鼠标在消息右侧自然可达。
+
+**代码变更** (`client/src/styles/global.css`):
+
+```diff
+- .msg-actions { display:none; gap:4px; margin-top:4px; background:...; }
++ .msg-actions { display:none; gap:4px; position:absolute; top:-8px; right:8px; z-index:5; background:...; }
+```
+
+**DOM 位置**: `msg-actions` 保持在 flex 内容区内、attachments/reactions 之前（不变），由 CSS `position:absolute` 脱离文档流。
+
+### 9-4: 菜单左对齐 + 悬浮上方，表情选单同位置（回退）
+
+**反馈**: `top:-40px` 太靠上点不到；且菜单位于 avatar/username/message 整体上方，定位锚点错误。
+
+**后续尝试**:
+- `top:-30px` 仍太靠上
+- `top:0; left:0` 相对于 `.msg-row` → 遮住 avatar，不是 message 上方
+- `bottom:100%; left:0` 相对于内容块 `position:relative` 容器 → 正确位置
+
+### 9-5: 消息 hover 菜单 — 最终方案（文本正上方左对齐）
+
+**反馈**: 菜单应与 **消息内容文本** 左对齐，正好在 **文本** 正上方（不在 username 上方，不遮 avatar）。
+
+**实现**: 用 `position:relative` 包裹内容块，菜单和表情选单以 `position:absolute; bottom:100%; left:0` 挂在文本正上方。
+
+**代码变更** (`client/src/components/MessageItem.jsx`):
+
+```diff
++          <div style={{position:'relative'}}>
+             {msg.deleted ? (...) : editing ? (...) : streaming ? (...) : (
+               <div className="msg-content">...</div>
+             )}
+             {!msg.deleted && (
+               <div className="msg-actions">
+                 😀 Edit Delete
+               </div>
+             )}
++          </div>
++          {showEmoji && (
++            <div className="emoji-picker">👍 ❤️ 😂 🎉 ...</div>
++          )}
+```
+
+- 表情选单从 flex div 末尾移入内容块容器
+- 移除 flex div 的 `position:relative`
+
+**代码变更** (`client/src/styles/global.css`):
+
+```diff
+- .msg-actions { position:absolute; top:0; left:0; }
++ .msg-actions { position:absolute; bottom:100%; left:0; }
+- .emoji-picker { position:absolute; top:0; left:0; }
++ .emoji-picker { position:absolute; bottom:100%; left:0; }
+```
+
+---
+
+### 9-6: Emoji picker 点击外部取消
+
+**反馈**: 点击 😀 打开表情选单后，没有取消选项，只能选一个 emoji 后关闭。
+
+**代码变更** (`client/src/components/MessageItem.jsx`):
+
+```diff
+- import { useState, useMemo } from 'react';
++ import { useState, useMemo, useRef, useEffect } from 'react';
+
++  const pickerRef = useRef(null);
++  useEffect(() => {
++    if (!showEmoji) return;
++    const handler = (e) => {
++      if (pickerRef.current && !pickerRef.current.contains(e.target)) {
++        setShowEmoji(false);
++      }
++    };
++    document.addEventListener('mousedown', handler);
++    return () => document.removeEventListener('mousedown', handler);
++  }, [showEmoji]);
+
+-  {showEmoji && <div className="emoji-picker">...</div>}
++  {showEmoji && <div className="emoji-picker" ref={pickerRef}>...</div>}
+```
+
+ 点击 emoji picker 外部任意区域（消息、sidebar、空白处）触发 `mousedown` → `setShowEmoji(false)` 关闭选单。
+
+### 9-7: Mock 数据缺少同一人连续多条消息
+
+**反馈**: 测试数据中每个用户的消息都是交替出现，没有一个人连续发送多条的场景，无法测试 `sameAuthor` 续接显示。
+
+**代码变更** (`client/src/dev/dummy.js` — `General` 话题末尾):
+
+```diff
+    ['Check out this link: https://example.com', 'dev-frank'],
++   ['Anyone tried the new dark mode?', 'ME'],
++   ['Yes, it looks great!', 'ME'],
++   ['Love the contrast ratio', 'ME'],
++   ['Also the animations are smooth', 'ME'],
+  ],
+```
+
+末尾 4 条消息均为 Alice (`ME`)，在 chat 中会渲染为 `sameAuthor=true` 的续接样式（无头像/用户名）。
+
+### 9-8: Chat list 菜单按钮判定范围太小（触屏适配）
+
+**反馈**: 三点菜单 `⋮` 按钮点击区域过窄（`padding: 0 2px`），经常点不到，触屏更严重。
+
+**代码变更** (`client/src/styles/global.css`):
+
+```diff
+- .chat-item-menu-btn { font-size:18px; padding:0 2px; }
++ .chat-item-menu-btn { font-size:18px; padding:12px 20px; }
+```
+
+点击区域从 2px → 20px 水平扩展、0 → 12px 垂直扩展，满足触屏 44×44px 推荐标准。
+
+### 9-9: 右侧成员面板按角色分组 + online 状态修复
+
+**反馈**: 成员列表应按 Owner → Admin → Member 分组排序；online 状态不显示（所有点都是灰色）。
+
+**根因**: `ensureData()` 未保存 `gen.onlineUserIds`；`dummy.js` 用 `u.id !== 'dev-self'` 计算在线导致 Frank 也被算作在线。
+
+**修正**:
+1. `dummy.js`: 改用 `last_seen` 时间戳判断在线，Bob/Carol/Eve 最近在线 → 绿点，Dave（1 分钟前）→ 绿点，Frank（1 天前）→ 灰点
+2. `mock.js`: 存储和传递 `onlineUserIds` 到 store
+3. `MemberPanel`: 按 `last_seen` 与当前时间差（<5 分钟）判断在线，在线排前面
+
+**代码变更** (`client/src/api/mock.js`):
+
+```diff
+  const MOCK_USERS = [
+-   { id: 'dev-self', ..., status: 'online' },
+-   { id: 'dev-frank', ..., status: 'offline' },
++   { id: 'dev-self', ..., last_seen: new Date().toISOString() },
++   { id: 'dev-frank', ..., last_seen: new Date(Date.now() - 86400000).toISOString() },
+  ];
+```
+
+**代码变更** (`client/src/dev/dummy.js`):
+
+```diff
+- const onlineUserIds = USERS.filter(u => u.id !== 'dev-self').map(u => u.id);
++ const onlineUserIds = USERS.filter(u => u.status === 'online').map(u => u.id);
+- const members = [...unique].map(...);
++ const members = unique.map((m) => ({
++   ...m,
++   role: m.id === ME.id ? 'owner' : (m.id === 'dev-bob' || m.id === 'dev-carol' ? 'admin' : 'member'),
++ }));
+```
+
+**代码变更** (`client/src/components/MemberPanel.jsx`):
+
+```diff
+- const { chats } = useChatStore();
++ const { chats, onlineUserIds } = useChatStore();
++ const isOnline = (m) => { ... };
+- <span className="status-dot offline" />
++ <span className={'status-dot ' + (isOnline(m) ? 'online' : 'offline')} />
+```
+
+### 9-10: 成员名后显示 Admin / Member tag
+
+**反馈**: Admin 和 Member 组成员名后应显示角色 tag。
+
+**代码变更** (`client/src/components/MemberPanel.jsx`):
+
+```diff
+  <span style={{flex:1}}>{m.username}</span>
++ {s.label !== 'Owner' && (
++   <span style={{fontSize:10,padding:'0 5px',borderRadius:3,fontWeight:500,
++     background:'rgba(88,101,242,0.15)',color:'#5865F2'}}>
++     {s.label === 'Admin' ? 'ADMIN' : 'MEMBER'}
++   </span>
++ )}
+```
+
+Owner 组不显示 tag（由 section label 区分），Admin 组显示 `ADMIN`，Member 组显示 `MEMBER`。
+
+### 9-11: 删除多余的高度占位 `<div>`
+
+**反馈**: 成员列表应按 Owner → Admin → Member 分组排序；online 状态不显示（所有点都是灰色）。
+
+**根因**: `ensureData()` 未保存 `gen.onlineUserIds`；store 没有 `onUserStatus` action，调用被 `?.` 静默忽略。`onlineUserIds` 始终为 `[]`。
+
+**代码变更** (`client/src/api/mock.js` — `ensureData`):
+
+```diff
+  const gen = generateDummyData(...);
+- data = { chats: gen.chats, messages: [...(gen.messages || [])] };
++ data = { chats: gen.chats, messages: [...(gen.messages || [])], onlineUserIds: gen.onlineUserIds || [] };
++ if (_store) _store.setState({ onlineUserIds: data.onlineUserIds });
+```
+
+**代码变更** (`client/src/components/MemberPanel.jsx`):
+
+```diff
+- const { chats } = useChatStore();
++ const { chats, onlineUserIds } = useChatStore();
+
+  // 按角色分组渲染（Owner → Admin → Member）
+- {[...members].sort((a,b) => onlineUserIds...).map(m => (...))}
++ {(() => {
++   const owner = members.find(m => m.id === chat.owner_id);
++   const admins = members.filter(m => m.id !== chat.owner_id && m.role === 'admin');
++   const rest = members.filter(m => m.id !== chat.owner_id && m.role !== 'admin');
++   // 分三组渲染，每组带 label
++ })()}
+
+- <span className="status-dot offline" />
++ <span className={'status-dot ' + (onlineUserIds.includes(m.id) ? 'online' : 'offline')} />
+```
+
+### 9-10: 删除多余的高度占位 `<div>`
+
+**反馈**: `unread_count` 为 0 时渲染的 `<div style={{height:18}} />` 多余。
+
+**代码变更** (`client/src/components/ChatListItem.jsx`):
+
+```diff
+- {unread > 0 ? <div className="unread-badge">{unread}</div> : <div style={{ height: 18 }} />}
++ {unread > 0 ? <div className="unread-badge">{unread}</div> : null}
+```
+
+### 9-11: 红点与菜单按钮同行对齐
+
+**反馈**: 删除占位 `<div>` 后红点不对齐。
+
+**代码变更** (`client/src/styles/global.css`):
+
+```diff
+- .chat-item-menu-wrap { position:relative; }
++ .chat-item-menu-wrap { display:flex; align-items:center; gap:4px; }
+```
+
+**代码变更** (`client/src/components/ChatListItem.jsx`):
+
+```diff
+  <div className="chat-item-meta">
+    <div className="chat-item-time">{timeAgo(chat.last_message_at)}</div>
+-   {unread > 0 ? <div className="unread-badge">{unread}</div> : null}
+    <div className="chat-item-menu-wrap">
++     {unread > 0 ? <div className="unread-badge">{unread}</div> : null}
+      <button ...>⋮</button>
+    </div>
+  </div>
+```
+
+红点移至 `.chat-item-menu-wrap` 内，与 `⋮` 按钮 flex 同行排列，自动对齐。
+
+---
+
+## 2026-07-11 第 10 轮 — Mock 数据清理 & 角色分配
+
+---
+
+### 10-1: DM 标记废弃注释
+
+**反馈**: `mockCreateDM` 已废弃，应标记。
+
+**代码变更** (`client/src/api/mock.js`):
+```diff
++ // @deprecated DMs are now handled via createChat with type='dm'
+export function mockCreateDM(_token, userId) {
+```
+
+---
+
+### 10-2: 去除 members MOCK_USERS 合并
+
+**反馈**: `mockListChats` 和 `mockGetChat` 中 `c.members?.map(m => ({ ...m, ...(MOCK_USERS.find(u => u.id === m.id) || {}) }))` 用 `MOCK_USERS` 的数据污染了原始数据，mock 应严格按 API 返回内容输出。
+
+**代码变更** (`client/src/api/mock.js`):
+```diff
+- members: c.members?.map(m => ({ ...m, ...(MOCK_USERS.find(u => u.id === m.id) || {}) })) || [],
++ members: c.members || [],
+```
+
+```diff
+- return { ...chat, members: chat.members?.map(m => ({ ...m, ...userById(m.id) })) || [] };
++ return { ...chat, members: chat.members || [] };
+```
+
+---
+
+### 10-3: Dummy 数据随机分配角色 + Owner 随机化
+
+**反馈**: 
+- mock 数据需要有一部分成员是 admin，个数随机、身份随机
+- owner 应是随机 member 而非固定 Alice
+- owner 属于 admin（不单独分栏）
+
+**代码变更** (`client/src/dev/dummy.js` — `generateDummyData`):
+```js
+const members = unique.map(u => ({ ...u }));
+const ownerMember = members[Math.floor(Math.random() * members.length)];
+ownerMember.role = 'admin';
+const adminCount = Math.floor(Math.random() * Math.max(1, Math.floor((members.length - 1) / 2)));
+const candidates = members.filter(m => m.id !== ownerMember.id).sort(() => Math.random() - 0.5);
+for (let i = 0; i < adminCount && i < candidates.length; i++) {
+  const idx = members.findIndex(m => m.id === candidates[i].id);
+  members[idx].role = 'admin';
+}
+```
+
+- Owner 从 members 中随机选取，自动获得 `role: 'admin'`
+- 再随机 0~floor((len-1)/2) 个其他成员为 admin
+- `owner_id` 改为 `ownerMember.id`（原固定 `ME.id`）
+
+---
+
+### 10-4: Owner 合并到 Admin 组（UI 改动）
+
+**反馈**: owner 属于 admin，UI 不应分成 Owner/Admin/Member 三栏，改为 Admin/Member 两栏。
+
+**代码变更** (`client/src/components/ChatInfoModal.jsx`):
+```diff
+- const { owner, admins, members } = useMemo(() => {
+-   const o = chat.members.find(m => m.id === chat.owner_id) || null;
+-   const a = chat.members.filter(m => m.role === 'admin' && m.id !== chat.owner_id);
+-   const m = chat.members.filter(m => m.id !== chat.owner_id && m.role !== 'admin');
+-   return { owner: o, admins: a, members: m };
++ const { admins, members } = useMemo(() => {
++   const isAdmin = m => m.role === 'admin' || m.id === chat.owner_id;
++   return {
++     admins: chat.members.filter(isAdmin),
++     members: chat.members.filter(m => !isAdmin(m)),
++   };
+ }, [chat]);
+```
+
+```diff
+- <Section title="Owner">...</Section>
+- {admins.length > 0 && <Section title={`Admin — ${admins.length}`}>...</Section>}
+- <Section title={`Member — ${members.length}`}>...</Section>
++ <Section title={`Admin — ${admins.length}`}>{admins.map(...)}</Section>
++ {members.length > 0 && <Section title={`Member — ${members.length}`}>...</Section>}
+```
+
+**代码变更** (`client/src/components/MemberPanel.jsx`):
+```diff
+- const owner = members.find(m => m.id === chat.owner_id);
+- const admins = sortOnline(members.filter(m => m.id !== chat.owner_id && m.role === 'admin'));
+- const rest = sortOnline(members.filter(m => m.id !== chat.owner_id && m.role !== 'admin'));
+- const sections = [
+-   owner ? { label: 'Owner', items: [owner] } : null,
+-   admins.length ? { label: 'Admin', items: admins } : null,
+-   rest.length ? { label: 'Member', items: rest } : null,
+- ].filter(Boolean);
++ const isAdmin = m => m.role === 'admin' || m.id === chat.owner_id;
++ const admins = sortOnline(members.filter(isAdmin));
++ const rest = sortOnline(members.filter(m => !isAdmin(m)));
++ const sections = [
++   admins.length ? { label: 'Admin', items: admins } : null,
++   rest.length ? { label: 'Member', items: rest } : null,
++ ].filter(Boolean);
+```
+
+---
+
+### 10-5: 移除 member tag
+
+**反馈**: member 后面的 ADMIN/MEMBER tag 不需要显示。
+
+**代码变更** (`client/src/components/MemberPanel.jsx`):
+```diff
+  <span style={{flex:1}}>{m.username}</span>
+- <span style={{fontSize:10,padding:'0 5px',borderRadius:3,fontWeight:500,background:'rgba(88,101,242,0.15)',color:'#5865F2'}}>{s.label === 'Admin' ? 'ADMIN' : 'MEMBER'}</span>
+```
+
+---
+
+### 10-6: GROUP_TOPICS 改用 'dev-self' 替代 'ME'
+
+**反馈**: GROUP_TOPICS 中用 `'ME'` 字符串标识 Alice，导致 `USERS.find(u => u.id === 'ME')` 找不到，需靠 `unique.unshift(ME)` 回退加入。应直接用 `'dev-self'`。
+
+**代码变更** (`client/src/dev/dummy.js`):
+```diff
+- ['Anyone tried the new dark mode?', 'ME'],
++ ['Anyone tried the new dark mode?', 'dev-self'],
+```
+（全局 23 处 `'ME'` → `'dev-self'`）
+
+```diff
+- if (!unique.find(m => m.id === ME.id)) unique.unshift(ME);
+```
+
+Alice 现在通过 `USERS.find(u => u.id === 'dev-self')` 自然匹配进入 members。
+
+---
+
+### 10-7: 修改 display name 时 chat list 丢失信息
+
+**反馈**: 在 Settings 修改用户名后，chat list 所有信息丢失（只剩 id 和 members）。
+
+**根因**: `mockUpdateProfile` 调用 `onChatUpdate({ id, members })` 仅传了部分字段。`onChatUpdate` 中 `n[idx] = updated` 直接用这个部分对象替换整个 chat，覆盖了 name、last_message、last_message_at 等字段。
+
+**代码变更** (`client/src/store/chat.js` — `onChatUpdate`):
+```diff
+- n[idx] = updated;
++ n[idx] = { ...n[idx], ...updated };
+```
+
+改为合并而非替换，只覆盖 payload 中提供的字段。
+
+---
+
+---
+
+### 10-8: 登录页重定向修复 + pinned 指示器 + 布局修复
+
+#### 10-8-1: 退出登录后未跳转登录页
+
+**反馈**: 用户退出后仍显示 chat 页面，无登录/注册页。
+
+**根因**: `auth.js` 的 `logout()` 中 `set({ user: null })` 未清除 `accessToken`，路由守卫 `token ? <ChatPage /> : <Navigate to="/login" />` 认为仍登录；且 ChatStore 的 `activeChatId` 残留，重新登录后直接跳回之前打开的聊天而非 WelcomeView。
+
+**代码变更** (`client/src/store/auth.js`):
+```diff
+  logout: async () => {
+    api.disableMock();
+    try { await api.logout(); } catch (e) { console.error('Logout error:', e); }
++   useChatStore.getState().reset();
+    storage.clear();
+-   set({ user: null });
++   set({ user: null, accessToken: null });
+  },
+```
+
+```diff
+  return {
+    user: saved.user || null,
++   accessToken: saved.accessToken || null,
+```
+
+**代码变更** (`client/src/store/chat.js` — 新增 `reset` action):
+```js
+reset() {
+  set({ chats: [], activeChatId: null, messages: [], pinnedMessage: {} });
+},
+```
+
+**代码变更** (`client/src/components/ChatList.jsx` — 安全防护):
+```diff
+- {user.avatar_url ? ...}
++ {user?.avatar_url ? ...}
+```
+
+#### 10-8-2: Chat list 添加 pinned 📌 指示器
+
+**反馈**: pinned 信息没有显示位置。
+
+**代码变更** (`client/src/components/ChatListItem.jsx`):
+```jsx
+{chat.pinned && <span style={{fontSize:12}}>📌</span>}
+```
+
+#### 10-8-3: ADMIN tag 垂直居中
+
+**反馈**: absolute 定位的 ADMIN tag 未垂直居中。
+
+**代码变更** (`client/src/components/MemberPanel.jsx`, `ChatInfoModal.jsx`):
+```diff
+- <span style={{position:'absolute',right:22,...}}>ADMIN</span>
++ <span style={{position:'absolute',right:22,top:'50%',transform:'translateY(-50%)',...}}>ADMIN</span>
+```
+
+#### 10-8-4: Chat name 禁止换行
+
+**反馈**: chat list 中的名称不应显示为两行。
+
+**代码变更** (`client/src/styles/global.css`):
+```diff
+- .chat-item-name { font-weight: 600; font-size: 15px; }
++ .chat-item-name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+```
+
+---
+
+### 10-8: MemberPanel 不分组 + ADMIN tag 右对齐
+
+**反馈**: member 不应按角色分组，按原始顺序显示；ADMIN tag 加在 admin/owner 名字后面。
+
+**过程**:
+
+1. **首次尝试 — flex:1 spacer**:
+   - 将 `flex:1` 从 username 移到独立的 `<div style={{flex:1}} />` 放在 username 和 tag 之间
+   - 结果: tag 和 × 被推到右侧，但当 × 存在时 tag 左移 × 的宽度，ADMIN 在不同行 x 坐标不一致
+
+2. **第二次尝试 — 固定宽度容器**:
+   - 将 tag + × 包裹在 `width:56` 的 `justifyContent:'flex-end'` 容器中
+   - 结果: tag + × 组合宽度 (~64px) 超过 56px，溢出导致布局错乱；且 flex-end 仍让 tag 位置随 × 显隐变化
+
+3. **最终方案 — absolute 定位**:
+   - 容器改为 `width:66; position:relative`，ADMIN tag `position:absolute; right:22`，× 按钮 `position:absolute; right:0`
+   - 无论 × 是否显示，ADMIN tag 的 right 值固定不变，所有 tag 在同一垂直线
+
+**教训**: 用 flex-end 或 margin-left:auto 做右对齐时，条件渲染的子元素会改变前一个元素的 x 坐标。如需多个元素固定在固定位置，用 absolute 定位。
+
+**代码变更** (`client/src/components/MemberPanel.jsx`):
+- 移除 `sortOnline` 分组逻辑，直接遍历 `members` 原始顺序
+- 移除 `Section` 分栏结构
+- 每行加 `isAdmin` 判断显示 ADMIN tag
+
+**代码变更** (`client/src/components/ChatInfoModal.jsx`):
+- 移除 `useMemo` 分组、`Section` 组件、`MemberRow` 函数
+- 直接遍历 `chat.members` 渲染
+- 移除重复的 `InfoRow` 函数声明（修复 build error）
+
+---
+
+### 验证
+- Build: ✓
+
+

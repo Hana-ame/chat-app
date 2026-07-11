@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useChatStore } from '../store/chat';
 import UserProfileModal from './UserProfileModal';
 
@@ -10,18 +10,10 @@ function fmtTime(t) {
 export default function ChatInfoModal({ chatId, onClose }) {
   const { chats } = useChatStore();
   const chat = chats.find(c => c.id === chatId);
-
   const [profileUser, setProfileUser] = useState(null);
-
-  const { owner, admins, members } = useMemo(() => {
-    if (!chat?.members) return { owner: null, admins: [], members: [] };
-    const o = chat.members.find(m => m.id === chat.owner_id) || null;
-    const a = chat.members.filter(m => m.role === 'admin' && m.id !== chat.owner_id);
-    const m = chat.members.filter(m => m.id !== chat.owner_id && m.role !== 'admin');
-    return { owner: o, admins: a, members: m };
-  }, [chat]);
-
   if (!chat) return null;
+
+  const isAdmin = m => m.role === 'admin' || m.id === chat.owner_id;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -39,45 +31,23 @@ export default function ChatInfoModal({ chatId, onClose }) {
         <InfoRow label="Created at" value={fmtTime(chat.created_at)} />
         <InfoRow label="Last message" value={fmtTime(chat.last_message_at)} />
 
-        <Section title={`Owner`}>
-          {owner && <MemberRow member={owner} onProfile={setProfileUser} />}
-        </Section>
-
-        {admins.length > 0 && (
-          <Section title={`Admin — ${admins.length}`}>
-            {admins.map(m => <MemberRow key={m.id} member={m} onProfile={setProfileUser} />)}
-          </Section>
-        )}
-
-        <Section title={`Member — ${members.length}`}>
-          {members.map(m => <MemberRow key={m.id} member={m} onProfile={setProfileUser} />)}
-        </Section>
+        <h4 style={{fontSize:12,textTransform:'uppercase',color:'var(--text-muted)',marginBottom:8}}>Members — {chat.members?.length || 0}</h4>
+        {(chat.members || []).map(m => (
+          <div key={m.id} onClick={() => setProfileUser(m)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', fontSize: 14, cursor: 'pointer' }}>
+            <div className="msg-avatar" style={{ width: 26, height: 26, fontSize: 11, background: m.avatar_color || '#5865F2' }}>
+              {m.username ? m.username[0].toUpperCase() : '?'}
+            </div>
+            <span>{m.username}</span>
+            <div style={{flex:1}} />
+            <div style={{width:44,height:26,position:'relative',flexShrink:0}}>
+              {isAdmin(m) && <span style={{position:'absolute',right:0,top:'50%',transform:'translateY(-50%)',fontSize:10,padding:'0 5px',borderRadius:3,fontWeight:500,background:'rgba(88,101,242,0.15)',color:'#5865F2'}}>ADMIN</span>}
+            </div>
+          </div>
+        ))}
       </div>
       {profileUser && (
         <UserProfileModal user={profileUser} onClose={() => setProfileUser(null)} />
       )}
-    </div>
-  );
-}
-
-function Section({ title, children }) {
-  return (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 11, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6, letterSpacing: 0.5 }}>
-        {title}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function MemberRow({ member, onProfile }) {
-  return (
-    <div onClick={() => onProfile?.(member)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', fontSize: 14, cursor: 'pointer' }}>
-      <div className="msg-avatar" style={{ width: 26, height: 26, fontSize: 11, background: member.avatar_color || '#5865F2' }}>
-        {member.username ? member.username[0].toUpperCase() : '?'}
-      </div>
-      <span>{member.username}</span>
     </div>
   );
 }

@@ -15,6 +15,7 @@ export const useAuthStore = create((set, get) => {
   }
   return {
     user: saved.user || null,
+    accessToken: saved.accessToken || null,
     loading: false,
     error: null,
 
@@ -52,15 +53,16 @@ export const useAuthStore = create((set, get) => {
         set(payload);
       } catch {
         storage.clear();
-        set({ user: null });
+        set({ user: null, accessToken: null });
       }
     },
 
     logout: async () => {
       api.disableMock();
       try { await api.logout(); } catch (e) { console.error('Logout error:', e); }
+      useChatStore.getState().reset();
       storage.clear();
-      set({ user: null });
+      set({ user: null, accessToken: null });
     },
 
     setUser: (user) => {
