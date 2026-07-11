@@ -27,7 +27,12 @@ func (s *Server) AddReaction(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "bad emoji encoding")
 		return
 	}
-	ok, _ := s.DB.IsChatMember(r.Context(), chatID, u.ID)
+	ok, err := s.DB.IsChatMember(r.Context(), chatID, u.ID)
+	if err != nil {
+		w.Header().Set("X-Error", err.Error())
+		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
 	if !ok {
 		writeError(w, http.StatusForbidden, "forbidden", "")
 		return
@@ -41,7 +46,10 @@ func (s *Server) AddReaction(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
-	updated, _ := s.DB.GetMessage(r.Context(), msgID)
+	updated, err := s.DB.GetMessage(r.Context(), msgID)
+	if err != nil {
+		w.Header().Set("X-Error", err.Error())
+	}
 	if s.Hub != nil {
 		s.Hub.BroadcastReaction(chatID, msgID, emoji, u.ID, true)
 	}
@@ -68,7 +76,12 @@ func (s *Server) RemoveReaction(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "bad emoji encoding")
 		return
 	}
-	ok, _ := s.DB.IsChatMember(r.Context(), chatID, u.ID)
+	ok, err := s.DB.IsChatMember(r.Context(), chatID, u.ID)
+	if err != nil {
+		w.Header().Set("X-Error", err.Error())
+		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
 	if !ok {
 		writeError(w, http.StatusForbidden, "forbidden", "")
 		return
@@ -80,7 +93,10 @@ func (s *Server) RemoveReaction(w http.ResponseWriter, r *http.Request) {
 	if s.Hub != nil {
 		s.Hub.BroadcastReaction(chatID, msgID, emoji, u.ID, false)
 	}
-	updated, _ := s.DB.GetMessage(r.Context(), msgID)
+	updated, err := s.DB.GetMessage(r.Context(), msgID)
+	if err != nil {
+		w.Header().Set("X-Error", err.Error())
+	}
 	writeJSON(w, http.StatusOK, updated)
 }
 
@@ -97,7 +113,12 @@ func (s *Server) ListReactions(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	chatID := chi.URLParam(r, "chatID")
 	msgID := chi.URLParam(r, "messageID")
-	ok, _ := s.DB.IsChatMember(r.Context(), chatID, u.ID)
+	ok, err := s.DB.IsChatMember(r.Context(), chatID, u.ID)
+	if err != nil {
+		w.Header().Set("X-Error", err.Error())
+		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
 	if !ok {
 		writeError(w, http.StatusForbidden, "forbidden", "")
 		return

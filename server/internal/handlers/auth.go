@@ -141,7 +141,9 @@ func (s *Server) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if rt.ExpiresAt.Before(timeNow()) {
-		_ = s.DB.DeleteRefreshToken(r.Context(), rt.ID)
+		if err := s.DB.DeleteRefreshToken(r.Context(), rt.ID); err != nil {
+			w.Header().Set("X-Error", err.Error())
+		}
 		s.refreshMu.Unlock()
 		writeError(w, http.StatusUnauthorized, "refresh_expired", "refresh token expired")
 		return
@@ -182,7 +184,9 @@ func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
 	// Refresh's CreateRefreshToken may insert a new token after this deletion.
 	// Accepted as low-risk. If it becomes a problem, acquire refreshMu here
 	// and move CreateRefreshToken inside refreshMu in Refresh.
-	_ = s.DB.DeleteUserRefreshTokens(r.Context(), u.ID)
+	if err := s.DB.DeleteUserRefreshTokens(r.Context(), u.ID); err != nil {
+		w.Header().Set("X-Error", err.Error())
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

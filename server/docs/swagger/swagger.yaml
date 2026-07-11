@@ -1,4 +1,3 @@
-basePath: /api
 definitions:
   handlers.addMemberReq:
     properties:
@@ -35,14 +34,14 @@ definitions:
       password:
         type: string
     type: object
+  handlers.pinContentReq:
+    properties:
+      content:
+        type: string
+    type: object
   handlers.readReq:
     properties:
       message_id:
-        type: string
-    type: object
-  handlers.refreshReq:
-    properties:
-      refresh_token:
         type: string
     type: object
   handlers.registerReq:
@@ -74,8 +73,6 @@ definitions:
         type: string
       expires_in:
         type: integer
-      refresh_token:
-        type: string
       user: {}
     type: object
   handlers.updateProfileReq:
@@ -111,69 +108,80 @@ definitions:
       id:
         type: string
       last_message:
-        $ref: '#/definitions/models.Message'
+        allOf:
+        - $ref: '#/definitions/models.Message'
+        description: Deprecated.
       last_message_at:
         type: string
-      members:
-        items:
-          $ref: '#/definitions/models.User'
-        type: array
+      last_message_id:
+        type: string
+      member_count:
+        type: integer
       name:
         type: string
       owner_id:
         type: string
       pinned:
         type: boolean
+      pinned_last_read_at:
+        type: string
+      pinned_message:
+        $ref: '#/definitions/models.PinnedContent'
+      pinned_updated_at:
+        type: string
       type:
         type: string
       unread_count:
+        description: Deprecated.
         type: integer
       visibility:
         type: string
     type: object
   models.Message:
     properties:
+      attachment_count:
+        type: integer
       attachments:
         items:
-          $ref: '#/definitions/models.Attachment'
+          type: integer
         type: array
       author:
-        $ref: '#/definitions/models.User'
+        allOf:
+        - $ref: '#/definitions/models.User'
+        description: Deprecated.
       chat_id:
         type: string
       content:
         type: string
       created_at:
         type: string
-      deleted:
-        type: boolean
+      deleted_at:
+        type: string
       edited_at:
         type: string
       id:
         type: string
+      mention_count:
+        type: integer
       mentions:
         items:
-          type: string
+          type: integer
         type: array
+      reaction_count:
+        type: integer
       reactions:
         items:
-          $ref: '#/definitions/models.Reaction'
+          type: integer
         type: array
       user_id:
         type: string
     type: object
-  models.Reaction:
+  models.PinnedContent:
     properties:
-      count:
-        type: integer
-      emoji:
+      content:
         type: string
-      me:
-        type: boolean
-      user_ids:
-        items:
-          type: string
-        type: array
+      pinned_at:
+        type: string
     type: object
   models.User:
     properties:
@@ -187,17 +195,15 @@ definitions:
         type: string
       id:
         type: string
+      last_seen:
+        type: string
       status:
         type: string
       username:
         type: string
     type: object
-host: localhost:8080
 info:
   contact: {}
-  description: Real-time chat server with WebSocket and SSE
-  title: Chat App API
-  version: "1.0"
 paths:
   /api/auth/login:
     post:
@@ -224,14 +230,7 @@ paths:
       - auth
   /api/auth/logout:
     post:
-      description: Invalidate refresh token to end session
-      parameters:
-      - description: Refresh token to revoke
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.refreshReq'
+      description: Revoke all refresh tokens for the user and clear cookie
       responses:
         "200":
           description: OK
@@ -245,14 +244,7 @@ paths:
       - auth
   /api/auth/refresh:
     post:
-      description: Exchange a refresh token for a new session
-      parameters:
-      - description: Refresh token
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.refreshReq'
+      description: Exchange a refresh token for a new session (via httpOnly cookie)
       responses:
         "200":
           description: OK
@@ -599,6 +591,32 @@ paths:
       summary: Edit a message
       tags:
       - messages
+  /api/chats/{chatID}/messages/{messageID}/reactions:
+    get:
+      description: Get aggregated reactions with user IDs and me flag for the current
+        user
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      - description: Message ID
+        in: path
+        name: messageID
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List reactions for a message
+      tags:
+      - reactions
   /api/chats/{chatID}/messages/{messageID}/reactions/{emoji}:
     delete:
       description: Remove your emoji reaction from a message
@@ -657,8 +675,8 @@ paths:
       tags:
       - reactions
   /api/chats/{chatID}/pin:
-    post:
-      description: Pin chat to top of user's chat list
+    delete:
+      description: Clear the pinned message from a chat (owner/admin only)
       parameters:
       - description: Chat ID
         in: path
@@ -673,7 +691,98 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: Pin a chat
+      summary: Remove pinned message
+      tags:
+      - chats
+    patch:
+      description: Update the pinned message text
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      - description: New pinned message content
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.pinContentReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update pinned message
+      tags:
+      - chats
+    post:
+      description: Set pinned message text (owner/admin only, chat must have ≥3 members)
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      - description: Pinned message content
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.pinContentReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Set pinned message
+      tags:
+      - chats
+  /api/chats/{chatID}/pin-read:
+    post:
+      description: Update pinned_last_read_at for the current user in the given chat
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Mark pinned message as read
+      tags:
+      - chats
+  /api/chats/{chatID}/pin-toggle:
+    post:
+      description: Toggle whether the chat appears at the top of the user's sidebar
+        list
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatID
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Toggle sidebar pinning
       tags:
       - chats
   /api/chats/{chatID}/read:
@@ -707,26 +816,6 @@ paths:
       summary: Mark messages as read
       tags:
       - messages
-  /api/chats/{chatID}/unpin:
-    post:
-      description: Remove pin from a chat
-      parameters:
-      - description: Chat ID
-        in: path
-        name: chatID
-        required: true
-        type: string
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-      security:
-      - BearerAuth: []
-      summary: Unpin a chat
-      tags:
-      - chats
   /api/chats/public:
     get:
       description: Get all discoverable public chats
@@ -866,9 +955,4 @@ paths:
       summary: Update user profile
       tags:
       - users
-securityDefinitions:
-  BearerAuth:
-    in: header
-    name: Authorization
-    type: apiKey
 swagger: "2.0"

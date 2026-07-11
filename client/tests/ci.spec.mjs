@@ -41,7 +41,7 @@ test.describe('Mock API Mode (CI)', () => {
     await openFirstChat(page);
     await page.waitForSelector('.chat-input textarea', { timeout: 5000 });
     await page.fill('.chat-input textarea', 'Hello from CI!');
-    await page.click('button:has-text("Send")');
+    await page.click('button[title="Send"]');
     const sentMsg = page.locator('.msg-content', { hasText: 'Hello from CI!' });
     await expect(sentMsg.first()).toBeVisible({ timeout: 5000 });
   });

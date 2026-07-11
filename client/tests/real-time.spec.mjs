@@ -35,7 +35,7 @@ test.describe('Real-time Events (WS / SSE / Polling)', () => {
     await openFirstChat(page);
     await page.waitForSelector('.chat-input textarea', { timeout: 5000 });
     await page.fill('.chat-input textarea', 'Real-time test message');
-    await page.click('button:has-text("Send")');
+    await page.click('button[title="Send"]');
     await expect(page.locator('.msg-content', { hasText: 'Real-time test message' }).first()).toBeVisible({ timeout: 5000 });
   });
 

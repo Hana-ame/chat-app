@@ -1,13 +1,8 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "Real-time chat server with WebSocket and SSE",
-        "title": "Chat App API",
-        "contact": {},
-        "version": "1.0"
+        "contact": {}
     },
-    "host": "localhost:8080",
-    "basePath": "/api",
     "paths": {
         "/api/auth/login": {
             "post": {
@@ -51,22 +46,11 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Invalidate refresh token to end session",
+                "description": "Revoke all refresh tokens for the user and clear cookie",
                 "tags": [
                     "auth"
                 ],
                 "summary": "Log out",
-                "parameters": [
-                    {
-                        "description": "Refresh token to revoke",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.refreshReq"
-                        }
-                    }
-                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -80,22 +64,11 @@
         },
         "/api/auth/refresh": {
             "post": {
-                "description": "Exchange a refresh token for a new session",
+                "description": "Exchange a refresh token for a new session (via httpOnly cookie)",
                 "tags": [
                     "auth"
                 ],
                 "summary": "Refresh access token",
-                "parameters": [
-                    {
-                        "description": "Refresh token",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.refreshReq"
-                        }
-                    }
-                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -659,6 +632,45 @@
                 }
             }
         },
+        "/api/chats/{chatID}/messages/{messageID}/reactions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get aggregated reactions with user IDs and me flag for the current user",
+                "tags": [
+                    "reactions"
+                ],
+                "summary": "List reactions for a message",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chat ID",
+                        "name": "chatID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Message ID",
+                        "name": "messageID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/chats/{chatID}/messages/{messageID}/reactions/{emoji}": {
             "put": {
                 "security": [
@@ -754,11 +766,153 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Pin chat to top of user's chat list",
+                "description": "Set pinned message text (owner/admin only, chat must have ≥3 members)",
                 "tags": [
                     "chats"
                 ],
-                "summary": "Pin a chat",
+                "summary": "Set pinned message",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chat ID",
+                        "name": "chatID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Pinned message content",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.pinContentReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Clear the pinned message from a chat (owner/admin only)",
+                "tags": [
+                    "chats"
+                ],
+                "summary": "Remove pinned message",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chat ID",
+                        "name": "chatID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update the pinned message text",
+                "tags": [
+                    "chats"
+                ],
+                "summary": "Update pinned message",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chat ID",
+                        "name": "chatID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New pinned message content",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.pinContentReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/chats/{chatID}/pin-read": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update pinned_last_read_at for the current user in the given chat",
+                "tags": [
+                    "chats"
+                ],
+                "summary": "Mark pinned message as read",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chat ID",
+                        "name": "chatID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/chats/{chatID}/pin-toggle": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Toggle whether the chat appears at the top of the user's sidebar list",
+                "tags": [
+                    "chats"
+                ],
+                "summary": "Toggle sidebar pinning",
                 "parameters": [
                     {
                         "type": "string",
@@ -819,38 +973,6 @@
                     },
                     "403": {
                         "description": "Forbidden",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
-        "/api/chats/{chatID}/unpin": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Remove pin from a chat",
-                "tags": [
-                    "chats"
-                ],
-                "summary": "Unpin a chat",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Chat ID",
-                        "name": "chatID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -1117,18 +1239,18 @@
                 }
             }
         },
-        "handlers.readReq": {
+        "handlers.pinContentReq": {
             "type": "object",
             "properties": {
-                "message_id": {
+                "content": {
                     "type": "string"
                 }
             }
         },
-        "handlers.refreshReq": {
+        "handlers.readReq": {
             "type": "object",
             "properties": {
-                "refresh_token": {
+                "message_id": {
                     "type": "string"
                 }
             }
@@ -1177,9 +1299,6 @@
                 },
                 "expires_in": {
                     "type": "integer"
-                },
-                "refresh_token": {
-                    "type": "string"
                 },
                 "user": {}
             }
@@ -1234,16 +1353,21 @@
                     "type": "string"
                 },
                 "last_message": {
-                    "$ref": "#/definitions/models.Message"
+                    "description": "Deprecated.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.Message"
+                        }
+                    ]
                 },
                 "last_message_at": {
                     "type": "string"
                 },
-                "members": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/models.User"
-                    }
+                "last_message_id": {
+                    "type": "string"
+                },
+                "member_count": {
+                    "type": "integer"
                 },
                 "name": {
                     "type": "string"
@@ -1254,10 +1378,20 @@
                 "pinned": {
                     "type": "boolean"
                 },
+                "pinned_last_read_at": {
+                    "type": "string"
+                },
+                "pinned_message": {
+                    "$ref": "#/definitions/models.PinnedContent"
+                },
+                "pinned_updated_at": {
+                    "type": "string"
+                },
                 "type": {
                     "type": "string"
                 },
                 "unread_count": {
+                    "description": "Deprecated.",
                     "type": "integer"
                 },
                 "visibility": {
@@ -1268,14 +1402,22 @@
         "models.Message": {
             "type": "object",
             "properties": {
+                "attachment_count": {
+                    "type": "integer"
+                },
                 "attachments": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/models.Attachment"
+                        "type": "integer"
                     }
                 },
                 "author": {
-                    "$ref": "#/definitions/models.User"
+                    "description": "Deprecated.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.User"
+                        }
+                    ]
                 },
                 "chat_id": {
                     "type": "string"
@@ -1286,8 +1428,8 @@
                 "created_at": {
                     "type": "string"
                 },
-                "deleted": {
-                    "type": "boolean"
+                "deleted_at": {
+                    "type": "string"
                 },
                 "edited_at": {
                     "type": "string"
@@ -1295,16 +1437,22 @@
                 "id": {
                     "type": "string"
                 },
+                "mention_count": {
+                    "type": "integer"
+                },
                 "mentions": {
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "type": "integer"
                     }
+                },
+                "reaction_count": {
+                    "type": "integer"
                 },
                 "reactions": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/models.Reaction"
+                        "type": "integer"
                     }
                 },
                 "user_id": {
@@ -1312,23 +1460,14 @@
                 }
             }
         },
-        "models.Reaction": {
+        "models.PinnedContent": {
             "type": "object",
             "properties": {
-                "count": {
-                    "type": "integer"
-                },
-                "emoji": {
+                "content": {
                     "type": "string"
                 },
-                "me": {
-                    "type": "boolean"
-                },
-                "user_ids": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
+                "pinned_at": {
+                    "type": "string"
                 }
             }
         },
@@ -1350,6 +1489,9 @@
                 "id": {
                     "type": "string"
                 },
+                "last_seen": {
+                    "type": "string"
+                },
                 "status": {
                     "type": "string"
                 },
@@ -1357,13 +1499,6 @@
                     "type": "string"
                 }
             }
-        }
-    },
-    "securityDefinitions": {
-        "BearerAuth": {
-            "type": "apiKey",
-            "name": "Authorization",
-            "in": "header"
         }
     }
 }

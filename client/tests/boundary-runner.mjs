@@ -16,7 +16,7 @@ export const tests = [
       await page.waitForSelector('.chat-input textarea', { timeout: 5000 });
       const longText = 'a'.repeat(4001);
       await page.fill('.chat-input textarea', longText);
-      await page.click('button:has-text("Send")');
+      await page.click('button[title="Send"]');
       
       const sentMsg = page.locator('.msg-content', { hasText: longText });
       const isVisible = await sentMsg.first().isVisible({ timeout: 2000 }).catch(() => false);
@@ -39,7 +39,7 @@ export const tests = [
       let errorDetected = false;
       for (let i = 0; i < 35; i++) {
         await page.fill('.chat-input textarea', `Spam ${i}`);
-        await page.click('button:has-text("Send")');
+        await page.click('button[title="Send"]');
         // Check for alert or error message in UI
         if (await page.locator('text=Too many requests').isVisible().catch(() => false)) {
           errorDetected = true;

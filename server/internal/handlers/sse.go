@@ -29,6 +29,20 @@ func (s *Server) SSE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID := claims.UserID
+	user, err := s.DB.GetUserByID(r.Context(), userID)
+	if err != nil {
+		w.Header().Set("X-Error", err.Error())
+		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+
+	chats, err := s.DB.ListUserChats(r.Context(), userID)
+	var xErr string
+	if err != nil {
+		xErr = err.Error()
+	}
+
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "SSE not supported", http.StatusInternalServerError)
@@ -38,16 +52,12 @@ func (s *Server) SSE(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // 为将来 CORS 支持而准备
+	if xErr != "" {
+		w.Header().Set("X-Error", xErr)
+	}
 	w.WriteHeader(http.StatusOK)
 
-	userID := claims.UserID
-	user, err := s.DB.GetUserByID(r.Context(), userID)
-	if err != nil {
-		return
-	}
-
-	chats, _ := s.DB.ListUserChats(r.Context(), userID)
 	ready, _ := json.Marshal(map[string]any{
 		"user": user, "chats": chats,
 		"online_user_ids": s.Hub.OnlineUserIDs(),

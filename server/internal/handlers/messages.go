@@ -50,7 +50,12 @@ func extractMentions(content string) []string {
 func (s *Server) ListMessages(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	id := chi.URLParam(r, "chatID")
-	ok, _ := s.DB.IsChatMember(r.Context(), id, u.ID)
+	ok, err := s.DB.IsChatMember(r.Context(), id, u.ID)
+	if err != nil {
+		w.Header().Set("X-Error", err.Error())
+		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
 	if !ok {
 		writeError(w, http.StatusForbidden, "forbidden", "")
 		return
@@ -78,7 +83,12 @@ func (s *Server) ListMessages(w http.ResponseWriter, r *http.Request) {
 func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	id := chi.URLParam(r, "chatID")
-	ok, _ := s.DB.IsChatMember(r.Context(), id, u.ID)
+	ok, err := s.DB.IsChatMember(r.Context(), id, u.ID)
+	if err != nil {
+		w.Header().Set("X-Error", err.Error())
+		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
 	if !ok {
 		writeError(w, http.StatusForbidden, "forbidden", "")
 		return
@@ -132,7 +142,12 @@ func (s *Server) EditMessage(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	chatID := chi.URLParam(r, "chatID")
 	id := chi.URLParam(r, "messageID")
-	ok, _ := s.DB.IsChatMember(r.Context(), chatID, u.ID)
+	ok, err := s.DB.IsChatMember(r.Context(), chatID, u.ID)
+	if err != nil {
+		w.Header().Set("X-Error", err.Error())
+		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
 	if !ok {
 		writeError(w, http.StatusForbidden, "forbidden", "")
 		return
@@ -175,7 +190,12 @@ func (s *Server) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	chatID := chi.URLParam(r, "chatID")
 	id := chi.URLParam(r, "messageID")
-	ok, _ := s.DB.IsChatMember(r.Context(), chatID, u.ID)
+	ok, err := s.DB.IsChatMember(r.Context(), chatID, u.ID)
+	if err != nil {
+		w.Header().Set("X-Error", err.Error())
+		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
 	if !ok {
 		writeError(w, http.StatusForbidden, "forbidden", "")
 		return
@@ -189,7 +209,10 @@ func (s *Server) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "chat mismatch")
 		return
 	}
-	chat, _ := s.DB.GetChat(r.Context(), chatID)
+	chat, err := s.DB.GetChat(r.Context(), chatID)
+	if err != nil {
+		w.Header().Set("X-Error", err.Error())
+	}
 	canDeleteAny := chat != nil && (chat.OwnerID == u.ID || s.requireOwnerOrAdmin(r.Context(), chatID, u.ID) == nil)
 	if existing.UserID != u.ID && !canDeleteAny {
 		writeError(w, http.StatusForbidden, "forbidden", "")
@@ -218,7 +241,12 @@ func (s *Server) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 func (s *Server) MarkRead(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	id := chi.URLParam(r, "chatID")
-	ok, _ := s.DB.IsChatMember(r.Context(), id, u.ID)
+	ok, err := s.DB.IsChatMember(r.Context(), id, u.ID)
+	if err != nil {
+		w.Header().Set("X-Error", err.Error())
+		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
 	if !ok {
 		writeError(w, http.StatusForbidden, "forbidden", "")
 		return

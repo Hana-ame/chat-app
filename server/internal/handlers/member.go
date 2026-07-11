@@ -57,7 +57,12 @@ func (s *Server) AddMember(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "cannot add to dm")
 		return
 	}
-	ok, _ := s.DB.IsChatMember(r.Context(), id, u.ID)
+	ok, err := s.DB.IsChatMember(r.Context(), id, u.ID)
+	if err != nil {
+		w.Header().Set("X-Error", err.Error())
+		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
 	if !ok {
 		writeError(w, http.StatusForbidden, "forbidden", "")
 		return
@@ -79,7 +84,10 @@ func (s *Server) AddMember(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
-	updated, _ := s.DB.GetChat(r.Context(), id)
+	updated, err := s.DB.GetChat(r.Context(), id)
+	if err != nil {
+		w.Header().Set("X-Error", err.Error())
+	}
 	if s.Hub != nil && updated != nil {
 		s.Hub.BroadcastChatUpdated(updated)
 		s.Hub.NotifyUserNewChat(req.UserID, updated)
@@ -125,7 +133,11 @@ func (s *Server) RemoveMember(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.Hub != nil {
 		s.Hub.NotifyUserLeftChat(target, id)
-		if updated, _ := s.DB.GetChat(r.Context(), id); updated != nil {
+		updated, err := s.DB.GetChat(r.Context(), id)
+		if err != nil {
+			w.Header().Set("X-Error", err.Error())
+		}
+		if updated != nil {
 			s.Hub.BroadcastChatUpdated(updated)
 		}
 	}

@@ -64,7 +64,7 @@ test('send and receive message', async ({ page }) => {
   await page.waitForSelector('.chat-input textarea');
 
   await page.fill('.chat-input textarea', 'Hello E2E!');
-  await page.click('button:has-text("Send")');
+  await page.click('button[title="Send"]');
   await page.waitForSelector('.msg-content');
   await expect(page.locator('.msg-content').first()).toContainText('Hello E2E');
 });

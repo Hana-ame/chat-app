@@ -24,7 +24,7 @@ test.describe('Boundary & Security Tests', () => {
     // Generate 4001 characters
     const longText = 'a'.repeat(4001);
     await page.fill('.chat-input textarea', longText);
-    await page.click('button:has-text("Send")');
+    await page.click('button[title="Send"]');
     
     // Expect alert or error message (backend returns 403 content_too_long)
     // Since we are in Mock mode, we need to check if the mock handles this or if we are using real API
@@ -41,7 +41,7 @@ test.describe('Boundary & Security Tests', () => {
     // Send messages rapidly to trigger 429 (limit is 30/min)
     for (let i = 0; i < 35; i++) {
       await page.fill('.chat-input textarea', `Spam ${i}`);
-      await page.click('button:has-text("Send")');
+      await page.click('button[title="Send"]');
     }
     
     // Expect a 429 error alert

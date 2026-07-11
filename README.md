@@ -80,6 +80,7 @@ cd server && go test ./... -cover -count=1 -timeout 120s
 | POST | `/api/chats/:id/messages` | Bearer | Send message |
 | PATCH | `/api/chats/:id/messages/:mid` | Bearer | Edit |
 | DELETE | `/api/chats/:id/messages/:mid` | Bearer | Delete |
+| GET | `/api/chats/:id/messages/:mid/reactions` | Bearer | List reactions |
 | PUT | `/api/chats/:id/messages/:mid/reactions/:emoji` | Bearer | Add reaction |
 | DELETE | `/api/chats/:id/messages/:mid/reactions/:emoji` | Bearer | Remove |
 | PUT | `upload.moonchan.xyz/api/upload` | - | External file upload (binary stream) |
