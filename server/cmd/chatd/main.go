@@ -1,5 +1,5 @@
 // @title           Chat App API
-// @version         1.0
+// @version         0.1.0-beta
 // @description     Real-time chat server with WebSocket and SSE
 // @host            localhost:8080
 // @BasePath        /api
