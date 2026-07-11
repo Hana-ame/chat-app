@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -46,6 +47,18 @@ func clearRefreshCookie(w http.ResponseWriter, r *http.Request) {
         SameSite: http.SameSiteLaxMode,
         MaxAge:   -1,
     })
+}
+
+func intQueryParam(r *http.Request, key string, def int) int {
+	v := r.URL.Query().Get(key)
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return def
+	}
+	return n
 }
 
 func clearAccessTokenCookie(w http.ResponseWriter, r *http.Request) {

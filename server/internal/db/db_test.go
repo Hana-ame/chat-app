@@ -437,7 +437,7 @@ func TestSetPinnedMessage_ThreeMembers(t *testing.T) {
 
 func TestListPublicChats_Empty(t *testing.T) {
 	f := testutil.New(t)
-	chats, err := f.DB.ListPublicChats(f.Ctx())
+	chats, err := f.DB.ListPublicChats(f.Ctx(), 1, 20)
 	if err != nil {
 		t.Fatal(err)
 	}

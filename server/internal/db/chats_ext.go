@@ -9,12 +9,21 @@ import (
 	"github.com/Hana-ame/chat-app/server/internal/models"
 )
 
-func (d *DB) ListPublicChats(ctx context.Context) ([]models.Chat, error) {
+func (d *DB) ListPublicChats(ctx context.Context, page, limit int) ([]models.Chat, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 50 {
+		limit = 20
+	}
+	offset := (page - 1) * limit
 	rows, err := d.QueryContext(ctx,
-		`SELECT id, type, name, icon_color, COALESCE(visibility,'private'), owner_id, created_at, last_message_at, pinned_message, pinned_updated_at,
-		        (SELECT COUNT(*) FROM chat_members WHERE chat_id = id) AS member_count
-		 FROM chats WHERE type = 'group' AND visibility = 'public'
-		 ORDER BY created_at DESC`,
+		`SELECT c.id, c.type, c.name, c.icon_color, COALESCE(c.visibility,'private'), c.owner_id, c.created_at, c.last_message_at, c.pinned_message, c.pinned_updated_at,
+		        (SELECT COUNT(*) FROM chat_members WHERE chat_id = c.id) AS member_count,
+		        (SELECT content FROM messages WHERE chat_id = c.id AND deleted = 0 ORDER BY created_at DESC LIMIT 1) AS last_message_content
+		 FROM chats c WHERE c.type = 'group' AND c.visibility = 'public'
+		 ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
+		 LIMIT ? OFFSET ?`, limit, offset,
 	)
 	if err != nil {
 		return nil, err
@@ -23,10 +32,10 @@ func (d *DB) ListPublicChats(ctx context.Context) ([]models.Chat, error) {
 	out := []models.Chat{}
 	for rows.Next() {
 		var c models.Chat
-		var name, owner, lastMsg, pinnedMsg, pinnedUpdAt sql.NullString
+		var name, owner, lastMsg, pinnedMsg, pinnedUpdAt, lastMsgContent sql.NullString
 		var created string
 		var memberCount int
-		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.Visibility, &owner, &created, &lastMsg, &pinnedMsg, &pinnedUpdAt, &memberCount); err != nil {
+		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.Visibility, &owner, &created, &lastMsg, &pinnedMsg, &pinnedUpdAt, &memberCount, &lastMsgContent); err != nil {
 			return nil, err
 		}
 		c.Name = name.String
@@ -46,6 +55,13 @@ func (d *DB) ListPublicChats(ctx context.Context) ([]models.Chat, error) {
 		if pinnedUpdAt.Valid && pinnedUpdAt.String != "" {
 			t := parseTime(pinnedUpdAt.String)
 			c.PinnedUpdatedAt = &t
+		}
+		if lastMsgContent.Valid && lastMsgContent.String != "" {
+			content := lastMsgContent.String
+			if len(content) > 100 {
+				content = content[:100] + "..."
+			}
+			c.LastMessage = &models.Message{Content: content}
 		}
 		c.MemberCount = memberCount
 		out = append(out, c)

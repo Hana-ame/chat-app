@@ -85,7 +85,14 @@ export const api = {
 
   // ── Chats ──
   listChats: (token) => request('GET', '/api/chats/my', token),
-  listPublicChats: (token) => request('GET', '/api/chats/public', token),
+  listPublicChats: (token, page, limit) => {
+    let url = '/api/chats/public';
+    const params = [];
+    if (page) params.push('page=' + page);
+    if (limit) params.push('limit=' + limit);
+    if (params.length) url += '?' + params.join('&');
+    return request('GET', url, token);
+  },
   createChat: (token, name, memberIds, visibility) =>
     request('POST', '/api/chats', token, { type: 'group', name, member_ids: memberIds, visibility: visibility || 'private' }),
   getChat: (token, id) => request('GET', '/api/chats/' + id, token),

@@ -198,7 +198,10 @@ func (s *Server) RenameChat(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
-	updated, _ := s.DB.GetChat(r.Context(), id)
+	updated, err := s.DB.GetChat(r.Context(), id)
+	if err != nil {
+		w.Header().Set("X-Error", err.Error())
+	}
 	if s.Hub != nil && updated != nil {
 		s.Hub.BroadcastChatUpdated(updated)
 	}
@@ -241,13 +244,17 @@ func (s *Server) DeleteChat(w http.ResponseWriter, r *http.Request) {
 
 // ListPublicChats godoc
 // @Summary      List public chats
-// @Description  Get all discoverable public chats
+// @Description  Get discoverable public chats with pagination, ordered by recent activity
 // @Tags         chats
 // @Security     BearerAuth
+// @Param        page   query  int  false  "Page number (default 1)"
+// @Param        limit  query  int  false  "Items per page (default 20, max 50)"
 // @Success      200  {object}  map[string]any
 // @Router       /api/chats/public [get]
 func (s *Server) ListPublicChats(w http.ResponseWriter, r *http.Request) {
-	chats, err := s.DB.ListPublicChats(r.Context())
+	page := intQueryParam(r, "page", 1)
+	limit := intQueryParam(r, "limit", 20)
+	chats, err := s.DB.ListPublicChats(r.Context(), page, limit)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
@@ -274,7 +281,10 @@ func (s *Server) JoinChat(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
-	chat, _ := s.DB.GetChat(r.Context(), id)
+	chat, err := s.DB.GetChat(r.Context(), id)
+	if err != nil {
+		w.Header().Set("X-Error", err.Error())
+	}
 	if s.Hub != nil && chat != nil {
 		s.Hub.NotifyUserNewChat(u.ID, chat)
 		s.Hub.BroadcastChatUpdated(chat)
@@ -348,7 +358,10 @@ func (s *Server) PinChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.Hub != nil {
-		updated, _ := s.DB.GetChat(r.Context(), id)
+		updated, err := s.DB.GetChat(r.Context(), id)
+		if err != nil {
+			w.Header().Set("X-Error", err.Error())
+		}
 		if updated != nil {
 			s.Hub.BroadcastChatUpdated(updated)
 		}
@@ -393,7 +406,10 @@ func (s *Server) DeletePinnedChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.Hub != nil {
-		updated, _ := s.DB.GetChat(r.Context(), id)
+		updated, err := s.DB.GetChat(r.Context(), id)
+		if err != nil {
+			w.Header().Set("X-Error", err.Error())
+		}
 		if updated != nil {
 			s.Hub.BroadcastChatUpdated(updated)
 		}
@@ -416,7 +432,12 @@ func (s *Server) TogglePin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := chi.URLParam(r, "chatID")
-	ok, _ := s.DB.IsChatMember(r.Context(), id, u.ID)
+	ok, err := s.DB.IsChatMember(r.Context(), id, u.ID)
+	if err != nil {
+		w.Header().Set("X-Error", err.Error())
+		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
 	if !ok {
 		writeError(w, http.StatusForbidden, "forbidden", "")
 		return
@@ -426,7 +447,10 @@ func (s *Server) TogglePin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.Hub != nil {
-		updated, _ := s.DB.GetChat(r.Context(), id)
+		updated, err := s.DB.GetChat(r.Context(), id)
+		if err != nil {
+			w.Header().Set("X-Error", err.Error())
+		}
 		if updated != nil {
 			s.Hub.BroadcastChatUpdated(updated)
 		}

@@ -372,12 +372,14 @@ export function mockJoinChat(_token, chatId) {
   const d = ensureData();
   const cu = currentUser();
   const chat = d.chats.find(c => c.id === chatId);
-  if (chat && !chat.members?.some(m => m.id === cu.id)) {
+  if (!chat) return { error: 'not_found' };
+  if (chat.visibility !== 'public' && chat.visibility !== 'unlisted') {
+    return { error: 'private' };
+  }
+  if (!chat.members?.some(m => m.id === cu.id)) {
     if (!chat.members) chat.members = [];
     chat.members.push({ id: cu.id, ...userById(cu.id), role: 'member' });
-  }
-  if (chat && chat.visibility !== 'public' && chat.visibility !== 'unlisted') {
-    return { error: 'private' };
+    if (_store) _store.getState().onChatUpdate({ ...chat, members: [...chat.members] });
   }
   return { ok: true };
 }
@@ -426,9 +428,26 @@ export function mockMe() {
   return userById(cu.id);
 }
 
-export function mockListPublicChats() {
+export function mockListPublicChats(_token, page = 1, limit = 20) {
   const d = ensureData();
-  return { chats: d.chats.filter(c => c.visibility === 'public') };
+  const all = d.chats.filter(c => c.visibility === 'public')
+    .map(c => {
+      const msgs = messagesFor(c.id).filter(m => m.content?.trim());
+      const last = msgs[msgs.length - 1];
+      let lastMsgContent = '';
+      if (last?.content) {
+        lastMsgContent = last.content.length > 100 ? last.content.slice(0, 100) + '...' : last.content;
+      }
+      return { ...c, last_message: lastMsgContent ? { content: lastMsgContent } : undefined };
+    })
+    .sort((a, b) => {
+      const da = a.last_message_at || a.created_at;
+      const db = b.last_message_at || b.created_at;
+      return new Date(db) - new Date(da);
+    });
+  const start = (page - 1) * limit;
+  const chats = all.slice(start, start + limit);
+  return { chats };
 }
 
 export function mockRenameChat(_token, _id, name) {
