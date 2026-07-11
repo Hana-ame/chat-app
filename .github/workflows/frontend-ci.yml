@@ -24,6 +24,11 @@ jobs:
         run: |
           npx vite --port 5173 &
           sleep 3
+          echo "=== Debug: fetch login page ==="
+          curl -s http://localhost:5173/login | head -30
+          echo "=== Debug: fetch root ==="
+          curl -s http://localhost:5173/ | head -30
+          echo "=== Running tests ==="
           npx playwright test tests/ci.spec.mjs tests/real-time.spec.mjs --reporter=list 2>&1
 
   full-e2e:
