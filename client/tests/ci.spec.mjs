@@ -6,7 +6,7 @@ test.describe('Mock API Mode (CI)', () => {
   async function mockLogin(page) {
     await page.goto('/login');
     await page.waitForSelector('.form-box');
-    await page.click('text=Quick Enter');
+    await page.evaluate(() => window.__mockLogin());
     await page.waitForURL('/');
     await page.waitForSelector('.sidebar');
   }
@@ -16,12 +16,6 @@ test.describe('Mock API Mode (CI)', () => {
     await page.waitForSelector('.chat-item', { timeout: 5000 });
     await page.locator('.chat-item').first().click();
   }
-
-  test('mock login button visible on login page', async ({ page }) => {
-    await page.goto('/login');
-    await page.waitForSelector('.form-box');
-    await expect(page.locator('text=Quick Enter')).toBeVisible();
-  });
 
   test('mock login shows sidebar', async ({ page }) => {
     await mockLogin(page);

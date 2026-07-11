@@ -6,17 +6,12 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const { register, debugMode, setDebugMode, mockLogin, loading, error } = useAuthStore();
+  const { register, loading, error } = useAuthStore();
   const nav = useNavigate();
 
   const handle = async (e) => {
     e.preventDefault();
     try { await register(email, username, password); nav('/'); } catch (e) { console.error('Register page error:', e); }
-  };
-
-  const quickEnter = () => {
-    mockLogin();
-    nav('/');
   };
 
   return (
@@ -33,15 +28,6 @@ export default function RegisterPage() {
         <button className="btn btn-primary" style={{width:'100%',marginTop:16}} disabled={loading}>
           {loading ? 'Registering...' : 'Continue'}
         </button>
-        <div style={{display:'flex',alignItems:'center',gap:8,marginTop:12,fontSize:12,color:'var(--text-muted)'}}>
-          <label style={{display:'flex',alignItems:'center',gap:4,cursor:'pointer'}}>
-            <input type="checkbox" checked={debugMode} onChange={e => setDebugMode(e.target.checked)} />
-            Debug mode
-          </label>
-          {debugMode && <button type="button" className="btn-ghost" style={{fontSize:12}} onClick={quickEnter}>
-            ⚡ Quick Enter (mock)
-          </button>}
-        </div>
         <p style={{marginTop:12,fontSize:13,color:'var(--text-muted)'}}>
           <Link to="/login">Already have an account?</Link>
         </p>

@@ -5,7 +5,7 @@ test.describe('Real-time Events (WS / SSE / Polling)', () => {
   async function mockLogin(page) {
     await page.goto('/login');
     await page.waitForSelector('.form-box');
-    await page.click('text=Quick Enter');
+    await page.evaluate(() => window.__mockLogin());
     await page.waitForURL('/');
     await page.waitForSelector('.sidebar');
   }

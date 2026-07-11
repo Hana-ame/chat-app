@@ -3004,4 +3004,4 @@ messages 表使用 `deleted_at`（时间戳，NULL=未删除），非 `deleted` 
 - Go build + vet + test: ✅
 - Client build: ✅
 - CI (Go): ✅
-- Frontend CI: ⚠️ 仍因 Send 按钮选择器问题 fail（已修复等待下一轮）
+- Frontend CI: ✅ 全部通过（选择器修复后）

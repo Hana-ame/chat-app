@@ -6,8 +6,7 @@ export const tests = [
     fn: async ({ page, ok }) => {
       await page.goto('/login');
       await page.waitForSelector('.form-box');
-      await page.click('text=Debug mode');
-      await page.click('text=Quick Enter (mock)');
+      await page.evaluate(() => window.__mockLogin());
       await page.waitForURL('/');
       
       await page.waitForSelector('.chat-item', { timeout: 5000 });
@@ -28,8 +27,7 @@ export const tests = [
     fn: async ({ page, ok }) => {
       await page.goto('/login');
       await page.waitForSelector('.form-box');
-      await page.click('text=Debug mode');
-      await page.click('text=Quick Enter (mock)');
+      await page.evaluate(() => window.__mockLogin());
       await page.waitForURL('/');
       
       await page.waitForSelector('.chat-item', { timeout: 5000 });
@@ -54,8 +52,7 @@ export const tests = [
     fn: async ({ page, ok }) => {
       await page.goto('/login');
       await page.waitForSelector('.form-box');
-      await page.click('text=Debug mode');
-      await page.click('text=Quick Enter (mock)');
+      await page.evaluate(() => window.__mockLogin());
       await page.waitForURL('/');
       
       await page.waitForSelector('.chat-item', { timeout: 5000 });
@@ -75,8 +72,7 @@ export const tests = [
     fn: async ({ page, ok }) => {
       await page.goto('/login');
       await page.waitForSelector('.form-box');
-      await page.click('text=Debug mode');
-      await page.click('text=Quick Enter (mock)');
+      await page.evaluate(() => window.__mockLogin());
       await page.waitForURL('/');
       
       await page.waitForSelector('.chat-item', { timeout: 5000 });
@@ -92,8 +88,7 @@ export const tests = [
     fn: async ({ page, ok }) => {
       await page.goto('/login');
       await page.waitForSelector('.form-box');
-      await page.click('text=Debug mode');
-      await page.click('text=Quick Enter (mock)');
+      await page.evaluate(() => window.__mockLogin());
       await page.waitForURL('/');
       
       await page.waitForSelector('.chat-item', { timeout: 5000 });

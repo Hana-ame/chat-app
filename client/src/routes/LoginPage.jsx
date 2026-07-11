@@ -1,24 +1,16 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
-import { api } from '../api/client';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, setDebugMode, mockLogin, loading, error } = useAuthStore();
+  const { login, loading, error } = useAuthStore();
   const nav = useNavigate();
 
   const handle = async (e) => {
     e.preventDefault();
     try { await login(email, password); nav('/'); } catch (e) { console.error('Login page error:', e); }
-  };
-
-  const quickEnter = () => {
-    api.enableMock();
-    setDebugMode(true);
-    mockLogin();
-    nav('/');
   };
 
   return (
@@ -34,11 +26,6 @@ export default function LoginPage() {
         <button className="btn btn-primary" style={{width:'100%',marginTop:16}} disabled={loading}>
           {loading ? 'Logging in...' : 'Log In'}
         </button>
-        <div style={{display:'flex',alignItems:'center',gap:8,marginTop:12,fontSize:12,color:'var(--text-muted)'}}>
-          <button type="button" className="btn-ghost" style={{fontSize:12}} onClick={quickEnter}>
-            ⚡ Quick Enter
-          </button>
-        </div>
         <p style={{marginTop:12,fontSize:13,color:'var(--text-muted)'}}>
           Need an account? <Link to="/register">Register</Link>
         </p>
