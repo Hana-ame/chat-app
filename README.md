@@ -72,7 +72,10 @@ cd server && go test ./... -cover -count=1 -timeout 120s
 | DELETE | `/api/chats/:id/members/:uid` | Bearer | Kick/Leave |
 | POST | `/api/chats/:id/join` | Bearer | Join a public chat |
 | POST | `/api/chats/:id/pin` | Bearer | Pin to top |
+| PATCH | `/api/chats/:id/pin` | Bearer | Update pinned message |
 | DELETE | `/api/chats/:id/pin` | Bearer | Unpin |
+| POST | `/api/chats/:id/pin-toggle` | Bearer | Toggle sidebar pin (per-user) |
+| POST | `/api/chats/:id/pin-read` | Bearer | Mark pinned as read (per-user) |
 | GET | `/api/chats/:id/messages` | Bearer | History (before,limit) |
 | POST | `/api/chats/:id/messages` | Bearer | Send message |
 | PATCH | `/api/chats/:id/messages/:mid` | Bearer | Edit |

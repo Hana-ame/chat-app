@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Hana-ame/chat-app/server/internal/models"
-
 	"github.com/go-chi/chi/v5"
 )
 
@@ -428,7 +426,10 @@ func (s *Server) TogglePin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.Hub != nil {
-		s.Hub.BroadcastChatUpdated(&models.Chat{ID: id})
+		updated, _ := s.DB.GetChat(r.Context(), id)
+		if updated != nil {
+			s.Hub.BroadcastChatUpdated(updated)
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }

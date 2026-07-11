@@ -93,11 +93,11 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 				r.Delete("/messages/{messageID}/reactions/{emoji}", s.RemoveReaction)
 				r.Get("/messages/{messageID}/reactions", s.ListReactions)
 				r.Post("/join", s.JoinChat)
-			r.Post("/pin", s.PinChat)
-			r.Patch("/pin", s.UpdatePinnedChat)
-			r.Delete("/pin", s.DeletePinnedChat)
-			r.Post("/pin-toggle", s.TogglePin)
-			r.Post("/pin-read", s.MarkPinnedRead)
+				r.Post("/pin", s.PinChat)
+				r.Patch("/pin", s.UpdatePinnedChat)
+				r.Delete("/pin", s.DeletePinnedChat)
+				r.Post("/pin-toggle", s.TogglePin)
+				r.Post("/pin-read", s.MarkPinnedRead)
 			})
 
 			r.Post("/uploads", s.Upload) // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
