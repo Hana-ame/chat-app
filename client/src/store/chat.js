@@ -8,7 +8,6 @@ export const useChatStore = create((set, get) => ({
   activeChatId: null,
   messages: [],
   pinnedMessage: {}, // { chatId: { id, content, pinned_at } }
-  membersByChatId: {}, // { chatId: [User, ...] }
   onlineUserIds: [],
 
   mode: 'ws',
@@ -69,9 +68,6 @@ export const useChatStore = create((set, get) => ({
             get().onChatDelete(env.payload); break;
           case 'chat_remove':
             get().onChatRemove(env.payload); break;
-          case 'user_update':
-            set(s => ({ chats: s.chats.map(c => ({ ...c, members: c.members?.map(m => m.id === env.payload.id ? env.payload : m) })) }));
-            break;
           case 'presence_update':
             set(s => {
               const ids = new Set(s.onlineUserIds);
@@ -312,13 +308,6 @@ export const useChatStore = create((set, get) => ({
     } catch (e) { console.error('loadMessages error:', e); }
   },
 
-  async loadMembers(token, chatId) {
-    try {
-      const data = await api.listMembers(token, chatId);
-      set(s => ({ membersByChatId: { ...s.membersByChatId, [chatId]: data.members || [] } }));
-    } catch (e) { console.error('loadMembers error:', e); }
-  },
-
   async sendMessage(token, chatId, content, attachments) {
     await api.sendMessage(token, chatId, content, attachments);
   },
@@ -369,7 +358,7 @@ export const useChatStore = create((set, get) => ({
   },
 
   reset() {
-    set({ chats: [], activeChatId: null, messages: [], pinnedMessage: {}, membersByChatId: {} });
+    set({ chats: [], activeChatId: null, messages: [], pinnedMessage: {} });
   },
 
   disconnect() {

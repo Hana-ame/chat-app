@@ -184,12 +184,6 @@ export function mockCreateDM(_token, userId) {
   return newDM;
 }
 
-function updateMembersByChatId(chatId, members) {
-  if (!_store) return;
-  const s = _store.getState();
-  _store.setState({ membersByChatId: { ...s.membersByChatId, [chatId]: members } });
-}
-
 function syncChatToStore(chat) {
   if (!_store) return;
   _store.getState().onChatUpdate({ ...chat });
@@ -202,7 +196,6 @@ export function mockAddMember(_token, chatId, userId) {
     if (!chat.members) chat.members = [];
     chat.members.push({ id: userId, ...userById(userId), role: '' });
     chat.member_count = (chat.member_count || 0) + 1;
-    updateMembersByChatId(chatId, [...chat.members]);
     syncChatToStore(chat);
   }
   return chat || { ok: true };
@@ -214,7 +207,6 @@ export function mockRemoveMember(_token, chatId, userId) {
   if (chat) {
     chat.members = chat.members?.filter(m => m.id !== userId);
     chat.member_count = Math.max(0, (chat.member_count || 0) - 1);
-    updateMembersByChatId(chatId, [...(chat.members || [])]);
     syncChatToStore(chat);
   }
   return { ok: true };
@@ -406,7 +398,6 @@ export function mockJoinChat(_token, chatId) {
     if (!chat.members) chat.members = [];
     chat.members.push({ id: cu.id, ...userById(cu.id), role: 'member' });
     chat.member_count = (chat.member_count || 0) + 1;
-    updateMembersByChatId(chatId, [...chat.members]);
     syncChatToStore(chat);
   }
   return { ok: true };

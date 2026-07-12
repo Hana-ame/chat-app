@@ -6,15 +6,14 @@ import MessageItem from './MessageItem';
 import Composer from './Composer';
 import { renderContent } from './renderContent';
 
-function getDMName(chat, currentUserId, members) {
+function getDMName(chat) {
   if (chat.type !== 'dm') return chat.name;
-  const other = members?.find(m => m.id !== currentUserId);
-  return other ? other.username : 'Unknown';
+  return chat.name || 'DM';
 }
 
 export default function ChatView({ chatId, onBack }) {
   const { user, accessToken } = useAuthStore();
-  const { chats, messages, loadMessages, loadMembers, subscribe, markRead, pinnedMessage, setPinnedMessage, clearPinnedMessage, markPinnedRead, membersByChatId } = useChatStore();
+  const { chats, messages, loadMessages, subscribe, markRead, pinnedMessage, setPinnedMessage, clearPinnedMessage, markPinnedRead } = useChatStore();
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [noticeInput, setNoticeInput] = useState('');
@@ -30,7 +29,6 @@ export default function ChatView({ chatId, onBack }) {
     if (chatId && accessToken) {
       subscribe(chatId);
       loadMessages(accessToken, chatId);
-      loadMembers(accessToken, chatId);
       setHasMore(true);
     }
   }, [chatId, accessToken]);
@@ -93,16 +91,9 @@ export default function ChatView({ chatId, onBack }) {
     }
   }, [chatId, messages]);
 
-  const chatMembers = membersByChatId[chatId] || [];
-  const name = chat ? getDMName(chat, user.id, chatMembers) : 'Loading...';
+  const name = chat ? getDMName(chat) : 'Loading...';
   const memberCount = chat?.member_count || 0;
-  const userMap = useMemo(() => {
-    const map = {};
-    for (const m of chatMembers) {
-      map[m.id] = m.username;
-    }
-    return map;
-  }, [chatMembers]);
+  const userMap = useMemo(() => ({}), []);
 
   const handleSaveNotice = async () => {
     if (!noticeInput.trim()) return;

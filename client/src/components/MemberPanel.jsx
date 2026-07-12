@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
@@ -7,18 +7,23 @@ import ImagePreviewModal from './ImagePreviewModal';
 
 export default function MemberPanel({ chatId }) {
   const { user, accessToken } = useAuthStore();
-  const { chats, membersByChatId } = useChatStore();
+  const { chats } = useChatStore();
   const ONLINE_THRESHOLD = 300000; // 5 min
 
   const isOnline = (m) => {
     if (!m.last_seen) return false;
     return Date.now() - new Date(m.last_seen).getTime() < ONLINE_THRESHOLD;
   };
+  const [members, setMembers] = useState([]);
   const [profileUser, setProfileUser] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
 
   const chat = chats.find(c => c.id === chatId);
-  const members = membersByChatId[chatId] || [];
+
+  useEffect(() => {
+    if (!chatId || !accessToken) return;
+    api.listMembers(accessToken, chatId).then(d => setMembers(d.members || [])).catch(() => {});
+  }, [chatId, accessToken]);
 
   const removeUser = async (userId) => {
     if (!confirm('Kick this member?')) return;

@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useChatStore } from '../store/chat';
+import { useAuthStore } from '../store/auth';
+import { api } from '../api/client';
 import UserProfileModal from './UserProfileModal';
 
 function fmtTime(t) {
@@ -8,13 +10,19 @@ function fmtTime(t) {
 }
 
 export default function ChatInfoModal({ chatId, onClose }) {
-  const { chats, membersByChatId } = useChatStore();
+  const { accessToken } = useAuthStore();
+  const { chats } = useChatStore();
   const chat = chats.find(c => c.id === chatId);
-  const members = membersByChatId[chatId] || [];
+  const [members, setMembers] = useState([]);
   const [profileUser, setProfileUser] = useState(null);
   if (!chat) return null;
 
   const isAdmin = m => m.role === 'admin' || m.id === chat.owner_id;
+
+  useEffect(() => {
+    if (!chatId || !accessToken) return;
+    api.listMembers(accessToken, chatId).then(d => setMembers(d.members || [])).catch(() => {});
+  }, [chatId, accessToken]);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
