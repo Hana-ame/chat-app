@@ -80,10 +80,17 @@ func (d *DB) JoinChatByID(ctx context.Context, chatID, userID string) error {
 	if visibility == "private" {
 		return errors.New("chat is private, invitation required")
 	}
-	_, err = d.ExecContext(ctx,
+	res, err := d.ExecContext(ctx,
 		`INSERT OR IGNORE INTO chat_members (chat_id, user_id, role) VALUES (?,?,'')`,
 		chatID, userID,
 	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n > 0 {
+		_, err = d.ExecContext(ctx, `UPDATE chats SET member_count = member_count + 1 WHERE id = ?`, chatID)
+	}
 	return err
 }
 
