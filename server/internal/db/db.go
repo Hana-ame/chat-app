@@ -6,6 +6,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -19,6 +20,8 @@ func isDupColumnErr(err error) bool {
 
 //go:embed migrations/*.sql
 var migrationFS embed.FS
+
+var versionRe = regexp.MustCompile(`^V(\d{3})__`)
 
 type DB struct {
 	*sql.DB
@@ -45,11 +48,19 @@ func Open(path string) (*DB, error) {
 }
 
 func (d *DB) Migrate() error {
+	if _, err := d.ExecContext(context.Background(),
+		`CREATE TABLE IF NOT EXISTS schema_migrations (
+			version INTEGER PRIMARY KEY,
+			applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+		)`); err != nil {
+		return fmt.Errorf("create schema_migrations: %w", err)
+	}
+
 	entries, err := fs.ReadDir(migrationFS, "migrations")
 	if err != nil {
 		return err
 	}
-	names := make([]string, 0, len(entries))
+	var names []string
 	for _, e := range entries {
 		if strings.HasSuffix(e.Name(), ".sql") {
 			names = append(names, e.Name())
@@ -58,16 +69,42 @@ func (d *DB) Migrate() error {
 	sort.Strings(names)
 
 	for _, n := range names {
+		m := versionRe.FindStringSubmatch(n)
+		if m == nil {
+			// non-versioned (init.sql) — run idempotently
+			b, err := migrationFS.ReadFile("migrations/" + n)
+			if err != nil {
+				return fmt.Errorf("read %s: %w", n, err)
+			}
+			if _, err := d.ExecContext(context.Background(), string(b)); err != nil {
+				if !isDupColumnErr(err) {
+					return fmt.Errorf("apply %s: %w", n, err)
+				}
+			}
+			logutil.Debug("applied base migration: %s", n)
+			continue
+		}
+
+		version := m[1]
+		var exists int
+		d.QueryRowContext(context.Background(),
+			`SELECT 1 FROM schema_migrations WHERE version = ?`, version).Scan(&exists)
+		if exists == 1 {
+			continue
+		}
+
 		b, err := migrationFS.ReadFile("migrations/" + n)
 		if err != nil {
-			return fmt.Errorf("read migration %s: %w", n, err)
+			return fmt.Errorf("read %s: %w", n, err)
 		}
 		if _, err := d.ExecContext(context.Background(), string(b)); err != nil {
-			if !isDupColumnErr(err) {
-				return fmt.Errorf("apply migration %s: %w", n, err)
-			}
+			return fmt.Errorf("apply %s: %w", n, err)
 		}
-		logutil.Debug("applied migration: %s", n)
+		if _, err := d.ExecContext(context.Background(),
+			`INSERT INTO schema_migrations (version) VALUES (?)`, version); err != nil {
+			return fmt.Errorf("record %s: %w", n, err)
+		}
+		logutil.Info("applied migration: %s", n)
 	}
 	return nil
 }

@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS chat_members (
     user_id              TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role                 TEXT NOT NULL DEFAULT '',
     joined_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-    last_active_at       TEXT,
+    last_visited_at      TEXT,
     last_read_message_id TEXT,
     pinned_last_read_at  TEXT,
     pinned               INTEGER NOT NULL DEFAULT 0,
