@@ -33,7 +33,7 @@ export default function MemberPanel({ chatId }) {
   return (
     <div className="members-panel">
       <h4 style={{fontSize:12,textTransform:'uppercase',color:'var(--text-muted)',marginBottom:12}}>
-        Members — {members.length}
+        Members — {chat?.member_count || members.length}
       </h4>
 
       {(() => {

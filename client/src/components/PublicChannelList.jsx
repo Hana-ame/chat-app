@@ -29,7 +29,7 @@ export default function PublicChannelList({ results, searching, onJoin }) {
           </div>
           <div className="chat-item-info">
             <div className="chat-item-name">{c.name}</div>
-            <div className="chat-item-preview">{c.members?.length || 0} members</div>
+            <div className="chat-item-preview">{c.member_count || c.members?.length || 0} members</div>
           </div>
         </div>
       ))}

@@ -95,11 +95,6 @@ export default function Composer({ chatId }) {
         <div style={{display:'flex',gap:4,marginTop:6,alignItems:'center'}}>
           <input type="file" ref={fileInput} onChange={handleFile} style={{display:'none'}} multiple />
           <button className="btn-ghost" style={{fontSize:18}} onClick={() => fileInput.current?.click()} title="Attach file">📎</button>
-          <button className="btn-ghost" style={{fontSize:18}} onClick={() => {
-            if (!api.isMockEnabled()) { alert('Enable mock first (🧪 Generate test data)'); return; }
-            const content = text.trim() || 'Tell me something interesting';
-            sendMessage(accessToken, chatId, content, []).catch(console.error);
-          }} title="Send to AI (mock only)">🤖</button>
         </div>
       </div>
     </div>

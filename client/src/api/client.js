@@ -100,7 +100,7 @@ export const api = {
   renameChat: (token, id, name) =>
     request('PATCH', '/api/chats/' + id, token, { name }),
   createDM: (token, userId) =>
-    request('POST', '/api/dms', token, { user_id: userId }),
+    request('POST', '/api/dms', token, { user_id: userId }), // @deprecated use createChat with type='dm'
   joinChat: (token, chatId) => request('POST', '/api/chats/' + chatId + '/join', token),
   setPinnedMessage: (token, chatId, content) => request('POST', '/api/chats/' + chatId + '/pin', token, { content }),
   clearPinnedMessage: (token, chatId) => request('DELETE', '/api/chats/' + chatId + '/pin', token),
@@ -211,7 +211,7 @@ const MOCKABLE = [
   ['getChat', mockGetChat],
   ['deleteChat', mockDeleteChat],
   ['renameChat', mockRenameChat],
-  ['createDM', mockCreateDM],
+  ['createDM', mockCreateDM], // @deprecated
   ['joinChat', mockJoinChat],
   ['setPinnedMessage', mockSetPinnedMessage],
   ['clearPinnedMessage', mockClearPinnedMessage],

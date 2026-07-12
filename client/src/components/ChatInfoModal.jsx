@@ -31,7 +31,7 @@ export default function ChatInfoModal({ chatId, onClose }) {
         <InfoRow label="Created at" value={fmtTime(chat.created_at)} />
         <InfoRow label="Last message" value={fmtTime(chat.last_message_at)} />
 
-        <h4 style={{fontSize:12,textTransform:'uppercase',color:'var(--text-muted)',marginBottom:8}}>Members — {chat.members?.length || 0}</h4>
+        <h4 style={{fontSize:12,textTransform:'uppercase',color:'var(--text-muted)',marginBottom:8}}>Members — {chat.member_count || 0}</h4>
         {(chat.members || []).map(m => (
           <div key={m.id} onClick={() => setProfileUser(m)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', fontSize: 14, cursor: 'pointer' }}>
             <div className="msg-avatar" style={{ width: 26, height: 26, fontSize: 11, background: m.avatar_color || '#5865F2' }}>

@@ -93,8 +93,7 @@ export default function ChatView({ chatId, onBack }) {
   }, [chatId, messages]);
 
   const name = chat ? getDMName(chat, user.id) : 'Loading...';
-  const memberCount = chat?.members?.length || 0;
-  const onlineCount = chat?.members?.filter(m => m.status === 'online')?.length || 0;
+  const memberCount = chat?.member_count || 0;
   const userMap = useMemo(() => {
     if (!chat?.members) return {};
     const map = {};
@@ -133,8 +132,7 @@ export default function ChatView({ chatId, onBack }) {
         <div style={{flex:1}}>
             <div style={{fontWeight:600}}>{name}</div>
             <div style={{fontSize:12,color:'var(--text-muted)'}}>
-              {memberCount} member{memberCount !== 1 ? 's' : ''}{' '}
-              {chat?.type !== 'dm' && <>{onlineCount} online</>}
+              {memberCount} member{memberCount !== 1 ? 's' : ''}
             </div>
           </div>
           <button className="btn-ghost" style={{
