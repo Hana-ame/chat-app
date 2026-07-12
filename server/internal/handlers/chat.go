@@ -491,7 +491,7 @@ func (s *Server) MarkPinnedRead(w http.ResponseWriter, r *http.Request) {
 
 // VisitChat godoc
 // @Summary      Record a chat visit
-// @Description  Update last_visited_at for the current user in the given chat
+// @Description  Update last_active_at for the current user in the given chat
 // @Tags         chats
 // @Security     BearerAuth
 // @Param        chatID  path  string  true  "Chat ID"
@@ -504,7 +504,7 @@ func (s *Server) VisitChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := chi.URLParam(r, "chatID")
-	if err := s.DB.UpdateLastVisitedAt(r.Context(), id, u.ID); err != nil {
+	if err := s.DB.UpdateLastActiveAt(r.Context(), id, u.ID); err != nil {
 		logutil.Error("visit chat %s: %v", id[:8], err)
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return

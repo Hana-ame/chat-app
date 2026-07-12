@@ -38,7 +38,7 @@ type Chat struct {
 	PinnedUpdatedAt *time.Time    `json:"pinned_updated_at,omitempty"`
 	PinnedLastReadAt *time.Time   `json:"pinned_last_read_at,omitempty"`
 	Pinned          bool          `json:"pinned"`
-	LastVisitedAt   *time.Time    `json:"last_visited_at,omitempty"`
+	LastActiveAt    *time.Time    `json:"last_active_at,omitempty"`
 	LastMessageID  string         `json:"last_message_id,omitempty"`
 	// Deprecated.
 	LastMessage   *Message   `json:"last_message,omitempty"`
@@ -48,8 +48,8 @@ type ChatMember struct {
 	ChatID   string    `json:"chat_id"`
 	UserID   string    `json:"user_id"`
 	Role     string    `json:"role"`
-	LastSeen time.Time `json:"last_seen,omitempty"`
 	JoinedAt time.Time `json:"joined_at"`
+	LastActiveAt *time.Time `json:"last_active_at,omitempty"`
 	// Deprecated.
 	LastReadMessageID string     `json:"last_read_message_id,omitempty"`
 	Pinned          bool       `json:"pinned"`

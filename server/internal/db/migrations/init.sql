@@ -73,22 +73,20 @@ ALTER TABLE chats ADD COLUMN pinned_updated_at TEXT;
 
 -- Chat memberships.
 -- role: "owner" for creator, "admin" for promoted members, "" for regular.
--- last_seen: updated to CURRENT_TIMESTAMP when the member sends a message.
+-- last_active_at: updated when the member sends a message or visits the chat.
 CREATE TABLE IF NOT EXISTS chat_members (
     chat_id              TEXT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
     user_id              TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role                 TEXT NOT NULL DEFAULT '',
     joined_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    last_active_at       TEXT,
     last_read_message_id TEXT,
+    pinned_last_read_at  TEXT,
+    pinned               INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (chat_id, user_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_chat_members_user ON chat_members(user_id);
-
-ALTER TABLE chat_members ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE chat_members ADD COLUMN role TEXT NOT NULL DEFAULT '';
-ALTER TABLE chat_members ADD COLUMN last_seen TEXT;
-ALTER TABLE chat_members ADD COLUMN pinned_last_read_at TEXT;
-ALTER TABLE chat_members ADD COLUMN last_visited_at TEXT;
 
 -- ── Messages ─────────────────────────────────────────────────────────────────
 

@@ -81,7 +81,7 @@ func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, 
 		return nil, err
 	}
 	_, err = tx.ExecContext(ctx,
-		`UPDATE chat_members SET last_seen = ? WHERE chat_id = ? AND user_id = ?`,
+		`UPDATE chat_members SET last_active_at = ? WHERE chat_id = ? AND user_id = ?`,
 		now, chatID, userID,
 	)
 	if err != nil {

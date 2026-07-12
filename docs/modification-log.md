@@ -3240,3 +3240,66 @@ if n > 0 {
 ### 验证
 - Client build: ✅
 - Go build + test: ✅
+
+---
+
+## 2026-07-12 第 27 轮 — 结构化日志 + WebSocket 成员列表 + 访问追踪
+
+---
+
+### 27-1: 全面结构化日志（logutil）
+
+**背景**: 替换 `stdlib log` 为内部 `logutil` 包，提升可观测性。
+
+**新增文件** (`server/internal/logutil/log.go`):
+- 提供 `Debug` / `Info` / `Warn` / `Error` 级别日志
+- 支持 `With(key, val)` 附加结构化字段
+- 注入到所有 handler、DB、WebSocket、SSE、Auth 流程
+
+**代码变更**:
+- `server/cmd/chatd/main.go`: 服务器启动/关闭日志改为 logutil
+- `server/internal/config/config.go`: 配置加载日志
+- `server/internal/db/*.go`: 所有 DB 操作加日志
+- `server/internal/handlers/*.go`: 所有 handler 入口/出口加日志
+- `server/internal/ws/*.go`: WebSocket 连接/消息/错误日志
+- `server/internal/auth/auth.go`: Token 生成/验证/刷新日志
+
+---
+
+### 27-2: WebSocket 成员列表请求/响应
+
+**背景**: 成员列表通过 WebSocket 实时获取，减少 API 调用。
+
+**后端变更**:
+- `server/internal/ws/hub.go`: 新增 `OpListMembers` / `OpMembersList` 消息类型、`ReqID` 字段用于请求追踪
+- `server/internal/ws/client.go`: `readPump` 处理 `list_members` 请求，查询 DB 后返回 `members_list` 响应
+
+**前端变更**:
+- `client/src/store/chat.js`: 新增 `_wsReqs` map + `reqId` 计数器 + `wsRequest(op, payload)` 返回 Promise；WS 消息处理中匹配 `reqId` resolve/reject pending 请求
+- `client/src/components/MemberPanel.jsx`: `useEffect` 中优先使用 `wsRequest('list_members', ...)`，回落 API
+- `client/src/components/ChatInfoModal.jsx`: 同理
+- 60 秒自动刷新成员列表
+
+---
+
+### 27-3: Chat 访问追踪
+
+**背景**: 记录用户最后访问聊天时间，用于未读计数优化。
+
+**后端变更**:
+- `server/internal/db/db.go` + `chats.go`: `Chat` 模型新增 `LastActiveAt` 字段，`GetChat`/`ListUserChats` SELECT 该字段，`UpdateLastActiveAt` 写入 `chat_members.last_active_at`
+- `server/internal/db/migrations/init.sql`: 合并 `last_seen` + `last_visited_at` → `last_active_at`
+- `server/internal/handlers/chat.go`: 新增 `VisitChat` handler
+- `server/internal/handlers/router.go`: 注册 `POST /api/chats/{chatID}/visit`
+
+**前端变更**:
+- `client/src/api/client.js`: 新增 `visitChat` API
+- `client/src/routes/ChatPage.jsx`: 进入聊天时调用 `api.visitChat`
+- 未读红点改为使用 `chat.unread_count` 直接显示
+
+---
+
+### 验证
+- Client build: ✅
+- Go build + test: ✅
+- Frontend CI: ✅

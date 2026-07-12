@@ -278,7 +278,7 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 	rows, err := d.QueryContext(ctx,
 		`SELECT c.id, c.type, c.name, c.icon_color, c.visibility, c.owner_id, c.created_at, c.last_message_at, c.last_message_id,
 		        cm.last_read_message_id, c.pinned_message, c.pinned_updated_at, c.member_count,
-		        cm.pinned_last_read_at, cm.pinned, cm.last_visited_at
+		        cm.pinned_last_read_at, cm.pinned, cm.last_active_at
 		 FROM chat_members cm JOIN chats c ON c.id = cm.chat_id
 		 WHERE cm.user_id = ?
 		 ORDER BY COALESCE(c.last_message_at, c.created_at) DESC`,
@@ -298,12 +298,12 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 	rows2 := []row{}
 	for rows.Next() {
 		var c models.Chat
-		var name, owner, lastMsg, lastMsgID, lastRead, pinnedMsg, pinnedUpdAt, pinnedLastReadAt, lastVisitedAt sql.NullString
+		var name, owner, lastMsg, lastMsgID, lastRead, pinnedMsg, pinnedUpdAt, pinnedLastReadAt, lastActiveAt sql.NullString
 		var visibility sql.NullString
 		var created string
 		var memberCount int
 		var pinnedBool bool
-		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &visibility, &owner, &created, &lastMsg, &lastMsgID, &lastRead, &pinnedMsg, &pinnedUpdAt, &memberCount, &pinnedLastReadAt, &pinnedBool, &lastVisitedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &visibility, &owner, &created, &lastMsg, &lastMsgID, &lastRead, &pinnedMsg, &pinnedUpdAt, &memberCount, &pinnedLastReadAt, &pinnedBool, &lastActiveAt); err != nil {
 			return nil, err
 		}
 		c.Name = name.String
@@ -325,9 +325,9 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 			t := parseTime(pinnedUpdAt.String)
 			c.PinnedUpdatedAt = &t
 		}
-		if lastVisitedAt.Valid && lastVisitedAt.String != "" {
-			t := parseTime(lastVisitedAt.String)
-			c.LastVisitedAt = &t
+		if lastActiveAt.Valid && lastActiveAt.String != "" {
+			t := parseTime(lastActiveAt.String)
+			c.LastActiveAt = &t
 		}
 		c.Pinned = pinnedBool
 		c.MemberCount = memberCount
@@ -470,10 +470,10 @@ func (d *DB) UpdatePinnedLastReadAt(ctx context.Context, chatID, userID string) 
 	return err
 }
 
-func (d *DB) UpdateLastVisitedAt(ctx context.Context, chatID, userID string) error {
+func (d *DB) UpdateLastActiveAt(ctx context.Context, chatID, userID string) error {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	_, err := d.ExecContext(ctx,
-		`UPDATE chat_members SET last_visited_at = ? WHERE chat_id = ? AND user_id = ?`,
+		`UPDATE chat_members SET last_active_at = ? WHERE chat_id = ? AND user_id = ?`,
 		now, chatID, userID,
 	)
 	return err
