@@ -203,10 +203,15 @@ export function mockAddMember(_token, chatId, userId) {
 
 export function mockRemoveMember(_token, chatId, userId) {
   const d = ensureData();
+  const cu = currentUser();
   const chat = d.chats.find(c => c.id === chatId);
-  if (chat) {
-    chat.members = chat.members?.filter(m => m.id !== userId);
-    chat.member_count = Math.max(0, (chat.member_count || 0) - 1);
+  if (!chat) return { ok: true };
+  chat.members = chat.members?.filter(m => m.id !== userId);
+  chat.member_count = Math.max(0, (chat.member_count || 0) - 1);
+  if (userId === cu.id) {
+    d.chats = d.chats.filter(c => c.id !== chatId);
+    if (_store) _store.getState().onChatDelete({ chat_id: chatId });
+  } else {
     syncChatToStore(chat);
   }
   return { ok: true };

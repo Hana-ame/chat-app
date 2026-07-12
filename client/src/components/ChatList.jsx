@@ -56,9 +56,12 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     } catch (e) { alert(e.message); }
   };
 
-  const handleDeleteChat = async (chatId) => {
-    if (!confirm('Delete this chat?')) return;
-    try { await api.deleteChat(accessToken, chatId); } catch (e) { console.error('Delete chat error:', e); }
+  const handleLeaveChat = async (chatId) => {
+    if (!confirm('Leave this chat?')) return;
+    try {
+      await api.removeMember(accessToken, chatId, user.id);
+      useChatStore.getState().onChatDelete({ chat_id: chatId });
+    } catch (e) { console.error('Leave chat error:', e); }
     setContextMenu(null);
   };
 
@@ -219,7 +222,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
         <div className="context-menu" style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 1000, right: 'auto', width: 140 }}>
           <button className="context-menu-item" onClick={() => handleTogglePin(contextMenu.chatId)}>{chats.find(c => c.id === contextMenu.chatId)?.pinned ? 'Unpin' : 'Pin'}</button>
           <button className="context-menu-item" onClick={() => { setShowChatInfo(contextMenu.chatId); setContextMenu(null); }}>View Info</button>
-          <button className="context-menu-item danger" onClick={() => handleDeleteChat(contextMenu.chatId)}>Delete</button>
+          <button className="context-menu-item danger" onClick={() => handleLeaveChat(contextMenu.chatId)}>Leave</button>
         </div>
       )}
 
