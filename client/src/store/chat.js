@@ -3,6 +3,9 @@ import { api } from '../api/client';
 import { __setStoreRef } from '../api/mock';
 import { useAuthStore } from './auth';
 
+const _wsReqs = {}; // { reqId: { resolve, reject, timer } }
+let _reqId = 0;
+
 export const useChatStore = create((set, get) => ({
   chats: [],
   activeChatId: null,
@@ -78,6 +81,11 @@ export const useChatStore = create((set, get) => ({
             break;
           case 'typing':
             break;
+        }
+        if (env.req_id && _wsReqs[env.req_id]) {
+          clearTimeout(_wsReqs[env.req_id].timer);
+          _wsReqs[env.req_id].resolve(env.payload);
+          delete _wsReqs[env.req_id];
         }
       } catch (e) { console.error('WS message parse error:', e); }
     };
@@ -350,6 +358,27 @@ export const useChatStore = create((set, get) => ({
     set(s => ({
       chats: s.chats.map(c => c.id === chatId ? { ...c, pinned_last_read_at: new Date().toISOString() } : c),
     }));
+  },
+
+  wsRequest(op, payload) {
+    return new Promise((resolve, reject) => {
+      const s = get();
+      if (!s.ws || s.ws.readyState !== WebSocket.OPEN) {
+        reject(new Error('WS not connected'));
+        return;
+      }
+      const reqId = ++_reqId;
+      const env = JSON.stringify({ op, req_id: reqId, payload });
+      s.ws.send(env);
+      _wsReqs[reqId] = {
+        resolve,
+        reject,
+        timer: setTimeout(() => {
+          delete _wsReqs[reqId];
+          reject(new Error('WS request timeout'));
+        }, 10000),
+      };
+    });
   },
 
   reset() {

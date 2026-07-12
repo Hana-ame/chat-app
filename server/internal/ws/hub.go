@@ -31,11 +31,14 @@ const (
 	OpPong           Op = "pong"
 	OpSubscribe      Op = "subscribe"
 	OpUnsubscribe    Op = "unsubscribe"
+	OpListMembers    Op = "list_members"
+	OpMembersList    Op = "members_list"
 	OpError          Op = "error"
 )
 
 type Envelope struct {
 	Op      Op              `json:"op"`
+	ReqID   int             `json:"req_id,omitempty"`
 	Payload json.RawMessage `json:"payload,omitempty"`
 }
 

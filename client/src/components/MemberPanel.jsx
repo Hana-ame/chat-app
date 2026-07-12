@@ -7,7 +7,7 @@ import ImagePreviewModal from './ImagePreviewModal';
 
 export default function MemberPanel({ chatId }) {
   const { user, accessToken } = useAuthStore();
-  const { chats } = useChatStore();
+  const { chats, wsReady, mode, wsRequest } = useChatStore();
   const ONLINE_THRESHOLD = 300000; // 5 min
 
   const isOnline = (m) => {
@@ -22,8 +22,17 @@ export default function MemberPanel({ chatId }) {
 
   useEffect(() => {
     if (!chatId || !accessToken) return;
-    api.listMembers(accessToken, chatId).then(d => setMembers(d.members || [])).catch(() => {});
-  }, [chatId, accessToken]);
+    const fetch = () => {
+      if (mode === 'ws' && wsReady) {
+        wsRequest('list_members', { chat_id: chatId }).then(d => setMembers(d.members || [])).catch(() => {});
+      } else {
+        api.listMembers(accessToken, chatId).then(d => setMembers(d.members || [])).catch(() => {});
+      }
+    };
+    fetch();
+    const id = setInterval(fetch, 60000);
+    return () => clearInterval(id);
+  }, [chatId, accessToken, mode, wsReady]);
 
   const removeUser = async (userId) => {
     if (!confirm('Kick this member?')) return;

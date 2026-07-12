@@ -21,7 +21,17 @@ export default function ChatInfoModal({ chatId, onClose }) {
 
   useEffect(() => {
     if (!chatId || !accessToken) return;
-    api.listMembers(accessToken, chatId).then(d => setMembers(d.members || [])).catch(() => {});
+    const fetch = () => {
+      const { wsReady, mode, wsRequest } = useChatStore.getState();
+      if (mode === 'ws' && wsReady) {
+        wsRequest('list_members', { chat_id: chatId }).then(d => setMembers(d.members || [])).catch(() => {});
+      } else {
+        api.listMembers(accessToken, chatId).then(d => setMembers(d.members || [])).catch(() => {});
+      }
+    };
+    fetch();
+    const id = setInterval(fetch, 60000);
+    return () => clearInterval(id);
   }, [chatId, accessToken]);
 
   return (

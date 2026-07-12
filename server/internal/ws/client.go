@@ -107,6 +107,18 @@ func (c *Client) readPump() {
 				continue
 			}
 			c.unsubscribe(p.ChatID)
+		case OpListMembers:
+			var p struct{ ChatID string `json:"chat_id"` }
+			if err := json.Unmarshal(env.Payload, &p); err != nil || p.ChatID == "" {
+				continue
+			}
+			if c.hub.db != nil {
+				members, err := c.hub.db.GetChatMembers(context.Background(), p.ChatID)
+				if err == nil {
+					b, _ := json.Marshal(map[string]any{"chat_id": p.ChatID, "members": members})
+					c.queue(Envelope{Op: OpMembersList, ReqID: env.ReqID, Payload: b})
+				}
+			}
 		case OpTyping:
 			var p struct{ ChatID string `json:"chat_id"` }
 			if err := json.Unmarshal(env.Payload, &p); err != nil || p.ChatID == "" {
