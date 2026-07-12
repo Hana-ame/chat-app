@@ -19,6 +19,7 @@ export default function MemberPanel({ chatId }) {
   const [previewUrl, setPreviewUrl] = useState(null);
 
   const chat = chats.find(c => c.id === chatId);
+  if (!chat) return null;
 
   useEffect(() => {
     if (!chatId || !accessToken) return;
@@ -46,7 +47,7 @@ export default function MemberPanel({ chatId }) {
       </h4>
 
       {(() => {
-        const isAdmin = m => m.role === 'admin' || m.id === chat.owner_id;
+        const isAdmin = m => m.role === 'admin' || m.id === chat?.owner_id;
         return members.map(m => (
           <div key={m.id} style={{display:'flex',alignItems:'center',gap:8,padding:'4px 0',fontSize:14,cursor:'pointer'}}
             onClick={() => setProfileUser(m)}>
