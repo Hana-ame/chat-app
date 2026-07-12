@@ -127,6 +127,8 @@ export const api = {
     request('DELETE', '/api/chats/' + chatId + '/messages/' + msgId, token),
   markRead: (token, chatId, messageId) =>
     request('POST', '/api/chats/' + chatId + '/read', token, { message_id: messageId }),
+  visitChat: (token, chatId) =>
+    request('POST', '/api/chats/' + chatId + '/visit', token, {}),
 
   // ── Reactions ──
   addReaction: (token, chatId, msgId, emoji) =>

@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import ImagePreviewModal from './ImagePreviewModal';
 
-export default function UserProfileModal({ user: profileUser, onClose }) {
+export default function UserProfileModal({ user: profileUser, onClose, chatId }) {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [avatarError, setAvatarError] = useState(false);
   if (!profileUser) return null;
+  const role = profileUser.role;
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 360, textAlign: 'center' }}>
@@ -28,6 +29,18 @@ export default function UserProfileModal({ user: profileUser, onClose }) {
         )}
 
         <div style={{ marginTop: 16, fontSize: 14, textAlign: 'left' }}>
+          {chatId && (
+            <div style={{ padding: '4px 0', display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Role</span>
+              <span style={{ textTransform: 'capitalize' }}>{role || 'member'}</span>
+            </div>
+          )}
+          {chatId && profileUser.last_seen && (
+            <div style={{ padding: '4px 0', display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Last seen</span>
+              <span style={{ fontSize: 12 }}>{new Date(profileUser.last_seen).toLocaleString()}</span>
+            </div>
+          )}
           {profileUser.email && (
             <div style={{ padding: '4px 0', display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>Email</span>

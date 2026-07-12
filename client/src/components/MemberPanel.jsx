@@ -67,7 +67,7 @@ export default function MemberPanel({ chatId }) {
         ));
       })()}
       {profileUser && (
-        <UserProfileModal user={profileUser} onClose={() => setProfileUser(null)} />
+        <UserProfileModal user={profileUser} onClose={() => setProfileUser(null)} chatId={chatId} />
       )}
       {previewUrl && (
         <ImagePreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />

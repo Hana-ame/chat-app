@@ -173,7 +173,7 @@ export const useChatStore = create((set, get) => ({
       }
       const lm = (c.last_message?.content?.trim() ? c.last_message : null) || (old.last_message?.content?.trim() ? old.last_message : null);
       const lma = c.last_message_at || old.last_message_at || c.created_at;
-      return { ...c, last_message_at: lma, last_message: lm, unread_count: old.unread_count || 0 };
+      return { ...c, last_message_at: lma, last_message: lm, unread_count: c.unread_count ?? 0 };
     });
       const sorted = merged.sort((a, b) => {
         const pa = !!a.pinned, pb = !!b.pinned;

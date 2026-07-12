@@ -38,6 +38,7 @@ type Chat struct {
 	PinnedUpdatedAt *time.Time    `json:"pinned_updated_at,omitempty"`
 	PinnedLastReadAt *time.Time   `json:"pinned_last_read_at,omitempty"`
 	Pinned          bool          `json:"pinned"`
+	LastVisitedAt   *time.Time    `json:"last_visited_at,omitempty"`
 	LastMessageID  string         `json:"last_message_id,omitempty"`
 	// Deprecated.
 	LastMessage   *Message   `json:"last_message,omitempty"`

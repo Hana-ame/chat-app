@@ -112,6 +112,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 				r.Delete("/pin", s.DeletePinnedChat)
 				r.Post("/pin-toggle", s.TogglePin)
 				r.Post("/pin-read", s.MarkPinnedRead)
+				r.Post("/visit", s.VisitChat)
 			})
 
 			r.Post("/uploads", s.Upload) // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.

@@ -488,3 +488,27 @@ func (s *Server) MarkPinnedRead(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
+
+// VisitChat godoc
+// @Summary      Record a chat visit
+// @Description  Update last_visited_at for the current user in the given chat
+// @Tags         chats
+// @Security     BearerAuth
+// @Param        chatID  path  string  true  "Chat ID"
+// @Success      200  {object}  map[string]any
+// @Router       /api/chats/{chatID}/visit [post]
+func (s *Server) VisitChat(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r.Context())
+	if u == nil {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "")
+		return
+	}
+	id := chi.URLParam(r, "chatID")
+	if err := s.DB.UpdateLastVisitedAt(r.Context(), id, u.ID); err != nil {
+		logutil.Error("visit chat %s: %v", id[:8], err)
+		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	logutil.Debug("user %s visited chat %s", u.ID[:8], id[:8])
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}

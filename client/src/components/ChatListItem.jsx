@@ -18,7 +18,8 @@ export default function ChatListItem({ chat, activeId, onSelectChat, onContextMe
 
   const name = chat.name || chat.id;
   const avatar = chat.icon_color || '#5865F2';
-  const unread = chat.unread_count || 0;
+  const raw = chat.unread_count || 0;
+  const unread = raw > 50 ? '50+' : raw;
 
   const handleMenu = (e) => {
     e.stopPropagation();
@@ -46,7 +47,7 @@ export default function ChatListItem({ chat, activeId, onSelectChat, onContextMe
         <div className="chat-item-meta">
           <div className="chat-item-time">{timeAgo(chat.last_message_at)}</div>
           <div className="chat-item-menu-wrap">
-            {unread > 0 ? <div className="unread-badge">{unread}</div> : null}
+            {raw > 0 ? <div className="unread-badge">{unread}</div> : null}
             <button ref={btnRef} className="btn-ghost chat-item-menu-btn" title="More" onClick={handleMenu}>⋮</button>
           </div>
         </div>
