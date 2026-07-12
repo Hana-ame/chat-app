@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
@@ -9,7 +9,8 @@ import MemberPanel from '../components/MemberPanel';
 import WelcomeView from '../components/WelcomeView';
 
 export default function ChatPage() {
-  const { chatId: urlChatId } = useParams();
+  const loc = useLocation();
+  const urlChatId = loc.pathname.startsWith('/g/') ? loc.pathname.slice(3) : null;
   const navigate = useNavigate();
   const { user, accessToken, logout } = useAuthStore();
   const { wsReady, mode, connectWS, connectSSE, connectPolling, disconnect, loadChats, loadMessages } = useChatStore();

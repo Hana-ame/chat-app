@@ -3288,7 +3288,7 @@ if n > 0 {
 
 **后端变更**:
 - `server/internal/db/db.go` + `chats.go`: `Chat` 模型新增 `LastActiveAt` 字段，`GetChat`/`ListUserChats` SELECT 该字段，`UpdateLastActiveAt` 写入 `chat_members.last_active_at`
-- `server/internal/db/migrations/init.sql`: 合并 `last_seen` + `last_visited_at` → `last_active_at`
+- `server/internal/db/migrations/000__init.sql`: 合并 `last_seen` + `last_visited_at` → `last_active_at`
 - `server/internal/handlers/chat.go`: 新增 `VisitChat` handler
 - `server/internal/handlers/router.go`: 注册 `POST /api/chats/{chatID}/visit`
 
@@ -3303,3 +3303,35 @@ if n > 0 {
 - Client build: ✅
 - Go build + test: ✅
 - Frontend CI: ✅
+
+---
+
+## 2026-07-13 第 28 轮 — DB migration ASCII 排序 bug + chat leave 修复
+
+---
+
+### 28-1: DB migration 排序导致 V001 在 init.sql 之前执行
+
+**根因**: `sort.Strings` 按 ASCII 排序，`V`(86) < `i`(105)，V001 排在 init.sql 之前 → 空数据库先跑 ALTER TABLE，chat_members 尚不存在，全库测试挂。
+
+**修复**:
+- `init.sql` → `000__init.sql`（`0`=48 < `V`=86，保证 init 先执行）
+- 删除遗留的 `rename_last_visited.sql`（旧非版本化 migration，与 V001 重复）
+
+### 28-2: 离开聊天改为调 removeMember
+
+**反馈**: 点击 Leave 之后整个群组从其他成员的列表消失。
+
+**根因**: `handleDeleteChat` 调 `deleteChat` 接口（解散群组），非 `removeMember`（仅自己退出）。
+
+**修复**:
+- `ChatList.jsx`: `handleDeleteChat` → `handleLeaveChat`，改调 `api.removeMember`
+- 菜单文字 "Delete" → "Leave"
+- `mockRemoveMember`: 自己退出时从 `d.chats` 移除并调 `onChatDelete`
+- 增加 `navigate('/', { replace: true })` 离开当前活跃聊天
+
+### 验证
+- Go all tests: ✅
+- Client build: ✅
+
+---

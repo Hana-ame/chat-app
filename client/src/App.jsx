@@ -28,7 +28,6 @@ export default function App() {
       <Route path="/login" element={token ? <Navigate to="/" /> : <LoginPage />} />
       <Route path="/register" element={token ? <Navigate to="/" /> : <RegisterPage />} />
       <Route path="/*" element={token ? <ChatPage /> : <Navigate to="/login" />} />
-      <Route path="/g/:chatId" element={token ? <ChatPage /> : <Navigate to="/login" />} />
     </Routes>
   )
 }
