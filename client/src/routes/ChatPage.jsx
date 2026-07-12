@@ -12,9 +12,14 @@ export default function ChatPage() {
   const { chatId: urlChatId } = useParams();
   const navigate = useNavigate();
   const { user, accessToken, logout } = useAuthStore();
-  const { setActiveChat, activeChatId, wsReady, mode, connectWS, connectSSE, connectPolling, disconnect, loadChats, loadMessages } = useChatStore();
+  const { wsReady, mode, connectWS, connectSSE, connectPolling, disconnect, loadChats, loadMessages } = useChatStore();
   const [mobileView, setMobileView] = useState('list');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  // sync URL → store for internal unread/message logic
+  useEffect(() => {
+    useChatStore.setState({ activeChatId: urlChatId || null });
+  }, [urlChatId]);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768);
@@ -34,47 +39,38 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (urlChatId && accessToken) {
-      setActiveChat(urlChatId);
       if (isMobile) setMobileView('chat');
+      const { messages } = useChatStore.getState();
+      if (messages.length === 0) loadMessages(accessToken, urlChatId);
+      const msgs = messages.filter(m => m.chat_id === urlChatId && !m.deleted);
+      if (msgs.length > 0) {
+        api.markRead(accessToken, urlChatId, msgs[msgs.length - 1].id).catch(()=>{});
+      }
     }
   }, [urlChatId, accessToken]);
 
-  useEffect(() => {
-    if (activeChatId && accessToken) {
-      const { messages } = useChatStore.getState();
-      if (messages.length === 0) loadMessages(accessToken, activeChatId);
-      const msgs = messages.filter(m => m.chat_id === activeChatId && !m.deleted);
-      if (msgs.length > 0) {
-        api.markRead(accessToken, activeChatId, msgs[msgs.length - 1].id).catch(()=>{});
-      }
-    }
-  }, [activeChatId, accessToken]);
-
   const handleSelectChat = (id) => {
-    setActiveChat(id);
     navigate('/g/' + id, { replace: true });
     if (isMobile) setMobileView('chat');
   };
 
   const handleBack = () => {
-    setActiveChat(null);
     navigate('/', { replace: true });
     setMobileView('list');
   };
 
-  const appClass = 'shell' + (isMobile ? (activeChatId && mobileView === 'chat' ? ' mobile-chat' : ' mobile-list') : '');
+  const appClass = 'shell' + (isMobile ? (urlChatId && mobileView === 'chat' ? ' mobile-chat' : ' mobile-list') : '');
 
   return (
     <div className={appClass}>
-      <ChatList onSelectChat={handleSelectChat} activeId={activeChatId} onLogout={logout} />
-       {activeChatId ? (
+      <ChatList onSelectChat={handleSelectChat} activeId={urlChatId} onLogout={logout} />
+       {urlChatId ? (
          <ChatView
-           chatId={activeChatId}
+           chatId={urlChatId}
            onBack={isMobile ? handleBack : null}
          />
        ) : isMobile ? null : <WelcomeView />}
-       {!isMobile && activeChatId && <MemberPanel chatId={activeChatId} />}
-
+       {!isMobile && urlChatId && <MemberPanel chatId={urlChatId} />}
     </div>
   );
 }

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 
 export default function WelcomeView() {
+  const navigate = useNavigate();
   const { accessToken } = useAuthStore();
-  const { chats, setActiveChat } = useChatStore();
+  const { chats } = useChatStore();
   const [publicChats, setPublicChats] = useState([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -33,8 +35,7 @@ export default function WelcomeView() {
         return;
       }
     }
-    setActiveChat(chatId);
-    window.history.pushState(null, '', '/g/' + chatId);
+    navigate('/g/' + chatId);
   };
 
   return (

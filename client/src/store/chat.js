@@ -285,12 +285,7 @@ export const useChatStore = create((set, get) => ({
     }) }));
   },
 
-  setActiveChat(chatId) {
-    set(s => ({
-      activeChatId: chatId,
-      chats: s.chats.map(c => c.id === chatId ? { ...c, unread_count: 0 } : c),
-    }));
-  },
+
 
   async loadChats(token) {
     try {
