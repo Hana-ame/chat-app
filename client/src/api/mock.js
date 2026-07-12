@@ -209,7 +209,6 @@ export function mockRemoveMember(_token, chatId, userId) {
   chat.members = chat.members?.filter(m => m.id !== userId);
   chat.member_count = Math.max(0, (chat.member_count || 0) - 1);
   if (userId === cu.id) {
-    d.chats = d.chats.filter(c => c.id !== chatId);
     if (_store) _store.getState().onChatDelete({ chat_id: chatId });
   } else {
     syncChatToStore(chat);

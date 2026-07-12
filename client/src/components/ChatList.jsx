@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
@@ -37,6 +38,8 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       : chatSearch.trim() && /^(join|create)\s/i.test(chatSearch.trim()) ? chatSearch.trim().startsWith('join') ? 'join' : 'create'
         : null;
 
+  const navigate = useNavigate();
+
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
 
   useEffect(() => {
@@ -61,6 +64,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     try {
       await api.removeMember(accessToken, chatId, user.id);
       useChatStore.getState().onChatDelete({ chat_id: chatId });
+      if (chatId === activeId) navigate('/', { replace: true });
     } catch (e) { console.error('Leave chat error:', e); }
     setContextMenu(null);
   };
@@ -114,12 +118,6 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     setShowSettings(false);
   };
 
-  const [buildCount] = useState(() => {
-    const n = parseInt(localStorage.getItem('build_count') || '0') + 1;
-    localStorage.setItem('build_count', String(n));
-    return n;
-  });
-
   const filteredChats = chats.filter(c => {
     if (c.type === 'dm') return false;
     if (!chatSearch.trim()) return true;
@@ -131,7 +129,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   return (
     <div className="sidebar">
       <div className="sidebar-header">
-        <h3 style={{ fontSize: 15, fontWeight: 700 }}>+#{buildCount}</h3>
+        <h3 style={{ fontSize: 15, fontWeight: 700 }}>Chats</h3>
         <div style={{ display: 'flex', gap: 4, alignItems: 'stretch' }}>
           <button className="btn-ghost" style={{ fontSize: 9, fontWeight: 700, minWidth: 34, textAlign: 'center', padding: '4px 2px', lineHeight: 1.2 }}
             onClick={() => setMode(MODES[(MODES.findIndex(m => m.key === mode) + 1) % MODES.length].key)} title={'Click to switch: ' + ['WS', 'SSE', 'Poll'][(['ws', 'sse', 'poll'].indexOf(mode) + 1) % 3]}>
