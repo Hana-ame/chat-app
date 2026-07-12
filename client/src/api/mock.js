@@ -190,6 +190,11 @@ function updateMembersByChatId(chatId, members) {
   _store.setState({ membersByChatId: { ...s.membersByChatId, [chatId]: members } });
 }
 
+function syncChatToStore(chat) {
+  if (!_store) return;
+  _store.getState().onChatUpdate({ ...chat });
+}
+
 export function mockAddMember(_token, chatId, userId) {
   const d = ensureData();
   const chat = d.chats.find(c => c.id === chatId);
@@ -198,7 +203,7 @@ export function mockAddMember(_token, chatId, userId) {
     chat.members.push({ id: userId, ...userById(userId), role: '' });
     chat.member_count = (chat.member_count || 0) + 1;
     updateMembersByChatId(chatId, [...chat.members]);
-    if (_store) _store.getState().onChatUpdate({ id: chatId });
+    syncChatToStore(chat);
   }
   return chat || { ok: true };
 }
@@ -210,7 +215,7 @@ export function mockRemoveMember(_token, chatId, userId) {
     chat.members = chat.members?.filter(m => m.id !== userId);
     chat.member_count = Math.max(0, (chat.member_count || 0) - 1);
     updateMembersByChatId(chatId, [...(chat.members || [])]);
-    if (_store) _store.getState().onChatUpdate({ id: chatId });
+    syncChatToStore(chat);
   }
   return { ok: true };
 }
@@ -402,7 +407,7 @@ export function mockJoinChat(_token, chatId) {
     chat.members.push({ id: cu.id, ...userById(cu.id), role: 'member' });
     chat.member_count = (chat.member_count || 0) + 1;
     updateMembersByChatId(chatId, [...chat.members]);
-    if (_store) _store.getState().onChatUpdate({ id: chatId });
+    syncChatToStore(chat);
   }
   return { ok: true };
 }

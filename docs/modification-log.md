@@ -3005,3 +3005,112 @@ messages 表使用 `deleted_at`（时间戳，NULL=未删除），非 `deleted` 
 - Client build: ✅
 - CI (Go): ✅
 - Frontend CI: ✅ 全部通过（选择器修复后）
+
+---
+
+## 2026-07-12 第 24 轮 — 生产清理 + 成员数据加载
+
+---
+
+### 24-1: 移除 Quick Enter / Debug mode 按钮
+
+**背景**: 公开测试后不应在 UI 暴露 Mock 入口。
+
+**代码变更**:
+- `LoginPage.jsx`: 移除 ⚡ Quick Enter 按钮、`quickEnter` 函数、`api`/`setDebugMode`/`mockLogin` import
+- `RegisterPage.jsx`: 移除 Debug mode checkbox、⚡ Quick Enter (mock) 按钮、`quickEnter` 函数
+- `main.jsx`: 添加 `window.__mockLogin` 测试钩子
+- 所有测试文件: 用 `page.evaluate(() => window.__mockLogin())` 替代按钮点击
+
+---
+
+### 24-2: 移除 Composer 🤖 按钮
+
+**背景**: "Send to AI (mock only)" 按钮在公开版无意义。
+
+**代码变更** (`Composer.jsx:98-102`): 移除 🤖 按钮及 `api.isMockEnabled()` 逻辑。
+
+---
+
+### 24-3: Member count 修复
+
+**反馈**: 无论何时 members 显示 0。
+
+**根因**: 后端 `ListUserChats` 返回 `member_count`（int），前端所有组件读 `chat.members`（array），后端从不返回 `members` 数组。
+
+**代码变更**:
+- `ChatView.jsx:96`: `chat?.members?.length` → `chat?.member_count`
+- `ChatView.jsx:97`: 移除 online count（无数据源）
+- `ChatInfoModal.jsx:34`: 同上
+- `MemberPanel.jsx:36`: 同上
+- `PublicChannelList.jsx:32`: 同上
+
+---
+
+### 24-4: Phase 2 — 从 API 加载真实成员数据
+
+**背景**: member count 显示正确了，但成员列表（头像、名字、Admin 标签）为空。
+
+**方案**: 独立的 `membersByChatId: { [chatId]: [User, ...] }` map，不与 chat 对象耦合。
+
+**后端**:
+- `models.User` 加 `Role` 字段 (`json:"role,omitempty"`)
+- `GetChatMembers` SQL 加 `cm.role`，scan 捕获
+
+**Client API**:
+- 新增 `api.listMembers(token, chatId)`
+- 新增 `mockListMembers`（在 store 初始化时自动触发）
+
+**Store** (`chat.js`):
+- 新增 `membersByChatId: {}` 状态
+- 新增 `loadMembers` action（调 API → 写 `membersByChatId`)
+- `setChats`: 不再尝试保留 members（各存各的）
+- `onChatUpdate`: 不再处理 members
+- `reset`: 清空 `membersByChatId`
+
+**组件**:
+- `ChatView`: 进入聊天时调用 `loadMembers(accessToken, chatId)`；`userMap` 和 `getDMName` 从 `membersByChatId` 读取
+- `MemberPanel`: 从 `membersByChatId[chatId]` 读取，移除本地 `members` state
+- `ChatInfoModal`: 同理
+
+**Mock 同步**:
+- `mockAddMember`/`mockRemoveMember`/`mockJoinChat`: 同时更新 `membersByChatId`
+- `mockCreateChat`/`mockCreateDM`: 加 `member_count`
+
+**Bug 修复 — 后端** (`server/internal/db/chats_ext.go`):
+- `JoinChatByID` 插入 `chat_members` 后未 `UPDATE chats SET member_count = member_count + 1`
+
+---
+
+### 24-5: Mock `member_count` 缺失修复
+
+**背景**: Phase 2 完成后 members 仍显示 0（mock 模式）。
+
+**根因**: Mock dummy data 生成 chat 时从未设置 `member_count` 字段。
+
+**代码变更**:
+- `dummy.js:generateDummyData`: 加 `member_count: members.length`
+- `mock.js:mockCreateChat`: 加 `member_count`
+- `mock.js:mockCreateDM`: 加 `member_count`
+- `mock.js:mockJoinChat`: `chat.member_count++`
+- `mock.js:mockAddMember`: `chat.member_count++`
+- `mock.js:mockRemoveMember`: `chat.member_count--`
+
+---
+
+### 24-6: Deprecation 标记补充
+
+- `client.js:createDM`: 加 `// @deprecated`
+- `client.js:MOCKABLE`: 加 `// @deprecated`
+
+---
+
+### 验证
+- Client build: ✅
+- Go build + test: ✅
+- Frontend CI: ✅
+
+---
+
+### 待办
+- [x] `mockJoinChat`/`mockAddMember`/`mockRemoveMember`: 改用完整 chat 对象调 `onChatUpdate`，避免 store 只存 `{ id: chatId }` 丢字段
