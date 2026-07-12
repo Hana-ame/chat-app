@@ -8,8 +8,9 @@ function fmtTime(t) {
 }
 
 export default function ChatInfoModal({ chatId, onClose }) {
-  const { chats } = useChatStore();
+  const { chats, membersByChatId } = useChatStore();
   const chat = chats.find(c => c.id === chatId);
+  const members = membersByChatId[chatId] || [];
   const [profileUser, setProfileUser] = useState(null);
   if (!chat) return null;
 
@@ -32,7 +33,7 @@ export default function ChatInfoModal({ chatId, onClose }) {
         <InfoRow label="Last message" value={fmtTime(chat.last_message_at)} />
 
         <h4 style={{fontSize:12,textTransform:'uppercase',color:'var(--text-muted)',marginBottom:8}}>Members — {chat.member_count || 0}</h4>
-        {(chat.members || []).map(m => (
+        {members.map(m => (
           <div key={m.id} onClick={() => setProfileUser(m)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', fontSize: 14, cursor: 'pointer' }}>
             <div className="msg-avatar" style={{ width: 26, height: 26, fontSize: 11, background: m.avatar_color || '#5865F2' }}>
               {m.username ? m.username[0].toUpperCase() : '?'}

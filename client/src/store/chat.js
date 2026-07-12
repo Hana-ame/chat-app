@@ -8,6 +8,7 @@ export const useChatStore = create((set, get) => ({
   activeChatId: null,
   messages: [],
   pinnedMessage: {}, // { chatId: { id, content, pinned_at } }
+  membersByChatId: {}, // { chatId: [User, ...] }
   onlineUserIds: [],
 
   mode: 'ws',
@@ -168,7 +169,7 @@ export const useChatStore = create((set, get) => ({
       }
       const lm = (c.last_message?.content?.trim() ? c.last_message : null) || (old.last_message?.content?.trim() ? old.last_message : null);
       const lma = c.last_message_at || old.last_message_at || c.created_at;
-      return { ...c, last_message_at: lma, last_message: lm, unread_count: old.unread_count || 0, members: old.members || c.members };
+      return { ...c, last_message_at: lma, last_message: lm, unread_count: old.unread_count || 0 };
     });
       const sorted = merged.sort((a, b) => {
         const pa = !!a.pinned, pb = !!b.pinned;
@@ -188,14 +189,12 @@ export const useChatStore = create((set, get) => ({
   onChatUpdate(chat) {
     set(s => {
       const idx = s.chats.findIndex(c => c.id === chat.id);
-      const updated = { ...chat };
-      if (!updated.members) updated.members = idx >= 0 ? s.chats[idx].members : [];
       let n;
       if (idx >= 0) {
         n = [...s.chats];
-        n[idx] = { ...n[idx], ...updated };
+        n[idx] = { ...n[idx], ...chat };
       } else {
-        n = [updated, ...s.chats];
+        n = [chat, ...s.chats];
       }
       n.sort((a, b) => {
         const pa = !!a.pinned, pb = !!b.pinned;
@@ -316,7 +315,7 @@ export const useChatStore = create((set, get) => ({
   async loadMembers(token, chatId) {
     try {
       const data = await api.listMembers(token, chatId);
-      get().onChatUpdate({ id: chatId, members: data.members || [] });
+      set(s => ({ membersByChatId: { ...s.membersByChatId, [chatId]: data.members || [] } }));
     } catch (e) { console.error('loadMembers error:', e); }
   },
 
@@ -370,7 +369,7 @@ export const useChatStore = create((set, get) => ({
   },
 
   reset() {
-    set({ chats: [], activeChatId: null, messages: [], pinnedMessage: {} });
+    set({ chats: [], activeChatId: null, messages: [], pinnedMessage: {}, membersByChatId: {} });
   },
 
   disconnect() {

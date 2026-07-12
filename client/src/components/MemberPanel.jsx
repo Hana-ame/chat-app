@@ -7,7 +7,7 @@ import ImagePreviewModal from './ImagePreviewModal';
 
 export default function MemberPanel({ chatId }) {
   const { user, accessToken } = useAuthStore();
-  const { chats } = useChatStore();
+  const { chats, membersByChatId } = useChatStore();
   const ONLINE_THRESHOLD = 300000; // 5 min
 
   const isOnline = (m) => {
@@ -18,7 +18,7 @@ export default function MemberPanel({ chatId }) {
   const [previewUrl, setPreviewUrl] = useState(null);
 
   const chat = chats.find(c => c.id === chatId);
-  const members = chat?.members || [];
+  const members = membersByChatId[chatId] || [];
 
   const removeUser = async (userId) => {
     if (!confirm('Kick this member?')) return;
