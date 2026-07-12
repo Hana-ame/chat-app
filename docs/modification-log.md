@@ -3114,3 +3114,69 @@ messages 表使用 `deleted_at`（时间戳，NULL=未删除），非 `deleted` 
 
 ### 待办
 - [x] `mockJoinChat`/`mockAddMember`/`mockRemoveMember`: 改用完整 chat 对象调 `onChatUpdate`，避免 store 只存 `{ id: chatId }` 丢字段
+
+---
+
+## 2026-07-12 第 25 轮 — 架构简化 + 后端 JoinChatByID 修复
+
+---
+
+### 25-1: 移除 `membersByChatId` store，组件直接调 API
+
+**背景**: `membersByChatId` 增加了 store 复杂度，轮询时会覆盖、同步容易出 bug。
+
+**方案**: 组件各自 `useEffect` 里直接 `api.listMembers(token, chatId)`，结果存本地 state。
+
+**代码变更**:
+- `store/chat.js`: 移除 `membersByChatId` 字段、`loadMembers` action、`user_update` handler、reset 里的清空
+- `MemberPanel.jsx`: 新增 `useEffect` → `api.listMembers` → `setMembers`，移除 `membersByChatId` 依赖
+- `ChatInfoModal.jsx`: 同上
+- `ChatView.jsx`: 移除 `loadMembers` 调用、`membersByChatId`、`getDMName` 简化
+- `mock.js`: 移除 `updateMembersByChatId` helper
+
+---
+
+### 25-2: 后端 `JoinChatByID` 补 `member_count` 自增
+
+**背景**: `JoinChatByID` INSERT INTO `chat_members` 后从未 `UPDATE chats SET member_count = member_count + 1`。
+
+**代码变更** (`server/internal/db/chats_ext.go:83-91`):
+```go
+res, err := d.ExecContext(ctx, ...)
+n, _ := res.RowsAffected()
+if n > 0 {
+    _, err = d.ExecContext(ctx, `UPDATE chats SET member_count = member_count + 1 WHERE id = ?`, chatID)
+}
+```
+
+---
+
+### 25-3: 右键菜单 "Delete" → "Leave"
+
+**反馈**: 删除应该是从自己列表移除（离开群组），不是解散整个 group。
+
+**代码变更**:
+- `ChatList.jsx`: `handleDeleteChat` → `handleLeaveChat`（调 `api.removeMember` + store `onChatDelete`），菜单文字 "Delete" → "Leave"
+- `mock.js:mockRemoveMember`: 当 `userId === currentUser.id` 时从 `d.chats` 移除并调 `onChatDelete`
+
+---
+
+### 25-4: Member count 改为组件直接调 API
+
+**背景**: `chat?.member_count` 从 store 读仍然有时为 0（取决于后端是否返回该字段）。
+
+**方案**: ChatView header 的 member count 改为 `useEffect` → `api.listMembers` → `.length`，跟 MemberPanel / ChatInfoModal 一致。
+
+**代码变更** (`ChatView.jsx`):
+```jsx
+const [memberCount, setMemberCount] = useState(0);
+useEffect(() => {
+    api.listMembers(accessToken, chatId).then(d => setMemberCount(d.members?.length || 0));
+}, [chatId, accessToken]);
+```
+
+---
+
+### 验证
+- Client build: ✅
+- Go build + test: ✅

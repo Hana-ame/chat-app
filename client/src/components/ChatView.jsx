@@ -19,11 +19,17 @@ export default function ChatView({ chatId, onBack }) {
   const [noticeInput, setNoticeInput] = useState('');
   const [isEditingNotice, setIsEditingNotice] = useState(false);
   const [showNotice, setShowNotice] = useState(true);
+  const [memberCount, setMemberCount] = useState(0);
   const bodyRef = useRef(null);
   const loadingMoreRef = useRef(false);
   const prevChatIdRef = useRef(null);
 
   const chat = useMemo(() => chats.find(c => c.id === chatId), [chats, chatId]);
+
+  useEffect(() => {
+    if (!chatId || !accessToken) return;
+    api.listMembers(accessToken, chatId).then(d => setMemberCount(d.members?.length || 0)).catch(() => {});
+  }, [chatId, accessToken]);
 
   useEffect(() => {
     if (chatId && accessToken) {
@@ -92,7 +98,6 @@ export default function ChatView({ chatId, onBack }) {
   }, [chatId, messages]);
 
   const name = chat ? getDMName(chat) : 'Loading...';
-  const memberCount = chat?.member_count || 0;
   const userMap = useMemo(() => ({}), []);
 
   const handleSaveNotice = async () => {
