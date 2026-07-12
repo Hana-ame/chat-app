@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -40,9 +41,11 @@ func (s *Server) ListChats(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	chats, err := s.DB.ListUserChats(r.Context(), u.ID)
 	if err != nil {
+		logutil.Error("list chats for %s: %v", u.ID[:8], err)
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	logutil.Debug("listed %d chats for user %s", len(chats), u.ID[:8])
 	writeJSON(w, http.StatusOK, map[string]any{"chats": chats})
 }
 
@@ -86,9 +89,11 @@ func (s *Server) CreateChat(w http.ResponseWriter, r *http.Request) {
 	}
 	chat, err := s.DB.CreateChat(r.Context(), "group", req.Name, req.Visibility, u.ID, members)
 	if err != nil {
+		logutil.Error("create chat: %v (user=%s name=%s)", err, u.ID[:8], req.Name)
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
+	logutil.Info("chat created: %s (name=%s owner=%s)", chat.ID[:8], req.Name, u.ID[:8])
 	if s.Hub != nil {
 		s.Hub.BroadcastChatCreated(chat)
 	}
@@ -233,9 +238,11 @@ func (s *Server) DeleteChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.DB.DeleteChat(r.Context(), id); err != nil {
+		logutil.Error("delete chat %s: %v", id[:8], err)
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	logutil.Warn("chat deleted: %s by %s", id[:8], u.ID[:8])
 	if s.Hub != nil {
 		s.Hub.BroadcastChatDeleted(c, id)
 	}
@@ -278,9 +285,11 @@ func (s *Server) JoinChat(w http.ResponseWriter, r *http.Request) {
 	}
 	id := chi.URLParam(r, "chatID")
 	if err := s.DB.JoinChatByID(r.Context(), id, u.ID); err != nil {
+		logutil.Error("join chat %s: %v (user=%s)", id[:8], err, u.ID[:8])
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	logutil.Info("user %s joined chat %s", u.ID[:8], id[:8])
 	chat, err := s.DB.GetChat(r.Context(), id)
 	if err != nil {
 		w.Header().Set("X-Error", err.Error())

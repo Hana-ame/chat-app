@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/Hana-ame/chat-app/server/internal/models"
 )
 
@@ -97,6 +98,7 @@ func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, 
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	logutil.Debug("created message in chat %s by user %s (len=%d, att=%d)", chatID, userID, len(content), len(attachments))
 	return d.GetMessage(ctx, id)
 }
 
@@ -304,6 +306,7 @@ func (d *DB) UpdateMessage(ctx context.Context, id, userID, content string) (*mo
 	if n == 0 {
 		return nil, ErrNotFound
 	}
+	logutil.Debug("updated message %s by user %s", id, userID)
 	return d.GetMessage(ctx, id)
 }
 
@@ -326,6 +329,7 @@ func (d *DB) DeleteMessage(ctx context.Context, id, userID string, allowAny bool
 	if n == 0 {
 		return ErrNotFound
 	}
+	logutil.Debug("deleted message %s by user %s", id, userID)
 	return nil
 }
 
@@ -386,6 +390,7 @@ func (d *DB) AddReaction(ctx context.Context, messageID, userID, emoji string) e
 	if err := tx.Commit(); err != nil {
 		return err
 	}
+	logutil.Debug("added reaction %s to message %s by %s", emoji, messageID, userID)
 	return d.syncReactionsColumn(ctx, messageID)
 }
 

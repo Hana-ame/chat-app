@@ -3180,3 +3180,63 @@ useEffect(() => {
 ### 验证
 - Client build: ✅
 - Go build + test: ✅
+
+---
+
+## 2026-07-12 第 26 轮 — 架构简化 II
+
+---
+
+### 26-1: 右键菜单 "Delete" → "Leave"
+
+**反馈**: 删除应该是从自己列表移除（离开群组），不是解散整个 group。
+
+**代码变更**:
+- `ChatList.jsx`: `handleDeleteChat` → `handleLeaveChat`（调 `api.removeMember` + store `onChatDelete`），菜单文字 "Delete" → "Leave"
+- `mock.js:mockRemoveMember`: 当 `userId === currentUser.id` 时从 `d.chats` 移除并调 `onChatDelete`
+
+---
+
+### 26-2: 后端 `JoinChatByID` 补 `member_count` 自增
+
+**代码变更** (`server/internal/db/chats_ext.go:83-91`):
+```go
+res, err := d.ExecContext(ctx, ...)
+n, _ := res.RowsAffected()
+if n > 0 {
+    _, err = d.ExecContext(ctx, `UPDATE chats SET member_count = member_count + 1 WHERE id = ?`, chatID)
+}
+```
+
+---
+
+### 26-3: 移除 `membersByChatId` store，组件直接调 API
+
+**背景**: store 维护成员列表增加复杂度，轮询覆盖、同步易出 bug。
+
+**方案**: 各组件 `useEffect` 里直接 `api.listMembers(token, chatId)`，存本地 state。
+
+**代码变更**:
+- `store/chat.js`: 移除 `membersByChatId`、`loadMembers`、`user_update` handler、reset 清空
+- `MemberPanel.jsx` / `ChatInfoModal.jsx`: 加 `useEffect` → `api.listMembers` → `setMembers`
+- `ChatView.jsx`: 移除 `loadMembers` 调用、`membersByChatId`，`getDMName` 简化
+- `mock.js`: 移除 `updateMembersByChatId` helper
+
+---
+
+### 26-4: `activeChatId` 完全由 URL 驱动
+
+**背景**: store 的 `activeChatId` 和 URL `/g/:chatId` 双源冗余。
+
+**方案**: 去掉 store 的 `setActiveChat` 暴露，`ChatPage` 直接用 `useParams().chatId`，所有组件通过 props 接收。
+
+**代码变更**:
+- `store/chat.js`: 移除 `setActiveChat` action
+- `ChatPage.jsx`: `urlChatId` 直接作为 `chatId` prop 传递给所有子组件；URL 变更时 `useChatStore.setState({ activeChatId })`（仅用于内部 unread 逻辑）；`handleSelectChat` 只 `navigate` 不调 store
+- `WelcomeView.jsx`: `navigate('/g/' + chatId)` 替代 `setActiveChat` + `pushState`
+
+---
+
+### 验证
+- Client build: ✅
+- Go build + test: ✅

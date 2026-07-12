@@ -11,7 +11,6 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -22,6 +21,7 @@ import (
 	"github.com/Hana-ame/chat-app/server/internal/config"
 	"github.com/Hana-ame/chat-app/server/internal/db"
 	"github.com/Hana-ame/chat-app/server/internal/handlers"
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/Hana-ame/chat-app/server/internal/ws"
 
 	_ "github.com/Hana-ame/chat-app/server/docs/swagger"
@@ -29,11 +29,11 @@ import (
 
 func main() {
 	cfg := config.Load()
-	log.Printf("chatd: starting (db=%s addr=%s)", cfg.DBPath, cfg.Addr)
+	logutil.Info("chatd: starting (db=%s addr=%s)", cfg.DBPath, cfg.Addr)
 
 	database, err := db.Open(cfg.DBPath)
 	if err != nil {
-		log.Fatalf("db open: %v", err)
+		logutil.Fatal("db open: %v", err)
 	}
 	defer database.Close()
 
@@ -44,7 +44,7 @@ func main() {
 	r := srv.Router(gateway)
 
 	if err := os.MkdirAll(cfg.UploadDir, 0o755); err != nil { // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
-		log.Fatalf("upload dir: %v", err)
+		logutil.Fatal("upload dir: %v", err)
 	}
 
 	server := &http.Server{
@@ -61,7 +61,7 @@ func main() {
 		defer ticker.Stop()
 		for range ticker.C {
 			if _, err := database.PurgeExpiredTokens(context.Background()); err != nil {
-				log.Printf("purge tokens: %v", err)
+				logutil.Warn("purge tokens: %v", err)
 			}
 		}
 	}()
@@ -71,17 +71,17 @@ func main() {
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 		<-sigCh
-		log.Println("chatd: shutting down")
+		logutil.Info("chatd: shutting down")
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		_ = server.Shutdown(ctx)
 		close(idle)
 	}()
 
-	log.Printf("chatd: listening on %s", cfg.Addr)
+	logutil.Info("chatd: listening on %s", cfg.Addr)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Fatalf("listen: %v", err)
+		logutil.Fatal("listen: %v", err)
 	}
 	<-idle
-	log.Println("chatd: bye")
+	logutil.Info("chatd: bye")
 }

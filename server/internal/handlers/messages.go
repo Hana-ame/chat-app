@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Hana-ame/chat-app/server/internal/db"
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/Hana-ame/chat-app/server/internal/models"
 	"github.com/go-chi/chi/v5"
 )
@@ -118,9 +119,11 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusForbidden, "content_too_long", err.Error())
 			return
 		}
+		logutil.Error("send message: %v (user=%s chat=%s)", err, u.ID[:8], id[:8])
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
+	logutil.Debug("message sent: %s (chat=%s user=%s len=%d)", msg.ID[:8], id[:8], u.ID[:8], len(req.Content))
 	if s.Hub != nil {
 		s.Hub.BroadcastMessageCreate(msg)
 	}

@@ -3,11 +3,11 @@ package ws
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/Hana-ame/chat-app/server/internal/db"
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/Hana-ame/chat-app/server/internal/models"
 )
 
@@ -64,9 +64,11 @@ func (h *Hub) register(c *Client) {
 	set[c] = struct{}{}
 	wasOffline := len(set) == 1
 	h.mu.Unlock()
+	logutil.Info("ws client registered: user=%s (total=%d)", c.userID[:8], h.ClientCount())
 	if wasOffline && h.db != nil {
 		_ = h.db.UpdateUserStatus(context.Background(), c.userID, "online")
 		_ = h.db.UpdateUserLastSeen(context.Background(), c.userID)
+		logutil.Debug("presence: %s -> online", c.userID[:8])
 		h.broadcastPresence(c.userID, "online")
 	}
 }
@@ -82,9 +84,11 @@ func (h *Hub) unregister(c *Client) {
 		}
 	}
 	h.mu.Unlock()
+	logutil.Info("ws client unregistered: user=%s (total=%d)", c.userID[:8], h.ClientCount())
 	if wasLast && h.db != nil {
 		_ = h.db.UpdateUserStatus(context.Background(), c.userID, "offline")
 		_ = h.db.UpdateUserLastSeen(context.Background(), c.userID)
+		logutil.Debug("presence: %s -> offline", c.userID[:8])
 		h.broadcastPresence(c.userID, "offline")
 	}
 }
@@ -144,7 +148,7 @@ func (h *Hub) sendToChat(chatID string, env Envelope, exceptUser string) {
 	}
 	members, err := h.db.GetChatMembers(context.Background(), chatID)
 	if err != nil {
-		log.Printf("ws: failed to load members for chat %s: %v", chatID, err)
+		logutil.Error("ws: failed to load members for chat %s: %v", chatID[:8], err)
 		return
 	}
 	b, _ := json.Marshal(env)

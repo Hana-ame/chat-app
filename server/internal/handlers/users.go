@@ -6,6 +6,7 @@ import (
 
 	"github.com/Hana-ame/chat-app/server/internal/auth"
 	"github.com/Hana-ame/chat-app/server/internal/db"
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 )
 
 type updateProfileReq struct {
@@ -54,12 +55,14 @@ func (s *Server) UpdateMe(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, db.ErrConflict) {
+			logutil.Warn("username taken: %s", name)
 			writeError(w, http.StatusConflict, "username_taken", "username already taken")
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	logutil.Info("profile updated: user=%s username=%s", u.ID[:8], name)
 	if s.Hub != nil {
 		s.Hub.BroadcastUserUpdate(updated)
 	}

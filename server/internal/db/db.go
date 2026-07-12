@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	_ "modernc.org/sqlite"
 )
 
@@ -39,6 +40,7 @@ func Open(path string) (*DB, error) {
 		conn.Close()
 		return nil, err
 	}
+	logutil.Info("database opened: %s", path)
 	return d, nil
 }
 
@@ -65,6 +67,7 @@ func (d *DB) Migrate() error {
 				return fmt.Errorf("apply migration %s: %w", n, err)
 			}
 		}
+		logutil.Debug("applied migration: %s", n)
 	}
 	return nil
 }

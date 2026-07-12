@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/joho/godotenv"
 )
 
@@ -76,7 +77,7 @@ func Load() *Config {
 		uploadDir = abs
 	}
 
-	return &Config{
+	cfg := &Config{
 		Addr:            getenv("CHAT_ADDR", ":8080"),
 		DBPath:          dbPath,
 		UploadDir:       uploadDir,
@@ -88,4 +89,7 @@ func Load() *Config {
 		StaticDir:       getenv("CHAT_STATIC_DIR", "../client/dist"),
 		AllowOrigins:    []string{"*"},
 	}
+	logutil.Debug("config loaded: addr=%s db=%s upload_dir=%s static_dir=%s base_url=%s",
+		cfg.Addr, cfg.DBPath, cfg.UploadDir, cfg.StaticDir, cfg.BaseURL)
+	return cfg
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/Hana-ame/chat-app/server/internal/orderedmap"
 	"github.com/Hana-ame/chat-app/server/internal/ws"
 	"github.com/go-chi/chi/v5"
@@ -23,6 +24,19 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 	r.Use(chimid.RealIP)
 	r.Use(chimid.RequestID)
 	r.Use(chimid.Recoverer)
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			ww := chimid.NewWrapResponseWriter(w, r.ProtoMajor)
+			next.ServeHTTP(ww, r)
+			u := userFrom(r.Context())
+			uid := ""
+			if u != nil {
+				uid = u.ID[:8]
+			}
+			logutil.Info("%s %s %d %s [user=%s]", r.Method, r.URL.Path, ww.Status(), time.Since(start).Round(time.Millisecond), uid)
+		})
+	})
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Security-Policy",
@@ -106,6 +120,8 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 
 	if gateway != nil {
 		r.Get("/ws", gateway.ServeHTTP)
+	} else {
+		logutil.Warn("WebSocket gateway is nil, /ws disabled")
 	}
 	r.Get("/api/events", s.SSE)
 

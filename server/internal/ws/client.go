@@ -3,10 +3,10 @@ package ws
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"sync"
 	"time"
 
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/gorilla/websocket"
 )
 
@@ -71,6 +71,7 @@ func (c *Client) readPump() {
 	defer func() {
 		c.hub.unregister(c)
 		c.close()
+		logutil.Debug("ws read pump ended: user=%s", c.userID[:8])
 	}()
 	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error {
@@ -132,7 +133,7 @@ func (c *Client) writePump() {
 				return
 			}
 			if err := c.conn.WriteJSON(env); err != nil {
-				log.Printf("ws: write error for %s: %v", c.userID, err)
+				logutil.Error("ws write error for %s: %v", c.userID[:8], err)
 				return
 			}
 		case <-ticker.C:

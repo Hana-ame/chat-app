@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 )
 
 // SSE godoc
@@ -45,6 +47,7 @@ func (s *Server) SSE(w http.ResponseWriter, r *http.Request) {
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
+		logutil.Error("SSE not supported for %s", userID[:8])
 		http.Error(w, "SSE not supported", http.StatusInternalServerError)
 		return
 	}
@@ -65,6 +68,8 @@ func (s *Server) SSE(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "id: 0\nevent: ready\ndata: %s\n\n", ready)
 	flusher.Flush()
 
+	logutil.Info("SSE connected: user=%s", userID[:8])
+
 	ch := make(chan []byte, 64)
 	s.Hub.SSERegister(userID, ch)
 	defer s.Hub.SSEUnregister(userID)
@@ -73,6 +78,7 @@ func (s *Server) SSE(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case <-notify:
+			logutil.Info("SSE disconnected: user=%s", userID[:8])
 			return
 		case data, ok := <-ch:
 			if !ok {

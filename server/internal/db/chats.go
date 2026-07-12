@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/Hana-ame/chat-app/server/internal/models"
 )
 
@@ -95,6 +96,8 @@ func (d *DB) CreateChat(ctx context.Context, typ, name, visibility, ownerID stri
 	}
 	defer tx.Rollback()
 
+	logutil.Debug("creating chat: type=%s name=%s owner=%s members=%v", typ, name, ownerID, memberIDs)
+
 	id := NewID()
 	color := PickColor(id)
 	if typ == "group" {
@@ -169,9 +172,11 @@ func (d *DB) GetChat(ctx context.Context, id string) (*models.Chat, error) {
 		id,
 	).Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.Visibility, &owner, &createdAt, &lastMsgAt, &lastMsgID, &pinnedMsg, &pinnedUpdAt, &memberCount)
 	if errors.Is(err, sql.ErrNoRows) {
+		logutil.Debug("chat not found: %s", id)
 		return nil, ErrNotFound
 	}
 	if err != nil {
+		logutil.Error("get chat %s: %v", id, err)
 		return nil, err
 	}
 	c.Name = name.String
@@ -200,6 +205,7 @@ func (d *DB) GetChat(ctx context.Context, id string) (*models.Chat, error) {
 			c.LastMessage = lastMsg
 		}
 	}
+	logutil.Debug("get chat %s: type=%s name=%s members=%d", id, c.Type, c.Name, c.MemberCount)
 	return &c, nil
 }
 
@@ -358,6 +364,7 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 	sort.SliceStable(out, func(i, j int) bool {
 		return out[i].LastMessageAt.After(out[j].LastMessageAt)
 	})
+	logutil.Debug("list chats for user %s: %d chats", userID, len(out))
 	return out, nil
 }
 
@@ -394,9 +401,11 @@ func (d *DB) AddChatMember(ctx context.Context, chatID, userID string) error {
 	}
 	n, _ := res.RowsAffected()
 	if n == 0 {
+		logutil.Debug("add member %s to %s: already member", userID, chatID)
 		return ErrConflict
 	}
 	_, err = d.ExecContext(ctx, `UPDATE chats SET member_count = member_count + 1 WHERE id = ?`, chatID)
+	logutil.Info("added member %s to chat %s", userID, chatID)
 	return err
 }
 
@@ -411,12 +420,20 @@ func (d *DB) RemoveChatMember(ctx context.Context, chatID, userID string) error 
 	n, _ := res.RowsAffected()
 	if n > 0 {
 		_, err = d.ExecContext(ctx, `UPDATE chats SET member_count = member_count - 1 WHERE id = ?`, chatID)
+		logutil.Info("removed member %s from chat %s", userID, chatID)
+	} else {
+		logutil.Debug("remove member %s from %s: not found", userID, chatID)
 	}
 	return err
 }
 
 func (d *DB) DeleteChat(ctx context.Context, chatID string) error {
 	_, err := d.ExecContext(ctx, `DELETE FROM chats WHERE id = ?`, chatID)
+	if err != nil {
+		logutil.Error("delete chat %s: %v", chatID, err)
+	} else {
+		logutil.Warn("deleted chat %s", chatID)
+	}
 	return err
 }
 
@@ -426,6 +443,9 @@ func (d *DB) RenameChat(ctx context.Context, chatID, name string) error {
 		return errors.New("name required")
 	}
 	_, err := d.ExecContext(ctx, `UPDATE chats SET name = ? WHERE id = ?`, name, chatID)
+	if err == nil {
+		logutil.Info("renamed chat %s to %q", chatID, name)
+	}
 	return err
 }
 

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -46,6 +47,7 @@ func (s *Server) AddReaction(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
+	logutil.Debug("reaction added: %s on %s by %s", emoji, msgID[:8], u.ID[:8])
 	updated, err := s.DB.GetMessage(r.Context(), msgID)
 	if err != nil {
 		w.Header().Set("X-Error", err.Error())

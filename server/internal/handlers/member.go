@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/Hana-ame/chat-app/server/internal/db"
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -78,12 +79,14 @@ func (s *Server) AddMember(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.DB.AddChatMember(r.Context(), id, req.UserID); err != nil {
 		if errors.Is(err, db.ErrConflict) {
+			logutil.Debug("add member conflict: user=%s chat=%s", req.UserID[:8], id[:8])
 			writeError(w, http.StatusConflict, "already_member", "")
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	logutil.Info("added member %s to chat %s (by %s)", req.UserID[:8], id[:8], u.ID[:8])
 	updated, err := s.DB.GetChat(r.Context(), id)
 	if err != nil {
 		w.Header().Set("X-Error", err.Error())
@@ -128,9 +131,11 @@ func (s *Server) RemoveMember(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err := s.DB.RemoveChatMember(r.Context(), id, target); err != nil {
+		logutil.Error("remove member %s from %s: %v", target[:8], id[:8], err)
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	logutil.Info("removed member %s from chat %s (by %s)", target[:8], id[:8], u.ID[:8])
 	if s.Hub != nil {
 		s.Hub.NotifyUserLeftChat(target, id)
 		updated, err := s.DB.GetChat(r.Context(), id)

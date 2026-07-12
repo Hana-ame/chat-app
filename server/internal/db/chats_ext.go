@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/Hana-ame/chat-app/server/internal/models"
 )
 
@@ -17,6 +19,7 @@ func (d *DB) ListPublicChats(ctx context.Context, page, limit int) ([]models.Cha
 		limit = 20
 	}
 	offset := (page - 1) * limit
+	logutil.Debug("list public chats: page=%d limit=%d", page, limit)
 	rows, err := d.QueryContext(ctx,
 		`SELECT c.id, c.type, c.name, c.icon_color, COALESCE(c.visibility,'private'), c.owner_id, c.created_at, c.last_message_at, c.pinned_message, c.pinned_updated_at,
 		        (SELECT COUNT(*) FROM chat_members WHERE chat_id = c.id) AS member_count,
@@ -78,6 +81,7 @@ func (d *DB) JoinChatByID(ctx context.Context, chatID, userID string) error {
 		return err
 	}
 	if visibility == "private" {
+		logutil.Warn("join private chat %s rejected for %s", chatID, userID)
 		return errors.New("chat is private, invitation required")
 	}
 	res, err := d.ExecContext(ctx,
@@ -90,6 +94,7 @@ func (d *DB) JoinChatByID(ctx context.Context, chatID, userID string) error {
 	n, _ := res.RowsAffected()
 	if n > 0 {
 		_, err = d.ExecContext(ctx, `UPDATE chats SET member_count = member_count + 1 WHERE id = ?`, chatID)
+		logutil.Info("user %s joined chat %s", userID, chatID)
 	}
 	return err
 }

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/Hana-ame/chat-app/server/internal/models"
 	"github.com/google/uuid"
 )
@@ -59,10 +60,12 @@ func (d *DB) CreateUser(ctx context.Context, email, username, passwordHash strin
 	)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
+			logutil.Warn("create user conflict: email=%s username=%s", email, username)
 			return nil, ErrConflict
 		}
 		return nil, err
 	}
+	logutil.Info("created user %s (username=%s email=%s)", id, username, email)
 	return d.GetUserByID(ctx, id)
 }
 

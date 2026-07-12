@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 )
 
 var allowedMime = map[string]bool{
@@ -102,9 +103,11 @@ func (s *Server) Upload(w http.ResponseWriter, r *http.Request) {
 	dst.Close()
 	if err != nil {
 		os.Remove(target)
+		logutil.Error("upload write failed: %v", err)
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	logutil.Info("file uploaded: %s (%d bytes, mime=%s) by user %s", key, written, mimeType, u.ID[:8])
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"id":        key,
 		"url":       "/uploads/" + key,

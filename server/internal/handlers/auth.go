@@ -6,6 +6,7 @@ import (
 
 	"github.com/Hana-ame/chat-app/server/internal/auth"
 	"github.com/Hana-ame/chat-app/server/internal/db"
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 )
 
 type registerReq struct {
@@ -53,12 +54,14 @@ func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
 	u, err := s.DB.CreateUser(r.Context(), email, username, hash)
 	if err != nil {
 		if errors.Is(err, db.ErrConflict) {
+			logutil.Warn("register conflict: email=%s username=%s", email, username)
 			writeError(w, http.StatusConflict, "already_taken", "email or username already taken")
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	logutil.Info("user registered: %s (username=%s email=%s)", u.ID[:8], username, email)
 	s.issueSession(w, r, u.ID)
 }
 
@@ -80,6 +83,7 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	u, hash, err := s.DB.GetUserByEmail(r.Context(), email)
 	if err != nil {
 		if errors.Is(err, db.ErrNotFound) {
+			logutil.Warn("login failed: email=%s (not found)", email)
 			writeError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 			return
 		}
@@ -87,9 +91,11 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := auth.VerifyPassword(hash, req.Password); err != nil {
+		logutil.Warn("login failed: email=%s (wrong password)", email)
 		writeError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 		return
 	}
+	logutil.Info("user logged in: %s (%s)", u.ID[:8], email)
 	s.issueSession(w, r, u.ID)
 }
 
@@ -187,6 +193,7 @@ func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
 	if err := s.DB.DeleteUserRefreshTokens(r.Context(), u.ID); err != nil {
 		w.Header().Set("X-Error", err.Error())
 	}
+	logutil.Info("user logged out: %s", u.ID[:8])
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

@@ -3,13 +3,14 @@ package auth
 import (
 	"crypto/rand"
 	"crypto/sha256"
-	"fmt"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -49,8 +50,10 @@ func (s *Service) IssueAccessToken(userID string) (string, time.Time, error) {
 	// The empty lock/unlock stubs were removed; kept as comment for context.
 	signed, err := tok.SignedString(s.jwtSecret)
 	if err != nil {
+		logutil.Error("issue access token: %v", err)
 		return "", time.Time{}, err
 	}
+	logutil.Debug("issued access token for user %s (expires %s)", userID, exp.Format(time.RFC3339))
 	return signed, exp, nil
 }
 
@@ -72,14 +75,18 @@ func (s *Service) ParseAccessToken(tokenStr string) (*AccessClaims, error) {
 	})
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {
+			logutil.Debug("token expired")
 			return nil, ErrTokenExpired
 		}
+		logutil.Warn("token parse failed: %v", err)
 		return nil, ErrTokenInvalid
 	}
 	if !tok.Valid {
+		logutil.Warn("token invalid (valid=false)")
 		return nil, ErrTokenInvalid
 	}
 	if claims.UserID == "" {
+		logutil.Warn("token missing user_id claim")
 		return nil, ErrTokenInvalid
 	}
 	return claims, nil
@@ -114,6 +121,7 @@ func VerifyPassword(hash, password string) error {
 		password = password[:72]
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
+		logutil.Debug("password verification failed")
 		return ErrInvalidCredentials
 	}
 	return nil
