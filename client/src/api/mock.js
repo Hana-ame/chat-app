@@ -132,6 +132,7 @@ export function mockGetChat(_token, id) {
 export function mockCreateChat(_token, name, memberIds, visibility) {
   const d = ensureData();
   const cu = currentUser();
+  const members = [{ id: cu.id, ...userById(cu.id), role: 'owner' }, ...(memberIds || []).map(id => ({ id, ...userById(id), role: '' }))];
   const newChat = {
     id: randid(),
     type: 'group',
@@ -142,7 +143,8 @@ export function mockCreateChat(_token, name, memberIds, visibility) {
     pinned: false,
     created_at: new Date().toISOString(),
     last_message_at: null,
-    members: [{ id: cu.id, ...userById(cu.id), role: 'owner' }, ...(memberIds || []).map(id => ({ id, ...userById(id), role: '' }))],
+    member_count: members.length,
+    members,
   };
   d.chats.unshift(newChat);
   if (_store) _store.getState().onChatUpdate(newChat);
@@ -162,6 +164,10 @@ export function mockCreateDM(_token, userId) {
   const cu = currentUser();
   const existing = d.chats.find(c => c.type === 'dm' && c.members?.some(m => m.id === userId));
   if (existing) return existing;
+  const dmMembers = [
+    { id: cu.id, ...userById(cu.id), role: '' },
+    { id: userId, ...userById(userId), role: '' },
+  ];
   const newDM = {
     id: randid(),
     type: 'dm',
@@ -170,10 +176,8 @@ export function mockCreateDM(_token, userId) {
     owner_id: '',
     visibility: 'private',
     created_at: new Date().toISOString(),
-    members: [
-      { id: cu.id, ...userById(cu.id), role: '' },
-      { id: userId, ...userById(userId), role: '' },
-    ],
+    member_count: dmMembers.length,
+    members: dmMembers,
   };
   d.chats.unshift(newDM);
   if (_store) _store.getState().onChatUpdate(newDM);
@@ -192,6 +196,7 @@ export function mockAddMember(_token, chatId, userId) {
   if (chat && !chat.members?.some(m => m.id === userId)) {
     if (!chat.members) chat.members = [];
     chat.members.push({ id: userId, ...userById(userId), role: '' });
+    chat.member_count = (chat.member_count || 0) + 1;
     updateMembersByChatId(chatId, [...chat.members]);
     if (_store) _store.getState().onChatUpdate({ id: chatId });
   }
@@ -203,6 +208,7 @@ export function mockRemoveMember(_token, chatId, userId) {
   const chat = d.chats.find(c => c.id === chatId);
   if (chat) {
     chat.members = chat.members?.filter(m => m.id !== userId);
+    chat.member_count = Math.max(0, (chat.member_count || 0) - 1);
     updateMembersByChatId(chatId, [...(chat.members || [])]);
     if (_store) _store.getState().onChatUpdate({ id: chatId });
   }
@@ -394,6 +400,7 @@ export function mockJoinChat(_token, chatId) {
   if (!chat.members?.some(m => m.id === cu.id)) {
     if (!chat.members) chat.members = [];
     chat.members.push({ id: cu.id, ...userById(cu.id), role: 'member' });
+    chat.member_count = (chat.member_count || 0) + 1;
     updateMembersByChatId(chatId, [...chat.members]);
     if (_store) _store.getState().onChatUpdate({ id: chatId });
   }

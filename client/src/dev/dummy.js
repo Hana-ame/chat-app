@@ -269,6 +269,7 @@ export function generateDummyData({ chatCount = 10, msgPerChat = 65 } = {}) {
       pinned: ci === 0,
       pinned_message: ci < 2 ? { id: mid(), content: '📌 Important notice for this channel!', pinned_at: timeAgo(3600) } : null,
       pinned_updated_at: ci < 2 ? timeAgo(1800) : null,
+      member_count: members.length,
       members,
       owner_id: ownerMember.id,
       created_at: timeAgo(86400 * (chatCount - ci)),
