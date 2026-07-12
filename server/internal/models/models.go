@@ -12,6 +12,7 @@ type User struct {
 	AvatarColor string    `json:"avatar_color"`
 	AvatarURL   string    `json:"avatar_url,omitempty"`
 	Status      string    `json:"status"`
+	Role        string    `json:"role,omitempty"`
 	LastSeen    time.Time `json:"last_seen,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
@@ -14,20 +14,15 @@ export default function MemberPanel({ chatId }) {
     if (!m.last_seen) return false;
     return Date.now() - new Date(m.last_seen).getTime() < ONLINE_THRESHOLD;
   };
-  const [members, setMembers] = useState([]);
   const [profileUser, setProfileUser] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
 
   const chat = chats.find(c => c.id === chatId);
-
-  useEffect(() => {
-    if (chat?.members) setMembers(chat.members);
-  }, [chat]);
+  const members = chat?.members || [];
 
   const removeUser = async (userId) => {
     if (!confirm('Kick this member?')) return;
     await api.removeMember(accessToken, chatId, userId);
-    setMembers(prev => prev.filter(m => m.id !== userId));
   };
 
   return (

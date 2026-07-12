@@ -3,7 +3,7 @@ import {
   mockListChats, mockListPublicChats, mockCreateChat, mockGetChat,
   mockDeleteChat, mockRenameChat, mockCreateDM, mockJoinChat,
   mockSetPinnedMessage, mockClearPinnedMessage,
-  mockAddMember, mockRemoveMember, mockSearchUsers, mockUpdateProfile,
+  mockAddMember, mockRemoveMember, mockListMembers, mockSearchUsers, mockUpdateProfile,
   mockListMessages, mockSendMessage, mockEditMessage, mockDeleteMessage,
   mockMarkRead, mockAddReaction, mockRemoveReaction, mockGetReactions,
   mockUpload, mockUploadAvatar,
@@ -106,6 +106,8 @@ export const api = {
   clearPinnedMessage: (token, chatId) => request('DELETE', '/api/chats/' + chatId + '/pin', token),
 
   // ── Members ──
+  listMembers: (token, chatId) =>
+    request('GET', '/api/chats/' + chatId + '/members', token),
   addMember: (token, chatId, userId) =>
     request('POST', '/api/chats/' + chatId + '/members', token, { user_id: userId }),
   removeMember: (token, chatId, userId) =>
@@ -215,6 +217,7 @@ const MOCKABLE = [
   ['joinChat', mockJoinChat],
   ['setPinnedMessage', mockSetPinnedMessage],
   ['clearPinnedMessage', mockClearPinnedMessage],
+  ['listMembers', mockListMembers],
   ['addMember', mockAddMember],
   ['removeMember', mockRemoveMember],
   ['listMessages', mockListMessages],

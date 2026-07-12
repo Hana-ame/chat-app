@@ -14,7 +14,7 @@ function getDMName(chat, currentUserId) {
 
 export default function ChatView({ chatId, onBack }) {
   const { user, accessToken } = useAuthStore();
-  const { chats, messages, loadMessages, subscribe, markRead, pinnedMessage, setPinnedMessage, clearPinnedMessage, markPinnedRead } = useChatStore();
+  const { chats, messages, loadMessages, loadMembers, subscribe, markRead, pinnedMessage, setPinnedMessage, clearPinnedMessage, markPinnedRead } = useChatStore();
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [noticeInput, setNoticeInput] = useState('');
@@ -30,6 +30,7 @@ export default function ChatView({ chatId, onBack }) {
     if (chatId && accessToken) {
       subscribe(chatId);
       loadMessages(accessToken, chatId);
+      loadMembers(accessToken, chatId);
       setHasMore(true);
     }
   }, [chatId, accessToken]);

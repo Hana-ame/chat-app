@@ -201,6 +201,13 @@ export function mockRemoveMember(_token, chatId, userId) {
   return { ok: true };
 }
 
+export function mockListMembers(_token, chatId) {
+  const d = ensureData();
+  const chat = d.chats.find(c => c.id === chatId);
+  const members = chat?.members || [];
+  return { members };
+}
+
 export function mockSearchUsers(_token, q) {
   const cu = currentUser();
   const results = MOCK_USERS
