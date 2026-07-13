@@ -72,6 +72,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       }
     } catch (e) { console.error('Leave chat error:', e); }
     setContextMenu(null);
+    setShowChatInfo(null);
   };
 
   const handleTogglePin = async (chatId) => {

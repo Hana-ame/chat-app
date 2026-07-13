@@ -12,12 +12,8 @@ function fmtTime(t) {
 export default function ChatInfoModal({ chatId, onClose }) {
   const { accessToken } = useAuthStore();
   const { chats } = useChatStore();
-  const chat = chats.find(c => c.id === chatId);
   const [members, setMembers] = useState([]);
   const [profileUser, setProfileUser] = useState(null);
-  if (!chat) return null;
-
-  const isAdmin = m => m.role === 'admin' || m.id === chat.owner_id;
 
   useEffect(() => {
     if (!chatId || !accessToken) return;
@@ -33,6 +29,11 @@ export default function ChatInfoModal({ chatId, onClose }) {
     const id = setInterval(fetch, 60000);
     return () => clearInterval(id);
   }, [chatId, accessToken]);
+
+  const chat = chats.find(c => c.id === chatId);
+  if (!chat) return null;
+
+  const isAdmin = m => m.role === 'admin' || m.id === chat.owner_id;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
