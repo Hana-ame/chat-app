@@ -45,6 +45,15 @@ export default function ChatView({ chatId, onBack }) {
     }
   }, [showNotice, chatId, pinnedMessage[chatId]]);
 
+  // Re-fetch chat if deleted from store by onChatDelete (e.g. after leave)
+  useEffect(() => {
+    if (!chat && chatId && accessToken) {
+      api.getChat(accessToken, chatId).then(data => {
+        if (data && data.id) useChatStore.getState().onChatUpdate(data);
+      }).catch(() => {});
+    }
+  }, [chatId, accessToken, chat]);
+
   const loadMore = useCallback(async () => {
     if (loading || !hasMore) return;
     setLoading(true);
