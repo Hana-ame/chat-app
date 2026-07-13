@@ -61,7 +61,6 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   };
 
   const handleLeaveChat = async (chatId) => {
-    if (!confirm('Leave this chat?')) return;
     try {
       await api.removeMember(accessToken, chatId, user.id);
       if (chatId === activeId) {
