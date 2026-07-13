@@ -69,7 +69,7 @@ jobs:
       - name: Build chatd (${{ matrix.goos }}/${{ matrix.goarch }})
         run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
-            -ldflags="-s -w" \
+            -ldflags="-s -w -X main.Version=build-${GITHUB_SHA::7}" \
             -o ../chatd-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }} \
             ./cmd/chatd/
       - uses: actions/upload-artifact@v4
