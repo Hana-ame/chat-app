@@ -110,11 +110,20 @@ func (d *DB) Migrate() error {
 }
 
 func (d *DB) ensureLastActiveColumn(ctx context.Context) error {
-	var cnt int
-	d.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM pragma_table_info('chat_members') WHERE name='last_visited_at'`).Scan(&cnt)
-	if cnt == 0 {
-		return nil // already last_active_at
+	var oldCnt, newCnt int
+	if err := d.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM pragma_table_info('chat_members') WHERE name='last_visited_at'`).Scan(&oldCnt); err != nil {
+		return fmt.Errorf("check last_visited_at: %w", err)
+	}
+	if err := d.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM pragma_table_info('chat_members') WHERE name='last_active_at'`).Scan(&newCnt); err != nil {
+		return fmt.Errorf("check last_active_at: %w", err)
+	}
+	if newCnt > 0 {
+		return nil // already correct
+	}
+	if oldCnt == 0 {
+		return fmt.Errorf("chat_members has neither last_visited_at nor last_active_at")
 	}
 	logutil.Info("migrating chat_members.last_visited_at → last_active_at")
 	if _, err := d.ExecContext(ctx,
