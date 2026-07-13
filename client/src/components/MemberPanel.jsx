@@ -18,9 +18,6 @@ export default function MemberPanel({ chatId }) {
   const [profileUser, setProfileUser] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
 
-  const chat = chats.find(c => c.id === chatId);
-  if (!chat) return null;
-
   useEffect(() => {
     if (!chatId || !accessToken) return;
     const fetch = () => {
@@ -34,6 +31,9 @@ export default function MemberPanel({ chatId }) {
     const id = setInterval(fetch, 60000);
     return () => clearInterval(id);
   }, [chatId, accessToken, mode, wsReady]);
+
+  const chat = chats.find(c => c.id === chatId);
+  if (!chat) return null;
 
   const removeUser = async (userId) => {
     if (!confirm('Kick this member?')) return;

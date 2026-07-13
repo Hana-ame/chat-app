@@ -64,8 +64,12 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     if (!confirm('Leave this chat?')) return;
     try {
       await api.removeMember(accessToken, chatId, user.id);
-      if (chatId === activeId) navigate('/', { replace: true });
-      useChatStore.getState().onChatDelete({ chat_id: chatId });
+      if (chatId === activeId) {
+        navigate('/', { replace: true });
+        queueMicrotask(() => useChatStore.getState().onChatDelete({ chat_id: chatId }));
+      } else {
+        useChatStore.getState().onChatDelete({ chat_id: chatId });
+      }
     } catch (e) { console.error('Leave chat error:', e); }
     setContextMenu(null);
   };

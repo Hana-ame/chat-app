@@ -122,6 +122,8 @@ export default function ChatView({ chatId, onBack }) {
     }
   };
 
+  if (!chat) return null;
+
   return (
     <div className="main">
       <div className="chat-header">
