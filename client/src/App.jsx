@@ -4,8 +4,10 @@ import { useAuthStore } from './store/auth'
 import LoginPage from './routes/LoginPage'
 import RegisterPage from './routes/RegisterPage'
 import ChatPage from './routes/ChatPage'
+import pkg from '../package.json'
 
 export default function App() {
+  useEffect(() => { console.log('chat-app version:', pkg.version) }, [])
   const token = useAuthStore((s) => s.accessToken)
   const logout = useAuthStore((s) => s.logout)
   const navigate = useNavigate()

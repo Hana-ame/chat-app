@@ -28,6 +28,7 @@ type Server struct {
 	DB        *db.DB
 	Auth      *auth.Service
 	Hub       *ws.Hub
+	Version   string
 	refreshMu sync.Mutex
 }
 
@@ -44,6 +45,10 @@ func userFrom(ctx context.Context) *models.User {
 func tokenFrom(ctx context.Context) string {
 	v, _ := ctx.Value(ctxKeyToken).(string)
 	return v
+}
+
+func (s *Server) VersionHandler(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{"version": s.Version})
 }
 
 func writeJSON(w http.ResponseWriter, status int, body interface{}) {

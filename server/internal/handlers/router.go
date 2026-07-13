@@ -76,6 +76,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 		r.Use(chimid.Timeout(30 * time.Second))
 		r.Use(httprate.LimitByIP(120, 1*time.Minute))
 
+		r.Get("/version", s.VersionHandler)
 		r.With(httprate.LimitByIP(10, 1*time.Minute)).Post("/auth/login", s.Login)
 		r.With(httprate.LimitByIP(5, 1*time.Minute)).Post("/auth/register", s.Register)
 		r.Post("/auth/refresh", s.Refresh)

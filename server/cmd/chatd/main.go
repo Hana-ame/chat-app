@@ -27,9 +27,13 @@ import (
 	_ "github.com/Hana-ame/chat-app/server/docs/swagger"
 )
 
+// Version is set at build time via -ldflags -X main.Version=build-xxxxx.
+// Default "dev" for local builds.
+var Version = "dev"
+
 func main() {
 	cfg := config.Load()
-	logutil.Info("chatd: starting (db=%s addr=%s)", cfg.DBPath, cfg.Addr)
+	logutil.Info("chatd: %s starting (db=%s addr=%s)", Version, cfg.DBPath, cfg.Addr)
 
 	database, err := db.Open(cfg.DBPath)
 	if err != nil {
@@ -41,6 +45,7 @@ func main() {
 	hub := ws.NewHub(database)
 	gateway := ws.NewGateway(hub, database, authSvc)
 	srv := handlers.New(cfg, database, authSvc, hub)
+	srv.Version = Version
 	r := srv.Router(gateway)
 
 	if err := os.MkdirAll(cfg.UploadDir, 0o755); err != nil { // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
