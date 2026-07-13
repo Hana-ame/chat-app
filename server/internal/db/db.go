@@ -41,6 +41,14 @@ func Open(path string) (*DB, error) {
 	return d, nil
 }
 
+func isIgnorableMigrateErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "no such column") || strings.Contains(msg, "duplicate column name")
+}
+
 func (d *DB) Migrate() error {
 	if _, err := d.ExecContext(context.Background(),
 		`CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -87,7 +95,11 @@ func (d *DB) Migrate() error {
 			return fmt.Errorf("read %s: %w", m.name, err)
 		}
 		if _, err := d.ExecContext(context.Background(), string(b)); err != nil {
-			return fmt.Errorf("apply %s: %w", m.name, err)
+			if isIgnorableMigrateErr(err) {
+				logutil.Debug("ignored error in %s: %v", m.name, err)
+			} else {
+				return fmt.Errorf("apply %s: %w", m.name, err)
+			}
 		}
 		if _, err := d.ExecContext(context.Background(),
 			`INSERT INTO schema_migrations (version) VALUES (?)`, m.version); err != nil {
