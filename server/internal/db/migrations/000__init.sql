@@ -88,6 +88,9 @@ CREATE TABLE IF NOT EXISTS chat_members (
 
 CREATE INDEX IF NOT EXISTS idx_chat_members_user ON chat_members(user_id);
 
+-- Rename column for existing DBs that still have the old name.
+ALTER TABLE chat_members RENAME COLUMN last_visited_at TO last_active_at;
+
 -- ── Messages ─────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS messages (

@@ -14,8 +14,13 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func isDupColumnErr(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "duplicate column name")
+func isIgnorableAlterErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "duplicate column name") ||
+		strings.Contains(msg, "no such column")
 }
 
 //go:embed migrations/*.sql
@@ -77,7 +82,7 @@ func (d *DB) Migrate() error {
 				return fmt.Errorf("read %s: %w", n, err)
 			}
 			if _, err := d.ExecContext(context.Background(), string(b)); err != nil {
-				if !isDupColumnErr(err) {
+				if !isIgnorableAlterErr(err) {
 					return fmt.Errorf("apply %s: %w", n, err)
 				}
 			}
