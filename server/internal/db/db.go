@@ -6,27 +6,16 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
-	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	_ "modernc.org/sqlite"
 )
 
-func isIgnorableAlterErr(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	return strings.Contains(msg, "duplicate column name") ||
-		strings.Contains(msg, "no such column")
-}
-
 //go:embed migrations/*.sql
 var migrationFS embed.FS
-
-var versionRe = regexp.MustCompile(`^V(\d{3})__`)
 
 type DB struct {
 	*sql.DB
@@ -65,51 +54,51 @@ func (d *DB) Migrate() error {
 	if err != nil {
 		return err
 	}
-	var names []string
-	for _, e := range entries {
-		if strings.HasSuffix(e.Name(), ".sql") {
-			names = append(names, e.Name())
-		}
-	}
-	sort.Strings(names)
 
-	for _, n := range names {
-		m := versionRe.FindStringSubmatch(n)
-		if m == nil {
-			// non-versioned (init.sql) — run idempotently
-			b, err := migrationFS.ReadFile("migrations/" + n)
-			if err != nil {
-				return fmt.Errorf("read %s: %w", n, err)
-			}
-			if _, err := d.ExecContext(context.Background(), string(b)); err != nil {
-				if !isIgnorableAlterErr(err) {
-					return fmt.Errorf("apply %s: %w", n, err)
-				}
-			}
-			logutil.Debug("applied base migration: %s", n)
+	type migration struct {
+		version int
+		name    string
+	}
+	var migrations []migration
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".sql") {
 			continue
 		}
+		v, err := strconv.Atoi(e.Name()[:3])
+		if err != nil {
+			continue
+		}
+		migrations = append(migrations, migration{v, e.Name()})
+	}
+	sort.Slice(migrations, func(i, j int) bool {
+		return migrations[i].version < migrations[j].version
+	})
 
-		version := m[1]
+	for _, m := range migrations {
 		var exists int
 		d.QueryRowContext(context.Background(),
-			`SELECT 1 FROM schema_migrations WHERE version = ?`, version).Scan(&exists)
+			`SELECT 1 FROM schema_migrations WHERE version = ?`, m.version).Scan(&exists)
 		if exists == 1 {
 			continue
 		}
 
-		b, err := migrationFS.ReadFile("migrations/" + n)
+		b, err := migrationFS.ReadFile("migrations/" + m.name)
 		if err != nil {
-			return fmt.Errorf("read %s: %w", n, err)
+			return fmt.Errorf("read %s: %w", m.name, err)
 		}
 		if _, err := d.ExecContext(context.Background(), string(b)); err != nil {
-			return fmt.Errorf("apply %s: %w", n, err)
+			return fmt.Errorf("apply %s: %w", m.name, err)
 		}
 		if _, err := d.ExecContext(context.Background(),
-			`INSERT INTO schema_migrations (version) VALUES (?)`, version); err != nil {
-			return fmt.Errorf("record %s: %w", n, err)
+			`INSERT INTO schema_migrations (version) VALUES (?)`, m.version); err != nil {
+			return fmt.Errorf("record %s: %w", m.name, err)
 		}
-		logutil.Info("applied migration: %s", n)
+		logutil.Info("applied migration: %s", m.name)
 	}
 	return nil
+}
+
+// IsDupColumnErr checks if the error is a duplicate column error.
+func IsDupColumnErr(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "duplicate column name")
 }
