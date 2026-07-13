@@ -84,52 +84,44 @@ func (d *DB) Migrate() error {
 			continue
 		}
 
-		if err := d.applyMigration(ctx, m); err != nil {
-			return err
+		b, err := migrationFS.ReadFile("migrations/" + m.name)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", m.name, err)
 		}
+		if _, err := d.ExecContext(ctx, string(b)); err != nil {
+			return fmt.Errorf("apply %s: %w", m.name, err)
+		}
+		if _, err := d.ExecContext(ctx,
+			`INSERT INTO schema_migrations (version) VALUES (?)`, m.version); err != nil {
+			return fmt.Errorf("record %s: %w", m.name, err)
+		}
+		logutil.Info("applied migration: %s", m.name)
 	}
+
+	// Unversioned startup fix: rename last_visited_at → last_active_at if needed.
+	// Runs every startup regardless of schema_migrations, because ensure_db()
+	// on the VPS may have bootstrapped the DB with last_visited_at and pre-recorded
+	// version 1, causing the versioned migration 001 to be skipped.
+	if err := d.ensureLastActiveColumn(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func (d *DB) applyMigration(ctx context.Context, m migration) error {
-	// Migration 001: rename last_visited_at → last_active_at.
-	// On fresh DBs (000__init.sql already uses last_active_at) the
-	// column doesn't exist → skip but still record version.
-	if m.version == 1 {
-		var cnt int
-		d.QueryRowContext(ctx,
-			`SELECT COUNT(*) FROM pragma_table_info('chat_members') WHERE name='last_visited_at'`).Scan(&cnt)
-		if cnt == 0 {
-			logutil.Debug("skip %s: last_visited_at not found", m.name)
-			if _, err := d.ExecContext(ctx,
-				`INSERT INTO schema_migrations (version) VALUES (?)`, m.version); err != nil {
-				return fmt.Errorf("record %s: %w", m.name, err)
-			}
-			logutil.Info("applied migration: %s (check-ok)", m.name)
-			return nil
-		}
+func (d *DB) ensureLastActiveColumn(ctx context.Context) error {
+	var cnt int
+	d.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM pragma_table_info('chat_members') WHERE name='last_visited_at'`).Scan(&cnt)
+	if cnt == 0 {
+		return nil // already last_active_at
 	}
-
-	b, err := migrationFS.ReadFile("migrations/" + m.name)
-	if err != nil {
-		return fmt.Errorf("read %s: %w", m.name, err)
-	}
-	if _, err := d.ExecContext(ctx, string(b)); err != nil {
-		return fmt.Errorf("apply %s: %w", m.name, err)
-	}
+	logutil.Info("migrating chat_members.last_visited_at → last_active_at")
 	if _, err := d.ExecContext(ctx,
-		`INSERT INTO schema_migrations (version) VALUES (?)`, m.version); err != nil {
-		return fmt.Errorf("record %s: %w", m.name, err)
+		`ALTER TABLE chat_members RENAME COLUMN last_visited_at TO last_active_at`); err != nil {
+		return fmt.Errorf("rename last_visited_at: %w", err)
 	}
-	logutil.Info("applied migration: %s", m.name)
+	logutil.Info("chat_members.last_visited_at → last_active_at done")
 	return nil
-}
-
-func isIgnorableMigrateErr(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	return strings.Contains(msg, "no such column") || strings.Contains(msg, "duplicate column name")
 }
 
