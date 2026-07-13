@@ -21,6 +21,11 @@ type DB struct {
 	*sql.DB
 }
 
+type migration struct {
+	version int
+	name    string
+}
+
 func Open(path string) (*DB, error) {
 	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(ON)&_time_format=sqlite", path)
 	conn, err := sql.Open("sqlite", dsn)
@@ -41,16 +46,9 @@ func Open(path string) (*DB, error) {
 	return d, nil
 }
 
-func isIgnorableMigrateErr(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	return strings.Contains(msg, "no such column") || strings.Contains(msg, "duplicate column name")
-}
-
 func (d *DB) Migrate() error {
-	if _, err := d.ExecContext(context.Background(),
+	ctx := context.Background()
+	if _, err := d.ExecContext(ctx,
 		`CREATE TABLE IF NOT EXISTS schema_migrations (
 			version INTEGER PRIMARY KEY,
 			applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
@@ -63,10 +61,6 @@ func (d *DB) Migrate() error {
 		return err
 	}
 
-	type migration struct {
-		version int
-		name    string
-	}
 	var migrations []migration
 	for _, e := range entries {
 		if !strings.HasSuffix(e.Name(), ".sql") {
@@ -84,29 +78,58 @@ func (d *DB) Migrate() error {
 
 	for _, m := range migrations {
 		var exists int
-		d.QueryRowContext(context.Background(),
+		d.QueryRowContext(ctx,
 			`SELECT 1 FROM schema_migrations WHERE version = ?`, m.version).Scan(&exists)
 		if exists == 1 {
 			continue
 		}
 
-		b, err := migrationFS.ReadFile("migrations/" + m.name)
-		if err != nil {
-			return fmt.Errorf("read %s: %w", m.name, err)
+		if err := d.applyMigration(ctx, m); err != nil {
+			return err
 		}
-		if _, err := d.ExecContext(context.Background(), string(b)); err != nil {
-			if isIgnorableMigrateErr(err) {
-				logutil.Debug("ignored error in %s: %v", m.name, err)
-			} else {
-				return fmt.Errorf("apply %s: %w", m.name, err)
-			}
-		}
-		if _, err := d.ExecContext(context.Background(),
-			`INSERT INTO schema_migrations (version) VALUES (?)`, m.version); err != nil {
-			return fmt.Errorf("record %s: %w", m.name, err)
-		}
-		logutil.Info("applied migration: %s", m.name)
 	}
 	return nil
+}
+
+func (d *DB) applyMigration(ctx context.Context, m migration) error {
+	// Migration 001: rename last_visited_at → last_active_at.
+	// On fresh DBs (000__init.sql already uses last_active_at) the
+	// column doesn't exist → skip but still record version.
+	if m.version == 1 {
+		var cnt int
+		d.QueryRowContext(ctx,
+			`SELECT COUNT(*) FROM pragma_table_info('chat_members') WHERE name='last_visited_at'`).Scan(&cnt)
+		if cnt == 0 {
+			logutil.Debug("skip %s: last_visited_at not found", m.name)
+			if _, err := d.ExecContext(ctx,
+				`INSERT INTO schema_migrations (version) VALUES (?)`, m.version); err != nil {
+				return fmt.Errorf("record %s: %w", m.name, err)
+			}
+			logutil.Info("applied migration: %s (check-ok)", m.name)
+			return nil
+		}
+	}
+
+	b, err := migrationFS.ReadFile("migrations/" + m.name)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", m.name, err)
+	}
+	if _, err := d.ExecContext(ctx, string(b)); err != nil {
+		return fmt.Errorf("apply %s: %w", m.name, err)
+	}
+	if _, err := d.ExecContext(ctx,
+		`INSERT INTO schema_migrations (version) VALUES (?)`, m.version); err != nil {
+		return fmt.Errorf("record %s: %w", m.name, err)
+	}
+	logutil.Info("applied migration: %s", m.name)
+	return nil
+}
+
+func isIgnorableMigrateErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "no such column") || strings.Contains(msg, "duplicate column name")
 }
 
