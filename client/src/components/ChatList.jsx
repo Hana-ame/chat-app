@@ -71,7 +71,10 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   };
 
   const handleTogglePin = async (chatId) => {
-    try { await api.togglePin(accessToken, chatId); } catch (e) { console.error('Toggle pin error:', e); }
+    try {
+      await api.togglePin(accessToken, chatId);
+      useChatStore.getState().onChatUpdate({ id: chatId, pinned: !useChatStore.getState().chats.find(c => c.id === chatId)?.pinned });
+    } catch (e) { console.error('Toggle pin error:', e); }
     setContextMenu(null);
   };
 
