@@ -57,17 +57,13 @@ CREATE TABLE IF NOT EXISTS chats (
     created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     last_message_at TEXT,
     last_message_id TEXT,
-    member_count    INTEGER NOT NULL DEFAULT 0
+    member_count    INTEGER NOT NULL DEFAULT 0,
+    visibility      TEXT NOT NULL DEFAULT 'private',
+    pinned_message  TEXT NOT NULL DEFAULT '',
+    pinned_updated_at TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_chats_last_msg ON chats(last_message_at DESC);
-
-ALTER TABLE chats ADD COLUMN visibility TEXT NOT NULL DEFAULT 'private';
-
--- pinned_message: text content of the pinned message, set by POST/PATCH /pin
--- pinned_updated_at: timestamp when pinned_message was last set or updated
-ALTER TABLE chats ADD COLUMN pinned_message TEXT NOT NULL DEFAULT '';
-ALTER TABLE chats ADD COLUMN pinned_updated_at TEXT;
 
 -- ── Chat Members ─────────────────────────────────────────────────────────────
 
@@ -91,31 +87,23 @@ CREATE INDEX IF NOT EXISTS idx_chat_members_user ON chat_members(user_id);
 -- ── Messages ─────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS messages (
-    id         TEXT PRIMARY KEY,
-    chat_id    TEXT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
-    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    content    TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-    edited_at  TEXT
+    id               TEXT PRIMARY KEY,
+    chat_id          TEXT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+    user_id          TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    content          TEXT NOT NULL DEFAULT '',
+    created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    edited_at        TEXT,
+    attachment_count INTEGER NOT NULL DEFAULT 0,
+    mention_count    INTEGER NOT NULL DEFAULT 0,
+    reaction_count   INTEGER NOT NULL DEFAULT 0,
+    deleted_at       TEXT,
+    reactions        TEXT NOT NULL DEFAULT '[]',
+    attachments      TEXT NOT NULL DEFAULT '[]',
+    mentions         TEXT NOT NULL DEFAULT '[]'
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id, id);
 CREATE INDEX IF NOT EXISTS idx_messages_chat_created ON messages(chat_id, created_at DESC);
-
--- Count columns avoid N+1 subqueries for chat-list previews.
-ALTER TABLE messages ADD COLUMN attachment_count INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE messages ADD COLUMN mention_count INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE messages ADD COLUMN reaction_count INTEGER NOT NULL DEFAULT 0;
-
--- Soft delete: deleted_at IS NULL means not deleted; set to timestamp to mark.
-ALTER TABLE messages ADD COLUMN deleted_at TEXT;
-
--- Aggregated reactions JSON array, synced on every add/remove reaction.
--- Format: [{"emoji":"👍","count":2}]
--- Avoids subquery on the reactions table for the common read path.
-ALTER TABLE messages ADD COLUMN reactions TEXT NOT NULL DEFAULT '[]';
-ALTER TABLE messages ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]';
-ALTER TABLE messages ADD COLUMN mentions TEXT NOT NULL DEFAULT '[]';
 
 -- ── Attachments ──────────────────────────────────────────────────────────────
 
@@ -158,12 +146,8 @@ CREATE INDEX IF NOT EXISTS idx_mentions_user ON mentions(user_id);
 -- Design notes
 -- ═══════════════════════════════════════════════════════════════════════════════
 --
--- Why ALTER TABLE after CREATE?
---   The schema was originally built with incremental migrations during
---   development. Since the app has never shipped, we collapse everything into
---   a single init file. We keep ALTER TABLE for columns added later so that
---   this file stays structurally identical to the migration sequence, making
---   it easy to verify correctness.
+-- All columns are defined inline in CREATE TABLE (no ALTER TABLE ADD COLUMN) so
+-- the file is idempotent on existing DBs where tables already exist.
 --
 -- Why a reactions JSON cache column?
 --   Reading reactions requires GROUP BY + aggregation across the reactions

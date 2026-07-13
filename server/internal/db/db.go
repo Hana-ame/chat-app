@@ -98,7 +98,3 @@ func (d *DB) Migrate() error {
 	return nil
 }
 
-// IsDupColumnErr checks if the error is a duplicate column error.
-func IsDupColumnErr(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "duplicate column name")
-}
