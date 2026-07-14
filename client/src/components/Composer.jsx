@@ -3,6 +3,24 @@ import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 
+function compressImage(file) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob((blob) => {
+        const name = file.name.replace(/\.[^.]+$/, '') + '.webp';
+        resolve(new File([blob], name, { type: 'image/webp' }));
+      }, 'image/webp', 0.75);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 export default function Composer({ chatId }) {
   const { accessToken } = useAuthStore();
   const { sendMessage, sendTyping } = useChatStore();
@@ -46,20 +64,41 @@ export default function Composer({ chatId }) {
     handleTyping();
   };
 
-  const handleFile = async (e) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  const uploadFiles = async (files) => {
     setUploading(true);
     try {
       const results = [];
       for (const f of files) {
-        const data = await api.upload(f);
+        const file = f.type?.startsWith('image/') ? await compressImage(f) : f;
+        const data = await api.upload(file);
         results.push({ filename: data.filename, mime_type: data.mime_type, size: data.size, url: data.url });
       }
       setAttachments(prev => [...prev, ...results]);
     } catch (err) { alert(err.message || 'Upload failed'); }
     setUploading(false);
+  };
+
+  const handleFile = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    await uploadFiles(files);
     fileInput.current.value = '';
+  };
+
+  const handlePaste = async (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const imageFiles = [];
+    for (const item of items) {
+      if (item.type?.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) imageFiles.push(file);
+      }
+    }
+    if (imageFiles.length) {
+      e.preventDefault();
+      await uploadFiles(imageFiles);
+    }
   };
 
   return (
@@ -80,6 +119,7 @@ export default function Composer({ chatId }) {
             ref={textRef}
             onChange={e => { setText(e.target.value); handleTyping(); autoResize(); }}
             onKeyDown={handleKey}
+            onPaste={handlePaste}
             style={{flex:1,resize:'none',overflow:'hidden',minHeight:36}} />
           <button className="btn-ghost" style={{padding:'4px 10px',lineHeight:0}}
             disabled={(!text.trim() && attachments.length === 0) || uploading}
