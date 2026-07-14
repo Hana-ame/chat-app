@@ -2,7 +2,7 @@ export default function CreateGroupForm({ name, visibility, onVisibilityChange, 
   return (
     <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
       <input className="input-field" placeholder="Group name..." value={name} autoFocus
-        onChange={onNameChange} onKeyDown={onNameKeyDown} />
+        onChange={onNameChange} onKeyDown={onNameKeyDown} style={{ fontSize: 14, padding: '8px 10px' }} />
       <div style={{ display: 'flex', gap: 6, marginTop: 6, fontSize: 12 }}>
         {['private', 'unlisted', 'public'].map(v => (
           <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
