@@ -31,6 +31,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const [showPublicList, setShowPublicList] = useState(false);
   const allPublicChats = useRef(null);
   const searchInputRef = useRef(null);
+  const searchTermRef = useRef('');
   const [contextMenu, setContextMenu] = useState(null); // { chatId, x, y }
   const [showSettings, setShowSettings] = useState(false);
   const [showChatInfo, setShowChatInfo] = useState(null); // chatId
@@ -87,11 +88,8 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
 
   const loadAllPublicChats = async () => {
     if (allPublicChats.current) {
-      setPublicResults(
-        chatSearch.trim()
-          ? filterPublicChats(allPublicChats.current, chatSearch)
-          : allPublicChats.current
-      );
+      const q = searchTermRef.current;
+      setPublicResults(q.trim() ? filterPublicChats(allPublicChats.current, q) : allPublicChats.current);
       setShowPublicList(true);
       return;
     }
@@ -99,11 +97,8 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     try {
       const data = await api.listPublicChats(accessToken);
       allPublicChats.current = data.chats || [];
-      setPublicResults(
-        chatSearch.trim()
-          ? filterPublicChats(allPublicChats.current, chatSearch)
-          : allPublicChats.current
-      );
+      const q = searchTermRef.current;
+      setPublicResults(q.trim() ? filterPublicChats(allPublicChats.current, q) : allPublicChats.current);
       setShowPublicList(true);
     } catch (e) { console.error('Load public chats error:', e); }
     setPublicSearching(false);
@@ -119,8 +114,9 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   };
 
   const handleSearchChange = (q) => {
+    searchTermRef.current = q;
     setChatSearch(q);
-    if (showPublicList && allPublicChats.current) {
+    if (allPublicChats.current) {
       setPublicResults(q.trim() ? filterPublicChats(allPublicChats.current, q) : allPublicChats.current);
     }
   };
@@ -142,6 +138,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     try {
       await api.joinChat(accessToken, chatId);
       setChatSearch('');
+      searchTermRef.current = '';
       setShowPublicList(false);
       setPublicResults(null);
       const data = await api.listChats(accessToken);
