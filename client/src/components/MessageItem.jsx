@@ -44,10 +44,9 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
     const rect = btn.getBoundingClientRect();
     const spaceAbove = rect.top;
     const spaceRight = window.innerWidth - rect.right;
-    const pickerH = 200;
     setPickerPos({
       left: spaceRight < 240 ? Math.max(0, window.innerWidth - 240) : rect.left,
-      top: spaceAbove > pickerH ? rect.top - pickerH : rect.bottom,
+      top: spaceAbove > 100 ? rect.top - 8 : rect.bottom,
     });
     const handler = (e) => {
       if (pickerRef.current && !pickerRef.current.contains(e.target)) {
