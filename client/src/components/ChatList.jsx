@@ -185,45 +185,46 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
         </div>
       </div>
 
-      {!showCreate && (
-        <div className="sidebar-search-row">
-          <input className="input-field" placeholder="Search chats..." value={chatSearch}
-            ref={searchInputRef}
-            onFocus={handleSearchFocus}
-            onBlur={handleSearchBlur}
-            onChange={e => handleSearchChange(e.target.value)}
-            style={{ fontSize: 14, padding: '8px 10px' }} />
-          {joinAction && (
-            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-              {joinAction === 'join' && (() => {
-                const id = chatSearch.trim().replace(/^join\s+/i, '');
-                return (
-                  <button className="btn" style={{ flex: 1, padding: '8px 12px', fontSize: 14, background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius)' }}
-                    onClick={() => joinChatByID(id)}>
-                    Join #{id}
-                  </button>
-                );
-              })()}
-              {joinAction === 'create' && (
-                <button className="btn" style={{ flex: 1, padding: '8px 12px', fontSize: 14, background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius)' }}
-                  onClick={() => { setNewChatName(chatSearch.trim()); setShowCreate(true); }}>
-                  Create &ldquo;{chatSearch.trim()}&rdquo;
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      <ScrollArea className="sidebar-body">
-        {showCreate && (
+      <div className="sidebar-search-row">
+        {showCreate ? (
           <CreateGroupForm name={newChatName} visibility={newChatVisibility}
             onVisibilityChange={setNewChatVisibility}
             onNameChange={e => setNewChatName(e.target.value)}
             onNameKeyDown={e => e.key === 'Enter' && handleCreate()}
             onCreate={handleCreate}
             onCancel={() => setShowCreate(false)} />
+        ) : (
+          <>
+            <input className="input-field" placeholder="Search chats..." value={chatSearch}
+              ref={searchInputRef}
+              onFocus={handleSearchFocus}
+              onBlur={handleSearchBlur}
+              onChange={e => handleSearchChange(e.target.value)}
+              style={{ fontSize: 14, padding: '8px 10px' }} />
+            {joinAction && (
+              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                {joinAction === 'join' && (() => {
+                  const id = chatSearch.trim().replace(/^join\s+/i, '');
+                  return (
+                    <button className="btn" style={{ flex: 1, padding: '8px 12px', fontSize: 14, background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius)' }}
+                      onClick={() => joinChatByID(id)}>
+                      Join #{id}
+                    </button>
+                  );
+                })()}
+                {joinAction === 'create' && (
+                  <button className="btn" style={{ flex: 1, padding: '8px 12px', fontSize: 14, background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius)' }}
+                    onClick={() => { setNewChatName(chatSearch.trim()); setShowCreate(true); }}>
+                    Create &ldquo;{chatSearch.trim()}&rdquo;
+                  </button>
+                )}
+              </div>
+            )}
+          </>
         )}
+      </div>
+
+      <ScrollArea className="sidebar-body">
         {showPublicList && <PublicChannelList results={publicResults} searching={publicSearching} onJoin={handleJoinPublic} />}
 
         {!showPublicList && (uuidDM ? (

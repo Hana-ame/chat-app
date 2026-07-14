@@ -1,6 +1,6 @@
 export default function CreateGroupForm({ name, visibility, onVisibilityChange, onNameChange, onNameKeyDown, onCreate, onCancel }) {
   return (
-    <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
+    <div>
       <input className="input-field" placeholder="Group name..." value={name} autoFocus
         onChange={onNameChange} onKeyDown={onNameKeyDown} style={{ fontSize: 14, padding: '8px 10px' }} />
       <div style={{ display: 'flex', gap: 6, marginTop: 6, fontSize: 12 }}>
