@@ -27,7 +27,8 @@ export const useAuthStore = create((set, get) => {
         storage.set(payload);
         set({ ...payload, loading: false });
       } catch (e) {
-        set({ loading: false, error: e.message || 'Registration failed' });
+        storage.clear();
+        set({ user: null, accessToken: null, loading: false, error: e.message || 'Registration failed' });
         throw e;
       }
     },
@@ -40,7 +41,8 @@ export const useAuthStore = create((set, get) => {
         storage.set(payload);
         set({ ...payload, loading: false });
       } catch (e) {
-        set({ loading: false, error: e.message || 'Login failed' });
+        storage.clear();
+        set({ user: null, accessToken: null, loading: false, error: e.message || 'Login failed' });
         throw e;
       }
     },
