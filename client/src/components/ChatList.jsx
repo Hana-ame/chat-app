@@ -106,7 +106,10 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
 
   const filterPublicChats = (list, q) => {
     const lower = q.toLowerCase();
-    return list.filter(c => c.name?.toLowerCase().includes(lower) || c.id.toLowerCase().includes(lower));
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(q)) {
+      return list.filter(c => c.id === q);
+    }
+    return list.filter(c => c.name?.toLowerCase().includes(lower));
   };
 
   const handleSearchFocus = () => {
