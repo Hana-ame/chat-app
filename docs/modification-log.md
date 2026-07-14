@@ -3390,9 +3390,24 @@ if n > 0 {
 - **修复**: `lastActiveAt.UTC().Format(time.RFC3339Nano)` 统一转 UTC
 - **文件**: `server/internal/db/messages.go:272`
 
+#### Bug 7: 快速切换聊天显示错乱
+- **现象**: 快速点击不同聊天，之前的 chat 的 fetch 完成后覆盖当前聊天显示
+- **根因**: `loadMessages` 用 `data.messages` 直接替换 `s.messages`，旧 chat 的异步响应晚于新 chat 到达时将 store 覆盖
+- **修复**: 引入 `_msgLoadId` 递增计数器，`loadMessages` 完成后检查 `_msgLoadId` 是否匹配，不匹配则丢弃结果
+- **文件**: `client/src/store/chat.js`
+
+#### Bug 8: 登录失败后 refresh/logout 无限循环
+- **现象**: 登录失败（密码错误）后控制台不断输出 refresh 400 + logout 401
+- **根因**: `api.logout()` 调用时 token 已 null → 服务器 401 → `request()` 自动尝试 refresh → 400 → 再次 触发 `auth:unauthorized` → 循环
+- **修复**:
+  - `logout()` 检查 `accessToken` 存在才调用 `api.logout()`
+  - `request()` 对 `/api/auth/logout` 路径跳过 auto-refresh
+  - App.jsx `auth:unauthorized` 处理器的 guard 不再用 setTimeout 重置（一次性守卫）防止二次触发
+- **文件**: `client/src/store/auth.js`, `client/src/api/client.js`, `client/src/App.jsx`
+
 ### 验证
 - Go all tests: ✅
-- CI: 两次构建（一次失败 `go vet`、一次成功）→ `go vet` 修复 db_test.go + messages_test.go 旧签名后 CI 重新触发
-- CI 构建 `build-024cf14` 等待部署至 `chat.moonchan.xyz`
+- Client build: ✅
+- 推送 `41b0cfd`，CI 构建中
 
 ---

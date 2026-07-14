@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
@@ -28,6 +28,9 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const [chatSearch, setChatSearch] = useState('');
   const [publicResults, setPublicResults] = useState(null);
   const [publicSearching, setPublicSearching] = useState(false);
+  const [showPublicList, setShowPublicList] = useState(false);
+  const allPublicChats = useRef(null);
+  const searchInputRef = useRef(null);
   const [contextMenu, setContextMenu] = useState(null); // { chatId, x, y }
   const [showSettings, setShowSettings] = useState(false);
   const [showChatInfo, setShowChatInfo] = useState(null); // chatId
@@ -82,17 +85,47 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     setContextMenu(null);
   };
 
-  const searchPublic = async (q) => {
-    if (!q.trim()) { setPublicResults(null); setPublicSearching(false); return; }
+  const loadAllPublicChats = async () => {
+    if (allPublicChats.current) {
+      setPublicResults(
+        chatSearch.trim()
+          ? filterPublicChats(allPublicChats.current, chatSearch)
+          : allPublicChats.current
+      );
+      setShowPublicList(true);
+      return;
+    }
     setPublicSearching(true);
     try {
       const data = await api.listPublicChats(accessToken);
-      const all = data.chats || [];
-      const lower = q.toLowerCase();
-      const matched = all.filter(c => c.name?.toLowerCase().includes(lower) || c.id.toLowerCase().includes(lower));
-      setPublicResults(matched);
-    } catch (e) { console.error('Search public chats error:', e); }
+      allPublicChats.current = data.chats || [];
+      setPublicResults(
+        chatSearch.trim()
+          ? filterPublicChats(allPublicChats.current, chatSearch)
+          : allPublicChats.current
+      );
+      setShowPublicList(true);
+    } catch (e) { console.error('Load public chats error:', e); }
     setPublicSearching(false);
+  };
+
+  const filterPublicChats = (list, q) => {
+    const lower = q.toLowerCase();
+    return list.filter(c => c.name?.toLowerCase().includes(lower) || c.id.toLowerCase().includes(lower));
+  };
+
+  const handleSearchFocus = () => {
+    loadAllPublicChats();
+  };
+
+  const handleSearchChange = (q) => {
+    setChatSearch(q);
+    if (!showPublicList) {
+      setShowPublicList(true);
+    }
+    if (allPublicChats.current) {
+      setPublicResults(q.trim() ? filterPublicChats(allPublicChats.current, q) : allPublicChats.current);
+    }
   };
 
   const handleJoinPublic = async (chatId) => {
@@ -108,6 +141,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     try {
       await api.joinChat(accessToken, chatId);
       setChatSearch('');
+      setShowPublicList(false);
       setPublicResults(null);
       const data = await api.listChats(accessToken);
       useChatStore.getState().setChats(data.chats || []);
@@ -150,16 +184,10 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       {!showCreate && (
         <div className="sidebar-search-row">
           <input className="input-field" placeholder="Search chats..." value={chatSearch}
-            onChange={e => { setChatSearch(e.target.value); setPublicResults(null); }}
+            ref={searchInputRef}
+            onFocus={handleSearchFocus}
+            onChange={e => handleSearchChange(e.target.value)}
             style={{ fontSize: 14, padding: '8px 10px' }} />
-          {chatSearch.trim() && publicResults === null && (
-            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-              <button className="btn" style={{ flex: 1, padding: '8px 12px', fontSize: 14, background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius)' }}
-                onClick={() => searchPublic(chatSearch.trim())}>
-                🔍 Search &ldquo;{chatSearch.trim()}&rdquo; in public channels
-              </button>
-            </div>
-          )}
           {joinAction && (
             <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
               {joinAction === 'join' && (
@@ -188,7 +216,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
             onCreate={handleCreate}
             onCancel={() => setShowCreate(false)} />
         )}
-        <PublicChannelList results={publicResults} searching={publicSearching} onJoin={handleJoinPublic} />
+        {showPublicList && <PublicChannelList results={publicResults} searching={publicSearching} onJoin={handleJoinPublic} />}
 
         {filteredChats.map(c => (
           <ChatListItem key={c.id} chat={c} activeId={activeId} onSelectChat={onSelectChat}
