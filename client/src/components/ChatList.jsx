@@ -38,10 +38,8 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [avatarError, setAvatarError] = useState(false);
 
-  const joinAction = chatSearch.trim() && /^\d{1,2}-\d{1,2}$/.test(chatSearch.trim()) ? 'join'
-    : chatSearch.trim() && /^\d+$/.test(chatSearch.trim()) ? 'join'
-      : chatSearch.trim() && /^(join|create)\s/i.test(chatSearch.trim()) ? chatSearch.trim().startsWith('join') ? 'join' : 'create'
-        : null;
+  const joinAction = chatSearch.trim() && /^(join|create)\s/i.test(chatSearch.trim())
+    ? chatSearch.trim().startsWith('join') ? 'join' : 'create' : null;
 
   const navigate = useNavigate();
 
@@ -197,12 +195,15 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
             style={{ fontSize: 14, padding: '8px 10px' }} />
           {joinAction && (
             <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-              {joinAction === 'join' && (
-                <button className="btn" style={{ flex: 1, padding: '8px 12px', fontSize: 14, background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius)' }}
-                  onClick={() => joinChatByID(chatSearch.trim())}>
-                  Join #{chatSearch.trim()}
-                </button>
-              )}
+              {joinAction === 'join' && (() => {
+                const id = chatSearch.trim().replace(/^join\s+/i, '');
+                return (
+                  <button className="btn" style={{ flex: 1, padding: '8px 12px', fontSize: 14, background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius)' }}
+                    onClick={() => joinChatByID(id)}>
+                    Join #{id}
+                  </button>
+                );
+              })()}
               {joinAction === 'create' && (
                 <button className="btn" style={{ flex: 1, padding: '8px 12px', fontSize: 14, background: 'var(--accent)', color: '#fff', borderRadius: 'var(--radius)' }}
                   onClick={() => { setNewChatName(chatSearch.trim()); setShowCreate(true); }}>
