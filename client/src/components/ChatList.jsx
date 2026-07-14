@@ -120,12 +120,13 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
 
   const handleSearchChange = (q) => {
     setChatSearch(q);
-    if (!showPublicList) {
-      setShowPublicList(true);
-    }
-    if (allPublicChats.current) {
+    if (showPublicList && allPublicChats.current) {
       setPublicResults(q.trim() ? filterPublicChats(allPublicChats.current, q) : allPublicChats.current);
     }
+  };
+
+  const handleSearchBlur = () => {
+    setTimeout(() => setShowPublicList(false), 200);
   };
 
   const handleJoinPublic = async (chatId) => {
@@ -186,6 +187,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
           <input className="input-field" placeholder="Search chats..." value={chatSearch}
             ref={searchInputRef}
             onFocus={handleSearchFocus}
+            onBlur={handleSearchBlur}
             onChange={e => handleSearchChange(e.target.value)}
             style={{ fontSize: 14, padding: '8px 10px' }} />
           {joinAction && (
