@@ -1,5 +1,7 @@
 # Chat App — Session Handoff
 
+> ⚠️ **每次推送前必须检查**: `client/package.json` 版本号是否 bump？详见 `docs/README.md`。
+
 ## 本次会话概览
 
 Go 后端 Review + Auth 重构 + Swagger 文档集成。
