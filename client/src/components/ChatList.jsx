@@ -158,13 +158,18 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     setShowSettings(false);
   };
 
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(chatSearch.trim());
+
   const filteredChats = chats.filter(c => {
     if (c.type === 'dm') return false;
     if (!chatSearch.trim()) return true;
+    if (isUUID) return c.id === chatSearch.trim();
     const q = chatSearch.toLowerCase();
     const name = c.name || '';
     return name.toLowerCase().includes(q);
   });
+
+  const uuidDM = isUUID && chatSearch.trim() ? chats.find(c => c.type === 'dm' && c.id === chatSearch.trim()) : null;
 
   return (
     <div className="sidebar">
@@ -217,10 +222,13 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
         )}
         {showPublicList && <PublicChannelList results={publicResults} searching={publicSearching} onJoin={handleJoinPublic} />}
 
-        {!showPublicList && filteredChats.map(c => (
+        {!showPublicList && (uuidDM ? (
+          <ChatListItem key={uuidDM.id} chat={uuidDM} activeId={activeId} onSelectChat={onSelectChat}
+            onContextMenu={setContextMenu} />
+        ) : filteredChats.map(c => (
           <ChatListItem key={c.id} chat={c} activeId={activeId} onSelectChat={onSelectChat}
             onContextMenu={setContextMenu} />
-        ))}
+        )))}
 
         {!showPublicList && chats.length === 0 && (
           <EmptyState message="No conversations yet. Create a new group!" />
