@@ -217,12 +217,12 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
         )}
         {showPublicList && <PublicChannelList results={publicResults} searching={publicSearching} onJoin={handleJoinPublic} />}
 
-        {filteredChats.map(c => (
+        {!showPublicList && filteredChats.map(c => (
           <ChatListItem key={c.id} chat={c} activeId={activeId} onSelectChat={onSelectChat}
             onContextMenu={setContextMenu} />
         ))}
 
-        {chats.length === 0 && (
+        {!showPublicList && chats.length === 0 && (
           <EmptyState message="No conversations yet. Create a new group!" />
         )}
       </ScrollArea>
