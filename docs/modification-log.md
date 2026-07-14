@@ -3384,9 +3384,15 @@ if n > 0 {
   - `UpdateLastRead` / `readReq` 标记为 deprecated
 - **文件**: `server/internal/db/messages.go`, `server/internal/db/chats.go`, `server/internal/handlers/messages.go`, `client/src/components/ChatListItem.jsx`, `client/src/routes/ChatPage.jsx`, `client/src/api/client.js`
 
+#### Bug 6: UnreadCount 时区比较错误
+- **现象**: CI 测试 `TestUnreadCount` 失败
+- **根因**: `UnreadCount` 格式化 `lastActiveAt` 时未转 UTC，但 `created_at` 始终存 UTC。字符串比较时带时区偏移的时间导致 `created_at > lastActiveAt` 为 false
+- **修复**: `lastActiveAt.UTC().Format(time.RFC3339Nano)` 统一转 UTC
+- **文件**: `server/internal/db/messages.go:272`
+
 ### 验证
 - Go all tests: ✅
-- Client build: ✅
-- CI 构建 `build-a274f8a` 部署至 `chat.moonchan.xyz`
+- CI: 两次构建（一次失败 `go vet`、一次成功）→ `go vet` 修复 db_test.go + messages_test.go 旧签名后 CI 重新触发
+- CI 构建 `build-024cf14` 等待部署至 `chat.moonchan.xyz`
 
 ---

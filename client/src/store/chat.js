@@ -302,12 +302,17 @@ export const useChatStore = create((set, get) => ({
     } catch (e) { console.error('loadChats error:', e); }
   },
 
+  _msgLoadId: 0,
   async loadMessages(token, chatId, before) {
+    const loadId = ++get()._msgLoadId;
     try {
       const data = await api.listMessages(token, chatId, before);
-      set(s => ({
-        messages: before ? [...(data.messages || []), ...s.messages] : (data.messages || []),
-      }));
+      set(s => {
+        if (s._msgLoadId !== loadId) return {};
+        return {
+          messages: before ? [...(data.messages || []), ...s.messages] : (data.messages || []),
+        };
+      });
     } catch (e) { console.error('loadMessages error:', e); }
   },
 

@@ -35,7 +35,7 @@ async function request(method, path, token, body) {
   }
   const res = await fetch(API_BASE + path, opts);
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && path !== '/api/auth/refresh') {
+  if (res.status === 401 && path !== '/api/auth/refresh' && path !== '/api/auth/logout') {
     if (!_refreshing) {
       _refreshing = true;
       try {

@@ -61,7 +61,9 @@ export const useAuthStore = create((set, get) => {
 
     logout: async () => {
       api.disableMock();
-      try { await api.logout(); } catch (e) { console.error('Logout error:', e); }
+      if (get().accessToken) {
+        try { await api.logout(get().accessToken); } catch (e) { console.error('Logout error:', e); }
+      }
       useChatStore.getState().reset();
       storage.clear();
       set({ user: null, accessToken: null });

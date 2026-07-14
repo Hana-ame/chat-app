@@ -11,15 +11,14 @@ export default function App() {
   const token = useAuthStore((s) => s.accessToken)
   const logout = useAuthStore((s) => s.logout)
   const navigate = useNavigate()
-  const loggingOut = useRef(false)
+  const unauthGuard = useRef(false)
 
   useEffect(() => {
     const onUnauth = () => {
-      if (loggingOut.current) return
-      loggingOut.current = true
+      if (unauthGuard.current) return
+      unauthGuard.current = true
       logout()
       navigate('/login', { replace: true })
-      setTimeout(() => { loggingOut.current = false }, 500)
     }
     window.addEventListener('auth:unauthorized', onUnauth)
     return () => window.removeEventListener('auth:unauthorized', onUnauth)
