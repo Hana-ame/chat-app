@@ -64,12 +64,12 @@ export default function Composer({ chatId }) {
     handleTyping();
   };
 
-  const uploadFiles = async (files) => {
+  const uploadPastedImages = async (files) => {
     setUploading(true);
     try {
       const results = [];
       for (const f of files) {
-        const file = f.type?.startsWith('image/') ? await compressImage(f) : f;
+        const file = await compressImage(f);
         const data = await api.upload(file);
         results.push({ filename: data.filename, mime_type: data.mime_type, size: data.size, url: data.url });
       }
@@ -81,7 +81,16 @@ export default function Composer({ chatId }) {
   const handleFile = async (e) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    await uploadFiles(files);
+    setUploading(true);
+    try {
+      const results = [];
+      for (const f of files) {
+        const data = await api.upload(f);
+        results.push({ filename: data.filename, mime_type: data.mime_type, size: data.size, url: data.url });
+      }
+      setAttachments(prev => [...prev, ...results]);
+    } catch (err) { alert(err.message || 'Upload failed'); }
+    setUploading(false);
     fileInput.current.value = '';
   };
 
@@ -97,7 +106,7 @@ export default function Composer({ chatId }) {
     }
     if (imageFiles.length) {
       e.preventDefault();
-      await uploadFiles(imageFiles);
+      await uploadPastedImages(imageFiles);
     }
   };
 
