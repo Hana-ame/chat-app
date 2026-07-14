@@ -54,6 +54,10 @@ export default function ChatPage() {
   }, [urlChatId, accessToken]);
 
   const handleSelectChat = (id) => {
+    useChatStore.setState(s => ({
+      activeChatId: id,
+      chats: s.chats.map(c => c.id === id ? { ...c, unread_count: 0 } : c),
+    }));
     navigate('/g/' + id, { replace: true });
     if (isMobile) setMobileView('chat');
   };
