@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
@@ -34,9 +34,21 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
   }, [chats, chatId, msg.user_id, msg.author, user]);
   const initials = author.username ? author.username[0].toUpperCase() : '?';
   const pickerRef = useRef(null);
+  const emojiBtnRef = useRef(null);
+  const [pickerPos, setPickerPos] = useState(null);
 
   useEffect(() => {
-    if (!showEmoji) return;
+    if (!showEmoji) { setPickerPos(null); return; }
+    const btn = emojiBtnRef.current;
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    const spaceAbove = rect.top;
+    const spaceRight = window.innerWidth - rect.right;
+    const pickerH = 200;
+    setPickerPos({
+      left: spaceRight < 240 ? Math.max(0, window.innerWidth - 240) : rect.left,
+      top: spaceAbove > pickerH ? rect.top - pickerH : rect.bottom,
+    });
     const handler = (e) => {
       if (pickerRef.current && !pickerRef.current.contains(e.target)) {
         setShowEmoji(false);
@@ -138,19 +150,12 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
             )}
             {!msg.deleted && (
               <div className="msg-actions">
-                <button className="msg-btn" onClick={() => setShowEmoji(!showEmoji)} disabled={opPending}>😀</button>
+                <button ref={emojiBtnRef} className="msg-btn" onClick={() => setShowEmoji(!showEmoji)} disabled={opPending}>😀</button>
                 {isMe && <button className="msg-btn" onClick={() => { setEditing(true); setEditText(msg.content); }} disabled={opPending}>Edit</button>}
                 {isMe && <button className="msg-btn" onClick={handleDelete} disabled={opPending}>Delete</button>}
               </div>
             )}
           </div>
-          {showEmoji && (
-            <div className="emoji-picker" ref={pickerRef}>
-              {COMMON_EMOJI.map(e => (
-                <button key={e} className="emoji-btn" onClick={() => handleReaction(e)}>{e}</button>
-              ))}
-            </div>
-          )}
           {msg.attachments?.map(a => (
               <div key={a.id} className="file-attach">
                 {a.mime_type?.startsWith('image/')
@@ -172,6 +177,18 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
           )}
         </div>
       </div>
+      {showEmoji && pickerPos && (
+        <div ref={pickerRef} style={{
+          position:'fixed', left: pickerPos.left, top: pickerPos.top, zIndex:9999,
+          display:'flex', flexWrap:'wrap', gap:4, padding:8,
+          background:'var(--bg-tertiary)', borderRadius:'var(--radius)',
+          maxWidth:240, boxShadow:'0 2px 12px rgba(0,0,0,0.3)',
+        }}>
+          {COMMON_EMOJI.map(e => (
+            <button key={e} className="emoji-btn" onClick={() => handleReaction(e)}>{e}</button>
+          ))}
+        </div>
+      )}
       {profileUser && (
         <UserProfileModal user={profileUser} onClose={() => setProfileUser(null)} />
       )}
