@@ -3456,3 +3456,35 @@ if n > 0 {
 - 最新推送 `78be5e8`，CI 构建部署中
 
 ---
+
+## 2026-07-14 细节修复（第 7 轮）
+
+#### Bug 15: 粘贴图片上传不压缩
+- **现象**: 粘贴图片直接上传原图，体积大
+- **修复**: 粘贴图片 canvas 转 WebP quality 0.75 后上传；文件选择器保持原样
+- **文件**: `client/src/components/Composer.jsx`
+
+#### Bug 16: 创建群组按钮样式不一致
+- **现象**: 点击 "+" 后 visibility radio 按钮太小，不适配触屏
+- **修复**: radio 改为 pill 按钮样式，`minHeight: 36`，选中高亮；Create/Cancel 按钮统一大小
+- **文件**: `client/src/components/CreateGroupForm.jsx`
+
+#### Bug 17: Emoji picker 离按钮太远
+- **现象**: 点击 😀 后 picker 显示在按钮上方 200px，组件远离按钮
+- **修复**: 改为紧贴按钮上方 8px，空间不够才显示下方
+- **文件**: `client/src/components/MessageItem.jsx`
+
+#### Bug 18: 输入栏布局
+- **现象**: 文件选择器在输入栏下方独立一行，空间浪费
+- **修复**: 📎 移到发送按钮左边，与 textarea 同行；保留 autoResize
+- **文件**: `client/src/components/Composer.jsx`
+
+### 其他
+- 版本号 `0.1.0-beta` → `0.2.0`
+- `docs/README.md` 添加 Release Checklist
+
+### 验证
+- Client build: ✅
+- 最新推送 `09271f9`，CI 构建中
+
+---
