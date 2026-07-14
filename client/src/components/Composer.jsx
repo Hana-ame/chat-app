@@ -129,7 +129,9 @@ export default function Composer({ chatId }) {
             onChange={e => { setText(e.target.value); handleTyping(); autoResize(); }}
             onKeyDown={handleKey}
             onPaste={handlePaste}
-            style={{flex:1,resize:'none',overflow:'hidden',minHeight:36}} />
+            style={{flex:1,resize:'none',minHeight:36}} />
+          <input type="file" ref={fileInput} onChange={handleFile} style={{display:'none'}} multiple />
+          <button className="btn-ghost" style={{fontSize:18,padding:'4px 6px',lineHeight:0}} onClick={() => fileInput.current?.click()} title="Attach file">📎</button>
           <button className="btn-ghost" style={{padding:'4px 10px',lineHeight:0}}
             disabled={(!text.trim() && attachments.length === 0) || uploading}
             onClick={handleSend} title="Send">
@@ -140,10 +142,6 @@ export default function Composer({ chatId }) {
               </svg>
             )}
           </button>
-        </div>
-        <div style={{display:'flex',gap:4,marginTop:6,alignItems:'center'}}>
-          <input type="file" ref={fileInput} onChange={handleFile} style={{display:'none'}} multiple />
-          <button className="btn-ghost" style={{fontSize:18}} onClick={() => fileInput.current?.click()} title="Attach file">📎</button>
         </div>
       </div>
     </div>
