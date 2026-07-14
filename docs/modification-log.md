@@ -3335,3 +3335,58 @@ if n > 0 {
 - Client build: ✅
 
 ---
+
+## 2026-07-14 真实后端修复（第 5 轮）
+
+### 环境
+- 真实后端部署于 `chat.moonchan.xyz`
+
+### 用户反馈
+
+#### Bug 1: 退出聊天白屏
+- **现象**: 点击退出聊天后页面白屏（React Error #300/#310）
+- **根因**: `MemberPanel`、`ChatInfoModal` 的 `if (!chat) return null` 写在 `useEffect` 之前，违反 rules-of-hooks
+- **修复**: 将 `useEffect` 移到 early return 之前；`ChatView` 加 `if (!chat) return null` guard 在所有 hooks 之后
+- **文件**: `client/src/components/MemberPanel.jsx`, `client/src/components/ChatInfoModal.jsx`, `client/src/components/ChatView.jsx`
+
+#### Bug 2: 公开群聊重新进入不显示消息
+- **现象**: 退出公开群聊后再次进入，消息列表空白
+- **根因**: ChatView 直接读 store 中的 chat，但退出时 chat 已被移除
+- **修复**: ChatView 加 `useEffect` 检测 chat 不在 store 时通过 `api.getChat` 重新获取
+- **文件**: `client/src/components/ChatView.jsx`
+
+#### Bug 3: 登录失败 → 注册 → 自动跳回登录页
+- **现象**: 登录时输错密码（服务器返回错误），跳到注册页注册成功后又被弹回登录页
+- **根因**: 登录失败后 store 残留了旧 `accessToken`，Route guard (`/app`) 判断有 token 但未初始化 → 重定向到 `/`
+- **修复**: `login()`/`register()` 捕获失败后调用 `storage.clear()` 并 `set({user:null, accessToken:null})`
+- **文件**: `client/src/store/auth.js`
+
+#### Bug 4: 红点通知反复出现
+- **现象**: 点击聊天消除红点后，收到新消息红点又出现在旧的聊天上
+- **根因**: `onMessageCreate` 内依赖的 `activeChatId` 是 stale closure；`handleSelectChat` 中 `unread_count` 未重置
+- **修复**: `handleSelectChat` 同步设置 `activeChatId`（而非通过 useEffect 延迟）并重置 `unread_count = 0`
+- **文件**: `client/src/routes/ChatPage.jsx`, `client/src/store/chat.js`
+
+#### Bug 5: 确认对话框残留
+- **现象**: 退出聊天弹 confirm 对话框，用户体验差
+- **修复**: 移除 confirm dialog，`queueMicrotask` 延迟 `onChatDelete` 到 `navigate('/')` 之后
+- **文件**: `client/src/components/ChatList.jsx`
+
+### 改进: 未读计数改用 last_active_at
+
+- **背景**: 原先用 `last_read_message_id` 计算未读，需要前端每次传 `message_id`，逻辑繁琐且容易出错
+- **方案**: 在 `chat_member` 表新增 `last_active_at` 字段，未读计数改为 `SELECT COUNT(*) WHERE created_at > last_active_at`
+- **变更**:
+  - `UnreadCount(ctx, chatID, lastActiveAt)`: 按时间戳计未读，上限 99
+  - `GetMessages` 默认 limit 50→100
+  - `MarkRead` handler 不再读取 request body，直接更新 `last_active_at`
+  - `ChatListItem` badge 显示 `99+` 封顶
+  - `UpdateLastRead` / `readReq` 标记为 deprecated
+- **文件**: `server/internal/db/messages.go`, `server/internal/db/chats.go`, `server/internal/handlers/messages.go`, `client/src/components/ChatListItem.jsx`, `client/src/routes/ChatPage.jsx`, `client/src/api/client.js`
+
+### 验证
+- Go all tests: ✅
+- Client build: ✅
+- CI 构建 `build-a274f8a` 部署至 `chat.moonchan.xyz`
+
+---

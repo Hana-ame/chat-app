@@ -269,7 +269,7 @@ func (d *DB) UnreadCount(ctx context.Context, chatID string, lastActiveAt time.T
 	var n int
 	err := d.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM messages WHERE chat_id = ? AND deleted_at IS NULL AND created_at > ?`,
-		chatID, lastActiveAt.Format(time.RFC3339Nano),
+		chatID, lastActiveAt.UTC().Format(time.RFC3339Nano),
 	).Scan(&n)
 	if err != nil {
 		return 0

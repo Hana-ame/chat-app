@@ -211,19 +211,24 @@ func TestUnreadCount(t *testing.T) {
 	f := testutil.New(t)
 	a, _ := f.DB.CreateUser(f.Ctx(), "unread@x.com", "UnreadUser", "pw00000000")
 	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "UnreadTest", "", a.ID, []string{a.ID})
-	msg, _ := f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, "msg1", nil, nil)
-	n, _ := f.DB.UnreadCount(f.Ctx(), chat.ID, "")
+	f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, "msg1", nil, nil)
+
+	n := f.DB.UnreadCount(f.Ctx(), chat.ID, time.Time{})
 	if n == 0 {
 		t.Fatal("should have unread")
 	}
-	f.DB.UpdateLastRead(f.Ctx(), chat.ID, a.ID, msg.ID)
-	n, _ = f.DB.UnreadCount(f.Ctx(), chat.ID, msg.ID)
+
+	time.Sleep(5 * time.Millisecond)
+	f.DB.UpdateLastActiveAt(f.Ctx(), chat.ID, a.ID)
+	now := time.Now().UTC()
+	n = f.DB.UnreadCount(f.Ctx(), chat.ID, now)
 	if n != 0 {
-		t.Fatalf("after reading, unread should be 0, got %d", n)
+		t.Fatalf("after marking read, unread should be 0, got %d", n)
 	}
+
 	time.Sleep(10 * time.Millisecond)
 	f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, "msg2", nil, nil)
-	n, _ = f.DB.UnreadCount(f.Ctx(), chat.ID, msg.ID)
+	n = f.DB.UnreadCount(f.Ctx(), chat.ID, now)
 	if n == 0 {
 		t.Fatal("new message should register unread")
 	}

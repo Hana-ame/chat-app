@@ -446,17 +446,14 @@ func TestListPublicChats_Empty(t *testing.T) {
 	}
 }
 
-func TestUnreadCount_NonexistentLastRead(t *testing.T) {
+func TestUnreadCount_FutureTimestamp(t *testing.T) {
 	f := testutil.New(t)
-	a, _ := f.DB.CreateUser(f.Ctx(), "unread_err@x.com", "UnreadErr", "pw")
-	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "UnreadErr", "", a.ID, []string{a.ID})
+	a, _ := f.DB.CreateUser(f.Ctx(), "unread_future@x.com", "UnreadFuture", "pw")
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "UnreadFuture", "", a.ID, []string{a.ID})
 	f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, "test", nil, nil)
-	n, err := f.DB.UnreadCount(f.Ctx(), chat.ID, "nonexistent-message-id")
-	if err != nil {
-		t.Fatal(err)
-	}
+	n := f.DB.UnreadCount(f.Ctx(), chat.ID, time.Now().UTC().Add(time.Hour))
 	if n != 0 {
-		t.Fatalf("nonexistent cursor: want 0 got %d", n)
+		t.Fatalf("future timestamp: want 0 got %d", n)
 	}
 }
 
