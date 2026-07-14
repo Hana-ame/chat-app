@@ -3411,3 +3411,48 @@ if n > 0 {
 - 推送 `41b0cfd`，CI 构建中
 
 ---
+
+## 2026-07-14 搜索/UI 修复（第 6 轮）
+
+### 用户反馈
+
+#### Bug 9: 快速切换聊天时旧 fetch 覆盖当前聊天
+- **现象**: 快速切换聊天，前一个 chat 的请求完成后覆盖当前聊天显示
+- **根因**: `loadMessages` 无条件替换 `s.messages`
+- **修复**: 引入 `_msgLoadId` 递增计数器，返回时校验 id，不匹配则丢弃
+- **文件**: `client/src/store/chat.js`
+
+#### Bug 10: 登录失败 refresh/logout 无限循环
+- **现象**: 登录失败后控制台不断刷 refresh 400 + logout 401
+- **根因**: `api.logout()` 时 token 已 null → 401 → `request()` 自动 refresh → 400 → 再次 `auth:unauthorized` → 循环
+- **修复**: `logout()` 无 token 跳过 `api.logout()`；`request()` 跳过 `/api/auth/logout` 的 auto-refresh；App.jsx guard 不再用 setTimeout 重置
+- **文件**: `client/src/store/auth.js`, `client/src/api/client.js`, `client/src/App.jsx`
+
+#### Bug 11: 搜索框 focus 不显示公开频道
+- **现象**: 搜索框 focus 时没有自动加载公开频道列表
+- **修复**: `onFocus` 加载所有公开频道；输入文字实时过滤；blur 200ms 延迟隐藏；隐藏时原有 chat list 不显示
+- **文件**: `client/src/components/ChatList.jsx`
+
+#### Bug 12: 搜索匹配 UUID 导致误中
+- **现象**: 搜 "44" 弹出某个聊天（UUID 含 44），搜 "4" 几乎全中
+- **根因**: `filteredChats` 和 `filterPublicChats` 都按 `c.id` 子串匹配
+- **修复**: 正常搜索只按 `c.name` 匹配；输入完整 UUID 格式时精确匹配 ID
+- **文件**: `client/src/components/ChatList.jsx`
+
+#### Bug 13: 首条消息的 emoji picker 被标题挡住
+- **现象**: 第一位发的消息点 emoji picker，弹出框被 chat header 裁剪
+- **根因**: emoji picker `position:absolute; bottom:100%`，`.chat-body` 的 `overflow-y:auto` 裁剪溢出
+- **修复**: 改用 `position:fixed`，打开时计算按钮位置，空间不足时显示在下方
+- **文件**: `client/src/components/MessageItem.jsx`
+
+#### Bug 14: 输入数字显示 "Join #N"
+- **现象**: 搜索框输入 "1" 出现 "Join #1" 按钮，含义不明
+- **根因**: 旧版数字 ID join 残留逻辑 `/^\d+$/`
+- **修复**: 去掉数字匹配，仅保留显式 `join <uuid>` 命令
+- **文件**: `client/src/components/ChatList.jsx`
+
+### 验证
+- Client build: ✅
+- 最新推送 `78be5e8`，CI 构建部署中
+
+---
