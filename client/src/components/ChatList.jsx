@@ -163,7 +163,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     if (!chatSearch.trim()) return true;
     const q = chatSearch.toLowerCase();
     const name = c.name || '';
-    return name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q);
+    return name.toLowerCase().includes(q);
   });
 
   return (
