@@ -19,7 +19,7 @@ export default function ChatListItem({ chat, activeId, onSelectChat, onContextMe
   const name = chat.name || chat.id;
   const avatar = chat.icon_color || '#5865F2';
   const raw = chat.unread_count || 0;
-  const unread = raw > 50 ? '50+' : raw;
+  const unread = raw >= 99 ? '99+' : raw;
 
   const handleMenu = (e) => {
     e.stopPropagation();

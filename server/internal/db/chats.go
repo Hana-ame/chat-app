@@ -344,24 +344,10 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 			t := parseTime(r.pinnedLastReadAt.String)
 			c.PinnedLastReadAt = &t
 		}
-		// Deprecated.
-		if c.LastMessageID != "" {
-			last, err := d.GetMessage(ctx, c.LastMessageID)
-			if err == nil {
-				c.LastMessage = last
-			}
+		c.UnreadCount = 0
+		if c.LastActiveAt != nil {
+			c.UnreadCount = d.UnreadCount(ctx, c.ID, *c.LastActiveAt)
 		}
-		var lastReadID string
-		if r.lastRead.Valid {
-			lastReadID = r.lastRead.String
-		}
-		// Deprecated.
-		unread, err := d.UnreadCount(ctx, c.ID, lastReadID)
-		if err != nil {
-			return nil, err
-		}
-		// Deprecated.
-		c.UnreadCount = unread
 		out = append(out, c)
 	}
 
@@ -453,6 +439,7 @@ func (d *DB) RenameChat(ctx context.Context, chatID, name string) error {
 	return err
 }
 
+// Deprecated: use UpdateLastActiveAt instead.
 func (d *DB) UpdateLastRead(ctx context.Context, chatID, userID, messageID string) error {
 	_, err := d.ExecContext(ctx,
 		`UPDATE chat_members SET last_read_message_id = ? WHERE chat_id = ? AND user_id = ?`,

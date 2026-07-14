@@ -125,8 +125,8 @@ export const api = {
     request('PATCH', '/api/chats/' + chatId + '/messages/' + msgId, token, { content }),
   deleteMessage: (token, chatId, msgId) =>
     request('DELETE', '/api/chats/' + chatId + '/messages/' + msgId, token),
-  markRead: (token, chatId, messageId) =>
-    request('POST', '/api/chats/' + chatId + '/read', token, { message_id: messageId }),
+  markRead: (token, chatId) =>
+    request('POST', '/api/chats/' + chatId + '/read', token, {}),
   visitChat: (token, chatId) =>
     request('POST', '/api/chats/' + chatId + '/visit', token, {}),
 

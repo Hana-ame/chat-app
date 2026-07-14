@@ -197,7 +197,7 @@ func (d *DB) fetchMessageRow(ctx context.Context, q, id string) (*models.Message
 // has been removed — all data is now in the row.
 func (d *DB) GetMessages(ctx context.Context, chatID, before string, limit int) ([]models.Message, error) {
 	if limit <= 0 || limit > 100 {
-		limit = 50
+		limit = 100
 	}
 	var (
 		rows *sql.Rows
@@ -265,26 +265,19 @@ func (d *DB) LastMessage(ctx context.Context, chatID string) (*models.Message, e
 	return m, nil
 }
 
-// Deprecated.
-func (d *DB) UnreadCount(ctx context.Context, chatID, lastReadID string) (int, error) {
+func (d *DB) UnreadCount(ctx context.Context, chatID string, lastActiveAt time.Time) int {
 	var n int
-	if lastReadID == "" {
-		err := d.QueryRowContext(ctx,
-			`SELECT COUNT(*) FROM messages WHERE chat_id = ? AND deleted_at IS NULL`,
-			chatID,
-		).Scan(&n)
-		return n, err
-	}
 	err := d.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM messages
-		 WHERE chat_id = ? AND deleted_at IS NULL
-		   AND (created_at, id) > (SELECT created_at, id FROM messages WHERE id = ?)`,
-		chatID, lastReadID,
+		`SELECT COUNT(*) FROM messages WHERE chat_id = ? AND deleted_at IS NULL AND created_at > ?`,
+		chatID, lastActiveAt.Format(time.RFC3339Nano),
 	).Scan(&n)
 	if err != nil {
-		return 0, err
+		return 0
 	}
-	return n, nil
+	if n > 99 {
+		return 99
+	}
+	return n
 }
 
 func (d *DB) UpdateMessage(ctx context.Context, id, userID, content string) (*models.Message, error) {

@@ -22,6 +22,7 @@ type editMsgReq struct {
 	Content string `json:"content"`
 }
 
+// Deprecated: no longer needed; MarkRead now uses last_active_at.
 type readReq struct {
 	MessageID string `json:"message_id"`
 }
@@ -231,16 +232,6 @@ func (s *Server) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-// MarkRead godoc
-// @Summary      Mark messages as read
-// @Description  Update the last-read message pointer for a chat
-// @Tags         messages
-// @Security     BearerAuth
-// @Param        chatID  path  string   true  "Chat ID"
-// @Param        body    body  readReq  true  "Last read message ID"
-// @Success      200  {object}  map[string]any
-// @Failure      403  {object}  map[string]any
-// @Router       /api/chats/{chatID}/read [post]
 func (s *Server) MarkRead(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	id := chi.URLParam(r, "chatID")
@@ -254,16 +245,7 @@ func (s *Server) MarkRead(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "forbidden", "")
 		return
 	}
-	var req readReq
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
-		return
-	}
-	if req.MessageID == "" {
-		writeError(w, http.StatusBadRequest, "bad_request", "message_id required")
-		return
-	}
-	if err := s.DB.UpdateLastRead(r.Context(), id, u.ID, req.MessageID); err != nil {
+	if err := s.DB.UpdateLastActiveAt(r.Context(), id, u.ID); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}

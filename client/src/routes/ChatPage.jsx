@@ -44,12 +44,8 @@ export default function ChatPage() {
   useEffect(() => {
     if (urlChatId && accessToken) {
       if (isMobile) setMobileView('chat');
-      const { messages } = useChatStore.getState();
-      if (messages.length === 0) loadMessages(accessToken, urlChatId);
-      const msgs = messages.filter(m => m.chat_id === urlChatId && !m.deleted);
-      if (msgs.length > 0) {
-        api.markRead(accessToken, urlChatId, msgs[msgs.length - 1].id).catch(()=>{});
-      }
+      loadMessages(accessToken, urlChatId);
+      api.markRead(accessToken, urlChatId).catch(()=>{});
     }
   }, [urlChatId, accessToken]);
 

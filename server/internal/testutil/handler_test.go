@@ -1535,7 +1535,7 @@ func TestSendMessage_BadJSON(t *testing.T) {
 	}
 }
 
-func TestMarkRead_EmptyMessageID(t *testing.T) {
+func TestMarkRead_NoBody(t *testing.T) {
 	f := testutil.New(t)
 	alice := f.Register(t, "mrempty@t.t", "MrEmpty", "password123")
 
@@ -1546,12 +1546,10 @@ func TestMarkRead_EmptyMessageID(t *testing.T) {
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
-	readRes := f.Do(t, "POST", "/api/chats/"+chat.ID+"/read", alice.AccessToken, map[string]string{
-		"message_id": "",
-	})
+	readRes := f.Do(t, "POST", "/api/chats/"+chat.ID+"/read", alice.AccessToken, nil)
 	defer readRes.Body.Close()
-	if readRes.StatusCode != 400 {
-		t.Fatalf("empty message_id: want 400 got %d", readRes.StatusCode)
+	if readRes.StatusCode != 200 {
+		t.Fatalf("mark read without body: want 200 got %d", readRes.StatusCode)
 	}
 }
 
