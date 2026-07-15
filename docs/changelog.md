@@ -3775,3 +3775,18 @@ CHAT_CSP_CONNECT_SRC="'self' ws://localhost:8080 wss://localhost:8080 http://loc
 - Client build: ✅ 76 modules
 
 ---
+
+## 2026-07-15 BroadcastUserUpdate data race 修复（第 19 轮）
+
+### 问题
+
+`BroadcastUserUpdate` 在 `h.mu.RLock()` 下读 `c.subs`，但 `subs` 由 `c.mu`（`Client.mu`）保护。两把锁不一致，并发迭代+写入 map 会 panic。
+
+### 修复
+
+`server/internal/ws/hub.go:256` — 遍历 `c.subs` 前加 `c.mu.RLock()` / `c.mu.RUnlock()`。
+
+### 验证
+- Go build + vet: ✅
+
+---

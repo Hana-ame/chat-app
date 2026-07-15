@@ -254,9 +254,11 @@ func (h *Hub) BroadcastUserUpdate(u *models.User) {
 	h.mu.RLock()
 	chatIDs := map[string]struct{}{}
 	for c := range h.clients[u.ID] {
+		c.mu.RLock()
 		for cid := range c.subs {
 			chatIDs[cid] = struct{}{}
 		}
+		c.mu.RUnlock()
 	}
 	h.mu.RUnlock()
 	h.mu.RLock()
