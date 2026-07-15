@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Hana-ame/chat-app/server/internal/auth"
 	"github.com/Hana-ame/chat-app/server/internal/config"
@@ -24,17 +25,24 @@ const (
 
 // Server is the HTTP handler container holding shared dependencies.
 type Server struct {
-	Cfg       *config.Config
-	DB        *db.DB
-	Auth      *auth.Service
-	Hub       *ws.Hub
-	Version   string
-	refreshMu sync.Mutex
+	Cfg          *config.Config
+	DB           *db.DB
+	Auth         *auth.Service
+	Hub          *ws.Hub
+	Version      string
+	refreshMu    sync.Mutex
+	loginLimiter *loginRateLimiter
 }
 
 // New creates a new Server.
 func New(cfg *config.Config, database *db.DB, authSvc *auth.Service, hub *ws.Hub) *Server {
-	return &Server{Cfg: cfg, DB: database, Auth: authSvc, Hub: hub}
+	return &Server{
+		Cfg:          cfg,
+		DB:           database,
+		Auth:         authSvc,
+		Hub:          hub,
+		loginLimiter: newLoginRateLimiter(5, 1*time.Hour),
+	}
 }
 
 func userFrom(ctx context.Context) *models.User {

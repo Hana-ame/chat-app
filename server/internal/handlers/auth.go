@@ -74,6 +74,12 @@ func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
 // @Failure      401  {object}  map[string]any
 // @Router       /api/auth/login [post]
 func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
+	ip := clientIP(r)
+	if !s.loginLimiter.allow(ip) {
+		logutil.Warn("login rate limited: ip=%s", ip)
+		writeError(w, http.StatusTooManyRequests, "rate_limited", "too many login attempts, try again later")
+		return
+	}
 	var req loginReq
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
@@ -84,6 +90,7 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, db.ErrNotFound) {
 			logutil.Warn("login failed: email=%s (not found)", email)
+			s.loginLimiter.record(ip)
 			writeError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 			return
 		}
@@ -92,6 +99,7 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := auth.VerifyPassword(hash, req.Password); err != nil {
 		logutil.Warn("login failed: email=%s (wrong password)", email)
+		s.loginLimiter.record(ip)
 		writeError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 		return
 	}
