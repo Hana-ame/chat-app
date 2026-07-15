@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
+import { notify } from '../store/notification';
 import MessageItem from './MessageItem';
 import Composer from './Composer';
 import { renderContent } from './renderContent';
@@ -28,7 +29,7 @@ export default function ChatView({ chatId, onBack }) {
 
   useEffect(() => {
     if (!chatId || !accessToken) return;
-    api.listMembers(accessToken, chatId).then(d => setMemberCount(d.members?.length || 0)).catch(() => {});
+    api.listMembers(accessToken, chatId).then(d => setMemberCount(d.members?.length || 0)).catch(() => notify('Failed to load members', 'error'));
   }, [chatId, accessToken]);
 
   useEffect(() => {
@@ -50,7 +51,7 @@ export default function ChatView({ chatId, onBack }) {
     if (!chat && chatId && accessToken) {
       api.getChat(accessToken, chatId).then(data => {
         if (data && data.id) useChatStore.getState().onChatUpdate(data);
-      }).catch(() => {});
+      }).catch(() => notify('Failed to load chat', 'error'));
     }
   }, [chatId, accessToken, chat]);
 

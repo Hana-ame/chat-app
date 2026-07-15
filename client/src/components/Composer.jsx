@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
+import { notify } from '../store/notification';
 
 function compressImage(file) {
   return new Promise((resolve) => {
@@ -53,7 +54,7 @@ export default function Composer({ chatId }) {
       await sendMessage(accessToken, chatId, content, attachments);
       setText('');
       setAttachments([]);
-    } catch (e) { console.error('Send message error:', e); }
+    } catch (e) { notify('Failed to send message', 'error'); }
   };
 
   const handleKey = (e) => {
@@ -74,7 +75,7 @@ export default function Composer({ chatId }) {
         results.push({ filename: data.filename, mime_type: data.mime_type, size: data.size, url: data.url });
       }
       setAttachments(prev => [...prev, ...results]);
-    } catch (err) { alert(err.message || 'Upload failed'); }
+    } catch (err) { notify('Upload failed', 'error'); }
     setUploading(false);
   };
 
@@ -89,7 +90,7 @@ export default function Composer({ chatId }) {
         results.push({ filename: data.filename, mime_type: data.mime_type, size: data.size, url: data.url });
       }
       setAttachments(prev => [...prev, ...results]);
-    } catch (err) { alert(err.message || 'Upload failed'); }
+    } catch (err) { notify('Upload failed', 'error'); }
     setUploading(false);
     fileInput.current.value = '';
   };

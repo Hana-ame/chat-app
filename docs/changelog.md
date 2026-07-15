@@ -3790,3 +3790,44 @@ CHAT_CSP_CONNECT_SRC="'self' ws://localhost:8080 wss://localhost:8080 http://loc
 - Go build + vet: ✅
 
 ---
+
+## 2026-07-15 removeUser try/catch 修复（第 20 轮）
+
+### 问题
+
+`MemberPanel.removeUser` 无 try/catch，网络错误 → Unhandled Rejection → React 白屏。
+
+### 修复
+
+`client/src/components/MemberPanel.jsx:38` — `api.removeMember` 包裹 try/catch，错误用 `notify()` 显示。
+
+### 验证
+- Client build: ✅
+
+---
+
+## 2026-07-15 统一前端错误通知通道（第 21 轮）
+
+### 问题
+
+各组件错误处理碎片化：`alert()`、`console.error()`、静默 `catch(() => {})` 混用。
+
+### 实现
+
+**新增** `client/src/store/notification.js`:
+- `useNotificationStore` — Zustand store，`notifications[]`
+- `notify(message, type, duration)` — 全局函数，组件直接调用
+
+**新增** `client/src/components/Toast.jsx`:
+- 右上角堆叠，4s 自动消失，滑入动画
+- 挂载在 `main.jsx` `<BrowserRouter>` 内
+
+**集成**（10 处替换）:
+- `Composer.jsx` — `alert()` → `notify()`
+- `ChatView.jsx` / `ChatInfoModal.jsx` / `MemberPanel.jsx` — `.catch(() => {})` → `notify()`
+- `MemberPanel` 移除内联 `removeErr` 状态
+
+### 验证
+- Client build: ✅ 76 modules
+
+---

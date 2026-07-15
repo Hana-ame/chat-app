@@ -28,14 +28,12 @@ func (s *Server) AddReaction(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "bad emoji encoding")
 		return
 	}
-	ok, err := s.DB.IsChatMember(r.Context(), chatID, u.ID)
-	if err != nil {
-		w.Header().Set("X-Error", err.Error())
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	if !ok {
-		writeError(w, http.StatusForbidden, "forbidden", "")
+	if err := s.Services.Chat.MustBeMember(r.Context(), chatID, u.ID); err != nil {
+		status, code := mapServiceError(err)
+		if status >= 500 {
+			w.Header().Set("X-Error", err.Error())
+		}
+		writeError(w, status, code, "")
 		return
 	}
 	msg, err := s.DB.GetMessage(r.Context(), msgID)
@@ -78,14 +76,12 @@ func (s *Server) RemoveReaction(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "bad emoji encoding")
 		return
 	}
-	ok, err := s.DB.IsChatMember(r.Context(), chatID, u.ID)
-	if err != nil {
-		w.Header().Set("X-Error", err.Error())
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	if !ok {
-		writeError(w, http.StatusForbidden, "forbidden", "")
+	if err := s.Services.Chat.MustBeMember(r.Context(), chatID, u.ID); err != nil {
+		status, code := mapServiceError(err)
+		if status >= 500 {
+			w.Header().Set("X-Error", err.Error())
+		}
+		writeError(w, status, code, "")
 		return
 	}
 	if err := s.DB.RemoveReaction(r.Context(), msgID, u.ID, emoji); err != nil {
@@ -115,14 +111,12 @@ func (s *Server) ListReactions(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	chatID := chi.URLParam(r, "chatID")
 	msgID := chi.URLParam(r, "messageID")
-	ok, err := s.DB.IsChatMember(r.Context(), chatID, u.ID)
-	if err != nil {
-		w.Header().Set("X-Error", err.Error())
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	if !ok {
-		writeError(w, http.StatusForbidden, "forbidden", "")
+	if err := s.Services.Chat.MustBeMember(r.Context(), chatID, u.ID); err != nil {
+		status, code := mapServiceError(err)
+		if status >= 500 {
+			w.Header().Set("X-Error", err.Error())
+		}
+		writeError(w, status, code, "")
 		return
 	}
 	rxs, err := s.DB.ListReactions(r.Context(), msgID, u.ID)

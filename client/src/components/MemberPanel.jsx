@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
+import { notify } from '../store/notification';
 import UserProfileModal from './UserProfileModal';
 import ImagePreviewModal from './ImagePreviewModal';
 
@@ -22,9 +23,9 @@ export default function MemberPanel({ chatId }) {
     if (!chatId || !accessToken) return;
     const fetch = () => {
       if (mode === 'ws' && wsReady) {
-        wsRequest('list_members', { chat_id: chatId }).then(d => setMembers(d.members || [])).catch(() => {});
+        wsRequest('list_members', { chat_id: chatId }).then(d => setMembers(d.members || [])).catch(() => notify('Failed to load members', 'error'));
       } else {
-        api.listMembers(accessToken, chatId).then(d => setMembers(d.members || [])).catch(() => {});
+        api.listMembers(accessToken, chatId).then(d => setMembers(d.members || [])).catch(() => notify('Failed to load members', 'error'));
       }
     };
     fetch();
@@ -37,7 +38,11 @@ export default function MemberPanel({ chatId }) {
 
   const removeUser = async (userId) => {
     if (!confirm('Kick this member?')) return;
-    await api.removeMember(accessToken, chatId, userId);
+    try {
+      await api.removeMember(accessToken, chatId, userId);
+    } catch (e) {
+      notify('Failed to remove member', 'error');
+    }
   };
 
   return (

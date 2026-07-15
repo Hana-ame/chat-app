@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useChatStore } from '../store/chat';
 import { useAuthStore } from '../store/auth';
 import { api } from '../api/client';
+import { notify } from '../store/notification';
 import UserProfileModal from './UserProfileModal';
 
 function fmtTime(t) {
@@ -20,9 +21,9 @@ export default function ChatInfoModal({ chatId, onClose }) {
     const fetch = () => {
       const { wsReady, mode, wsRequest } = useChatStore.getState();
       if (mode === 'ws' && wsReady) {
-        wsRequest('list_members', { chat_id: chatId }).then(d => setMembers(d.members || [])).catch(() => {});
+        wsRequest('list_members', { chat_id: chatId }).then(d => setMembers(d.members || [])).catch(() => notify('Failed to load members', 'error'));
       } else {
-        api.listMembers(accessToken, chatId).then(d => setMembers(d.members || [])).catch(() => {});
+        api.listMembers(accessToken, chatId).then(d => setMembers(d.members || [])).catch(() => notify('Failed to load members', 'error'));
       }
     };
     fetch();
