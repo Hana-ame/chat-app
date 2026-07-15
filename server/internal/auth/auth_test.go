@@ -116,7 +116,8 @@ func TestValidateUsername(t *testing.T) {
 	}
 }
 
-func TestLongPassword(t *testing.T) {
+func TestPasswordTruncation(t *testing.T) {
+	// bcrypt only considers the first 72 bytes.
 	long := strings.Repeat("a", 100)
 	hash, err := auth.HashPassword(long)
 	if err != nil {
@@ -124,6 +125,9 @@ func TestLongPassword(t *testing.T) {
 	}
 	if err := auth.VerifyPassword(hash, long); err != nil {
 		t.Fatal("verify with original long password failed")
+	}
+	if err := auth.VerifyPassword(hash, long[:72]); err != nil {
+		t.Fatal("verify with truncated password failed")
 	}
 }
 
