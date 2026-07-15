@@ -13,6 +13,7 @@ import (
 	"github.com/Hana-ame/chat-app/server/internal/config"
 	"github.com/Hana-ame/chat-app/server/internal/db"
 	"github.com/Hana-ame/chat-app/server/internal/models"
+	"github.com/Hana-ame/chat-app/server/internal/service"
 	"github.com/Hana-ame/chat-app/server/internal/ws"
 )
 
@@ -30,6 +31,7 @@ type Server struct {
 	Auth         *auth.Service
 	Hub          *ws.Hub
 	Version      string
+	Services     *service.Service
 	refreshMu    sync.Mutex
 	loginLimiter *loginRateLimiter
 }
@@ -41,6 +43,7 @@ func New(cfg *config.Config, database *db.DB, authSvc *auth.Service, hub *ws.Hub
 		DB:           database,
 		Auth:         authSvc,
 		Hub:          hub,
+		Services:     service.New(database, hub),
 		loginLimiter: newLoginRateLimiter(5, 1*time.Hour),
 	}
 }
@@ -57,6 +60,28 @@ func tokenFrom(ctx context.Context) string {
 
 func (s *Server) VersionHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"version": s.Version})
+}
+
+func mapServiceError(err error) (int, string) {
+	if err == nil {
+		return 0, ""
+	}
+	if errors.Is(err, service.ErrForbidden) {
+		return http.StatusForbidden, "forbidden"
+	}
+	if errors.Is(err, service.ErrNotFound) {
+		return http.StatusNotFound, "not_found"
+	}
+	if errors.Is(err, service.ErrInvalidInput) {
+		return http.StatusBadRequest, "bad_request"
+	}
+	if errors.Is(err, service.ErrConflict) {
+		return http.StatusConflict, "conflict"
+	}
+	if errors.Is(err, service.ErrContentTooLong) {
+		return http.StatusForbidden, "content_too_long"
+	}
+	return http.StatusInternalServerError, "internal"
 }
 
 func writeJSON(w http.ResponseWriter, status int, body interface{}) {

@@ -1,14 +1,9 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
-	"regexp"
 	"strconv"
-	"strings"
 
-	"github.com/Hana-ame/chat-app/server/internal/db"
-	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/Hana-ame/chat-app/server/internal/models"
 	"github.com/go-chi/chi/v5"
 )
@@ -27,17 +22,6 @@ type readReq struct {
 	MessageID string `json:"message_id"`
 }
 
-var mentionRegex = regexp.MustCompile(`<@([a-f0-9-]{36})>`)
-
-func extractMentions(content string) []string {
-	matches := mentionRegex.FindAllStringSubmatch(content, -1)
-	out := make([]string, 0, len(matches))
-	for _, m := range matches {
-		out = append(out, m[1])
-	}
-	return out
-}
-
 // ListMessages godoc
 // @Summary      List messages in a chat
 // @Description  Get paginated messages for a chat the user is a member of
@@ -52,21 +36,12 @@ func extractMentions(content string) []string {
 func (s *Server) ListMessages(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	id := chi.URLParam(r, "chatID")
-	ok, err := s.DB.IsChatMember(r.Context(), id, u.ID)
-	if err != nil {
-		w.Header().Set("X-Error", err.Error())
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	if !ok {
-		writeError(w, http.StatusForbidden, "forbidden", "")
-		return
-	}
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	before := r.URL.Query().Get("before")
-	msgs, err := s.DB.GetMessages(r.Context(), id, before, limit)
+	msgs, err := s.Services.Message.List(r.Context(), id, u.ID, before, limit)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		status, code := mapServiceError(err)
+		writeError(w, status, code, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"messages": msgs})
@@ -85,48 +60,16 @@ func (s *Server) ListMessages(w http.ResponseWriter, r *http.Request) {
 func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	id := chi.URLParam(r, "chatID")
-	ok, err := s.DB.IsChatMember(r.Context(), id, u.ID)
-	if err != nil {
-		w.Header().Set("X-Error", err.Error())
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	if !ok {
-		writeError(w, http.StatusForbidden, "forbidden", "")
-		return
-	}
 	var req sendMsgReq
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
-	for i, a := range req.Attachments {
-		if a.URL == "" || a.Filename == "" {
-			writeError(w, http.StatusBadRequest, "bad_request", "attachment missing url/filename")
-			return
-		}
-		if !strings.HasPrefix(a.URL, "https://upload.moonchan.xyz/") {
-			writeError(w, http.StatusBadRequest, "bad_request", "attachment url must be on upload.moonchan.xyz")
-			return
-		}
-		if a.MimeType == "" {
-			req.Attachments[i].MimeType = "application/octet-stream"
-		}
-	}
-	mentions := extractMentions(req.Content)
-	msg, err := s.DB.CreateMessage(r.Context(), id, u.ID, req.Content, mentions, req.Attachments)
+	msg, err := s.Services.Message.Send(r.Context(), id, u.ID, req.Content, req.Attachments)
 	if err != nil {
-		if strings.Contains(err.Error(), "content too long") {
-			writeError(w, http.StatusForbidden, "content_too_long", err.Error())
-			return
-		}
-		logutil.Error("send message: %v (user=%s chat=%s)", err, u.ID[:8], id[:8])
-		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		status, code := mapServiceError(err)
+		writeError(w, status, code, err.Error())
 		return
-	}
-	logutil.Debug("message sent: %s (chat=%s user=%s len=%d)", msg.ID[:8], id[:8], u.ID[:8], len(req.Content))
-	if s.Hub != nil {
-		s.Hub.BroadcastMessageCreate(msg)
 	}
 	writeJSON(w, http.StatusCreated, msg)
 }
@@ -145,37 +88,17 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 func (s *Server) EditMessage(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	chatID := chi.URLParam(r, "chatID")
-	id := chi.URLParam(r, "messageID")
-	ok, err := s.DB.IsChatMember(r.Context(), chatID, u.ID)
-	if err != nil {
-		w.Header().Set("X-Error", err.Error())
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	if !ok {
-		writeError(w, http.StatusForbidden, "forbidden", "")
-		return
-	}
+	messageID := chi.URLParam(r, "messageID")
 	var req editMsgReq
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
-	msg, err := s.DB.UpdateMessage(r.Context(), id, u.ID, req.Content)
+	msg, err := s.Services.Message.Edit(r.Context(), chatID, messageID, u.ID, req.Content)
 	if err != nil {
-		if errors.Is(err, db.ErrNotFound) {
-			writeError(w, http.StatusNotFound, "not_found", "")
-			return
-		}
-		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		status, code := mapServiceError(err)
+		writeError(w, status, code, err.Error())
 		return
-	}
-	if msg.ChatID != chatID {
-		writeError(w, http.StatusBadRequest, "bad_request", "chat mismatch")
-		return
-	}
-	if s.Hub != nil {
-		s.Hub.BroadcastMessageUpdate(msg)
 	}
 	writeJSON(w, http.StatusOK, msg)
 }
@@ -193,41 +116,11 @@ func (s *Server) EditMessage(w http.ResponseWriter, r *http.Request) {
 func (s *Server) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	chatID := chi.URLParam(r, "chatID")
-	id := chi.URLParam(r, "messageID")
-	ok, err := s.DB.IsChatMember(r.Context(), chatID, u.ID)
-	if err != nil {
-		w.Header().Set("X-Error", err.Error())
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+	messageID := chi.URLParam(r, "messageID")
+	if err := s.Services.Message.Delete(r.Context(), chatID, messageID, u.ID); err != nil {
+		status, code := mapServiceError(err)
+		writeError(w, status, code, err.Error())
 		return
-	}
-	if !ok {
-		writeError(w, http.StatusForbidden, "forbidden", "")
-		return
-	}
-	existing, err := s.DB.GetMessage(r.Context(), id)
-	if err != nil {
-		writeError(w, http.StatusNotFound, "not_found", "")
-		return
-	}
-	if existing.ChatID != chatID {
-		writeError(w, http.StatusBadRequest, "bad_request", "chat mismatch")
-		return
-	}
-	chat, err := s.DB.GetChat(r.Context(), chatID)
-	if err != nil {
-		w.Header().Set("X-Error", err.Error())
-	}
-	canDeleteAny := chat != nil && (chat.OwnerID == u.ID || s.requireOwnerOrAdmin(r.Context(), chatID, u.ID) == nil)
-	if existing.UserID != u.ID && !canDeleteAny {
-		writeError(w, http.StatusForbidden, "forbidden", "")
-		return
-	}
-	if err := s.DB.DeleteMessage(r.Context(), id, u.ID, canDeleteAny); err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	if s.Hub != nil {
-		s.Hub.BroadcastMessageDelete(chatID, id)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
@@ -235,18 +128,9 @@ func (s *Server) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 func (s *Server) MarkRead(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	id := chi.URLParam(r, "chatID")
-	ok, err := s.DB.IsChatMember(r.Context(), id, u.ID)
-	if err != nil {
-		w.Header().Set("X-Error", err.Error())
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	if !ok {
-		writeError(w, http.StatusForbidden, "forbidden", "")
-		return
-	}
-	if err := s.DB.UpdateLastActiveAt(r.Context(), id, u.ID); err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+	if err := s.Services.Message.MarkRead(r.Context(), id, u.ID); err != nil {
+		status, code := mapServiceError(err)
+		writeError(w, status, code, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})

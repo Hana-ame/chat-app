@@ -1,11 +1,8 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
 
-	"github.com/Hana-ame/chat-app/server/internal/db"
-	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -24,14 +21,10 @@ type addMemberReq struct {
 func (s *Server) ListMembers(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	id := chi.URLParam(r, "chatID")
-	ok, err := s.DB.IsChatMember(r.Context(), id, u.ID)
-	if err != nil || !ok {
-		writeError(w, http.StatusForbidden, "forbidden", "")
-		return
-	}
-	members, err := s.DB.GetChatMembers(r.Context(), id)
+	members, err := s.Services.Member.List(r.Context(), id, u.ID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		status, code := mapServiceError(err)
+		writeError(w, status, code, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"members": members})
@@ -49,51 +42,16 @@ func (s *Server) ListMembers(w http.ResponseWriter, r *http.Request) {
 func (s *Server) AddMember(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	id := chi.URLParam(r, "chatID")
-	c, err := s.DB.GetChat(r.Context(), id)
-	if err != nil {
-		writeError(w, http.StatusNotFound, "not_found", "")
-		return
-	}
-	if c.Type == "dm" {
-		writeError(w, http.StatusBadRequest, "bad_request", "cannot add to dm")
-		return
-	}
-	ok, err := s.DB.IsChatMember(r.Context(), id, u.ID)
-	if err != nil {
-		w.Header().Set("X-Error", err.Error())
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	if !ok {
-		writeError(w, http.StatusForbidden, "forbidden", "")
-		return
-	}
 	var req addMemberReq
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
-	if _, err := s.DB.GetUserByID(r.Context(), req.UserID); err != nil {
-		writeError(w, http.StatusNotFound, "user_not_found", "")
-		return
-	}
-	if err := s.DB.AddChatMember(r.Context(), id, req.UserID); err != nil {
-		if errors.Is(err, db.ErrConflict) {
-			logutil.Debug("add member conflict: user=%s chat=%s", req.UserID[:8], id[:8])
-			writeError(w, http.StatusConflict, "already_member", "")
-			return
-		}
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	logutil.Info("added member %s to chat %s (by %s)", req.UserID[:8], id[:8], u.ID[:8])
-	updated, err := s.DB.GetChat(r.Context(), id)
+	updated, err := s.Services.Member.Add(r.Context(), id, u.ID, req.UserID)
 	if err != nil {
-		w.Header().Set("X-Error", err.Error())
-	}
-	if s.Hub != nil && updated != nil {
-		s.Hub.BroadcastChatUpdated(updated)
-		s.Hub.NotifyUserNewChat(req.UserID, updated)
+		status, code := mapServiceError(err)
+		writeError(w, status, code, err.Error())
+		return
 	}
 	writeJSON(w, http.StatusOK, updated)
 }
@@ -111,40 +69,10 @@ func (s *Server) RemoveMember(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	id := chi.URLParam(r, "chatID")
 	target := chi.URLParam(r, "userID")
-	c, err := s.DB.GetChat(r.Context(), id)
-	if err != nil {
-		writeError(w, http.StatusNotFound, "not_found", "")
+	if err := s.Services.Member.Remove(r.Context(), id, u.ID, target); err != nil {
+		status, code := mapServiceError(err)
+		writeError(w, status, code, err.Error())
 		return
-	}
-	if c.Type == "dm" {
-		writeError(w, http.StatusBadRequest, "bad_request", "cannot remove from dm")
-		return
-	}
-	if target == c.OwnerID && target != u.ID {
-		writeError(w, http.StatusForbidden, "forbidden", "cannot kick owner")
-		return
-	}
-	if target != u.ID {
-		if err := s.requireOwnerOrAdmin(r.Context(), id, u.ID); err != nil {
-			writeError(w, http.StatusForbidden, "forbidden", "only owner or admin can kick others")
-			return
-		}
-	}
-	if err := s.DB.RemoveChatMember(r.Context(), id, target); err != nil {
-		logutil.Error("remove member %s from %s: %v", target[:8], id[:8], err)
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	logutil.Info("removed member %s from chat %s (by %s)", target[:8], id[:8], u.ID[:8])
-	if s.Hub != nil {
-		s.Hub.NotifyUserLeftChat(target, id)
-		updated, err := s.DB.GetChat(r.Context(), id)
-		if err != nil {
-			w.Header().Set("X-Error", err.Error())
-		}
-		if updated != nil {
-			s.Hub.BroadcastChatUpdated(updated)
-		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
