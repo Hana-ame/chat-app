@@ -3488,3 +3488,21 @@ if n > 0 {
 - 最新推送 `09271f9`，CI 构建中
 
 ---
+
+## 2026-07-15 安全加固（第 8 轮）
+
+#### Bug 19: 登录无频率限制
+- **现象**: 无限制尝试密码，可暴力破解
+- **修复**: 每 IP 每小时最多 5 次登录失败，超限返回 429
+- **文件**: `server/internal/handlers/ratelimit.go`, `auth.go`, `handler.go`
+
+#### Bug 20: Cloudflare IP 段硬编码
+- **现象**: CF IP 段可能过期，导致来源判定出错
+- **修复**: 启动时从 `cloudflare.com/ips-v4` 和 `ips-v6` 拉取最新段，失败则回退硬编码列表
+- **文件**: `server/internal/handlers/ratelimit.go`
+
+### 验证
+- Go build: ✅ `go vet` ✅
+- 最新推送 `557152e`，CI 构建中
+
+---
