@@ -340,16 +340,16 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  async setPinnedMessage(token, chatId, content) {
-    const res = await api.setPinnedMessage(token, chatId, content);
+  async setAnnouncement(token, chatId, content) {
+    const res = await api.setAnnouncement(token, chatId, content);
     const p = res.pinned_message || { id: '', content, pinned_at: new Date().toISOString() };
     set(s => ({
       pinnedMessage: { ...s.pinnedMessage, [chatId]: p }
     }));
   },
 
-  async clearPinnedMessage(token, chatId) {
-    await api.clearPinnedMessage(token, chatId);
+  async clearAnnouncement(token, chatId) {
+    await api.clearAnnouncement(token, chatId);
     set(s => {
       const next = { ...s.pinnedMessage };
       delete next[chatId];
@@ -357,9 +357,9 @@ export const useChatStore = create((set, get) => ({
     });
   },
 
-  async markPinnedRead(chatId) {
+  async markAnnouncementRead(chatId) {
     const { accessToken } = useAuthStore.getState();
-    try { await api.markPinnedRead(accessToken, chatId); } catch (e) { console.error('markPinnedRead error:', e); }
+    try { await api.markAnnouncementRead(accessToken, chatId); } catch (e) { console.error('markAnnouncementRead error:', e); }
     set(s => ({
       chats: s.chats.map(c => c.id === chatId ? { ...c, pinned_last_read_at: new Date().toISOString() } : c),
     }));

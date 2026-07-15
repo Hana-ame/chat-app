@@ -13,7 +13,7 @@ function getDMName(chat) {
 
 export default function ChatView({ chatId, onBack }) {
   const { user, accessToken } = useAuthStore();
-  const { chats, messages, loadMessages, subscribe, markRead, pinnedMessage, setPinnedMessage, clearPinnedMessage, markPinnedRead } = useChatStore();
+  const { chats, messages, loadMessages, subscribe, markRead, pinnedMessage, setAnnouncement, clearAnnouncement, markAnnouncementRead } = useChatStore();
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [noticeInput, setNoticeInput] = useState('');
@@ -41,7 +41,7 @@ export default function ChatView({ chatId, onBack }) {
 
   useEffect(() => {
     if (showNotice && pinnedMessage[chatId]) {
-      markPinnedRead(chatId);
+      markAnnouncementRead(chatId);
     }
   }, [showNotice, chatId, pinnedMessage[chatId]]);
 
@@ -112,7 +112,7 @@ export default function ChatView({ chatId, onBack }) {
   const handleSaveNotice = async () => {
     if (!noticeInput.trim()) return;
     try {
-      await setPinnedMessage(accessToken, chatId, noticeInput);
+      await setAnnouncement(accessToken, chatId, noticeInput);
       setIsEditingNotice(false);
     } catch (e) {
       if (e.status === 429) alert(e.message);
@@ -122,7 +122,7 @@ export default function ChatView({ chatId, onBack }) {
 
   const handleClearNotice = async () => {
     try {
-      await clearPinnedMessage(accessToken, chatId);
+      await clearAnnouncement(accessToken, chatId);
       setNoticeInput('');
       setIsEditingNotice(false);
     } catch (e) {

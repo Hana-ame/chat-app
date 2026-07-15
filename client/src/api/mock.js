@@ -374,14 +374,14 @@ export function mockRemoveReaction(_token, _chatId, msgId, emoji) {
   return { ok: true };
 }
 
-export function mockSetPinnedMessage(_token, chatId, content) {
+export function mockSetAnnouncement(_token, chatId, content) {
   const now = new Date().toISOString();
   const pinned = { id: 'pm-' + randid(), content, pinned_at: now };
   if (_store) _store.getState().onChatUpdate({ id: chatId, pinned_message: pinned, pinned_updated_at: now });
   return { ok: true, pinned_message: pinned, pinned_updated_at: now };
 }
 
-export function mockClearPinnedMessage(_token, chatId) {
+export function mockClearAnnouncement(_token, chatId) {
   if (_store) _store.getState().onChatUpdate({ id: chatId, pinned_message: null, pinned_updated_at: null });
   return { ok: true };
 }
@@ -495,16 +495,25 @@ export function mockUploadAvatar(_token, file) {
   return { url: URL.createObjectURL(file) };
 }
 
-export function mockTogglePin(_token, chatId, pinned) {
+export function mockPinChat(_token, chatId) {
   const d = ensureData();
   const chat = d.chats.find(c => c.id === chatId);
   if (!chat) return { ok: false };
-  chat.pinned = pinned;
-  if (_store) _store.getState().onChatUpdate({ id: chatId, pinned: chat.pinned });
-  return { ok: true, pinned: chat.pinned };
+  chat.pinned = true;
+  if (_store) _store.getState().onChatUpdate({ id: chatId, pinned: true });
+  return { ok: true, pinned: true };
 }
 
-export function mockMarkPinnedRead(_token, chatId) {
+export function mockUnpinChat(_token, chatId) {
+  const d = ensureData();
+  const chat = d.chats.find(c => c.id === chatId);
+  if (!chat) return { ok: false };
+  chat.pinned = false;
+  if (_store) _store.getState().onChatUpdate({ id: chatId, pinned: false });
+  return { ok: true, pinned: false };
+}
+
+export function mockMarkAnnouncementRead(_token, chatId) {
   const d = ensureData();
   const chat = d.chats.find(c => c.id === chatId);
   if (!chat) return { ok: true };

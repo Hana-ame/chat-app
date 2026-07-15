@@ -76,11 +76,19 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     setShowChatInfo(null);
   };
 
-  const handleTogglePin = async (chatId, pinned) => {
+  const handlePin = async (chatId) => {
     try {
-      await api.togglePin(accessToken, chatId, pinned);
-      useChatStore.getState().onChatUpdate({ id: chatId, pinned });
-    } catch (e) { console.error('Toggle pin error:', e); }
+      await api.pinChat(accessToken, chatId);
+      useChatStore.getState().onChatUpdate({ id: chatId, pinned: true });
+    } catch (e) { console.error('Pin error:', e); }
+    setContextMenu(null);
+  };
+
+  const handleUnpin = async (chatId) => {
+    try {
+      await api.unpinChat(accessToken, chatId);
+      useChatStore.getState().onChatUpdate({ id: chatId, pinned: false });
+    } catch (e) { console.error('Unpin error:', e); }
     setContextMenu(null);
   };
 
@@ -266,8 +274,8 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
 
       {contextMenu && (
         <div className="context-menu" style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 1000, right: 'auto', width: 140 }}>
-          <button className="context-menu-item" onClick={() => handleTogglePin(contextMenu.chatId, true)}>Pin</button>
-          <button className="context-menu-item" onClick={() => handleTogglePin(contextMenu.chatId, false)}>Unpin</button>
+          <button className="context-menu-item" onClick={() => handlePin(contextMenu.chatId)}>Pin</button>
+          <button className="context-menu-item" onClick={() => handleUnpin(contextMenu.chatId)}>Unpin</button>
           <button className="context-menu-item" onClick={() => { setShowChatInfo(contextMenu.chatId); setContextMenu(null); }}>View Info</button>
           <button className="context-menu-item danger" onClick={() => handleLeaveChat(contextMenu.chatId)}>Leave</button>
         </div>

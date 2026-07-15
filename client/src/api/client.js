@@ -2,12 +2,12 @@ import {
   mockRegister, mockLogin, mockRefresh, mockLogout, mockMe,
   mockListChats, mockListPublicChats, mockCreateChat, mockGetChat,
   mockDeleteChat, mockRenameChat, mockCreateDM, mockJoinChat,
-  mockSetPinnedMessage, mockClearPinnedMessage,
+  mockSetAnnouncement, mockClearAnnouncement,
   mockAddMember, mockRemoveMember, mockListMembers, mockSearchUsers, mockUpdateProfile,
   mockListMessages, mockSendMessage, mockEditMessage, mockDeleteMessage,
   mockMarkRead, mockAddReaction, mockRemoveReaction, mockGetReactions,
   mockUpload, mockUploadAvatar,
-  mockTogglePin, mockMarkPinnedRead,
+  mockPinChat, mockUnpinChat, mockMarkAnnouncementRead,
   resetMockData,
 } from './mock';
 import { createStreamSource } from '../dev/stream-source';
@@ -102,8 +102,8 @@ export const api = {
   createDM: (token, userId) =>
     request('POST', '/api/dms', token, { user_id: userId }), // @deprecated use createChat with type='dm'
   joinChat: (token, chatId) => request('POST', '/api/chats/' + chatId + '/join', token),
-  setPinnedMessage: (token, chatId, content) => request('POST', '/api/chats/' + chatId + '/pin', token, { content }),
-  clearPinnedMessage: (token, chatId) => request('DELETE', '/api/chats/' + chatId + '/pin', token),
+  setAnnouncement: (token, chatId, content) => request('POST', '/api/chats/' + chatId + '/announcement', token, { content }),
+  clearAnnouncement: (token, chatId) => request('DELETE', '/api/chats/' + chatId + '/announcement', token),
 
   // ── Members ──
   listMembers: (token, chatId) =>
@@ -138,8 +138,9 @@ export const api = {
   getReactions: (token, chatId, msgId) =>
     request('GET', '/api/chats/' + chatId + '/messages/' + msgId + '/reactions', token),
 
-  togglePin: (_token, chatId, pinned) => request('POST', '/api/chats/' + chatId + '/pin-toggle', _token, { pinned }),
-  markPinnedRead: (token, chatId) => request('POST', '/api/chats/' + chatId + '/pin-read', token, {}),
+  pinChat: (_token, chatId) => request('POST', '/api/chats/' + chatId + '/pin', _token),
+  unpinChat: (_token, chatId) => request('POST', '/api/chats/' + chatId + '/unpin', _token),
+  markAnnouncementRead: (token, chatId) => request('POST', '/api/chats/' + chatId + '/announcement/read', token, {}),
 
   // ── Uploads (external upload.moonchan.xyz) ──
   upload: async (file) => {
@@ -217,8 +218,8 @@ const MOCKABLE = [
   ['renameChat', mockRenameChat],
   ['createDM', mockCreateDM], // @deprecated
   ['joinChat', mockJoinChat],
-  ['setPinnedMessage', mockSetPinnedMessage],
-  ['clearPinnedMessage', mockClearPinnedMessage],
+  ['setAnnouncement', mockSetAnnouncement],
+  ['clearAnnouncement', mockClearAnnouncement],
   ['listMembers', mockListMembers],
   ['addMember', mockAddMember],
   ['removeMember', mockRemoveMember],
@@ -232,8 +233,9 @@ const MOCKABLE = [
   ['getReactions', mockGetReactions],
   ['upload', mockUpload],
   ['uploadAvatar', mockUploadAvatar],
-  ['togglePin', mockTogglePin],
-  ['markPinnedRead', mockMarkPinnedRead],
+  ['pinChat', mockPinChat],
+  ['unpinChat', mockUnpinChat],
+  ['markAnnouncementRead', mockMarkAnnouncementRead],
 ];
 
 api.enableMock = () => {

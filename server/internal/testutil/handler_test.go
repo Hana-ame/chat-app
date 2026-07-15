@@ -950,7 +950,7 @@ func TestPinMessage(t *testing.T) {
 	}
 
 	t.Run("owner can pin", func(t *testing.T) {
-		res := f.Do(t, "POST", "/api/chats/"+chatID+"/pin", alice.AccessToken, map[string]string{
+		res := f.Do(t, "POST", "/api/chats/"+chatID+"/announcement", alice.AccessToken, map[string]string{
 			"content": "pinned message",
 		})
 		defer res.Body.Close()
@@ -961,7 +961,7 @@ func TestPinMessage(t *testing.T) {
 	})
 
 	t.Run("non-owner cannot pin", func(t *testing.T) {
-		res := f.Do(t, "POST", "/api/chats/"+chatID+"/pin", bob.AccessToken, map[string]string{
+		res := f.Do(t, "POST", "/api/chats/"+chatID+"/announcement", bob.AccessToken, map[string]string{
 			"content": "non-owner pin",
 		})
 		defer res.Body.Close()
@@ -978,7 +978,7 @@ func TestPinMessage(t *testing.T) {
 		json.NewDecoder(res.Body).Decode(&small)
 		res.Body.Close()
 
-		res2 := f.Do(t, "POST", "/api/chats/"+small.ID+"/pin", alice.AccessToken, map[string]string{
+		res2 := f.Do(t, "POST", "/api/chats/"+small.ID+"/announcement", alice.AccessToken, map[string]string{
 			"content": "should fail",
 		})
 		defer res2.Body.Close()
@@ -1002,25 +1002,25 @@ func TestDeletePinnedChat(t *testing.T) {
 	res.Body.Close()
 	chatID := c["id"].(string)
 
-	f.Do(t, "POST", "/api/chats/"+chatID+"/pin", alice.AccessToken, map[string]string{
+	f.Do(t, "POST", "/api/chats/"+chatID+"/announcement", alice.AccessToken, map[string]string{
 		"content": "to delete",
 	})
 
 	t.Run("owner can clear pin", func(t *testing.T) {
-		res2 := f.Do(t, "DELETE", "/api/chats/"+chatID+"/pin", alice.AccessToken, nil)
+		res2 := f.Do(t, "DELETE", "/api/chats/"+chatID+"/announcement", alice.AccessToken, nil)
 		defer res2.Body.Close()
 		if res2.StatusCode != 200 {
 			t.Fatalf("owner clear pin: want 200 got %d", res2.StatusCode)
 		}
 	})
 
-	f.Do(t, "POST", "/api/chats/"+chatID+"/pin", alice.AccessToken, map[string]string{
+	f.Do(t, "POST", "/api/chats/"+chatID+"/announcement", alice.AccessToken, map[string]string{
 		"content": "pin again",
 	})
 
 	t.Run("non-member cannot clear pin", func(t *testing.T) {
 		dave := f.Register(t, "delpin@d.t", "DelPinD", "password123")
-		res3 := f.Do(t, "DELETE", "/api/chats/"+chatID+"/pin", dave.AccessToken, nil)
+		res3 := f.Do(t, "DELETE", "/api/chats/"+chatID+"/announcement", dave.AccessToken, nil)
 		defer res3.Body.Close()
 		if res3.StatusCode != 403 {
 			t.Fatalf("non-member clear pin: want 403 got %d", res3.StatusCode)
@@ -1028,7 +1028,7 @@ func TestDeletePinnedChat(t *testing.T) {
 	})
 
 	t.Run("regular member cannot clear pin", func(t *testing.T) {
-		res4 := f.Do(t, "DELETE", "/api/chats/"+chatID+"/pin", bob.AccessToken, nil)
+		res4 := f.Do(t, "DELETE", "/api/chats/"+chatID+"/announcement", bob.AccessToken, nil)
 		defer res4.Body.Close()
 		if res4.StatusCode != 403 {
 			t.Fatalf("member clear pin: want 403 got %d", res4.StatusCode)
