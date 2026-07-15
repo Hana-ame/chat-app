@@ -3868,6 +3868,8 @@ CHAT_CSP_CONNECT_SRC="'self' ws://localhost:8080 wss://localhost:8080 http://loc
 
 ---
 
+
+
 ## 2026-07-16 后端添加单元测试覆盖（第 24 轮）
 
 ### 新增测试文件
@@ -3890,23 +3892,6 @@ CHAT_CSP_CONNECT_SRC="'self' ws://localhost:8080 wss://localhost:8080 http://loc
 - `go build ./...` — ✅
 - `go vet ./...` — ✅
 - `go test ./...` — ✅
-
----
-
----
-
-## 2026-07-15 authz.go isNotFound/isConflict 改用 errors.Is（第 23 轮）
-
-### 问题
-
-`service/authz.go` 的 `isNotFound`/`isConflict` 使用 `err.Error() == "not found"` 字符串比较，错误被 `fmt.Errorf("...: %w", err)` 包装后失效。
-
-### 修复
-
-改用 `errors.Is(err, db.ErrNotFound)` / `errors.Is(err, db.ErrConflict)`。`isContentTooLong` 保持字符串检查（DB 层无 sentinel 错误）。
-
-### 验证
-- Server: `go build`, `go vet`, `go test` — ✅
 
 ---
 
