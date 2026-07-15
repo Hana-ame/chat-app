@@ -1,5 +1,15 @@
+/**
+ * @typedef {import('../types').User} User
+ * @typedef {import('../types').Chat} Chat
+ * @typedef {import('../types').Message} Message
+ * @typedef {import('../types').Reaction} Reaction
+ * @typedef {import('../types').Attachment} Attachment
+ * @typedef {import('../types').PinnedContent} PinnedContent
+ */
+
 import { generateDummyData } from '../dev/dummy';
 
+/** @returns {string} */
 function randid() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -10,12 +20,14 @@ function randid() {
   });
 }
 
+/** @type {string[]} */
 const CHAT_COLORS = [
   '#5865F2', '#23a559', '#f0b232', '#ed4245', '#9b59b6',
   '#1abc9c', '#e67e22', '#2ecc71', '#e74c3c', '#3498db',
   '#f39c12', '#1dd1a1', '#a29bfe', '#fd79a8', '#00cec9',
 ];
 
+/** @returns {User} */
 function currentUser() {
   try {
     const raw = localStorage.getItem('auth');
@@ -27,6 +39,7 @@ function currentUser() {
   return userById('dev-self');
 }
 
+/** @type {string[]} */
 const AI_RESPONSES = [
   "That's an interesting thought! Let me add my perspective here.",
   "I agree with you. Building on what you said, there's more to consider.",
@@ -40,10 +53,15 @@ const AI_RESPONSES = [
   "Let me share what I've learned from past experience with this.",
 ];
 
+/**
+ * @type {{ chats: Chat[], messages: Message[] }|null}
+ */
 let data = null;
+/** @type {import('zustand').UseBoundStore<import('zustand').StoreApi<import('../store/chat').ChatStore>>|null} */
 let _store = null;
 import('../store/chat').then(m => { _store = m.useChatStore; }).catch(() => {});
 
+/** @type {User[]} */
 const MOCK_USERS = [
   { id: 'dev-self', username: 'Alice', avatar_color: '#5865F2', email: 'alice@test.com', role: 'owner', last_seen: new Date().toISOString() },
   { id: 'dev-bob', username: 'Bob', avatar_color: '#23a559', email: 'bob@test.com', role: 'admin', last_seen: new Date().toISOString() },
@@ -54,6 +72,7 @@ const MOCK_USERS = [
   { id: 'ai', username: 'AI Bot', avatar_color: '#10a37f', email: '', role: '', last_seen: new Date().toISOString() },
 ];
 
+/** @returns {{ chats: Chat[], messages: Message[] }} */
 function ensureData() {
   if (!data) {
     const gen = generateDummyData({ chatCount: 10, msgPerChat: 150 });
@@ -67,15 +86,24 @@ export function resetMockData() {
   ensureData();
 }
 
+/**
+ * @param {string} id
+ * @returns {User}
+ */
 function userById(id) {
   return MOCK_USERS.find(u => u.id === id) || { id, username: 'Unknown', avatar_color: '#5865F2', email: '' };
 }
 
+/**
+ * @param {string} chatId
+ * @returns {Message[]}
+ */
 function messagesFor(chatId) {
   const d = ensureData();
   return d.messages.filter(m => m.chat_id === chatId).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 }
 
+/** @returns {{ chats: Chat[] }} */
 export function mockListChats() {
   const d = ensureData();
   const enriched = d.chats.map((c, i) => {
@@ -92,6 +120,13 @@ export function mockListChats() {
   return { chats: enriched };
 }
 
+/**
+ * @param {string} _token
+ * @param {string} chatId
+ * @param {string} [before]
+ * @param {number} [limit]
+ * @returns {{ messages: Message[] }}
+ */
 export function mockListMessages(_token, chatId, before, limit) {
   const all = messagesFor(chatId);
   const cu = currentUser();
@@ -114,6 +149,11 @@ export function mockListMessages(_token, chatId, before, limit) {
   return { messages: mapped.slice(start, total) };
 }
 
+/**
+ * @param {string} _token
+ * @param {string} id
+ * @returns {Chat & { members: User[] }}
+ */
 export function mockGetChat(_token, id) {
   const d = ensureData();
   const chat = d.chats.find(c => c.id === id);
@@ -121,6 +161,13 @@ export function mockGetChat(_token, id) {
   return { ...chat, members: chat.members || [] };
 }
 
+/**
+ * @param {string} _token
+ * @param {string} name
+ * @param {string[]} memberIds
+ * @param {string} [visibility]
+ * @returns {Chat}
+ */
 export function mockCreateChat(_token, name, memberIds, visibility) {
   const d = ensureData();
   const cu = currentUser();
@@ -143,6 +190,11 @@ export function mockCreateChat(_token, name, memberIds, visibility) {
   return newChat;
 }
 
+/**
+ * @param {string} _token
+ * @param {string} id
+ * @returns {{ ok: boolean }}
+ */
 export function mockDeleteChat(_token, id) {
   const d = ensureData();
   d.chats = d.chats.filter(c => c.id !== id);
@@ -151,6 +203,11 @@ export function mockDeleteChat(_token, id) {
 }
 
 // @deprecated DMs are now handled via createChat with type='dm'
+/**
+ * @param {string} _token
+ * @param {string} userId
+ * @returns {Chat}
+ */
 export function mockCreateDM(_token, userId) {
   const d = ensureData();
   const cu = currentUser();
@@ -176,11 +233,18 @@ export function mockCreateDM(_token, userId) {
   return newDM;
 }
 
+/** @param {Partial<Chat>} chat */
 function syncChatToStore(chat) {
   if (!_store) return;
   _store.getState().onChatUpdate({ ...chat });
 }
 
+/**
+ * @param {string} _token
+ * @param {string} chatId
+ * @param {string} userId
+ * @returns {Chat|{ ok: boolean }}
+ */
 export function mockAddMember(_token, chatId, userId) {
   const d = ensureData();
   const chat = d.chats.find(c => c.id === chatId);
@@ -193,6 +257,12 @@ export function mockAddMember(_token, chatId, userId) {
   return chat || { ok: true };
 }
 
+/**
+ * @param {string} _token
+ * @param {string} chatId
+ * @param {string} userId
+ * @returns {{ ok: boolean }}
+ */
 export function mockRemoveMember(_token, chatId, userId) {
   const d = ensureData();
   const cu = currentUser();
@@ -208,6 +278,11 @@ export function mockRemoveMember(_token, chatId, userId) {
   return { ok: true };
 }
 
+/**
+ * @param {string} _token
+ * @param {string} chatId
+ * @returns {{ members: User[] }}
+ */
 export function mockListMembers(_token, chatId) {
   const d = ensureData();
   const chat = d.chats.find(c => c.id === chatId);
@@ -215,6 +290,11 @@ export function mockListMembers(_token, chatId) {
   return { members };
 }
 
+/**
+ * @param {string} _token
+ * @param {string} q
+ * @returns {{ users: User[] }}
+ */
 export function mockSearchUsers(_token, q) {
   const cu = currentUser();
   const results = MOCK_USERS
@@ -223,6 +303,11 @@ export function mockSearchUsers(_token, q) {
   return { users: results };
 }
 
+/**
+ * @param {string} _token
+ * @param {{ username?: string, avatar_color?: string, avatar_url?: string }} data
+ * @returns {User}
+ */
 export function mockUpdateProfile(_token, data) {
   const cu = currentUser();
   const updated = { ...cu, username: data.username || cu.username, avatar_color: data.avatar_color || cu.avatar_color, avatar_url: data.avatar_url || cu.avatar_url || '' };
@@ -238,6 +323,13 @@ export function mockUpdateProfile(_token, data) {
   return updated;
 }
 
+/**
+ * @param {string} _token
+ * @param {string} chatId
+ * @param {string} content
+ * @param {Attachment[]} [attachments]
+ * @returns {Message}
+ */
 export function mockSendMessage(_token, chatId, content, attachments) {
   const d = ensureData();
   const now = new Date().toISOString();
@@ -262,6 +354,7 @@ export function mockSendMessage(_token, chatId, content, attachments) {
     const aiId = randid();
     const aiCreatedAt = new Date(Date.now() + 1).toISOString();
 
+    /** @type {Message} */
     const aiStoreMsg = {
       id: aiId,
       chat_id: chatId,
@@ -288,6 +381,7 @@ export function mockSendMessage(_token, chatId, content, attachments) {
       },
     };
 
+    /** @type {Message} */
     const aiDataMsg = {
       id: aiId,
       chat_id: chatId,
@@ -311,6 +405,13 @@ export function mockSendMessage(_token, chatId, content, attachments) {
   return userMsg;
 }
 
+/**
+ * @param {string} _token
+ * @param {string} _chatId
+ * @param {string} msgId
+ * @param {string} content
+ * @returns {{ ok: boolean }}
+ */
 export function mockEditMessage(_token, _chatId, msgId, content) {
   const d = ensureData();
   const msg = d.messages.find(m => m.id === msgId);
@@ -322,6 +423,12 @@ export function mockEditMessage(_token, _chatId, msgId, content) {
   return { ok: true };
 }
 
+/**
+ * @param {string} _token
+ * @param {string} _chatId
+ * @param {string} msgId
+ * @returns {{ ok: boolean }}
+ */
 export function mockDeleteMessage(_token, _chatId, msgId) {
   const d = ensureData();
   d.messages = d.messages.filter(m => m.id !== msgId);
@@ -329,6 +436,13 @@ export function mockDeleteMessage(_token, _chatId, msgId) {
   return { ok: true };
 }
 
+/**
+ * @param {string} _token
+ * @param {string} _chatId
+ * @param {string} msgId
+ * @param {string} emoji
+ * @returns {{ ok: boolean }}
+ */
 export function mockAddReaction(_token, _chatId, msgId, emoji) {
   const d = ensureData();
   const cu = currentUser();
@@ -350,6 +464,13 @@ export function mockAddReaction(_token, _chatId, msgId, emoji) {
   return { ok: true };
 }
 
+/**
+ * @param {string} _token
+ * @param {string} _chatId
+ * @param {string} msgId
+ * @param {string} emoji
+ * @returns {{ ok: boolean }}
+ */
 export function mockRemoveReaction(_token, _chatId, msgId, emoji) {
   const d = ensureData();
   const cu = currentUser();
@@ -366,6 +487,12 @@ export function mockRemoveReaction(_token, _chatId, msgId, emoji) {
   return { ok: true };
 }
 
+/**
+ * @param {string} _token
+ * @param {string} chatId
+ * @param {string} content
+ * @returns {{ ok: boolean, pinned_message?: PinnedContent, pinned_updated_at?: string }}
+ */
 export function mockSetAnnouncement(_token, chatId, content) {
   const now = new Date().toISOString();
   const pinned = { id: 'pm-' + randid(), content, pinned_at: now };
@@ -373,15 +500,26 @@ export function mockSetAnnouncement(_token, chatId, content) {
   return { ok: true, pinned_message: pinned, pinned_updated_at: now };
 }
 
+/**
+ * @param {string} _token
+ * @param {string} chatId
+ * @returns {{ ok: boolean }}
+ */
 export function mockClearAnnouncement(_token, chatId) {
   if (_store) _store.getState().onChatUpdate({ id: chatId, pinned_message: null, pinned_updated_at: null });
   return { ok: true };
 }
 
+/** @returns {{ ok: boolean }} */
 export function mockMarkRead() {
   return { ok: true };
 }
 
+/**
+ * @param {string} _token
+ * @param {string} chatId
+ * @returns {{ ok: boolean, error?: string }}
+ */
 export function mockJoinChat(_token, chatId) {
   const d = ensureData();
   const cu = currentUser();
@@ -399,6 +537,13 @@ export function mockJoinChat(_token, chatId) {
   return { ok: true };
 }
 
+/**
+ * @param {string} _token
+ * @param {string} email
+ * @param {string} username
+ * @param {string} password
+ * @returns {{ user: User, access_token: string, expires_in: number }}
+ */
 export function mockRegister(_token, email, username, password) {
   const existing = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
   if (existing) {
@@ -413,6 +558,12 @@ export function mockRegister(_token, email, username, password) {
   };
 }
 
+/**
+ * @param {string} _token
+ * @param {string} email
+ * @param {string} password
+ * @returns {{ user: User, access_token: string, expires_in: number }}
+ */
 export function mockLogin(_token, email, password) {
   const user = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
   if (!user) {
@@ -425,6 +576,7 @@ export function mockLogin(_token, email, password) {
   };
 }
 
+/** @returns {{ user: User, access_token: string, expires_in: number }} */
 export function mockRefresh() {
   const cu = currentUser();
   return {
@@ -434,15 +586,23 @@ export function mockRefresh() {
   };
 }
 
+/** @returns {{ ok: boolean }} */
 export function mockLogout() {
   return { ok: true };
 }
 
+/** @returns {User} */
 export function mockMe() {
   const cu = currentUser();
   return userById(cu.id);
 }
 
+/**
+ * @param {string} _token
+ * @param {number} [page]
+ * @param {number} [limit]
+ * @returns {{ chats: Chat[] }}
+ */
 export function mockListPublicChats(_token, page = 1, limit = 20) {
   const d = ensureData();
   const all = d.chats.filter(c => c.visibility === 'public')
@@ -465,6 +625,12 @@ export function mockListPublicChats(_token, page = 1, limit = 20) {
   return { chats };
 }
 
+/**
+ * @param {string} _token
+ * @param {string} _id
+ * @param {string} name
+ * @returns {{ ok: boolean }}
+ */
 export function mockRenameChat(_token, _id, name) {
   const d = ensureData();
   const chat = d.chats.find(c => c.id === _id);
@@ -473,6 +639,10 @@ export function mockRenameChat(_token, _id, name) {
   return { ok: true };
 }
 
+/**
+ * @param {File} file
+ * @returns {{ filename: string, mime_type: string, size: number, url: string }}
+ */
 export function mockUpload(file) {
   const ext = file?.name?.split('.').pop() || 'bin';
   return {
@@ -483,28 +653,48 @@ export function mockUpload(file) {
   };
 }
 
+/**
+ * @param {string} _token
+ * @param {File} file
+ * @returns {{ url: string }}
+ */
 export function mockUploadAvatar(_token, file) {
   return { url: URL.createObjectURL(file) };
 }
 
+/**
+ * @param {string} _token
+ * @param {string} chatId
+ * @returns {{ ok: boolean, pinned: boolean }}
+ */
 export function mockPinChat(_token, chatId) {
   const d = ensureData();
   const chat = d.chats.find(c => c.id === chatId);
-  if (!chat) return { ok: false };
+  if (!chat) return { ok: false, pinned: false };
   chat.pinned = true;
   if (_store) _store.getState().onChatUpdate({ id: chatId, pinned: true });
   return { ok: true, pinned: true };
 }
 
+/**
+ * @param {string} _token
+ * @param {string} chatId
+ * @returns {{ ok: boolean, pinned: boolean }}
+ */
 export function mockUnpinChat(_token, chatId) {
   const d = ensureData();
   const chat = d.chats.find(c => c.id === chatId);
-  if (!chat) return { ok: false };
+  if (!chat) return { ok: false, pinned: false };
   chat.pinned = false;
   if (_store) _store.getState().onChatUpdate({ id: chatId, pinned: false });
   return { ok: true, pinned: false };
 }
 
+/**
+ * @param {string} _token
+ * @param {string} chatId
+ * @returns {{ ok: boolean }}
+ */
 export function mockMarkAnnouncementRead(_token, chatId) {
   const d = ensureData();
   const chat = d.chats.find(c => c.id === chatId);
@@ -514,6 +704,12 @@ export function mockMarkAnnouncementRead(_token, chatId) {
   return { ok: true };
 }
 
+/**
+ * @param {string} _token
+ * @param {string} _chatId
+ * @param {string} msgId
+ * @returns {{ reactions: Reaction[] }}
+ */
 export function mockGetReactions(_token, _chatId, msgId) {
   const d = ensureData();
   const cu = currentUser();

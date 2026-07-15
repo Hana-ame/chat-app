@@ -3742,3 +3742,36 @@ CHAT_CSP_CONNECT_SRC="'self' ws://localhost:8080 wss://localhost:8080 http://loc
 - Go build + vet: ✅
 
 ---
+
+## 2026-07-15 JSDoc 类型注释 — API + Store + Mock（第 18 轮）
+
+### 背景
+
+前端纯 JSX，状态形状、API 响应类型、组件 props 全靠运行时隐式约定，无类型提示。
+
+### 变更
+
+**新增** `client/src/types.js` — 共享类型定义：
+- `User`, `Chat`, `Message`, `Reaction`, `Attachment`, `PinnedContent`, `StreamSource`
+
+**`store/chat.js`**:
+- `@typedef ChatStore` 完整 state + 所有 action 方法签名
+- 每个 action 方法加 `@param` / `@returns`
+- 外部回调（`onReady`, `onEvent`）加参数类型
+
+**`api/client.js`**:
+- 所有 API 方法加 `@param` / `@returns`
+- 响应类型化（`AuthResponse`, `ListChatsResponse` 等）
+- `request()`、`buildUploadUrl()`、`mockCallLog()` 加签名
+
+**`api/mock.js`**:
+- 所有 export 函数加 `@param` / `@returns`
+- `randid()`、`currentUser()`、`userById()`、`messagesFor()` 加签名
+
+**新增** `client/tsconfig.json`:
+- `allowJs: true`, `checkJs: true` — IDE 可启用 TypeScript 类型检查
+
+### 验证
+- Client build: ✅ 76 modules
+
+---

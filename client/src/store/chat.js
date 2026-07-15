@@ -1,3 +1,44 @@
+/**
+ * @typedef {import('../types').Chat} Chat
+ * @typedef {import('../types').Message} Message
+ * @typedef {import('../types').User} User
+ * @typedef {import('../types').PinnedContent} PinnedContent
+ */
+
+/**
+ * @typedef {Object} ChatStore
+ * @property {Chat[]} chats
+ * @property {string|null} activeChatId
+ * @property {Message[]} messages
+ * @property {Object<string, PinnedContent|null>} pinnedMessage
+ * @property {string[]} onlineUserIds
+ * @property {'ws'|'sse'|'poll'} mode
+ * @property {boolean} wsReady
+ * @property {boolean} sseReady
+ * @property {(mode: string) => void} setMode
+ * @property {(token: string|null) => void} connect
+ * @property {(chats: Chat[]) => void} setChats
+ * @property {(chat: Partial<Chat>) => void} onChatUpdate
+ * @property {(payload: {chat_id?:string, id?:string}) => void} onChatDelete
+ * @property {(payload: {chat_id:string}) => void} onChatRemove
+ * @property {(msg: Message) => void} onMessageCreate
+ * @property {(msg: Partial<Message>) => void} onMessageUpdate
+ * @property {(payload: {message_id:string}) => void} onMessageDelete
+ * @property {(payload: {message_id:string, emoji:string, user_id:string}, added: boolean) => void} onReaction
+ * @property {(token: string) => Promise<void>} loadChats
+ * @property {(token: string, chatId: string, before?: string) => Promise<void>} loadMessages
+ * @property {(token: string, chatId: string, content: string, attachments?: import('../types').Attachment[]) => Promise<void>} sendMessage
+ * @property {(msgId: string) => void} finishStreaming
+ * @property {(msg: Message) => void} startConsumingStream
+ * @property {(chatId: string) => void} sendTyping
+ * @property {(chatId: string) => void} subscribe
+ * @property {(op: string, payload?: any) => Promise<any>} wsRequest
+ * @property {(token: string, chatId: string, content: string) => Promise<void>} setAnnouncement
+ * @property {(token: string, chatId: string) => Promise<void>} clearAnnouncement
+ * @property {(chatId: string) => Promise<void>} markAnnouncementRead
+ * @property {() => void} reset
+ */
+
 import { create } from 'zustand';
 import { api } from '../api/client';
 import { useAuthStore } from './auth';
@@ -6,10 +47,12 @@ import { getCoordinator } from '../realtime/coordinator';
 const coord = getCoordinator();
 
 coord.setHandlers({
+  /** @param {{ onlineUserIds?: string[], chats?: import('../types').Chat[] }} payload */
   onReady: ({ onlineUserIds, chats }) => {
     set({ onlineUserIds, wsReady: true, sseReady: true });
     get().setChats(chats || []);
   },
+  /** @param {string} op @param {any} payload */
   onEvent: (op, payload) => {
     const s = get();
     switch (op) {
@@ -40,9 +83,11 @@ coord.setHandlers({
   getActiveChatId: () => get().activeChatId,
 });
 
+/** @param {Partial<ChatStore>|((s: ChatStore) => Partial<ChatStore>)} fn */
 const set = (fn) => useChatStore.setState(fn);
 const get = () => useChatStore.getState();
 
+/** @type {import('zustand').StateCreator<ChatStore>} */
 export const useChatStore = create((set, get) => ({
   chats: [],
   activeChatId: null,
@@ -54,6 +99,7 @@ export const useChatStore = create((set, get) => ({
   wsReady: false,
   sseReady: false,
 
+  /** @param {string} mode */
   setMode(mode) {
     coord.disconnect();
     set({ mode, wsReady: false, sseReady: false });
@@ -61,12 +107,14 @@ export const useChatStore = create((set, get) => ({
     if (token) coord.connect(mode, token);
   },
 
+  /** @param {string|null} token */
   connect(token) {
     if (!token) { coord.disconnect(); set({ wsReady: false, sseReady: false }); return; }
     const mode = get().mode;
     coord.connect(mode, token);
   },
 
+  /** @param {import('../types').Chat[]} chats */
   setChats(chats) {
     set(s => {
       const existing = new Map(s.chats.map(c => [c.id, c]));
@@ -95,6 +143,7 @@ export const useChatStore = create((set, get) => ({
     });
   },
 
+  /** @param {Partial<import('../types').Chat>} chat */
   onChatUpdate(chat) {
     set(s => {
       const idx = s.chats.findIndex(c => c.id === chat.id);
@@ -119,6 +168,7 @@ export const useChatStore = create((set, get) => ({
     });
   },
 
+  /** @param {{ chat_id?: string, id?: string }} payload */
   onChatDelete(payload) {
     const id = payload.chat_id || payload.id;
     set(s => ({
@@ -128,6 +178,7 @@ export const useChatStore = create((set, get) => ({
     }));
   },
 
+  /** @param {{ chat_id: string }} payload */
   onChatRemove(payload) {
     set(s => ({
       chats: s.chats.filter(c => c.id !== payload.chat_id),
@@ -136,6 +187,7 @@ export const useChatStore = create((set, get) => ({
     }));
   },
 
+  /** @param {import('../types').Message} msg */
   onMessageCreate(msg) {
     set(s => {
       const chat = s.chats.find(c => c.id === msg.chat_id);
@@ -154,6 +206,7 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  /** @param {import('../types').Message} msg */
   startConsumingStream(msg) {
     api.startStreaming(msg.source)
       .onChunk(chunk => {
@@ -168,14 +221,17 @@ export const useChatStore = create((set, get) => ({
       });
   },
 
+  /** @param {Partial<import('../types').Message>} msg */
   onMessageUpdate(msg) {
     set(s => ({ messages: s.messages.map(m => m.id === msg.id ? { ...m, ...msg } : m) }));
   },
 
+  /** @param {{ message_id: string }} payload */
   onMessageDelete(payload) {
     set(s => ({ messages: s.messages.map(m => m.id === payload.message_id ? { ...m, deleted: true, content: '' } : m) }));
   },
 
+  /** @param {{ message_id: string, emoji: string, user_id: string }} payload @param {boolean} added */
   onReaction(payload, added) {
     const myId = useAuthStore.getState().user?.id;
     set(s => ({ messages: s.messages.map(m => {
@@ -198,6 +254,7 @@ export const useChatStore = create((set, get) => ({
     }) }));
   },
 
+  /** @param {string} token */
   async loadChats(token) {
     try {
       const data = await api.listChats(token);
@@ -206,6 +263,7 @@ export const useChatStore = create((set, get) => ({
   },
 
   _msgLoadId: 0,
+  /** @param {string} token @param {string} chatId @param {string} [before] */
   async loadMessages(token, chatId, before) {
     const loadId = ++get()._msgLoadId;
     try {
@@ -219,20 +277,26 @@ export const useChatStore = create((set, get) => ({
     } catch (e) { console.error('loadMessages error:', e); }
   },
 
+  /** @param {string} token @param {string} chatId @param {string} content @param {import('../types').Attachment[]} [attachments] */
   async sendMessage(token, chatId, content, attachments) {
     await api.sendMessage(token, chatId, content, attachments);
   },
 
+  /** @param {string} msgId */
   finishStreaming(msgId) {
     set(s => ({
       messages: s.messages.map(m => m.id === msgId ? { ...m, streaming: false } : m),
     }));
   },
 
+  /** @param {string} chatId */
   sendTyping(chatId) { coord.sendTyping(chatId); },
+  /** @param {string} chatId */
   subscribe(chatId) { coord.subscribe(chatId); },
+  /** @param {string} op @param {any} [payload] @returns {Promise<any>} */
   wsRequest(op, payload) { return coord.wsRequest(op, payload); },
 
+  /** @param {string} token @param {string} chatId @param {string} content */
   async setAnnouncement(token, chatId, content) {
     const res = await api.setAnnouncement(token, chatId, content);
     const p = res.pinned_message || { id: '', content, pinned_at: new Date().toISOString() };
@@ -241,6 +305,7 @@ export const useChatStore = create((set, get) => ({
     }));
   },
 
+  /** @param {string} token @param {string} chatId */
   async clearAnnouncement(token, chatId) {
     await api.clearAnnouncement(token, chatId);
     set(s => {
@@ -250,6 +315,7 @@ export const useChatStore = create((set, get) => ({
     });
   },
 
+  /** @param {string} chatId */
   async markAnnouncementRead(chatId) {
     const { accessToken } = useAuthStore.getState();
     try { await api.markAnnouncementRead(accessToken, chatId); } catch (e) { console.error('markAnnouncementRead error:', e); }
