@@ -13,3 +13,5 @@ client/test-results/
 server/chatd
 
 chatd
+
+docs/*.pptx
