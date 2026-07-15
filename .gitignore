@@ -15,3 +15,5 @@ server/chatd
 chatd
 
 docs/*.pptx
+server/internal/handlers/swagger.json
+server/docs/swagger/swagger.json

@@ -20,7 +20,9 @@ export default function UserProfileModal({ user: profileUser, onClose, chatId })
           <button className="btn-ghost" onClick={onClose}>✕</button>
         </div>
 
-        <UserAvatar user={profileUser} size={64} onClick={() => setPreviewUrl(profileUser.avatar_url)} style={{ margin: '8px auto' }} />
+        <div style={{ display: 'flex', justifyContent: 'center', margin: '8px 0' }}>
+          <UserAvatar user={profileUser} size={64} onClick={() => setPreviewUrl(profileUser.avatar_url)} />
+        </div>
 
         <h3 style={{ margin: '8px 0 4px' }}>{profileUser.username}</h3>
 

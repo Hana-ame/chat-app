@@ -4027,3 +4027,70 @@ CHAT_CSP_CONNECT_SRC="'self' ws://localhost:8080 wss://localhost:8080 http://loc
 ### 验证
 - `go build` + `go vet` + `go test` — ✅
 - 全部新测试通过，无回归
+
+---
+
+## 2026-07-16 删除消息重载后显示为空信息（第 31 轮）
+
+### 问题
+
+服务器对已删除消息返回 `deleted_at` 时间戳 + `content: ""`。实时广播通过 `onMessageDelete` 正确设置 `deleted: true`，但页面重载时（API 分页加载 / polling），`deleted_at` 未被转为 `deleted: true`，导致已删除消息渲染为空白可编辑信息。
+
+### 代码变更
+
+**`client/src/store/chat.js`**:
+
+新增 `_normalize(m)` 辅助函数，将 `deleted_at` 时间戳映射为 `deleted: true`，并在以下入口调用：
+- `loadMessages` — API 分页加载
+- `poll:messages` — 轮询传输
+
+```js
+/** @param {import('../types').Message} m */
+_normalize(m) {
+  if (m.deleted_at) {
+    return { ...m, deleted: true, content: '' };
+  }
+  if (m.deleted) {
+    return { ...m, content: '' };
+  }
+  return m;
+},
+```
+
+### 验证
+- Client build: ✅
+- Go build + vet + test: ✅
+
+---
+
+## 2026-07-16 UserProfileModal 头像居中修复 + OpenAPI Spec 替换（第 32 轮）
+
+### Avatar 居中修复
+
+**问题**: `UserProfileModal` 中头像未居中。
+
+**根因**: `<UserAvatar style={{ margin: '8px auto' }}>` — `UserAvatar` 不接受 `style` prop（内部 inline style 硬编码），prop 被静默忽略。
+
+**修复**: 用 `<div style={{ display:'flex', justifyContent:'center' }}>` 包裹 `<UserAvatar>`，替代无效的 `style` prop（`client/src/components/UserProfileModal.jsx:23`）。
+
+### OpenAPI Spec 替换
+
+**背景**: 旧 `server/docs/swagger/` 由 swaggo 从 Go 注解生成，存在以下问题：
+- 路径不匹配（`/api/chats` 实为 `/api/chats/my`，`pin-toggle` 已改 `announcement`）
+- 缺失 8 个路径（`healthz`、`version`、`announcement/*`、`unpin`、`visit`、`/ws`）
+- 响应描述空洞（大量 `additionalProperties: true`）
+- 格式落后（Swagger 2.0）
+
+**方案**: 手写 `docs/openapi.yml`（OpenAPI 3.1，29 路径，18 Schema，完整错误码）作为契约，替代 swaggo 生成的 spec。
+
+**代码变更**:
+- `docs/openapi.yml` — 新增，v0.3.0 的 API 契约骨架
+- `server/internal/handlers/router.go` — `//go:embed swagger.json` + 本地 `GET /swagger/swagger.json`，删除远程 URL 依赖
+- `server/internal/handlers/swagger.json` — 从 `openapi.yml` 转换的 JSON，embedded
+- `server/cmd/chatd/main.go` — 删除 swaggo 全局注解 + 废弃的 `_ import`
+- `server/docs/swagger/docs.go` — 删除（swaggo 生成死代码）
+- `server/docs/swagger/swagger.yaml` — 删除（swaggo 生成死代码）
+
+### 验证
+- Go build + vet: ✅
+- Client build: ✅

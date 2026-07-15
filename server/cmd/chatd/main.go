@@ -1,11 +1,3 @@
-// @title           Chat App API
-// @version         0.1.0-beta
-// @description     Real-time chat server with WebSocket and SSE
-// @host            localhost:8080
-// @BasePath        /api
-// @securityDefinitions.apikey  BearerAuth
-// @in                          header
-// @name                        Authorization
 package main
 
 import (
@@ -23,8 +15,6 @@ import (
 	"github.com/Hana-ame/chat-app/server/internal/handlers"
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/Hana-ame/chat-app/server/internal/ws"
-
-	_ "github.com/Hana-ame/chat-app/server/docs/swagger"
 )
 
 // Version is set at build time via -ldflags -X main.Version=build-xxxxx.

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	_ "embed"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,6 +18,9 @@ import (
 	"github.com/go-chi/httprate"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
+
+//go:embed swagger.json
+var swaggerJSON []byte
 
 // Router builds the HTTP handler with all routes and middleware.
 func (s *Server) Router(gateway *ws.Gateway) http.Handler {
@@ -129,8 +133,13 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 	r.Get("/api/events", s.SSE)
 
 	r.Get("/swagger/*", httpSwagger.Handler(
-		httpSwagger.URL("https://wsl-8080.moonchan.xyz/swagger/doc.json"),
+		httpSwagger.URL("/swagger/swagger.json"),
 	))
+	r.Get("/swagger/swagger.json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(swaggerJSON)
+	})
 
 	r.Get("/uploads/*", s.serveUpload) // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
 	if s.Cfg.StaticDir != "" {

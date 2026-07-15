@@ -82,7 +82,7 @@ coord.setHandlers({
         break;
       }
       case 'poll:chats': s.setChats(payload); break;
-      case 'poll:messages': set({ messages: payload }); break;
+      case 'poll:messages': set({ messages: (payload || []).map(m => get()._normalize(m)) }); break;
     }
   },
   onClose: () => {
@@ -254,16 +254,28 @@ export const useChatStore = create((set, get) => ({
     } catch (e) { console.error('loadChats error:', e); }
   },
 
+  /** @param {import('../types').Message} m */
+  _normalize(m) {
+    if (m.deleted_at) {
+      return { ...m, deleted: true, content: '' };
+    }
+    if (m.deleted) {
+      return { ...m, content: '' };
+    }
+    return m;
+  },
+
   _msgLoadId: 0,
   /** @param {string} token @param {string} chatId @param {string} [before] */
   async loadMessages(token, chatId, before) {
     const loadId = ++get()._msgLoadId;
     try {
       const data = await api.listMessages(token, chatId, before);
+      const norm = (data.messages || []).map(m => get()._normalize(m));
       set(s => {
         if (s._msgLoadId !== loadId) return {};
         return {
-          messages: before ? [...(data.messages || []), ...s.messages] : (data.messages || []),
+          messages: before ? [...norm, ...s.messages] : norm,
         };
       });
     } catch (e) { console.error('loadMessages error:', e); }
