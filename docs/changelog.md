@@ -3593,6 +3593,25 @@ Handlers 直接调 `s.DB.*`，权限检查、Hub 广播、验证逻辑在每个 
 - `go vet ./...`: ✅
 - `go test ./...`: ✅
 - CI (GitHub): ✅
-- 最新推送 `59a3579`，CI 构建中
+
+---
+
+## 2026-07-15 DB 包拆分 — refresh_tokens.go（第 12 轮）
+
+### 操作
+
+`chats.go` (487行) 中混有 5 个 Refresh Token 方法（CreateRefreshToken, FindRefreshToken, DeleteRefreshToken, DeleteUserRefreshTokens, PurgeExpiredTokens），文件命名与实际内容不符。
+
+**修复**：
+- 新增 `refresh_tokens.go`（78行），搬入 5 个方法 + 精准 import
+- `chats.go` 删除对应 60 行，现纯属 chat/member 领域
+
+### 验证
+
+- `go build ./...`: ✅
+- `go vet ./...`: ✅
+- `go test ./...`: ✅
+- CI (GitHub): ✅
+- 最新推送 `f689db4`，CI 构建中
 
 ---
