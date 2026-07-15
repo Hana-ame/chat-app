@@ -1,0 +1,1462 @@
+openapi: "3.1.0"
+info:
+  title: Chat App API
+  version: "0.3.0"
+  description: |
+    实时聊天应用后端 API。
+
+    认证方式:
+    - `Authorization: Bearer <access_token>` 请求头（首选）
+    - `access_token` Cookie（SSE 等 WebSocket 场景回退）
+    - `refresh_token` Cookie（仅 `/api/auth/refresh`）
+
+    所有错误响应统一格式:
+    ```json
+    { "error": "error_code", "message": "human-readable message" }
+    ```
+
+servers:
+  - url: https://wsl-8080.moonchan.xyz
+    description: 生产服务器
+  - url: http://localhost:8080
+    description: 本地开发
+
+paths:
+  # ────────────────────────────── Health ──────────────────────────────
+  /healthz:
+    get:
+      summary: 健康检查
+      operationId: healthz
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  echo:
+                    type: object
+                    description: 请求头回显
+
+  # ────────────────────────────── Version ──────────────────────────────
+  /api/version:
+    get:
+      summary: 获取版本信息
+      operationId: getVersion
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: string
+                    example: "0.3.0"
+
+  # ────────────────────────────── Auth ──────────────────────────────
+  /api/auth/register:
+    post:
+      summary: 注册新用户
+      operationId: register
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "200":
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+          headers:
+            Set-Cookie:
+              $ref: "#/components/headers/SetCookie"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: 用户已存在
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorResponse"
+                  - example:
+                      error: already_taken
+                      message: "email or username already taken"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/auth/login:
+    post:
+      summary: 登录
+      operationId: login
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+          headers:
+            Set-Cookie:
+              $ref: "#/components/headers/SetCookie"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: 凭据无效
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorResponse"
+                  - example:
+                      error: invalid_credentials
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/auth/refresh:
+    post:
+      summary: 刷新 access token
+      description: 从 Cookie 中读取 refresh_token，轮换机制（一次性）
+      operationId: refreshToken
+      tags: [Auth]
+      responses:
+        "200":
+          description: 刷新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+          headers:
+            Set-Cookie:
+              $ref: "#/components/headers/SetCookie"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: refresh token 无效或过期
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorResponse"
+                  - example:
+                      error: refresh_invalid
+
+  /api/auth/logout:
+    post:
+      summary: 登出
+      description: 清除所有 refresh token
+      operationId: logout
+      tags: [Auth]
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: 登出成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ────────────────────────────── Users ──────────────────────────────
+  /api/users/me:
+    get:
+      summary: 获取当前用户信息
+      operationId: getMe
+      tags: [Users]
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    patch:
+      summary: 更新当前用户信息
+      operationId: updateMe
+      tags: [Users]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: 用户名已存在
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ErrorResponse"
+                  - example:
+                      error: username_taken
+
+  /api/users:
+    get:
+      summary: 搜索用户
+      operationId: searchUsers
+      tags: [Users]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+          description: 搜索关键词
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+        "500":
+          $ref: "#/components/responses/Internal"
+
+  # ────────────────────────────── Chats ──────────────────────────────
+  /api/chats/my:
+    get:
+      summary: 获取当前用户的聊天列表
+      operationId: listChats
+      tags: [Chats]
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  chats:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Chat"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/chats/public:
+    get:
+      summary: 获取公开聊天列表（分页）
+      operationId: listPublicChats
+      tags: [Chats]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  chats:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Chat"
+
+  /api/chats:
+    post:
+      summary: 创建聊天（仅群组）
+      operationId: createChat
+      tags: [Chats]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateChatRequest"
+      responses:
+        "201":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Chat"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/chats/{chatID}:
+    parameters:
+      - $ref: "#/components/parameters/ChatID"
+    get:
+      summary: 获取聊天详情
+      operationId: getChat
+      tags: [Chats]
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Chat"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      summary: 重命名聊天
+      operationId: renameChat
+      tags: [Chats]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenameChatRequest"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Chat"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    delete:
+      summary: 删除聊天
+      operationId: deleteChat
+      tags: [Chats]
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/chats/{chatID}/join:
+    post:
+      summary: 加入公开聊天
+      operationId: joinChat
+      tags: [Chats]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ChatID"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  chat:
+                    $ref: "#/components/schemas/Chat"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/chats/{chatID}/visit:
+    post:
+      summary: 标记聊天访问（更新 last_active_at）
+      operationId: visitChat
+      tags: [Chats]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ChatID"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ────────────────────────────── DM ──────────────────────────────
+  /api/dms:
+    post:
+      summary: 创建或获取私聊（已废弃）
+      description: Deprecated. 后续版本移除。
+      operationId: createOrGetDM
+      tags: [Chats]
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+      responses:
+        "200":
+          description: 返回已有私聊
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Chat"
+        "201":
+          description: 新建私聊
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Chat"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ────────────────────────────── Announcement ──────────────────────────────
+  /api/chats/{chatID}/announcement:
+    parameters:
+      - $ref: "#/components/parameters/ChatID"
+    post:
+      summary: 创建公告
+      operationId: setAnnouncement
+      tags: [Announcement]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PinContentRequest"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    patch:
+      summary: 更新公告（委托给 POST）
+      operationId: updateAnnouncement
+      tags: [Announcement]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PinContentRequest"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    delete:
+      summary: 删除公告
+      operationId: deleteAnnouncement
+      tags: [Announcement]
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/chats/{chatID}/announcement/read:
+    post:
+      summary: 标记公告已读
+      operationId: markAnnouncementRead
+      tags: [Announcement]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ChatID"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ────────────────────────────── Pin/Unpin Chat List ──────────────────────────────
+  /api/chats/{chatID}/pin:
+    post:
+      summary: 置顶聊天到列表顶部
+      operationId: pinChatList
+      tags: [Chats]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ChatID"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+                  pinned:
+                    type: boolean
+                    enum: [true]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/chats/{chatID}/unpin:
+    post:
+      summary: 取消聊天置顶
+      operationId: unpinChatList
+      tags: [Chats]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ChatID"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+                  pinned:
+                    type: boolean
+                    enum: [false]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ────────────────────────────── Members ──────────────────────────────
+  /api/chats/{chatID}/members:
+    parameters:
+      - $ref: "#/components/parameters/ChatID"
+    get:
+      summary: 获取聊天成员列表
+      operationId: listMembers
+      tags: [Members]
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  members:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ChatMember"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      summary: 添加成员
+      operationId: addMember
+      tags: [Members]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddMemberRequest"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Chat"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/chats/{chatID}/members/{userID}:
+    parameters:
+      - $ref: "#/components/parameters/ChatID"
+      - name: userID
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      summary: 移除成员
+      operationId: removeMember
+      tags: [Members]
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  # ────────────────────────────── Messages ──────────────────────────────
+  /api/chats/{chatID}/messages:
+    parameters:
+      - $ref: "#/components/parameters/ChatID"
+    get:
+      summary: 获取消息列表（游标分页）
+      operationId: listMessages
+      tags: [Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: before
+          in: query
+          schema:
+            type: string
+          description: 游标（消息 ID），获取此消息之前的更早消息
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Message"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      summary: 发送消息
+      operationId: sendMessage
+      tags: [Messages]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageRequest"
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "413":
+          $ref: "#/components/responses/ContentTooLong"
+
+  /api/chats/{chatID}/messages/{messageID}:
+    parameters:
+      - $ref: "#/components/parameters/ChatID"
+    patch:
+      summary: 编辑消息
+      operationId: editMessage
+      tags: [Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: messageID
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditMessageRequest"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    delete:
+      summary: 删除消息
+      operationId: deleteMessage
+      tags: [Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: messageID
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/chats/{chatID}/read:
+    post:
+      summary: 标记消息已读
+      operationId: markRead
+      tags: [Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ChatID"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum: [true]
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  # ────────────────────────────── Reactions ──────────────────────────────
+  /api/chats/{chatID}/messages/{messageID}/reactions:
+    parameters:
+      - $ref: "#/components/parameters/ChatID"
+      - name: messageID
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: 获取消息的所有 Reaction
+      operationId: listReactions
+      tags: [Reactions]
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reactions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Reaction"
+
+  /api/chats/{chatID}/messages/{messageID}/reactions/{emoji}:
+    parameters:
+      - $ref: "#/components/parameters/ChatID"
+      - name: messageID
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: emoji
+        in: path
+        required: true
+        schema:
+          type: string
+        description: URL 编码的 UTF-8 emoji
+    put:
+      summary: 添加 Reaction
+      operationId: addReaction
+      tags: [Reactions]
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    delete:
+      summary: 移除 Reaction
+      operationId: removeReaction
+      tags: [Reactions]
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  # ────────────────────────────── Uploads ──────────────────────────────
+  /api/uploads:
+    post:
+      summary: 上传文件（已废弃）
+      description: Deprecated. 前端直接上传到 upload.moonchan.xyz，后续版本移除。
+      operationId: uploadFile
+      tags: [Uploads]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: 上传成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  url:
+                    type: string
+                  filename:
+                    type: string
+                  mime_type:
+                    type: string
+                  size:
+                    type: integer
+        "413":
+          $ref: "#/components/responses/ContentTooLong"
+        "415":
+          description: 不支持的媒体类型
+
+  # ────────────────────────────── Events (SSE) ──────────────────────────────
+  /api/events:
+    get:
+      summary: SSE 事件流
+      description: |
+        Server-Sent Events 端点，用于实时推送。
+
+        连接流程:
+        1. 客户端连接后立即收到 `ready` 事件，包含 user、chats、online_user_ids
+        2. 后续收到 message_create、message_update、message_delete、reaction_update 等事件
+
+        认证方式: 查询参数 `access_token`（WebSocket 不支持自定义 header 的 fallback）
+      operationId: sseEvents
+      tags: [Realtime]
+      parameters:
+        - name: access_token
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: SSE 事件流
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  # ────────────────────────────── WebSocket ──────────────────────────────
+  /ws:
+    get:
+      summary: WebSocket 实时连接
+      description: |
+        WebSocket 端点，用于实时消息推送。
+
+        认证: URL 查询参数 `token` 携带 access_token。
+        （WebSocket 不支持自定义 header，因此用 URL 参数传递。）
+
+        事件类型与 SSE 一致。
+      operationId: wsConnect
+      tags: [Realtime]
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "101":
+          description: 切换协议成功
+        "401":
+          description: 认证失败
+
+components:
+  # ──────────────────────────── Security Schemes ────────────────────────────
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        `Authorization: Bearer <access_token>`
+        access_token 有效期 15 分钟，通过 `/api/auth/refresh` 续期。
+
+  # ──────────────────────────── Headers ────────────────────────────
+  headers:
+    SetCookie:
+      schema:
+        type: string
+      description: |
+        设置 `access_token` 和 `refresh_token` Cookie。
+        refresh_token 为 httpOnly，用于 `/api/auth/refresh`。
+
+  # ──────────────────────────── Parameters ────────────────────────────
+  parameters:
+    ChatID:
+      name: chatID
+      in: path
+      required: true
+      schema:
+        type: string
+      description: 聊天 ID
+
+  # ──────────────────────────── Responses ────────────────────────────
+  responses:
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ErrorResponse"
+              - example:
+                  error: bad_request
+                  message: "invalid request body"
+
+    Unauthorized:
+      description: 未认证
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ErrorResponse"
+              - example:
+                  error: unauthorized
+                  message: "missing or invalid access token"
+
+    Forbidden:
+      description: 无权限
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ErrorResponse"
+              - example:
+                  error: forbidden
+                  message: "you are not a member of this chat"
+
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ErrorResponse"
+              - example:
+                  error: not_found
+                  message: "resource not found"
+
+    RateLimited:
+      description: 请求频率超限
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ErrorResponse"
+              - example:
+                  error: rate_limited
+                  message: "too many requests"
+
+    Internal:
+      description: 服务器内部错误
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ErrorResponse"
+              - example:
+                  error: internal
+                  message: "internal server error"
+
+    ContentTooLong:
+      description: 内容超长
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ErrorResponse"
+              - example:
+                  error: content_too_long
+                  message: "content exceeds maximum length"
+
+  # ──────────────────────────── Schemas ────────────────────────────
+  schemas:
+    # ── Common ──
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: 错误码（稳定，可用于客户端判断）
+          example: bad_request
+        message:
+          type: string
+          description: 人类可读的错误描述
+          example: "invalid request body"
+
+    # ── Auth ──
+    RegisterRequest:
+      type: object
+      required: [email, username, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        username:
+          type: string
+          minLength: 1
+          maxLength: 32
+          example: alice
+        password:
+          type: string
+          minLength: 6
+          maxLength: 128
+          example: "securePassword123"
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          example: "securePassword123"
+
+    SessionResponse:
+      type: object
+      required: [user, access_token, expires_in]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        access_token:
+          type: string
+          description: JWT access token
+        expires_in:
+          type: integer
+          description: 过期时间（秒）
+          example: 900
+
+    # ── User ──
+    User:
+      type: object
+      required: [id, username, avatar_color, status, created_at]
+      properties:
+        id:
+          type: string
+          example: "abc123def456"
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        username:
+          type: string
+          example: alice
+        avatar_color:
+          type: string
+          description: 默认头像背景色（Hex）
+          example: "#5865F2"
+        avatar_url:
+          type: string
+          format: uri
+          example: "https://upload.moonchan.xyz/api/xxx/avatar.png"
+        status:
+          type: string
+          enum: [online, offline, away]
+          example: online
+        role:
+          type: string
+          example: "admin"
+        last_seen:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 32
+        avatar_color:
+          type: string
+          example: "#5865F2"
+        avatar_url:
+          type: string
+          format: uri
+
+    # ── Chat ──
+    Chat:
+      type: object
+      required: [id, type, created_at, last_message_at, member_count, unread_count, pinned]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [group, dm]
+        name:
+          type: string
+        icon_color:
+          type: string
+        visibility:
+          type: string
+          enum: [public, private]
+        owner_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        last_message_at:
+          type: string
+          format: date-time
+        member_count:
+          type: integer
+        unread_count:
+          type: integer
+          description: Deprecated. 已弃用，保留兼容。
+        pinned_message:
+          $ref: "#/components/schemas/PinnedContent"
+        pinned_updated_at:
+          type: string
+          format: date-time
+        pinned_last_read_at:
+          type: string
+          format: date-time
+        pinned:
+          type: boolean
+        last_active_at:
+          type: string
+          format: date-time
+        last_message_id:
+          type: string
+        last_message:
+          $ref: "#/components/schemas/Message"
+          description: Deprecated. 已弃用，保留兼容。
+
+    PinnedContent:
+      type: object
+      properties:
+        content:
+          type: string
+        pinned_at:
+          type: string
+          format: date-time
+
+    CreateChatRequest:
+      type: object
+      required: [type, name]
+      properties:
+        type:
+          type: string
+          enum: [group]
+          description: 目前仅支持创建群组
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        visibility:
+          type: string
+          enum: [public, private]
+          default: private
+        member_ids:
+          type: array
+          items:
+            type: string
+          description: 初始成员 ID 列表
+
+    RenameChatRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+
+    PinContentRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          maxLength: 500
+
+    # ── ChatMember ──
+    ChatMember:
+      type: object
+      required: [chat_id, user_id, role, joined_at, pinned]
+      properties:
+        chat_id:
+          type: string
+        user_id:
+          type: string
+        role:
+          type: string
+          enum: [owner, admin, member]
+        joined_at:
+          type: string
+          format: date-time
+        last_active_at:
+          type: string
+          format: date-time
+        last_read_message_id:
+          type: string
+          description: Deprecated. 已弃用，保留兼容。
+        pinned:
+          type: boolean
+        pinned_last_read_at:
+          type: string
+          format: date-time
+
+    AddMemberRequest:
+      type: object
+      required: [user_id]
+      properties:
+        user_id:
+          type: string
+
+    # ── Message ──
+    Message:
+      type: object
+      required: [id, chat_id, user_id, content, created_at, attachment_count, mention_count, reaction_count]
+      properties:
+        id:
+          type: string
+        chat_id:
+          type: string
+        user_id:
+          type: string
+        author:
+          $ref: "#/components/schemas/User"
+          description: Deprecated. 已弃用，保留兼容。
+        content:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        edited_at:
+          type: string
+          format: date-time
+          nullable: true
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+        attachment_count:
+          type: integer
+        mention_count:
+          type: integer
+        reaction_count:
+          type: integer
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Attachment"
+        reactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Reaction"
+        mentions:
+          type: array
+          items:
+            type: string
+
+    SendMessageRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Attachment"
+
+    EditMessageRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 5000
+
+    # ── Attachment ──
+    Attachment:
+      type: object
+      required: [id, message_id, filename, mime_type, size, url]
+      properties:
+        id:
+          type: string
+        message_id:
+          type: string
+        filename:
+          type: string
+        mime_type:
+          type: string
+        size:
+          type: integer
+        url:
+          type: string
+          format: uri
+
+    # ── Reaction ──
+    Reaction:
+      type: object
+      required: [emoji, count, me]
+      properties:
+        emoji:
+          type: string
+          example: "👍"
+        count:
+          type: integer
+        user_ids:
+          type: array
+          items:
+            type: string
+          description: 选择该 reaction 的用户 ID 列表（ListReactions 时返回）
+        me:
+          type: boolean
+          description: 当前用户是否选中该 reaction
