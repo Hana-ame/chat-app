@@ -55,7 +55,6 @@ async function request(method, path, token, body) {
           return retryData;
         }
       } catch (e) {
-        // refresh failed
       } finally {
         _refreshing = false;
       }
@@ -70,7 +69,7 @@ async function request(method, path, token, body) {
 }
 
 // ── Auth ──
-export const api = {
+const _apiMethods = {
   register: (email, username, password) =>
     request('POST', '/api/auth/register', null, { email, username, password }),
   login: (email, password) =>
@@ -100,7 +99,7 @@ export const api = {
   renameChat: (token, id, name) =>
     request('PATCH', '/api/chats/' + id, token, { name }),
   createDM: (token, userId) =>
-    request('POST', '/api/dms', token, { user_id: userId }), // @deprecated use createChat with type='dm'
+    request('POST', '/api/dms', token, { user_id: userId }),
   joinChat: (token, chatId) => request('POST', '/api/chats/' + chatId + '/join', token),
   setAnnouncement: (token, chatId, content) => request('POST', '/api/chats/' + chatId + '/announcement', token, { content }),
   clearAnnouncement: (token, chatId) => request('DELETE', '/api/chats/' + chatId + '/announcement', token),
@@ -157,103 +156,76 @@ export const api = {
       url: buildUploadUrl(data, file.name),
     };
   },
-  uploadAvatar: async (_token, file) => {
-    const data = await api.upload(file);
-    return { url: data.url };
-  },
+  // uploadAvatar defined after Proxy setup below
 
   // ── Misc ──
   sseUrl: (token) => API_BASE + '/api/events?access_token=' + encodeURIComponent(token),
+
+  startStreaming: (source) => {
+    if (typeof source === 'function') return createStreamSource(source);
+    if (source.type === 'mock') return createStreamSource(source.fn);
+    if (source.type === 'sse') {
+      return createStreamSource(async (emit) => {
+        const res = await fetch(source.url);
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          for (const line of decoder.decode(value).split('\n')) {
+            if (line.startsWith('data: ')) emit(line.slice(6));
+          }
+        }
+      });
+    }
+    return createStreamSource(source);
+  },
 };
 
-api.startStreaming = (source) => {
-  if (typeof source === 'function') return createStreamSource(source);
-  if (source.type === 'mock') return createStreamSource(source.fn);
-  if (source.type === 'sse') {
-    return createStreamSource(async (emit) => {
-      const res = await fetch(source.url);
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        for (const line of decoder.decode(value).split('\n')) {
-          if (line.startsWith('data: ')) emit(line.slice(6));
-        }
-      }
-    });
-  }
-  return createStreamSource(source);
+const _mockHandlers = {
+  register: mockRegister, login: mockLogin, refresh: mockRefresh, logout: mockLogout,
+  me: mockMe, updateProfile: mockUpdateProfile, searchUsers: mockSearchUsers,
+  listChats: mockListChats, listPublicChats: mockListPublicChats,
+  createChat: mockCreateChat, getChat: mockGetChat, deleteChat: mockDeleteChat,
+  renameChat: mockRenameChat, createDM: mockCreateDM, joinChat: mockJoinChat,
+  setAnnouncement: mockSetAnnouncement, clearAnnouncement: mockClearAnnouncement,
+  addMember: mockAddMember, removeMember: mockRemoveMember,
+  listMembers: mockListMembers, listMessages: mockListMessages,
+  sendMessage: mockSendMessage, editMessage: mockEditMessage, deleteMessage: mockDeleteMessage,
+  markRead: mockMarkRead, addReaction: mockAddReaction, removeReaction: mockRemoveReaction,
+  getReactions: mockGetReactions, pinChat: mockPinChat, unpinChat: mockUnpinChat,
+  markAnnouncementRead: mockMarkAnnouncementRead,
+  upload: mockUpload, uploadAvatar: mockUploadAvatar,
 };
 
 let _mockEnabled = false;
-const _originals = {};
 
-function save(key, fn) { _originals[key] = fn; }
-function swap(key, mock) {
-  api[key] = (...args) => {
-    console.log(`[Mock API] ${key}(`, ...args, ')');
-    const result = mock(...args);
-    if (result && typeof result.then === 'function') {
-      return result.then(v => { console.log(`[Mock API] ${key} =>`, v); return v; });
-    }
-    console.log(`[Mock API] ${key} =>`, result);
-    return Promise.resolve(result);
-  };
+function mockCallLog(key, fn, args) {
+  console.log(`[Mock API] ${key}(`, ...args, ')');
+  const result = fn(...args);
+  const p = result && typeof result.then === 'function' ? result : Promise.resolve(result);
+  return p.then(v => { console.log(`[Mock API] ${key} =>`, v); return v; });
 }
 
-const MOCKABLE = [
-  ['register', mockRegister],
-  ['login', mockLogin],
-  ['refresh', mockRefresh],
-  ['logout', mockLogout],
-  ['me', mockMe],
-  ['updateProfile', mockUpdateProfile],
-  ['searchUsers', mockSearchUsers],
-  ['listChats', mockListChats],
-  ['listPublicChats', mockListPublicChats],
-  ['createChat', mockCreateChat],
-  ['getChat', mockGetChat],
-  ['deleteChat', mockDeleteChat],
-  ['renameChat', mockRenameChat],
-  ['createDM', mockCreateDM], // @deprecated
-  ['joinChat', mockJoinChat],
-  ['setAnnouncement', mockSetAnnouncement],
-  ['clearAnnouncement', mockClearAnnouncement],
-  ['listMembers', mockListMembers],
-  ['addMember', mockAddMember],
-  ['removeMember', mockRemoveMember],
-  ['listMessages', mockListMessages],
-  ['sendMessage', mockSendMessage],
-  ['editMessage', mockEditMessage],
-  ['deleteMessage', mockDeleteMessage],
-  ['markRead', mockMarkRead],
-  ['addReaction', mockAddReaction],
-  ['removeReaction', mockRemoveReaction],
-  ['getReactions', mockGetReactions],
-  ['upload', mockUpload],
-  ['uploadAvatar', mockUploadAvatar],
-  ['pinChat', mockPinChat],
-  ['unpinChat', mockUnpinChat],
-  ['markAnnouncementRead', mockMarkAnnouncementRead],
-];
+export const api = new Proxy(_apiMethods, {
+  get(target, prop) {
+    if (_mockEnabled && prop in _mockHandlers) {
+      return (...args) => mockCallLog(prop, _mockHandlers[prop], args);
+    }
+    return target[prop];
+  },
+});
+
+api.uploadAvatar = async (_token, file) => {
+  const data = await api.upload(file);
+  return { url: data.url };
+};
 
 api.enableMock = () => {
   if (_mockEnabled) return;
   _mockEnabled = true;
   resetMockData();
-  for (const [key, mock] of MOCKABLE) {
-    save(key, api[key]);
-    swap(key, mock);
-  }
 };
 
-api.disableMock = () => {
-  if (!_mockEnabled) return;
-  _mockEnabled = false;
-  for (const [key] of MOCKABLE) {
-    api[key] = _originals[key];
-  }
-};
-
+api.disableMock = () => { _mockEnabled = false; };
 api.isMockEnabled = () => _mockEnabled;

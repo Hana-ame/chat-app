@@ -1,7 +1,21 @@
-# Session Log
+# AGENTS.md — Project Context for AI Agents
 
-## 2026-07-15
+## Project
+Chat application with Go backend + React frontend.
 
-- Split `server/internal/db/chats.go` → `chats.go` (293 lines) + `chat_members.go` (150 lines)
-- Split `server/internal/db/messages.go` → `messages.go` (356 lines) + `message_reactions.go` (176 lines)
-- Build and tests pass after split.
+## Key Paths
+- `server/` — Go backend (chi router, SQLite, WebSocket)
+- `client/` — React frontend (Vite, Zustand)
+
+## Commands
+- Server: `cd server && go build ./... && go test ./... && go vet ./...`
+- Client: `cd client && npm run build`
+
+## Architecture
+- Handlers in `server/internal/handlers/` — HTTP layer only
+- Service in `server/internal/service/` — business logic, permissions, broadcasts
+- DB in `server/internal/db/` — data access
+- WS in `server/internal/ws/` — WebSocket hub + client
+
+## Notes
+- This file is for initialization context only. Session logs and changelogs go in `docs/changelog.md`.

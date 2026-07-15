@@ -1,165 +1,70 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
-import { __setStoreRef } from '../api/mock';
 import { useAuthStore } from './auth';
+import { getCoordinator } from '../realtime/coordinator';
 
-const _wsReqs = {}; // { reqId: { resolve, reject, timer } }
-let _reqId = 0;
+const coord = getCoordinator();
+
+coord.setHandlers({
+  onReady: ({ onlineUserIds, chats }) => {
+    set({ onlineUserIds, wsReady: true, sseReady: true });
+    get().setChats(chats || []);
+  },
+  onEvent: (op, payload) => {
+    const s = get();
+    switch (op) {
+      case 'message_create': s.onMessageCreate(payload); break;
+      case 'message_update': s.onMessageUpdate(payload); break;
+      case 'message_delete': s.onMessageDelete(payload); break;
+      case 'reaction_add': s.onReaction(payload, true); break;
+      case 'reaction_remove': s.onReaction(payload, false); break;
+      case 'chat_create': case 'chat_update': s.onChatUpdate(payload); break;
+      case 'chat_delete': s.onChatDelete(payload); break;
+      case 'chat_remove': s.onChatRemove(payload); break;
+      case 'presence_update': {
+        set(s => {
+          const ids = new Set(s.onlineUserIds);
+          if (payload.status === 'online') ids.add(payload.user_id);
+          else ids.delete(payload.user_id);
+          return { onlineUserIds: [...ids] };
+        });
+        break;
+      }
+      case 'poll:chats': s.setChats(payload); break;
+      case 'poll:messages': set({ messages: payload }); break;
+    }
+  },
+  onClose: () => {
+    set({ wsReady: false, sseReady: false });
+  },
+  getActiveChatId: () => get().activeChatId,
+});
+
+const set = (fn) => useChatStore.setState(fn);
+const get = () => useChatStore.getState();
 
 export const useChatStore = create((set, get) => ({
   chats: [],
   activeChatId: null,
   messages: [],
-  pinnedMessage: {}, // { chatId: { id, content, pinned_at } }
+  pinnedMessage: {},
   onlineUserIds: [],
 
   mode: 'ws',
-  ws: null,
   wsReady: false,
-
-  sse: null,
   sseReady: false,
 
-  pollTimer: null,
-
   setMode(mode) {
-    const s = get();
-    s.disconnect();
-    set({ mode });
-    const token = s._lastToken;
-    if (token) {
-      if (mode === 'ws') get().connectWS(token);
-      else if (mode === 'sse') get().connectSSE(token);
-      else if (mode === 'poll') get().connectPolling(token);
-    }
+    coord.disconnect();
+    set({ mode, wsReady: false, sseReady: false });
+    const token = coord.token;
+    if (token) coord.connect(mode, token);
   },
 
-  _lastToken: null,
-
-  connectWS(token) {
-    get().disconnect();
-    set({ _lastToken: token });
-    const isProd = location.hostname.endsWith('pages.dev');
-    const host = isProd ? 'wsl-8080.moonchan.xyz' : location.host;
-    const proto = isProd ? 'wss' : (location.protocol === 'https:' ? 'wss' : 'ws');
-    const url = proto + '://' + host + '/ws?access_token=' + token;
-    const ws = new WebSocket(url);
-    ws.onopen = () => {};
-    ws.onmessage = (e) => {
-      try {
-        const env = JSON.parse(e.data);
-        switch (env.op) {
-          case 'ready': {
-            const p = env.payload || {};
-            set({ onlineUserIds: p.online_user_ids || [], wsReady: true });
-            get().setChats(p.chats || []);
-            break;
-          }
-          case 'message_create':
-            get().onMessageCreate(env.payload); break;
-          case 'message_update':
-            get().onMessageUpdate(env.payload); break;
-          case 'message_delete':
-            get().onMessageDelete(env.payload); break;
-          case 'reaction_add':
-          case 'reaction_remove':
-            get().onReaction(env.payload, env.op === 'reaction_add'); break;
-          case 'chat_create':
-          case 'chat_update':
-            get().onChatUpdate(env.payload); break;
-          case 'chat_delete':
-            get().onChatDelete(env.payload); break;
-          case 'chat_remove':
-            get().onChatRemove(env.payload); break;
-          case 'presence_update':
-            set(s => {
-              const ids = new Set(s.onlineUserIds);
-              if (env.payload.status === 'online') ids.add(env.payload.user_id);
-              else ids.delete(env.payload.user_id);
-              return { onlineUserIds: [...ids] };
-            });
-            break;
-          case 'typing':
-            break;
-        }
-        if (env.req_id && _wsReqs[env.req_id]) {
-          clearTimeout(_wsReqs[env.req_id].timer);
-          _wsReqs[env.req_id].resolve(env.payload);
-          delete _wsReqs[env.req_id];
-        }
-      } catch (e) { console.error('WS message parse error:', e); }
-    };
-    ws.onclose = () => {
-      set({ wsReady: false });
-      setTimeout(() => {
-        if (get().mode === 'ws') get().connectWS(token);
-      }, 3000);
-    };
-    set({ ws, sse: null, sseReady: false, pollTimer: null });
-  },
-
-  connectSSE(token) {
-    get().disconnect();
-    set({ _lastToken: token });
-    const url = api.sseUrl(token);
-    const sse = new EventSource(url);
-    sse.onopen = () => set({ sseReady: true });
-    sse.addEventListener('ready', (e) => {
-      try {
-        const p = JSON.parse(e.data);
-        set({ onlineUserIds: p.online_user_ids || [], sseReady: true });
-        get().setChats(p.chats || []);
-      } catch (e) { console.error('SSE ready parse error:', e); }
-    });
-    sse.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.op === 'message_create') get().onMessageCreate(data.payload);
-        else if (data.op === 'message_update') get().onMessageUpdate(data.payload);
-        else if (data.op === 'message_delete') get().onMessageDelete(data.payload);
-        else if (data.op === 'reaction_add' || data.op === 'reaction_remove') get().onReaction(data.payload, data.op === 'reaction_add');
-        else if (data.op === 'chat_create' || data.op === 'chat_update') get().onChatUpdate(data.payload);
-        else if (data.op === 'chat_delete') get().onChatDelete(data.payload);
-        else if (data.op === 'chat_remove') get().onChatRemove(data.payload);
-        else if (data.op === 'presence_update') {
-          set(s => {
-            const ids = new Set(s.onlineUserIds);
-            if (data.payload.status === 'online') ids.add(data.payload.user_id);
-            else ids.delete(data.payload.user_id);
-            return { onlineUserIds: [...ids] };
-          });
-        }
-      } catch (e) { console.error('SSE message parse error:', e); }
-    };
-    sse.onerror = () => {
-      set({ sseReady: false });
-      setTimeout(() => {
-        if (get().mode === 'sse') get().connectSSE(token);
-      }, 3000);
-    };
-    set({ sse, ws: null, wsReady: false, pollTimer: null });
-  },
-
-  connectPolling(token) {
-    get().disconnect();
-    set({ _lastToken: token, wsReady: false, sseReady: false });
-    const poll = async () => {
-      try {
-        const data = await api.listChats(token);
-        get().setChats(data.chats || []);
-      } catch (e) { console.error('Polling chats error:', e); }
-      if (get().activeChatId) {
-        try {
-          const data = await api.listMessages(token, get().activeChatId);
-          set({ messages: data.messages || [] });
-        } catch (e) { console.error('Polling messages error:', e); }
-      }
-      if (get().mode === 'poll') {
-        const t = setTimeout(poll, 2000);
-        set({ pollTimer: t });
-      }
-    };
-    poll();
+  connect(token) {
+    if (!token) { coord.disconnect(); set({ wsReady: false, sseReady: false }); return; }
+    const mode = get().mode;
+    coord.connect(mode, token);
   },
 
   setChats(chats) {
@@ -293,8 +198,6 @@ export const useChatStore = create((set, get) => ({
     }) }));
   },
 
-
-
   async loadChats(token) {
     try {
       const data = await api.listChats(token);
@@ -326,19 +229,9 @@ export const useChatStore = create((set, get) => ({
     }));
   },
 
-  async sendTyping(chatId) {
-    const ws = get().ws;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ op: 'typing', chat_id: chatId }));
-    }
-  },
-
-  async subscribe(chatId) {
-    const ws = get().ws;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ op: 'subscribe', chat_id: chatId }));
-    }
-  },
+  sendTyping(chatId) { coord.sendTyping(chatId); },
+  subscribe(chatId) { coord.subscribe(chatId); },
+  wsRequest(op, payload) { return coord.wsRequest(op, payload); },
 
   async setAnnouncement(token, chatId, content) {
     const res = await api.setAnnouncement(token, chatId, content);
@@ -365,38 +258,7 @@ export const useChatStore = create((set, get) => ({
     }));
   },
 
-  wsRequest(op, payload) {
-    return new Promise((resolve, reject) => {
-      const s = get();
-      if (!s.ws || s.ws.readyState !== WebSocket.OPEN) {
-        reject(new Error('WS not connected'));
-        return;
-      }
-      const reqId = ++_reqId;
-      const env = JSON.stringify({ op, req_id: reqId, payload });
-      s.ws.send(env);
-      _wsReqs[reqId] = {
-        resolve,
-        reject,
-        timer: setTimeout(() => {
-          delete _wsReqs[reqId];
-          reject(new Error('WS request timeout'));
-        }, 10000),
-      };
-    });
-  },
-
   reset() {
     set({ chats: [], activeChatId: null, messages: [], pinnedMessage: {} });
   },
-
-  disconnect() {
-    const s = get();
-    if (s.ws) { s.ws.onclose = null; s.ws.close(); }
-    if (s.sse) { s.sse.close(); }
-    if (s.pollTimer) { clearTimeout(s.pollTimer); }
-    set({ ws: null, wsReady: false, sse: null, sseReady: false, pollTimer: null });
-  },
 }));
-
-__setStoreRef(useChatStore);

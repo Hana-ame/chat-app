@@ -13,7 +13,7 @@ export default function ChatPage() {
   const urlChatId = loc.pathname.startsWith('/g/') ? loc.pathname.slice(3) : null;
   const navigate = useNavigate();
   const { user, accessToken, logout } = useAuthStore();
-  const { wsReady, mode, connectWS, connectSSE, connectPolling, disconnect, loadChats, loadMessages } = useChatStore();
+  const { wsReady, mode, connect, loadChats, loadMessages } = useChatStore();
   const [mobileView, setMobileView] = useState('list');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
@@ -33,12 +33,10 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (accessToken) {
-      if (mode === 'ws') connectWS(accessToken);
-      else if (mode === 'sse') connectSSE(accessToken);
-      else if (mode === 'poll') connectPolling(accessToken);
+      connect(accessToken);
       loadChats(accessToken);
     }
-    return () => disconnect();
+    return () => useChatStore.getState().connect(null);
   }, [accessToken]);
 
   useEffect(() => {

@@ -147,34 +147,17 @@ func (s *Server) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.refreshMu.Lock()
+	defer s.refreshMu.Unlock()
 	hash := auth.HashRefreshToken(c.Value)
-	rt, err := s.DB.FindRefreshToken(r.Context(), hash)
+	rt, err := s.DB.FindAndDeleteRefreshToken(r.Context(), hash)
 	if err != nil {
-		s.refreshMu.Unlock()
 		writeError(w, http.StatusUnauthorized, "refresh_invalid", "invalid refresh token")
 		return
 	}
 	if rt.ExpiresAt.Before(timeNow()) {
-		if err := s.DB.DeleteRefreshToken(r.Context(), rt.ID); err != nil {
-			w.Header().Set("X-Error", err.Error())
-		}
-		s.refreshMu.Unlock()
 		writeError(w, http.StatusUnauthorized, "refresh_expired", "refresh token expired")
 		return
 	}
-	if err := s.DB.DeleteRefreshToken(r.Context(), rt.ID); err != nil {
-		s.refreshMu.Unlock()
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	s.refreshMu.Unlock()
-	// NOTE: issueSession creates a new refresh token outside refreshMu.
-	// Race: a concurrent Logout may delete all tokens (DeleteUserRefreshTokens)
-	// before CreateRefreshToken inserts the new one, making the logout incomplete.
-	// This is intentionally accepted — the timing window is tiny and the impact
-	// is a stale cookie that the user's browser already discarded.
-	// If this becomes a problem, move CreateRefreshToken inside refreshMu
-	// and also acquire refreshMu in Logout.
 	s.issueSession(w, r, rt.UserID)
 }
 
@@ -193,12 +176,10 @@ func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 	clearRefreshCookie(w, r)
 	clearAccessTokenCookie(w, r)
-	// NOTE: see Refresh for the known Logout-vs-Refresh race.
-	// DeleteUserRefreshTokens does not hold refreshMu, so a concurrent
-	// Refresh's CreateRefreshToken may insert a new token after this deletion.
-	// Accepted as low-risk. If it becomes a problem, acquire refreshMu here
-	// and move CreateRefreshToken inside refreshMu in Refresh.
-	if err := s.DB.DeleteUserRefreshTokens(r.Context(), u.ID); err != nil {
+	s.refreshMu.Lock()
+	err := s.DB.DeleteUserRefreshTokens(r.Context(), u.ID)
+	s.refreshMu.Unlock()
+	if err != nil {
 		w.Header().Set("X-Error", err.Error())
 	}
 	logutil.Info("user logged out: %s", u.ID[:8])

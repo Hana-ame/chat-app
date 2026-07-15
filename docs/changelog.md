@@ -3615,3 +3615,42 @@ Handlers 直接调 `s.DB.*`，权限检查、Hub 广播、验证逻辑在每个 
 - 最新推送 `f689db4`，CI 构建中
 
 ---
+
+## 2026-07-15 DB 文件拆分 — chats.go + messages.go（第 13 轮）
+
+### 操作
+
+`chats.go` (427行) 包含 Chat CRUD + 成员管理 + pin 操作，`messages.go` (523行) 包含消息 CRUD + reactions。
+
+**拆分**：
+- `chats.go` (293行) → chats.go + `chat_members.go` (150行)
+- `messages.go` (356行) → messages.go + `message_reactions.go` (176行)
+
+### 验证
+- `go build ./...`: ✅
+- `go test ./...`: ✅
+
+---
+
+## 2026-07-15 refreshMu 竞态修复（第 14 轮）
+
+### 问题
+
+`handler.go:35` 的 `refreshMu sync.Mutex` 只保护了 Find+Delete，不保护 `issueSession`（创建新 token），Logout 也未加锁，存在并发竞态。
+
+### 修复
+
+1. **`db.FindAndDeleteRefreshToken`** — 原子 find+delete 事务，替代分离的 Find+Delete 调用
+2. **`Refresh`** — 锁范围扩展到 `issueSession`（`defer s.refreshMu.Unlock()`）
+3. **`Logout`** — 持有 `refreshMu` 执行 `DeleteUserRefreshTokens`
+
+### 并发安全性
+
+- 两个 `Refresh` 同 token → 原子 find+delete，第一个成功第二个 401
+- `Refresh` vs `Logout` → 互斥锁串行化，`issueSession` 完成后 `Logout` 删除所有 token
+
+### 验证
+- `go build ./...`: ✅
+- `go test ./...`: ✅
+
+---

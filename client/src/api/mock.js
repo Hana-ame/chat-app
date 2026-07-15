@@ -42,15 +42,7 @@ const AI_RESPONSES = [
 
 let data = null;
 let _store = null;
-
-export function __setStoreRef(store) { _store = store; }
-export function __getAuthUser() {
-  try {
-    const raw = localStorage.getItem('auth');
-    if (raw) return JSON.parse(raw).user || null;
-  } catch {}
-  return null;
-}
+import('../store/chat').then(m => { _store = m.useChatStore; }).catch(() => {});
 
 const MOCK_USERS = [
   { id: 'dev-self', username: 'Alice', avatar_color: '#5865F2', email: 'alice@test.com', role: 'owner', last_seen: new Date().toISOString() },
