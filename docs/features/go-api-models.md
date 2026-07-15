@@ -82,7 +82,7 @@ type addMemberReq struct {
 }
 ```
 
-### `pinContentReq` — `POST /api/chats/{chatID}/pin`
+### `pinContentReq` — `POST /api/chats/{chatID}/announcement`
 ```go
 type pinContentReq struct {
     Content string `json:"content"`
@@ -285,7 +285,7 @@ Response:
 | `createDMReq` | POST /api/dms | ⚠️ Deprecated |
 | `renameChatReq` | PATCH /api/chats/{chatID} | |
 | `addMemberReq` | POST /api/chats/{chatID}/members | |
-| `pinContentReq` | POST /api/chats/{chatID}/pin | |
+| `pinContentReq` | POST /api/chats/{chatID}/announcement | |
 | `sendMsgReq` | POST /api/chats/{chatID}/messages | |
 | `editMsgReq` | PATCH /api/chats/{chatID}/messages/{messageID} | |
 | `readReq` | POST /api/chats/{chatID}/read | ⚠️ Deprecated |

@@ -104,7 +104,7 @@ client/
 `Server Event` $\rightarrow$ `WS/SSE Client` $\rightarrow$ `ChatStore.onMessageCreate` $\rightarrow$ `Sate Update` $\rightarrow$ `ChatView Re-render` $\rightarrow$ `Scroll to Bottom`.
 
 ### 4.3 置顶公告流 (Notice Flow)
-`Owner Click Edit` $\rightarrow$ `Input Content` $\rightarrow$ `api.setPinnedMessage` $\rightarrow$ `Server DB Update` $\rightarrow$ `WS Broadcast ChatUpdate` $\rightarrow$ `All Clients Update pinnedMessage state`.
+`Owner Click Edit` $\rightarrow$ `Input Content` $\rightarrow$ `api.setAnnouncement` $\rightarrow$ `Server DB Update` $\rightarrow$ `WS Broadcast ChatUpdate` $\rightarrow$ `All Clients Update pinnedMessage state`.
 
 ---
 

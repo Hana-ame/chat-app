@@ -28,11 +28,12 @@
 | `PATCH /api/chats/{id}` | `RenameChat` | `mockRenameChat` | ✅ 基本对齐（owner only、DM 不可、返回更新 chat）；微小：Go 不显式校验空 name（依赖 DB），mock 校验 `name` 为空→400 |
 | `DELETE /api/chats/{id}` | `DeleteChat` | `mockDeleteChat` | ✅ 对齐（owner only、DM 不可删除、返回 `{ok:true}`） |
 | `POST /api/chats/{id}/join` | `JoinChat` | `mockJoinChat` | ✅ 基本对齐（public/unlisted 可加入、private 拒绝 400、返回 `{ok:true}`）；Go 由 DB 约束可见性，mock 显式检查 |
-| `POST /api/chats/{id}/pin` | `PinChat` | `mockSetPinnedMessage` | ✅ 对齐（owner only、>=3 members、存 `{content, pinned_at}`、返回 `{ok:true}`） |
-| `PATCH /api/chats/{id}/pin` | `UpdatePinnedChat` | — | ✅ 同 `PinChat`，mock 共用 `mockSetPinnedMessage` |
-| `DELETE /api/chats/{id}/pin` | `DeletePinnedChat` | `mockClearPinnedMessage` | ✅ 对齐（owner/admin only、clear `pinned_message`、返回 `{ok:true}`） |
-| `POST /api/chats/{id}/pin-toggle` | `TogglePin` | `mockTogglePin` | ✅ 对齐。toggle `pinned` 字段，触发 `onChatUpdate` |
-| `POST /api/chats/{id}/pin-read` | `MarkPinnedRead` | `mockMarkPinnedRead` | ✅ 对齐。更新 `pinned_last_read_at` |
+| `POST /api/chats/{id}/announcement` | `PinChat` | `mockSetAnnouncement` | ✅ 对齐（owner only、>=3 members、存 `{content, pinned_at}`、返回 `{ok:true}`） |
+| `PATCH /api/chats/{id}/announcement` | `UpdatePinnedChat` | — | ✅ 同 `PinChat`，mock 共用 `mockSetAnnouncement` |
+| `DELETE /api/chats/{id}/announcement` | `DeletePinnedChat` | `mockClearAnnouncement` | ✅ 对齐（owner/admin only、clear `pinned_message`、返回 `{ok:true}`） |
+| `POST /api/chats/{id}/announcement/read` | `MarkPinnedRead` | `mockMarkAnnouncementRead` | ✅ 对齐。更新 `pinned_last_read_at` |
+| `POST /api/chats/{id}/pin` | `PinChatList` | `mockPinChat` | ✅ 对齐。set `pinned=true`，触发 `onChatUpdate` |
+| `POST /api/chats/{id}/unpin` | `UnpinChatList` | `mockUnpinChat` | ✅ 对齐。set `pinned=false`，触发 `onChatUpdate` |
 | `POST /api/chats/{id}/visit` | `VisitChat` | — | ⚠️ Mock 无对应实现（非关键 UI 路径） |
 
 ## Members
@@ -82,8 +83,9 @@
 | `chat_delete` | `_store.getState().onChatUpdate({id, deleted: true})` | ✅ 对齐 |
 | `user_update` | `_store.getState().onChatUpdate({id, members})` 在每个 chat 上 | ⚠️ 差异。Go 用 `BroadcastUserUpdate` 全局广播；mock 逐 chat 遍历通知（语义等价，但 mock 仅通知当前用户已加入的 chat） |
 | `presence_update` | 未实现 | ❌ 差异。Go 有 WS 连接/断开的 online/offline broadcast；mock 模式无 presence |
-| `pin_toggle` | `_store.getState().onChatUpdate({id, pinned})` | ✅ 对齐（TogglePin 广播 chat_update，mock 直接调 onChatUpdate） |
-| `pinned_read` | `_store.getState().onChatUpdate({id, pinned_last_read_at})` | ✅ 对齐 |
+| `pin` | `_store.getState().onChatUpdate({id, pinned: true})` | ✅ 对齐（PinChatList 广播 chat_update，mock 直接调 onChatUpdate） |
+| `unpin` | `_store.getState().onChatUpdate({id, pinned: false})` | ✅ 对齐 |
+| `announcement_read` | `_store.getState().onChatUpdate({id, pinned_last_read_at})` | ✅ 对齐 |
 
 ## 未实现 (不涉及)
 

@@ -88,11 +88,12 @@ X-Content-Type-Options: nosniff
 | 19 | `PATCH` | `/api/chats/{chatID}` | `s.RenameChat` | `chatID` |
 | 20 | `DELETE` | `/api/chats/{chatID}` | `s.DeleteChat` | `chatID` |
 | 21 | `POST` | `/api/chats/{chatID}/join` | `s.JoinChat` | `chatID` |
-| 22 | `POST` | `/api/chats/{chatID}/pin` | `s.PinChat` | `chatID` |
-| 22a | `PATCH` | `/api/chats/{chatID}/pin` | `s.UpdatePinnedChat` | `chatID` |
-| 22b | `DELETE` | `/api/chats/{chatID}/pin` | `s.DeletePinnedChat` | `chatID` |
-| 23 | `POST` | `/api/chats/{chatID}/pin-toggle` | `s.TogglePin` | `chatID` |
-| 24 | `POST` | `/api/chats/{chatID}/pin-read` | `s.MarkPinnedRead` | `chatID` |
+| 22 | `POST` | `/api/chats/{chatID}/announcement` | `s.PinChat` | `chatID` |
+| 22a | `PATCH` | `/api/chats/{chatID}/announcement` | `s.UpdatePinnedChat` | `chatID` |
+| 22b | `DELETE` | `/api/chats/{chatID}/announcement` | `s.DeletePinnedChat` | `chatID` |
+| 22c | `POST` | `/api/chats/{chatID}/announcement/read` | `s.MarkPinnedRead` | `chatID` |
+| 23 | `POST` | `/api/chats/{chatID}/pin` | `s.PinChatList` | `chatID` |
+| 23a | `POST` | `/api/chats/{chatID}/unpin` | `s.UnpinChatList` | `chatID` |
 | 25 | `POST` | `/api/chats/{chatID}/visit` | `s.VisitChat` | `chatID` |
 
 ### Members

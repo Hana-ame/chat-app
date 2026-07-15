@@ -3525,3 +3525,27 @@ if n > 0 {
 - 最新推送 `f564348`，CI 构建中
 
 ---
+
+## 2026-07-15 API 重命名与风格统一（第 10 轮）
+
+#### API 路径重命名
+- `/pin` (POST/PATCH/DELETE) → `/announcement` — 公告 CRUD
+- `/pin-read` → `/announcement/read` — 标记公告已读
+- `/pin-toggle` → 拆分为 `POST /pin` 和 `POST /unpin` — 显式顶置/取消顶置
+- 前后端所有函数名同步更新（`setAnnouncement`, `clearAnnouncement`, `pinChat`, `unpinChat` 等）
+- **文件**: `server/internal/handlers/router.go`, `chat.go`, `client/src/api/client.js`, `mock.js`, `store/chat.js`, `ChatList.jsx`, `ChatView.jsx`
+
+#### 文档更新
+- `docs/features/api-endpoints.md` — 更新 API 路径表
+- `docs/features/go-api-routes.md` — 更新路由表
+- `docs/features/go-api-models.md` — 更新模型引用
+- `docs/features/mock-vs-go-api-report.md` — 更新对齐报告
+- `docs/features/frontend-architecture.md` — 更新公告流程图
+
+### 验证
+- Go build: ✅ `go vet` ✅
+- Go test: ✅
+- Client build: ✅
+- 最新推送 `9f54c38`，CI 构建中
+
+---
