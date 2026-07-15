@@ -3549,3 +3549,50 @@ if n > 0 {
 - 最新推送 `9f54c38`，CI 构建中
 
 ---
+
+## 2026-07-15 服务层架构重构（第 11 轮）
+
+### 背景
+
+Handlers 直接调 `s.DB.*`，权限检查、Hub 广播、验证逻辑在每个 handler 重复。Handler = HTTP + 业务逻辑紧耦合。
+
+### 方案
+
+提取 `server/internal/service/` 包，作为 handler 与 DB 之间的中间层。
+
+### 新增文件（6 个）
+
+| 文件 | 行数 | 职责 |
+|------|------|------|
+| `server/internal/service/errors.go` | 10 | Sentinel 错误（ErrForbidden, ErrNotFound 等） |
+| `server/internal/service/service.go` | 30 | 容器 + WithTx 占位 |
+| `server/internal/service/authz.go` | 53 | MustBeMember, RequireOwnerOrAdmin（解耦自 ChatService） |
+| `server/internal/service/chat.go` | 175 | ChatService（聊天业务逻辑） |
+| `server/internal/service/message.go` | 111 | MessageService（消息业务逻辑） |
+| `server/internal/service/member.go` | 100 | MemberService（成员管理） |
+
+### 修改文件（4 个）
+
+| 文件 | 变更 |
+|------|------|
+| `handler.go` | 新增 `Services` 字段、`mapServiceError()` 函数 |
+| `chat.go` | -179 +86，只做 HTTP 编解码 |
+| `messages.go` | -199 +88，只做 HTTP 编解码 |
+| `member.go` | -156 +43，只做 HTTP 编解码 |
+
+### 关键设计决策
+
+1. **Sentinel Errors** — 所有 service 返回命名错误，handler 用 `mapServiceError` 映射到 HTTP 状态码
+2. **AuthZ 解耦** — `MustBeMember`/`RequireOwnerOrAdmin` 在 `authz.go` 中，可被 ChatService/MessageService/MemberService 共用
+3. **WithTx 占位** — 预备未来跨表事务，当前透传
+4. **广播集中化** — Hub 广播在 service 层内完成，不依赖 handler
+
+### 验证
+
+- `go build ./...`: ✅
+- `go vet ./...`: ✅
+- `go test ./...`: ✅
+- CI (GitHub): ✅
+- 最新推送 `59a3579`，CI 构建中
+
+---
