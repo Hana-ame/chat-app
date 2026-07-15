@@ -2,6 +2,7 @@ import { api } from '../../api/client';
 
 export function createPollTransport({ token, onChats, onMessages, getActiveChatId, onClose }) {
   let timer = null;
+  let cancelled = false;
 
   const poll = async () => {
     try {
@@ -17,10 +18,16 @@ export function createPollTransport({ token, onChats, onMessages, getActiveChatI
       } catch (e) { console.error('Poll messages error:', e); }
     }
 
+    if (cancelled) return;
     timer = setTimeout(poll, 2000);
   };
 
   poll();
 
-  return { disconnect() { if (timer) { clearTimeout(timer); timer = null; } } };
+  return {
+    disconnect() {
+      cancelled = true;
+      if (timer) { clearTimeout(timer); timer = null; }
+    },
+  };
 }

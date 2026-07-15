@@ -46,6 +46,14 @@ import { getCoordinator } from '../realtime/coordinator';
 
 const coord = getCoordinator();
 
+function sortChats(a, b) {
+  const pa = !!a.pinned, pb = !!b.pinned;
+  if (pa !== pb) return pa ? -1 : 1;
+  const da = a.last_message_at || a.created_at;
+  const db = b.last_message_at || b.created_at;
+  return new Date(db) - new Date(da);
+}
+
 coord.setHandlers({
   /** @param {{ onlineUserIds?: string[], chats?: import('../types').Chat[] }} payload */
   onReady: ({ onlineUserIds, chats }) => {
@@ -128,13 +136,7 @@ export const useChatStore = create((set, get) => ({
       const lma = c.last_message_at || old.last_message_at || c.created_at;
       return { ...c, last_message_at: lma, last_message: lm, unread_count: c.unread_count ?? 0 };
     });
-      const sorted = merged.sort((a, b) => {
-        const pa = !!a.pinned, pb = !!b.pinned;
-        if (pa !== pb) return pa ? -1 : 1;
-        const da = a.last_message_at || a.created_at;
-        const db = b.last_message_at || b.created_at;
-        return new Date(db) - new Date(da);
-      });
+      const sorted = merged.sort(sortChats);
       const pinned = {};
       for (const c of sorted) {
         if (c.pinned_message?.content) pinned[c.id] = c.pinned_message;
@@ -154,13 +156,7 @@ export const useChatStore = create((set, get) => ({
       } else {
         n = [chat, ...s.chats];
       }
-      n.sort((a, b) => {
-        const pa = !!a.pinned, pb = !!b.pinned;
-        if (pa !== pb) return pa ? -1 : 1;
-        const da = a.last_message_at || a.created_at;
-        const db = b.last_message_at || b.created_at;
-        return new Date(db) - new Date(da);
-      });
+      n.sort(sortChats);
       const next = chat.pinned_message !== undefined
         ? { ...s.pinnedMessage, [chat.id]: chat.pinned_message || null }
         : s.pinnedMessage;
@@ -194,11 +190,7 @@ export const useChatStore = create((set, get) => ({
       if (!chat) return { messages: s.activeChatId === msg.chat_id ? [...s.messages, msg] : s.messages };
       return {
         messages: s.activeChatId === msg.chat_id ? [...s.messages, msg] : s.messages,
-        chats: s.chats.map(c => c.id === msg.chat_id ? { ...c, last_message: msg, last_message_at: msg.created_at, unread_count: s.activeChatId === msg.chat_id ? 0 : (c.unread_count || 0) + 1 } : c).sort((a,b) => {
-          const pa = !!a.pinned, pb = !!b.pinned;
-          if (pa !== pb) return pa ? -1 : 1;
-          return new Date(b.last_message_at || b.created_at) - new Date(a.last_message_at || a.created_at);
-        }),
+        chats: s.chats.map(c => c.id === msg.chat_id ? { ...c, last_message: msg, last_message_at: msg.created_at, unread_count: s.activeChatId === msg.chat_id ? 0 : (c.unread_count || 0) + 1 } : c).sort(sortChats),
       };
     });
     if (msg.streaming && msg.source) {

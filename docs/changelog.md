@@ -3907,3 +3907,27 @@ CHAT_CSP_CONNECT_SRC="'self' ws://localhost:8080 wss://localhost:8080 http://loc
 - Server: `go build`, `go vet`, `go test` — ✅
 
 ---
+
+## 2026-07-16 gateway.go/poll.js/handler.go/ChatPage/chat.js 修复（第 25 轮）
+
+### 问题
+
+1. `gateway.go` — `chats, _ := g.db.ListUserChats(...)` 丢弃错误，失败后 `chats` 为 nil，JSON 序列化为 `"chats": null`
+2. `handler.go` — `ErrContentTooLong` 返回 403 Forbidden，语义应为 413
+3. `poll.js` — `disconnect()` 后 in-flight 异步 poll 仍会调度下一轮
+4. `ChatPage.jsx` — 与 `ChatView.jsx` 重复调用 `loadMessages`
+5. `chat.js` — `setChats`/`onChatUpdate`/`onMessageCreate` 3 处重复的排序逻辑
+
+### 修复
+
+- `gateway.go` — 记录 error log，失败时 `chats = []models.Chat{}` 保底空数组
+- `handler.go` — `http.StatusForbidden` → `http.StatusRequestEntityTooLarge`
+- `poll.js` — `cancelled` 标志，`disconnect()` 设 true，`poll()` 调度前检查
+- `ChatPage.jsx` — 移除第 45 行 `loadMessages(accessToken, urlChatId)`
+- `chat.js` — 抽取 `sortChats(a, b)` 公共函数替换 3 处内联排序
+
+### 验证
+- Server: `go build`, `go vet`, `go test` — ✅
+- Client: `npm run build` — ✅
+
+---
