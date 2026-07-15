@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"crypto/md5"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -106,22 +106,23 @@ func HashRefreshToken(raw string) string {
 }
 
 func HashPassword(password string) (string, error) {
-	if len(password) > 72 {
-		password = password[:72]
-	}
-	b, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
+	salt := make([]byte, 16)
+	if _, err := rand.Read(salt); err != nil {
 		return "", err
 	}
-	return string(b), nil
+	saltHex := hex.EncodeToString(salt)
+	sum := md5.Sum([]byte(saltHex + password))
+	return saltHex + "$" + hex.EncodeToString(sum[:]), nil
 }
 
-func VerifyPassword(hash, password string) error {
-	if len(password) > 72 {
-		password = password[:72]
+func VerifyPassword(stored, password string) error {
+	parts := strings.SplitN(stored, "$", 2)
+	if len(parts) != 2 {
+		return ErrInvalidCredentials
 	}
-	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
-		logutil.Debug("password verification failed")
+	saltHex, hashHex := parts[0], parts[1]
+	sum := md5.Sum([]byte(saltHex + password))
+	if hex.EncodeToString(sum[:]) != hashHex {
 		return ErrInvalidCredentials
 	}
 	return nil
