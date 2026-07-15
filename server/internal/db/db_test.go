@@ -1,7 +1,10 @@
 package db_test
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -812,5 +815,316 @@ func TestRenameChat(t *testing.T) {
 	updated, _ := f.DB.GetChat(f.Ctx(), chat.ID)
 	if updated.Name != "NewName" {
 		t.Fatal("rename didn't stick")
+	}
+}
+
+func TestFindAndDeleteRefreshToken(t *testing.T) {
+	f := testutil.New(t)
+	a, _ := f.DB.CreateUser(f.Ctx(), "fadrt@x.com", "FadRT", "pw00000000")
+
+	// Create token
+	rt, err := f.DB.CreateRefreshToken(f.Ctx(), a.ID, "hash-fad", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rt.ID == "" {
+		t.Fatal("empty refresh token ID")
+	}
+
+	// Find and delete — atomically consumed
+	found, err := f.DB.FindAndDeleteRefreshToken(f.Ctx(), "hash-fad")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found.ID != rt.ID {
+		t.Fatal("wrong token returned")
+	}
+
+	// Second call → ErrNotFound (prevents replay)
+	_, err = f.DB.FindAndDeleteRefreshToken(f.Ctx(), "hash-fad")
+	if err != db.ErrNotFound {
+		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+
+	// Nonexistent hash → ErrNotFound
+	_, err = f.DB.FindAndDeleteRefreshToken(f.Ctx(), "no-such-hash")
+	if err != db.ErrNotFound {
+		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+}
+
+func TestDeleteUserRefreshTokens(t *testing.T) {
+	f := testutil.New(t)
+	a, _ := f.DB.CreateUser(f.Ctx(), "durt@x.com", "DurT", "pw00000000")
+	b, _ := f.DB.CreateUser(f.Ctx(), "durt2@x.com", "DurT2", "pw00000000")
+
+	if _, err := f.DB.CreateRefreshToken(f.Ctx(), a.ID, "a1", time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.DB.CreateRefreshToken(f.Ctx(), a.ID, "a2", time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.DB.CreateRefreshToken(f.Ctx(), b.ID, "b1", time.Hour); err != nil {
+		t.Fatal(err)
+	}
+
+	// Delete all for user a
+	if err := f.DB.DeleteUserRefreshTokens(f.Ctx(), a.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify a's tokens are gone
+	_, err := f.DB.FindRefreshToken(f.Ctx(), "a1")
+	if err != db.ErrNotFound {
+		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+	_, err = f.DB.FindRefreshToken(f.Ctx(), "a2")
+	if err != db.ErrNotFound {
+		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+
+	// Verify b's token unaffected
+	if _, err = f.DB.FindRefreshToken(f.Ctx(), "b1"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Calling on user with no tokens should not error
+	if err := f.DB.DeleteUserRefreshTokens(f.Ctx(), "no-such-user"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestListReactions(t *testing.T) {
+	f := testutil.New(t)
+	a, _ := f.DB.CreateUser(f.Ctx(), "lrx1@x.com", "LRx1", "pw00000000")
+	b, _ := f.DB.CreateUser(f.Ctx(), "lrx2@x.com", "LRx2", "pw00000000")
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "LRx", "", a.ID, []string{a.ID, b.ID})
+	msg, _ := f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, "rx", nil, nil)
+
+	f.DB.AddReaction(context.Background(), msg.ID, a.ID, "👍")
+	f.DB.AddReaction(context.Background(), msg.ID, b.ID, "👍")
+	f.DB.AddReaction(context.Background(), msg.ID, a.ID, "❤️")
+
+	// Viewer = a (who reacted 👍 and ❤️)
+	rxs, err := f.DB.ListReactions(context.Background(), msg.ID, a.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rxs) != 2 {
+		t.Fatalf("want 2 reaction groups, got %d", len(rxs))
+	}
+	for _, rx := range rxs {
+		if rx.Count == 0 {
+			t.Fatal("reaction count should be > 0")
+		}
+		if !rx.Me {
+			t.Fatal("viewer a should have Me=true for all reactions they left")
+		}
+	}
+
+	// Viewer = some third party (not reacted)
+	c, _ := f.DB.CreateUser(f.Ctx(), "lrx3@x.com", "LRx3", "pw00000000")
+	rxs2, _ := f.DB.ListReactions(context.Background(), msg.ID, c.ID)
+	for _, rx := range rxs2 {
+		if rx.Me {
+			t.Fatal("third party should have Me=false")
+		}
+	}
+
+	// No reactions
+	msg2, _ := f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, "norx", nil, nil)
+	rxs3, _ := f.DB.ListReactions(context.Background(), msg2.ID, a.ID)
+	if len(rxs3) != 0 {
+		t.Fatalf("want 0 reactions, got %d", len(rxs3))
+	}
+}
+
+func TestSetAndTogglePinned(t *testing.T) {
+	f := testutil.New(t)
+	a, _ := f.DB.CreateUser(f.Ctx(), "pin@x.com", "Pin", "pw00000000")
+	b, _ := f.DB.CreateUser(f.Ctx(), "pin2@x.com", "Pin2", "pw00000000")
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "PinTest", "", a.ID, []string{a.ID, b.ID})
+
+	if err := f.DB.SetPinned(context.Background(), chat.ID, a.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	chats, _ := f.DB.ListUserChats(context.Background(), a.ID)
+	var foundA bool
+	for _, c := range chats {
+		if c.ID == chat.ID {
+			foundA = true
+			if !c.Pinned {
+				t.Fatal("a should have chat pinned")
+			}
+		}
+	}
+	if !foundA {
+		t.Fatal("chat not in a's list")
+	}
+	chats, _ = f.DB.ListUserChats(context.Background(), b.ID)
+	for _, c := range chats {
+		if c.ID == chat.ID {
+			if c.Pinned {
+				t.Fatal("b should NOT have chat pinned")
+			}
+		}
+	}
+
+	if err := f.DB.SetPinned(context.Background(), chat.ID, a.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	chats, _ = f.DB.ListUserChats(context.Background(), a.ID)
+	for _, c := range chats {
+		if c.ID == chat.ID {
+			if c.Pinned {
+				t.Fatal("a should no longer have chat pinned")
+			}
+		}
+	}
+}
+
+func TestTogglePinned(t *testing.T) {
+	f := testutil.New(t)
+	a, _ := f.DB.CreateUser(f.Ctx(), "tog@x.com", "Tog", "pw00000000")
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "TogTest", "", a.ID, []string{a.ID})
+
+	if err := f.DB.TogglePinned(context.Background(), chat.ID, a.ID); err != nil {
+		t.Fatal(err)
+	}
+	chats, _ := f.DB.ListUserChats(context.Background(), a.ID)
+	var pinnedCount int
+	for _, c := range chats {
+		if c.ID == chat.ID && c.Pinned {
+			pinnedCount++
+		}
+	}
+	if pinnedCount == 0 {
+		t.Fatal("a should have chat pinned after toggle")
+	}
+
+	if err := f.DB.TogglePinned(context.Background(), chat.ID, a.ID); err != nil {
+		t.Fatal(err)
+	}
+	chats, _ = f.DB.ListUserChats(context.Background(), a.ID)
+	for _, c := range chats {
+		if c.ID == chat.ID && c.Pinned {
+			t.Fatal("a should NOT have chat pinned after second toggle")
+		}
+	}
+}
+
+func TestGetChatMemberRole_Success(t *testing.T) {
+	f := testutil.New(t)
+	a, _ := f.DB.CreateUser(f.Ctx(), "gcmr@x.com", "GCMR", "pw00000000")
+	b, _ := f.DB.CreateUser(f.Ctx(), "gcmr2@x.com", "GCMR2", "pw00000000")
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "GCMRTest", "", a.ID, []string{a.ID, b.ID})
+
+	role, err := f.DB.GetChatMemberRole(f.Ctx(), chat.ID, a.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if role != "owner" {
+		t.Fatalf("owner role should be 'owner', got %q", role)
+	}
+
+	role, err = f.DB.GetChatMemberRole(f.Ctx(), chat.ID, b.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if role != "" {
+		t.Fatalf("regular member role should be empty, got %q", role)
+	}
+}
+
+func TestListPublicChats_Pagination(t *testing.T) {
+	f := testutil.New(t)
+	a, _ := f.DB.CreateUser(f.Ctx(), "lpc@x.com", "LPC", "pw00000000")
+	for i := 0; i < 3; i++ {
+		name := fmt.Sprintf("PubChat_%d", i)
+		if _, err := f.DB.CreateChat(f.Ctx(), "group", name, "public", a.ID, []string{a.ID}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// page = 0 (clamped to 1)
+	chats, err := f.DB.ListPublicChats(f.Ctx(), 0, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chats) != 2 {
+		t.Fatalf("want 2 chats, got %d", len(chats))
+	}
+
+	// page = 2
+	chats, err = f.DB.ListPublicChats(f.Ctx(), 2, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chats) < 1 {
+		t.Fatal("expected at least 1 chat on page 2")
+	}
+
+	// limit = 0 (clamped to 20)
+	chats, err = f.DB.ListPublicChats(f.Ctx(), 1, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestListPublicChats_WithMessages(t *testing.T) {
+	f := testutil.New(t)
+	a, _ := f.DB.CreateUser(f.Ctx(), "lpcm@x.com", "LPCM", "pw00000000")
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "PubWithMsg", "public", a.ID, []string{a.ID})
+
+	longContent := strings.Repeat("x", 150)
+	if _, err := f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, longContent, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	chats, err := f.DB.ListPublicChats(f.Ctx(), 1, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chats) != 1 {
+		t.Fatalf("want 1 chat, got %d", len(chats))
+	}
+	if chats[0].LastMessageAt.IsZero() {
+		t.Fatal("LastMessageAt should be set")
+	}
+}
+
+func TestListPublicChats_WithPinnedMessage(t *testing.T) {
+	f := testutil.New(t)
+	a, _ := f.DB.CreateUser(f.Ctx(), "lpcp@x.com", "LPCP", "pw00000000")
+	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "PubPinned", "public", a.ID, []string{a.ID})
+	if err := f.DB.SetPinnedMessage(f.Ctx(), chat.ID, "important notice"); err != nil {
+		t.Fatal(err)
+	}
+
+	chats, err := f.DB.ListPublicChats(f.Ctx(), 1, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chats) != 1 {
+		t.Fatalf("want 1 chat, got %d", len(chats))
+	}
+	if chats[0].PinnedMessage == nil || chats[0].PinnedMessage.Content != "important notice" {
+		t.Fatal("pinned message content mismatch")
+	}
+}
+
+func TestListPublicChats_PrivateExcluded(t *testing.T) {
+	f := testutil.New(t)
+	a, _ := f.DB.CreateUser(f.Ctx(), "lpcpriv@x.com", "LPCPriv", "pw00000000")
+	if _, err := f.DB.CreateChat(f.Ctx(), "group", "PrivateChat", "private", a.ID, []string{a.ID}); err != nil {
+		t.Fatal(err)
+	}
+
+	chats, err := f.DB.ListPublicChats(f.Ctx(), 1, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chats) != 0 {
+		t.Fatalf("private chats should be excluded, got %d", len(chats))
 	}
 }

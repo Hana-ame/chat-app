@@ -3994,3 +3994,36 @@ CHAT_CSP_CONNECT_SRC="'self' ws://localhost:8080 wss://localhost:8080 http://loc
 ### 验证
 - Client: `npm run build` — ✅ (316 KB)
 - Server: `go build` + `go vet` + `go test` — ✅
+
+---
+
+## 2026-07-16 reactions 迁移至 Service 层（第 29 轮）
+
+### 问题
+`handlers/reactions.go` 中 AddReaction/RemoveReaction/ListReactions 直连 `s.DB`，绕过 Service 层。
+
+### 修复
+- 新建 `server/internal/service/reaction.go`：`ReactionService` 封装 `Add`/`Remove`/`List`
+- 各方法统一走 `s.Chat.MustBeMember` → DB → Hub broadcast 模式
+- 修正 `GetMessage` 的 `db.ErrNotFound` → `service.ErrNotFound` 映射（修复测试断言）
+- Handler 层简化：三处 handler 统一通过 `s.Services.Reaction.XXX` 调用，删除直连 DB 代码
+
+### 验证
+- `go build` + `go vet` + `go test` — ✅
+
+---
+
+## 2026-07-16 后端单元测试覆盖：Phase 4（第 30 轮）
+
+### 新增测试
+
+| 包 | +测试数 | 覆盖提升 | 测试内容 |
+|----|---------|----------|----------|
+| `internal/service` | 27 | 84.2% → 92.6% | 取消上下文错误路径（AuthZ / Chat / User / Member / Message / Reaction）、MemberService Remove 三种角色、MessageService Edit/Delete 边界、ReactionService 全套 |
+| `internal/auth` | 2 | 85.2% → 90.7% | WrongSigningMethod（"none" 算法）、EmptyUserID claim |
+| `internal/db` | 9 | 70.2% → 81.6% | FindAndDeleteRefreshToken 原子性 / DeleteUserRefreshTokens 隔离 / ListReactions Me 标志 / SetPinned / TogglePinned / GetChatMemberRole / ListPublicChats 分页+内容+固定+私密排除 |
+| `internal/orderedmap` | 8 | 71.4% → 78.6% | 无效 JSON、嵌套数组/对象、重复 Unmarshal、Marshal/Reader 错误路径 |
+
+### 验证
+- `go build` + `go vet` + `go test` — ✅
+- 全部新测试通过，无回归
