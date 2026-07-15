@@ -1,24 +1,26 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import UserAvatar from './UserAvatar';
 import ImagePreviewModal from './ImagePreviewModal';
 
 export default function UserProfileModal({ user: profileUser, onClose, chatId }) {
   const [previewUrl, setPreviewUrl] = useState(null);
-  const [avatarError, setAvatarError] = useState(false);
+
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose?.(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
   if (!profileUser) return null;
   const role = profileUser.role;
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 360, textAlign: 'center' }}>
+      <div className="modal-box" role="dialog" aria-modal="true" aria-label="User profile" onClick={e => e.stopPropagation()} style={{ maxWidth: 360, textAlign: 'center' }}>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button className="btn-ghost" onClick={onClose}>✕</button>
         </div>
 
-        {profileUser.avatar_url && !avatarError
-          ? <img src={profileUser.avatar_url} alt="" style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', margin: '8px auto', cursor: 'pointer' }} onClick={() => setPreviewUrl(profileUser.avatar_url)} onError={() => setAvatarError(true)} />
-          : <div className="msg-avatar" style={{ width: 64, height: 64, fontSize: 28, background: profileUser.avatar_color || '#5865F2', margin: '8px auto' }}>
-              {profileUser.username ? profileUser.username[0].toUpperCase() : '?'}
-            </div>
-        }
+        <UserAvatar user={profileUser} size={64} onClick={() => setPreviewUrl(profileUser.avatar_url)} style={{ margin: '8px auto' }} />
 
         <h3 style={{ margin: '8px 0 4px' }}>{profileUser.username}</h3>
 

@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 import { renderContent } from './renderContent';
+import UserAvatar from './UserAvatar';
 import UserProfileModal from './UserProfileModal';
 import ImagePreviewModal from './ImagePreviewModal';
 
@@ -24,7 +25,6 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
   const [opPending, setOpPending] = useState(false);
   const [profileUser, setProfileUser] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
-  const [avatarError, setAvatarError] = useState(false);
   const [reactions, setReactions] = useState(msg.reactions || []);
 
   const author = useMemo(() => {
@@ -32,7 +32,6 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
     if (msg.user_id === user.id) return user;
     return chat?.members?.find(m => m.id === msg.user_id) || msg.author || { username: 'Unknown', avatar_color: '#5865F2', id: msg.user_id };
   }, [chats, chatId, msg.user_id, msg.author, user]);
-  const initials = author.username ? author.username[0].toUpperCase() : '?';
   const pickerRef = useRef(null);
   const emojiBtnRef = useRef(null);
   const [pickerPos, setPickerPos] = useState(null);
@@ -112,10 +111,7 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
       <div className={'msg-row' + (sameAuthor ? ' msg-continuation' : '')}>
         {!sameAuthor && (
           <div onClick={() => setProfileUser(author)} style={{ cursor: 'pointer' }}>
-            {author.avatar_url && !avatarError
-              ? <img src={author.avatar_url} className="msg-avatar-img" alt={author.username} onClick={e => { e.stopPropagation(); setPreviewUrl(author.avatar_url); }} onError={() => setAvatarError(true)} />
-              : <div className="msg-avatar" style={{background:author.avatar_color}}>{initials}</div>
-            }
+            <UserAvatar user={author} size={40} onClick={(e) => { e.stopPropagation(); setPreviewUrl(author.avatar_url); }} />
           </div>
         )}
         <div style={{flex:1,minWidth:0}}>

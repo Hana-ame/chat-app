@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/Hana-ame/chat-app/server/internal/db"
-	"github.com/Hana-ame/chat-app/server/internal/models"
 )
 
 func (s *ChatService) MustBeMember(ctx context.Context, chatID, userID string) error {
@@ -45,13 +44,6 @@ func (s *ChatService) RequireOwnerOrAdmin(ctx context.Context, chatID, userID st
 		return nil
 	}
 	return ErrForbidden
-}
-
-func modelsUser(u *models.User, err error) (*models.User, error) {
-	if err != nil {
-		return nil, err
-	}
-	return u, nil
 }
 
 func isNotFound(err error) bool {

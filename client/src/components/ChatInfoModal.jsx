@@ -17,6 +17,12 @@ export default function ChatInfoModal({ chatId, onClose }) {
   const [profileUser, setProfileUser] = useState(null);
 
   useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose?.(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  useEffect(() => {
     if (!chatId || !accessToken) return;
     const fetch = () => {
       const { wsReady, mode, wsRequest } = useChatStore.getState();
@@ -38,7 +44,7 @@ export default function ChatInfoModal({ chatId, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+      <div className="modal-box" role="dialog" aria-modal="true" aria-label="Chat info" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h3 style={{ margin: 0 }}>Chat Info</h3>
           <button className="btn-ghost" onClick={onClose}>✕</button>

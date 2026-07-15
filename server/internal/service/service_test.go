@@ -313,6 +313,50 @@ func TestChatService_ListPublic(t *testing.T) {
 	_ = chats
 }
 
+func TestChatService_Join_Success(t *testing.T) {
+	f := testutil.New(t)
+	owner := createTestUser(t, f, "join_own@x.com", "JoinOwner")
+	member := createTestUser(t, f, "join_mem@x.com", "JoinMember")
+	chat, err := f.DB.CreateChat(f.Ctx(), "group", "PublicChat", "public", owner, []string{owner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := f.Server.Services.Chat.Join(f.Ctx(), chat.ID, member)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != chat.ID {
+		t.Fatal("wrong chat returned")
+	}
+	ok, _ := f.DB.IsChatMember(f.Ctx(), chat.ID, member)
+	if !ok {
+		t.Fatal("member should have joined")
+	}
+}
+
+func TestChatService_Join_PrivateChat(t *testing.T) {
+	f := testutil.New(t)
+	owner := createTestUser(t, f, "join_priv@x.com", "JoinPriv")
+	member := createTestUser(t, f, "join_priv2@x.com", "JoinPriv2")
+	chat, err := f.DB.CreateChat(f.Ctx(), "group", "PrivateChat", "private", owner, []string{owner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.Server.Services.Chat.Join(f.Ctx(), chat.ID, member)
+	if err == nil {
+		t.Fatal("joining private chat should fail")
+	}
+}
+
+func TestChatService_Join_Nonexistent(t *testing.T) {
+	f := testutil.New(t)
+	member := createTestUser(t, f, "join_nf@x.com", "JoinNF")
+	_, err := f.Server.Services.Chat.Join(f.Ctx(), "nonexistent", member)
+	if err == nil {
+		t.Fatal("joining nonexistent chat should fail")
+	}
+}
+
 func TestChatService_Visit(t *testing.T) {
 	f := testutil.New(t)
 	a := createTestUser(t, f, "visit@x.com", "VisitUser")

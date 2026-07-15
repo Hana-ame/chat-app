@@ -24,7 +24,7 @@ func TestMapServiceError(t *testing.T) {
 		{service.ErrNotFound, http.StatusNotFound, "not_found"},
 		{service.ErrInvalidInput, http.StatusBadRequest, "bad_request"},
 		{service.ErrConflict, http.StatusConflict, "conflict"},
-		{service.ErrContentTooLong, http.StatusForbidden, "content_too_long"},
+		{service.ErrContentTooLong, http.StatusRequestEntityTooLarge, "content_too_long"},
 		{errors.New("unknown"), http.StatusInternalServerError, "internal"},
 	}
 	for _, tc := range tests {

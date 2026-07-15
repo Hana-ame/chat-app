@@ -922,8 +922,8 @@ func TestMessageContentTooLong(t *testing.T) {
 		"content": longContent,
 	})
 	defer res2.Body.Close()
-	if res2.StatusCode != 403 {
-		t.Fatalf("long content: want 403 got %d", res2.StatusCode)
+	if res2.StatusCode != 413 {
+		t.Fatalf("long content: want 413 got %d", res2.StatusCode)
 	}
 	var errResp struct{ Error string `json:"error"` }
 	json.NewDecoder(res2.Body).Decode(&errResp)

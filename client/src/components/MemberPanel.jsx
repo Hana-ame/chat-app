@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 import { notify } from '../store/notification';
+import UserAvatar from './UserAvatar';
 import UserProfileModal from './UserProfileModal';
 import ImagePreviewModal from './ImagePreviewModal';
 
@@ -57,10 +58,7 @@ export default function MemberPanel({ chatId }) {
           <div key={m.id} style={{display:'flex',alignItems:'center',gap:8,padding:'4px 0',fontSize:14,cursor:'pointer'}}
             onClick={() => setProfileUser(m)}>
             <span className={'status-dot ' + (isOnline(m) ? 'online' : 'offline')} />
-            {m.avatar_url
-              ? <img src={m.avatar_url} style={{width:28,height:28,borderRadius:'50%',objectFit:'cover',flexShrink:0}} alt={m.username} onClick={e => { e.stopPropagation(); setPreviewUrl(m.avatar_url); }} />
-              : <div className="msg-avatar" style={{width:28,height:28,fontSize:11,background:m.avatar_color}}>{m.username[0]}</div>
-            }
+            <UserAvatar user={m} size={28} onClick={(e) => { e.stopPropagation(); setPreviewUrl(m.avatar_url); }} />
             <span>{m.username}</span>
             <div style={{flex:1}} />
             <div style={{width:66,height:28,position:'relative',flexShrink:0}}>

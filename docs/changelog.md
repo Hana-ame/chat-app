@@ -3893,6 +3893,8 @@ CHAT_CSP_CONNECT_SRC="'self' ws://localhost:8080 wss://localhost:8080 http://loc
 
 ---
 
+---
+
 ## 2026-07-15 authz.go isNotFound/isConflict 改用 errors.Is（第 23 轮）
 
 ### 问题
@@ -3929,5 +3931,49 @@ CHAT_CSP_CONNECT_SRC="'self' ws://localhost:8080 wss://localhost:8080 http://loc
 ### 验证
 - Server: `go build`, `go vet`, `go test` — ✅
 - Client: `npm run build` — ✅
+
+---
+
+## 2026-07-16 删除死代码 modelsUser + 补充 Chat.Join 测试 + 修复 content_too_long 状态码（第 26 轮）
+
+### 变更
+
+| 文件 | 操作 |
+|------|------|
+| `server/internal/service/authz.go` | 删除未使用的 `modelsUser` 函数及对应 `models` import |
+| `server/internal/service/service_test.go` | 新增 `TestChatService_Join_Success` / `Join_PrivateChat` / `Join_Nonexistent` |
+| `server/internal/handlers/util_test.go` | `ErrContentTooLong` 期望值 403 → 413（对齐实际代码） |
+| `server/internal/testutil/handler_test.go` | 同一测试期望值 403 → 413 |
+
+### 验证
+- `go build ./...` — ✅
+- `go vet ./...` — ✅
+- `go test ./...` — ✅
+
+---
+
+## 2026-07-16 UserAvatar 组件抽取 + 模态框无障碍（第 27 轮）
+
+### 新增
+- `client/src/components/UserAvatar.jsx` — `<UserAvatar user size onClick onFallbackClick>`，内置 img 错误回退/首字母彩色圆环 fallback
+
+### 替换 6 处内联头像渲染
+| 组件 | 效果 |
+|------|------|
+| `MemberPanel` | 替换内联条件 + `avatarError` 状态 |
+| `MessageItem` | 同上，同步删除 `initials` 变量 |
+| `UserProfileModal` | 同上 |
+| `SettingsModal` | 同上 |
+| `ChatList` (侧栏底部) | 同上 |
+| `DmSearchPanel` | 同上，**修复**缺失 `onError` 回退的 bug |
+
+### 模态框无障碍
+4 个模态框统一添加：
+- `role="dialog"` + `aria-modal="true"` + `aria-label`
+- Escape 键关闭 (全局 `keydown` 监听)
+- 涉及: `ImagePreviewModal` / `UserProfileModal` / `SettingsModal` / `ChatInfoModal`
+
+### 验证
+- Client: `npm run build` — ✅ (316 KB)
 
 ---

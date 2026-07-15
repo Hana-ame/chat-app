@@ -1,3 +1,5 @@
+import UserAvatar from './UserAvatar';
+
 export default function DmSearchPanel({ query, results, onSearch, onSelect }) {
   return (
     <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
@@ -6,10 +8,7 @@ export default function DmSearchPanel({ query, results, onSearch, onSelect }) {
       {results.map(u => (
         <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', cursor: 'pointer' }}
           onClick={() => onSelect(u)}>
-          {u.avatar_url
-            ? <img src={u.avatar_url} style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} alt={u.username} />
-            : <span className="msg-avatar" style={{ width: 32, height: 32, fontSize: 12, background: u.avatar_color }}>{u.username[0]}</span>
-          }
+          <UserAvatar user={u} size={32} />
           <span>{u.username}</span>
         </div>
       ))}

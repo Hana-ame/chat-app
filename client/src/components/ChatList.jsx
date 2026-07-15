@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 import pkg from '../../package.json';
+import UserAvatar from './UserAvatar';
 import ChatListItem from './ChatListItem';
 import PublicChannelList from './PublicChannelList';
 import CreateGroupForm from './CreateGroupForm';
@@ -36,7 +37,6 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showChatInfo, setShowChatInfo] = useState(null); // chatId
   const [previewUrl, setPreviewUrl] = useState(null);
-  const [avatarError, setAvatarError] = useState(false);
 
   const joinAction = chatSearch.trim() && /^(join|create)\s/i.test(chatSearch.trim())
     ? chatSearch.trim().startsWith('join') ? 'join' : 'create' : null;
@@ -250,12 +250,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
 
       <div className="sidebar-footer">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={(e) => { if (!e.target.closest('img')) setShowSettings(true); }}>
-          {user?.avatar_url && !avatarError
-            ? <img src={user.avatar_url} className="user-avatar-img" alt="" onClick={e => { e.stopPropagation(); setPreviewUrl(user.avatar_url); }} onError={() => setAvatarError(true)} />
-            : <div className="chat-item-avatar" style={{ width: 32, height: 32, fontSize: 13, background: user?.avatar_color || '#5865F2' }} onClick={() => setShowSettings(true)}>
-              {(user?.username?.[0] || '?').toUpperCase()}
-            </div>
-          }
+          <UserAvatar user={user} size={32} onClick={(e) => { e.stopPropagation(); setPreviewUrl(user?.avatar_url); }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 600 }}>{user?.username || 'Unknown'}</div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Online</div>
