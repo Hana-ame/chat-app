@@ -54,6 +54,26 @@ func (s *ChatService) Create(ctx context.Context, userID, name, visibility strin
 	return chat, nil
 }
 
+func (s *ChatService) CreateOrGetDM(ctx context.Context, userID, otherUserID string) (*models.Chat, bool, error) {
+	if _, err := s.DB.GetUserByID(ctx, otherUserID); err != nil {
+		if isNotFound(err) {
+			return nil, false, ErrNotFound
+		}
+		return nil, false, err
+	}
+	if dm, err := s.DB.FindDMBetween(ctx, userID, otherUserID); err == nil {
+		return dm, true, nil
+	}
+	chat, err := s.DB.CreateChat(ctx, "dm", "", "", "", []string{userID, otherUserID})
+	if err != nil {
+		return nil, false, err
+	}
+	if s.Hub != nil {
+		s.Hub.BroadcastChatCreated(chat)
+	}
+	return chat, false, nil
+}
+
 func (s *ChatService) Rename(ctx context.Context, chatID, userID, name string) (*models.Chat, error) {
 	chat, err := s.DB.GetChat(ctx, chatID)
 	if err != nil {

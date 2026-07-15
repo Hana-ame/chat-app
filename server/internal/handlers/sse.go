@@ -32,14 +32,17 @@ func (s *Server) SSE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := claims.UserID
-	user, err := s.DB.GetUserByID(r.Context(), userID)
+	user, err := s.Services.User.GetByID(r.Context(), userID)
 	if err != nil {
-		w.Header().Set("X-Error", err.Error())
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		status, code := mapServiceError(err)
+		if status >= 500 {
+			w.Header().Set("X-Error", err.Error())
+		}
+		writeError(w, status, code, err.Error())
 		return
 	}
 
-	chats, err := s.DB.ListUserChats(r.Context(), userID)
+	chats, err := s.Services.Chat.ListForUser(r.Context(), userID)
 	var xErr string
 	if err != nil {
 		xErr = err.Error()
@@ -55,7 +58,7 @@ func (s *Server) SSE(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // 为将来 CORS 支持而准备
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	if xErr != "" {
 		w.Header().Set("X-Error", xErr)
 	}

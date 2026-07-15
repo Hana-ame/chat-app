@@ -3776,6 +3776,10 @@ CHAT_CSP_CONNECT_SRC="'self' ws://localhost:8080 wss://localhost:8080 http://loc
 
 ---
 
+
+
+---
+
 ## 2026-07-15 BroadcastUserUpdate data race 修复（第 19 轮）
 
 ### 问题
@@ -3829,5 +3833,37 @@ CHAT_CSP_CONNECT_SRC="'self' ws://localhost:8080 wss://localhost:8080 http://loc
 
 ### 验证
 - Client build: ✅ 76 modules
+
+---
+
+## 2026-07-15 Handler 层直连 DB 清理 + coordinator 修复（第 22 轮）
+
+### 问题
+
+审计第 2 条及更多：4 个 handler 文件绕过 Service 层直接调用 `s.DB.*`。另 `coordinator.js` 有两处 bug：
+1. `disconnect()` 后旧 `setTimeout` 重连 — 缺少 `_closeGuard` 检查
+2. `_initTransport` 在 ws/sse 握手完成前就设 `_state = STATE.CONNECTED`
+
+### 实现
+
+**新增** `server/internal/service/user.go`:
+- `UserService` — `GetByID`, `GetByEmail`, `Create`, `UpdateProfile`, `Search`
+- DB 错误统一映射为 `service.Err*`
+
+**新增** `ChatService.CreateOrGetDM` — 封装 DM 创建全流程（查用户 + 查现有 DM + 创建 + 广播）
+
+**修改** 4 个 handler:
+- `auth.go` — `CreateUser`/`GetUserByEmail`/`GetUserByID` → `Services.User.*`
+- `users.go` — `UpdateUserProfile`/`SearchUsers` → `Services.User.*`
+- `sse.go` — `GetUserByID`/`ListUserChats` → `Services.User.GetByID`/`Services.Chat.ListForUser`
+- `chat.go` — `CreateOrGetDM` 全链路 → `Services.Chat.CreateOrGetDM`
+
+**修改** `client/src/realtime/coordinator.js`:
+- `setTimeout` 回调增加 `if (this._closeGuard) return`（disconnect 后不重连）
+- `_state = STATE.CONNECTED` 移入 `onReady` 回调，增加 `if (this._state !== STATE.CONNECTING) return` 过时守卫
+
+### 验证
+- Server: `go build`, `go vet`, `go test` — ✅
+- Client: `npm run build` — ✅
 
 ---

@@ -11,6 +11,7 @@ type Service struct {
 	DB      *db.DB
 	Hub     *ws.Hub
 	Chat    *ChatService
+	User    *UserService
 	Message *MessageService
 	Member  *MemberService
 }
@@ -18,6 +19,7 @@ type Service struct {
 func New(database *db.DB, hub *ws.Hub) *Service {
 	s := &Service{DB: database, Hub: hub}
 	s.Chat = &ChatService{Service: s}
+	s.User = &UserService{Service: s}
 	s.Message = &MessageService{Service: s}
 	s.Member = &MemberService{Service: s}
 	return s

@@ -96,24 +96,21 @@ func (s *Server) CreateOrGetDM(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "invalid user_id")
 		return
 	}
-	other, err := s.DB.GetUserByID(r.Context(), req.UserID)
+	chat, existing, err := s.Services.Chat.CreateOrGetDM(r.Context(), u.ID, req.UserID)
 	if err != nil {
-		writeError(w, http.StatusNotFound, "user_not_found", "")
+		status, code := mapServiceError(err)
+		if status == http.StatusNotFound {
+			writeError(w, status, "user_not_found", "")
+			return
+		}
+		writeError(w, status, code, err.Error())
 		return
 	}
-	if dm, err := s.DB.FindDMBetween(r.Context(), u.ID, other.ID); err == nil {
-		writeJSON(w, http.StatusOK, dm)
-		return
+	if existing {
+		writeJSON(w, http.StatusOK, chat)
+	} else {
+		writeJSON(w, http.StatusCreated, chat)
 	}
-	chat, err := s.DB.CreateChat(r.Context(), "dm", "", "", "", []string{u.ID, other.ID})
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
-		return
-	}
-	if s.Hub != nil {
-		s.Hub.BroadcastChatCreated(chat)
-	}
-	writeJSON(w, http.StatusCreated, chat)
 }
 
 // GetChat godoc

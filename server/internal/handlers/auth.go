@@ -1,11 +1,9 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/Hana-ame/chat-app/server/internal/auth"
-	"github.com/Hana-ame/chat-app/server/internal/db"
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
 )
 
@@ -51,14 +49,15 @@ func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "weak_password", err.Error())
 		return
 	}
-	u, err := s.DB.CreateUser(r.Context(), email, username, hash)
+	u, err := s.Services.User.Create(r.Context(), email, username, hash)
 	if err != nil {
-		if errors.Is(err, db.ErrConflict) {
+		status, code := mapServiceError(err)
+		if status == http.StatusConflict {
 			logutil.Warn("register conflict: email=%s username=%s", email, username)
-			writeError(w, http.StatusConflict, "already_taken", "email or username already taken")
+			writeError(w, status, "already_taken", "email or username already taken")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		writeError(w, status, code, err.Error())
 		return
 	}
 	logutil.Info("user registered: %s (username=%s email=%s)", u.ID[:8], username, email)
@@ -86,15 +85,16 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	email := auth.NormalizeEmail(req.Email)
-	u, hash, err := s.DB.GetUserByEmail(r.Context(), email)
+	u, hash, err := s.Services.User.GetByEmail(r.Context(), email)
 	if err != nil {
-		if errors.Is(err, db.ErrNotFound) {
+		status, code := mapServiceError(err)
+		if status == http.StatusNotFound {
 			logutil.Warn("login failed: email=%s (not found)", email)
 			s.loginLimiter.record(ip)
 			writeError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		writeError(w, status, code, err.Error())
 		return
 	}
 	if err := auth.VerifyPassword(hash, req.Password); err != nil {
@@ -118,9 +118,10 @@ func (s *Server) issueSession(w http.ResponseWriter, r *http.Request, userID str
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
-	u, err := s.DB.GetUserByID(r.Context(), userID)
+	u, err := s.Services.User.GetByID(r.Context(), userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		status, code := mapServiceError(err)
+		writeError(w, status, code, err.Error())
 		return
 	}
 	setAuthCookie(w, r, "access_token", access, "/", s.Cfg.AccessTokenTTL)

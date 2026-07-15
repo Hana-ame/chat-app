@@ -19,3 +19,7 @@ Chat application with Go backend + React frontend.
 
 ## Notes
 - This file is for initialization context only. Session logs and changelogs go in `docs/changelog.md`.
+
+## Changelog Rules
+- Always append new entries to the **end** of `docs/changelog.md`.
+- When appending, anchor `edit`'s `oldString` on the **last section heading** (e.g., `## 2026-... 统一前端错误通知通道（第 21 轮）`) to guarantee a unique match — never match a generic line like `- Client build: ✅` that appears multiple times.

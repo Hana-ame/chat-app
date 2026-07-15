@@ -1,11 +1,9 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/Hana-ame/chat-app/server/internal/auth"
-	"github.com/Hana-ame/chat-app/server/internal/db"
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
 )
 
@@ -48,18 +46,19 @@ func (s *Server) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	if req.AvatarColor == "" {
 		req.AvatarColor = u.AvatarColor
 	}
-	updated, err := s.DB.UpdateUserProfile(r.Context(), u.ID, name, req.AvatarColor, req.AvatarURL)
+	updated, err := s.Services.User.UpdateProfile(r.Context(), u.ID, name, req.AvatarColor, req.AvatarURL)
 	if err != nil {
-		if errors.Is(err, db.ErrNotFound) {
-			writeError(w, http.StatusNotFound, "not_found", "user disappeared")
+		status, code := mapServiceError(err)
+		if status == http.StatusNotFound {
+			writeError(w, status, "not_found", "user disappeared")
 			return
 		}
-		if errors.Is(err, db.ErrConflict) {
+		if status == http.StatusConflict {
 			logutil.Warn("username taken: %s", name)
-			writeError(w, http.StatusConflict, "username_taken", "username already taken")
+			writeError(w, status, "username_taken", "username already taken")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+		writeError(w, status, code, err.Error())
 		return
 	}
 	logutil.Info("profile updated: user=%s username=%s", u.ID[:8], name)
@@ -83,7 +82,7 @@ func (s *Server) SearchUsers(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"users": []any{}})
 		return
 	}
-	users, err := s.DB.SearchUsers(r.Context(), q, 20)
+	users, err := s.Services.User.Search(r.Context(), q, 20)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return

@@ -47,7 +47,11 @@ class RealtimeCoordinator {
   _initTransport(mode, token) {
     const ctx = {
       token,
-      onReady: (data) => this._handlers.onReady?.(data),
+      onReady: (data) => {
+        if (this._state !== STATE.CONNECTING) return;
+        this._state = STATE.CONNECTED;
+        this._handlers.onReady?.(data);
+      },
       onEvent: (op, payload) => this._handlers.onEvent?.(op, payload),
       onClose: () => {
         if (this._closeGuard) return;
@@ -55,22 +59,21 @@ class RealtimeCoordinator {
         this._transport = null;
         this._handlers.onClose?.();
         setTimeout(() => {
+          if (this._closeGuard) return;
           if (this._state === STATE.IDLE && this._mode && this._token)
             this.connect(this._mode, this._token);
         }, 3000);
       },
     };
 
-    if (mode === 'mock') { this._transport = createMockTransport(ctx); this._state = STATE.CONNECTED; return; }
+    if (mode === 'mock') { this._transport = createMockTransport(ctx); return; }
 
     switch (mode) {
       case 'ws':
         this._transport = createWsTransport(ctx);
-        this._state = STATE.CONNECTED;
         break;
       case 'sse':
         this._transport = createSseTransport(ctx);
-        this._state = STATE.CONNECTED;
         break;
       case 'poll':
         this._transport = createPollTransport({
