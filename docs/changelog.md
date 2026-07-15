@@ -3867,3 +3867,43 @@ CHAT_CSP_CONNECT_SRC="'self' ws://localhost:8080 wss://localhost:8080 http://loc
 - Client: `npm run build` — ✅
 
 ---
+
+## 2026-07-16 后端添加单元测试覆盖（第 24 轮）
+
+### 新增测试文件
+
+| 文件 | 测试数 | 覆盖包 |
+|------|--------|--------|
+| `server/internal/config/config_test.go` | 6 | config (100%) |
+| `server/internal/orderedmap/orderedmap_test.go` | 23 | orderedmap (71.4%) |
+| `server/internal/service/service_test.go` | 83 | service (80.4%) |
+| `server/internal/handlers/util_test.go` | 17 | handlers util (100% of util) |
+
+### 测试内容
+
+- **config**: 默认值 / 自定义环境变量 / 非法值回退 / JWT 随机密钥
+- **orderedmap**: 核心 CRUD / 排序 / JSON 序列化与反序列化 / 嵌套对象 / HTML 转义
+- **service (83 个测试)**: Chat CRUD + 权限（owner/admin/member）/ DM / 消息发送校验（附件 URL 白名单 / 内容长度 / @提及提取）/ 成员管理（owner 保护）/ User CRUD + 搜索 / authz 边界
+- **handlers util**: mapServiceError / writeJSON / writeError / decodeJSON / bearerToken / cookie helpers
+
+### 验证
+- `go build ./...` — ✅
+- `go vet ./...` — ✅
+- `go test ./...` — ✅
+
+---
+
+## 2026-07-15 authz.go isNotFound/isConflict 改用 errors.Is（第 23 轮）
+
+### 问题
+
+`service/authz.go` 的 `isNotFound`/`isConflict` 使用 `err.Error() == "not found"` 字符串比较，错误被 `fmt.Errorf("...: %w", err)` 包装后失效。
+
+### 修复
+
+改用 `errors.Is(err, db.ErrNotFound)` / `errors.Is(err, db.ErrConflict)`。`isContentTooLong` 保持字符串检查（DB 层无 sentinel 错误）。
+
+### 验证
+- Server: `go build`, `go vet`, `go test` — ✅
+
+---

@@ -9,6 +9,7 @@ import (
 	"github.com/Hana-ame/chat-app/server/internal/auth"
 	"github.com/Hana-ame/chat-app/server/internal/db"
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
+	"github.com/Hana-ame/chat-app/server/internal/models"
 	"github.com/gorilla/websocket"
 )
 
@@ -77,7 +78,11 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		send:   make(chan Envelope, sendQueueSize),
 		subs:   make(map[string]struct{}),
 	}
-	chats, _ := g.db.ListUserChats(r.Context(), user.ID)
+	chats, err := g.db.ListUserChats(r.Context(), user.ID)
+	if err != nil {
+		logutil.Error("ws ready: list chats for %s: %v", user.ID[:8], err)
+		chats = []models.Chat{}
+	}
 	for _, ch := range chats {
 		c.subscribe(ch.ID)
 	}

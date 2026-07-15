@@ -79,7 +79,7 @@ func mapServiceError(err error) (int, string) {
 		return http.StatusConflict, "conflict"
 	}
 	if errors.Is(err, service.ErrContentTooLong) {
-		return http.StatusForbidden, "content_too_long"
+		return http.StatusRequestEntityTooLarge, "content_too_long"
 	}
 	return http.StatusInternalServerError, "internal"
 }

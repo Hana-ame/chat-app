@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strings"
 
+	"github.com/Hana-ame/chat-app/server/internal/db"
 	"github.com/Hana-ame/chat-app/server/internal/models"
 )
 
@@ -53,11 +55,11 @@ func modelsUser(u *models.User, err error) (*models.User, error) {
 }
 
 func isNotFound(err error) bool {
-	return err != nil && err.Error() == "not found"
+	return errors.Is(err, db.ErrNotFound)
 }
 
 func isConflict(err error) bool {
-	return err != nil && err.Error() == "conflict"
+	return errors.Is(err, db.ErrConflict)
 }
 
 func isContentTooLong(err error) bool {

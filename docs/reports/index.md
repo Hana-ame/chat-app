@@ -32,3 +32,4 @@
 | 文件名 | 说明 |
 |---|---|
 | [`testing-guide-20260709.md`](testing-guide-20260709.md) | 测试指南 |
+| [`backend-test-coverage-20260716.md`](backend-test-coverage-20260716.md) | 后端测试覆盖报告（2026-07-16） |
