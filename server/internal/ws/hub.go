@@ -42,18 +42,26 @@ type Envelope struct {
 	Payload json.RawMessage `json:"payload,omitempty"`
 }
 
+type memberCacheEntry struct {
+	members []models.User
+	expires time.Time
+}
+
 type Hub struct {
 	mu         sync.RWMutex
 	clients    map[string]map[*Client]struct{}
 	sseClients map[string][]chan []byte
 	db         *db.DB
+	memberMu   sync.Mutex
+	memberCache map[string]*memberCacheEntry
 }
 
 func NewHub(database *db.DB) *Hub {
 	return &Hub{
-		clients:    make(map[string]map[*Client]struct{}),
-		sseClients: make(map[string][]chan []byte),
-		db:         database,
+		clients:     make(map[string]map[*Client]struct{}),
+		sseClients:  make(map[string][]chan []byte),
+		db:          database,
+		memberCache: make(map[string]*memberCacheEntry),
 	}
 }
 
@@ -149,10 +157,15 @@ func (h *Hub) sendToChat(chatID string, env Envelope, exceptUser string) {
 	if h.db == nil {
 		return
 	}
-	members, err := h.db.GetChatMembers(context.Background(), chatID)
-	if err != nil {
-		logutil.Error("ws: failed to load members for chat %s: %v", chatID[:8], err)
-		return
+	members, ok := h.getCachedMembers(chatID)
+	if !ok {
+		var err error
+		members, err = h.db.GetChatMembers(context.Background(), chatID)
+		if err != nil {
+			logutil.Error("ws: failed to load members for chat %s: %v", chatID[:8], err)
+			return
+		}
+		h.setCachedMembers(chatID, members)
 	}
 	b, _ := json.Marshal(env)
 	for _, m := range members {
@@ -164,6 +177,24 @@ func (h *Hub) sendToChat(chatID string, env Envelope, exceptUser string) {
 		}
 		h.sseSend(m.ID, b)
 	}
+}
+
+const memberCacheTTL = 1 * time.Second
+
+func (h *Hub) getCachedMembers(chatID string) ([]models.User, bool) {
+	h.memberMu.Lock()
+	defer h.memberMu.Unlock()
+	e, ok := h.memberCache[chatID]
+	if !ok || time.Now().After(e.expires) {
+		return nil, false
+	}
+	return e.members, true
+}
+
+func (h *Hub) setCachedMembers(chatID string, members []models.User) {
+	h.memberMu.Lock()
+	defer h.memberMu.Unlock()
+	h.memberCache[chatID] = &memberCacheEntry{members: members, expires: time.Now().Add(memberCacheTTL)}
 }
 
 func envelope(op Op, payload interface{}) Envelope {
