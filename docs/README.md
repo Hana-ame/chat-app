@@ -24,17 +24,5 @@ Detailed technical implementation of core app functionalities:
 Developer reports and architectural analysis (see [`index.md`](./reports/index.md) for full list):
 
 ### 📦 [Archive](./archive/)
-Stale, session-specific, and duplicate documents:
-- [`handoff.md`](./archive/handoff.md): Previous session handoff (outdated).
-- [`log.md`](./archive/log.md): Short change log (superseded by `modification-log.md`).
-- [`upload_summary.md`](./archive/upload_summary.md): Temporary upload index (no longer relevant).
-- [`conversation-20260707.md`](./archive/conversation-20260707.md): Chat transcripts with the AI agent.
-- [`session-20260706.md`](./archive/session-20260706.md): Session summaries.
-- [`todo-20260706.md`](./archive/todo-20260706.md): Historical task lists.
-- [`todo-uiux.md`](./archive/todo-uiux.md): UI/UX specific task lists.
-- **Reports archived:**
-  - `db-base-spec-20260709.md` / `db-dao-api-reference-20260708.md`: Superseded by `db-spec-20260710.md`.
-  - `frontend-logic-spec-20260710.delta.md`: Redundant summary of corrections.
-  - `frontend-update-report-20260707.md`: Earliest report, absorbed into later specs.
-  - `upload-urls-20260710.md`: Operational URL list, not substantive.
-  - `ws-implementation-spec.md` / `sse-implementation-spec.md`: Undated drafts duplicated by dated specs.
+Stale, session-specific, and duplicate documents.
+Includes: session handoffs, superseded specs, one-time audit reports, temporary files, and draft duplicates.

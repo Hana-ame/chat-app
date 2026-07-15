@@ -3506,3 +3506,22 @@ if n > 0 {
 - 最新推送 `557152e`，CI 构建中
 
 ---
+
+## 2026-07-15 功能改进（第 9 轮）
+
+#### Pin-Toggle 改为显式设定
+- **现象**: `pin-toggle` 自动翻转顶置状态，无法直接设定
+- **修复**: 接受 `{"pinned": true/false}` body，DB 新增 `SetPinned()` 方法；Context Menu 分 Pin/Unpin 两个按钮
+- **文件**: `server/internal/handlers/chat.go`, `server/internal/db/chats.go`, `client/src/api/client.js`, `mock.js`, `ChatList.jsx`
+
+#### Pinned Message 改名为 公告
+- **现象**: 群组公告栏无明确标题
+- **修复**: 公告横幅前显示 `📢 公告` 标签
+- **文件**: `client/src/components/ChatView.jsx`, `client/src/dev/dummy.js`
+
+### 验证
+- Go build: ✅ `go vet` ✅
+- Client build: ✅
+- 最新推送 `f564348`，CI 构建中
+
+---
