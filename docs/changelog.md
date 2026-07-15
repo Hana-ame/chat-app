@@ -3700,3 +3700,45 @@ Handlers 直接调 `s.DB.*`，权限检查、Hub 广播、验证逻辑在每个 
 - Go build + vet: ✅
 
 ---
+
+## 2026-07-15 Hub 成员列表缓存（第 16 轮）
+
+### 背景
+
+`sendToChat` 每次广播都调 `GetChatMembers`（SQL JOIN 查询）。500 人群每秒 10 条消息 → 5000 qps DB 查询，连接池大概率挂。
+
+### 修复
+
+`server/internal/ws/hub.go`:
+- 新增 `memberCacheEntry` 结构体 + `memberCache map[string]*memberCacheEntry` + `memberMu sync.Mutex`
+- `getCachedMembers(chatID)`: 命中且未过期返回，否则 nil
+- `setCachedMembers(chatID, members)`: 写入 cache，TTL 1s
+- `sendToChat`: 先查缓存，miss 才查 DB 并写回缓存
+- 1s TTL 削减 ~99% DB 查询压力
+
+### 验证
+- Go build + vet: ✅
+
+---
+
+## 2026-07-15 CSP 可配置化（第 17 轮）
+
+### 背景
+
+`connect-src` 硬编码 `wss://wsl-8080.moonchan.xyz`，本地开发不用 tunnel 时 WS 被 CSP 拦截。
+
+### 变更
+
+- `server/internal/config/config.go`: 新增 `CSPConnectSrc` 字段，`Load()` 从 `CHAT_CSP_CONNECT_SRC` 环境变量读取，默认值保持向后兼容
+- `server/internal/handlers/router.go`: CSP header 改为 `"connect-src "+s.Cfg.CSPConnectSrc`
+
+### 开发环境用法
+
+```bash
+CHAT_CSP_CONNECT_SRC="'self' ws://localhost:8080 wss://localhost:8080 http://localhost:* https://upload.moonchan.xyz" go run ./cmd/chatd
+```
+
+### 验证
+- Go build + vet: ✅
+
+---

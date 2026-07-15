@@ -44,7 +44,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 					"script-src 'self' 'unsafe-inline'; "+
 					"style-src 'self' 'unsafe-inline'; "+
 					"img-src 'self' https://upload.moonchan.xyz data:; "+
-					"connect-src 'self' wss://wsl-8080.moonchan.xyz https://upload.moonchan.xyz; "+
+					"connect-src "+s.Cfg.CSPConnectSrc+"; "+
 					"font-src 'self' data:;")
 			w.Header().Set("X-Content-Type-Options", "nosniff")
 			next.ServeHTTP(w, r)

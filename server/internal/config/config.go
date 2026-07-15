@@ -23,6 +23,7 @@ type Config struct {
 	MaxUploadBytes   int64         // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
 	StaticDir        string
 	AllowOrigins     []string
+	CSPConnectSrc    string
 }
 
 func getenv(key, def string) string {
@@ -88,6 +89,7 @@ func Load() *Config {
 		MaxUploadBytes:  getenvInt64("CHAT_MAX_UPLOAD", 20<<20),
 		StaticDir:       getenv("CHAT_STATIC_DIR", "../client/dist"),
 		AllowOrigins:    []string{"*"},
+		CSPConnectSrc:   getenv("CHAT_CSP_CONNECT_SRC", "'self' wss://wsl-8080.moonchan.xyz https://upload.moonchan.xyz"),
 	}
 	logutil.Debug("config loaded: addr=%s db=%s upload_dir=%s static_dir=%s base_url=%s",
 		cfg.Addr, cfg.DBPath, cfg.UploadDir, cfg.StaticDir, cfg.BaseURL)
