@@ -33,6 +33,11 @@ type sessionResp struct {
 // @Failure      409  {object}  map[string]any
 // @Router       /api/auth/register [post]
 func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
+	if !s.registerLimiter.allow() {
+		logutil.Warn("register rate limited: global limit reached")
+		writeError(w, http.StatusTooManyRequests, "rate_limited", "registration limit reached, try again later")
+		return
+	}
 	var req registerReq
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
@@ -61,6 +66,7 @@ func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logutil.Info("user registered: %s (username=%s email=%s)", u.ID[:8], username, email)
+	s.registerLimiter.record()
 	s.issueSession(w, r, u.ID)
 }
 

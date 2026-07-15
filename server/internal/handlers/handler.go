@@ -32,8 +32,9 @@ type Server struct {
 	Hub          *ws.Hub
 	Version      string
 	Services     *service.Service
-	refreshMu    sync.Mutex
-	loginLimiter *loginRateLimiter
+	refreshMu       sync.Mutex
+	loginLimiter    *loginRateLimiter
+	registerLimiter *registerLimiter
 }
 
 // New creates a new Server.
@@ -44,7 +45,8 @@ func New(cfg *config.Config, database *db.DB, authSvc *auth.Service, hub *ws.Hub
 		Auth:         authSvc,
 		Hub:          hub,
 		Services:     service.New(database, hub),
-		loginLimiter: newLoginRateLimiter(5, 1*time.Hour),
+		loginLimiter:    newLoginRateLimiter(5, 1*time.Hour),
+		registerLimiter: newRegisterLimiter(100, 24*time.Hour),
 	}
 }
 

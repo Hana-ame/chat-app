@@ -127,8 +127,8 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
               <div className="msg-deleted">(message deleted)</div>
             ) : editing ? (
               <div style={{display:'flex',gap:8}}>
-                <input className="input-field" value={editText} onChange={e=>setEditText(e.target.value)}
-                  style={{flex:1}} autoFocus onKeyDown={e=>e.key==='Enter'&&handleEdit()} />
+                <textarea className="input-field" value={editText} onChange={e=>setEditText(e.target.value)}
+                  style={{flex:1,resize:'none',minHeight:36}} autoFocus onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleEdit();}}} />
                  <button className="btn btn-primary" style={{padding:'4px 12px',fontSize:12}} onClick={handleEdit} disabled={opPending}>
                    {opPending ? '...' : 'Save'}
                  </button>

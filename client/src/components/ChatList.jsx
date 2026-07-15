@@ -8,6 +8,7 @@ import ChatListItem from './ChatListItem';
 import PublicChannelList from './PublicChannelList';
 import CreateGroupForm from './CreateGroupForm';
 import SettingsModal from './SettingsModal';
+import { notify } from '../store/notification';
 import ChatInfoModal from './ChatInfoModal';
 import ScrollArea from './ScrollArea';
 import EmptyState from './EmptyState';
@@ -25,7 +26,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const { chats, mode, setMode } = useChatStore();
   const [showCreate, setShowCreate] = useState(false);
   const [newChatName, setNewChatName] = useState('');
-  const [newChatVisibility, setNewChatVisibility] = useState('private');
+  const [newChatVisibility, setNewChatVisibility] = useState('public');
   const [chatSearch, setChatSearch] = useState('');
   const [publicResults, setPublicResults] = useState(null);
   const [publicSearching, setPublicSearching] = useState(false);
@@ -53,7 +54,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   }, [contextMenu]);
 
   const handleCreate = async () => {
-    if (!newChatName.trim()) return;
+    if (!newChatName.trim()) { notify('Please enter a group name', 'error'); return; }
     try {
       const data = await api.createChat(accessToken, newChatName, [], newChatVisibility);
       setShowCreate(false);
@@ -160,10 +161,19 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     const file = document.getElementById('avatar-file-input')?.files?.[0];
     if (file) {
       const data = await api.uploadAvatar(accessToken, file);
-      payload.avatar_url = data.url;
+      payload.avatar_url = data.url + '?v=' + Date.now();
     }
     const updated = await api.updateProfile(accessToken, payload);
     useAuthStore.getState().setUser(updated);
+    // Update avatar_url in cached chat data (last_message.author, etc.)
+    useChatStore.setState(s => ({
+      chats: s.chats.map(c => {
+        if (c.last_message?.author?.id === updated.user.id) {
+          return { ...c, last_message: { ...c.last_message, author: { ...c.last_message.author, avatar_url: updated.user.avatar_url } } };
+        }
+        return c;
+      }),
+    }));
     setShowSettings(false);
   };
 

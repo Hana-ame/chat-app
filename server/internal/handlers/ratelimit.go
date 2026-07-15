@@ -70,6 +70,38 @@ func (l *loginRateLimiter) record(ip string) {
 	l.attempts[ip] = append(l.attempts[ip], time.Now())
 }
 
+type registerLimiter struct {
+	mu      sync.Mutex
+	count   int
+	limit   int
+	window  time.Duration
+	resetAt time.Time
+}
+
+func newRegisterLimiter(limit int, window time.Duration) *registerLimiter {
+	return &registerLimiter{
+		limit:   limit,
+		window:  window,
+		resetAt: time.Now().Add(window),
+	}
+}
+
+func (l *registerLimiter) allow() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if time.Now().After(l.resetAt) {
+		l.count = 0
+		l.resetAt = time.Now().Add(l.window)
+	}
+	return l.count < l.limit
+}
+
+func (l *registerLimiter) record() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.count++
+}
+
 var cloudflareNets []*net.IPNet
 
 func initCloudflareNets() {

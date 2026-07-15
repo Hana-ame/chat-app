@@ -9,7 +9,7 @@ export default function UserAvatar({ user, size = 32, onClick, onFallbackClick }
       <img
         src={user.avatar_url}
         alt={user?.username || ''}
-        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, display: 'block' }}
         onClick={onClick}
         onError={() => setImgError(true)}
       />

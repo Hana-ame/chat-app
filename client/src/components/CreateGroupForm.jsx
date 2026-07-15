@@ -4,7 +4,7 @@ export default function CreateGroupForm({ name, visibility, onVisibilityChange, 
       <input className="input-field" placeholder="Group name..." value={name} autoFocus
         onChange={onNameChange} onKeyDown={onNameKeyDown} style={{ fontSize: 14, padding: '8px 10px' }} />
       <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-        {['private', 'unlisted', 'public'].map(v => (
+        {['public', 'unlisted'].map(v => (
           <button key={v} type="button"
             onClick={() => onVisibilityChange(v)}
             style={{
@@ -15,7 +15,7 @@ export default function CreateGroupForm({ name, visibility, onVisibilityChange, 
               color: visibility === v ? '#fff' : 'var(--text-primary)',
               fontWeight: visibility === v ? 600 : 400,
             }}>
-            {v === 'private' ? '🔒 Private' : v === 'unlisted' ? '🔗 Unlisted' : '🌍 Public'}
+            {v === 'public' ? '🌍 Public' : '🔗 Unlisted'}
           </button>
         ))}
       </div>
