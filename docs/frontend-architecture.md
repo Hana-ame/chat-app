@@ -27,16 +27,35 @@ client/
 │   │   └── mock.js         # 模拟数据 (开发/演示用)
 │   ├── components/         # UI 组件层
 │   │   ├── ChatView.jsx    # 聊天主界面 (消息流、公告栏)
+│   │   ├── ChatList.jsx    # 聊天列表容器
 │   │   ├── ChatListItem.jsx # 聊天列表项
 │   │   ├── Composer.jsx    # 消息输入框与附件上传
 │   │   ├── MessageItem.jsx  # 单条消息渲染与操作
-│   │   └── renderContent.js # Markdown/提及渲染逻辑
+│   │   ├── renderContent.jsx # Markdown/提及渲染逻辑
+│   │   ├── ChatInfoModal.jsx # 聊天信息弹窗
+│   │   ├── MemberPanel.jsx  # 成员面板
+│   │   ├── WelcomeView.jsx  # 欢迎页
+│   │   ├── UserProfileModal.jsx # 用户资料弹窗
+│   │   ├── SettingsModal.jsx # 设置弹窗
+│   │   ├── ScrollArea.jsx  # 虚拟滚动容器
+│   │   ├── PublicChannelList.jsx # 公开频道列表
+│   │   ├── DmSearchPanel.jsx # DM 搜索面板
+│   │   ├── CreateGroupForm.jsx # 创建群组表单
+│   │   ├── ImagePreviewModal.jsx # 图片预览弹窗
+│   │   └── EmptyState.jsx  # 空状态占位
+│   ├── routes/             # 页面级路由组件
+│   │   ├── LoginPage.jsx   # 登录页
+│   │   ├── RegisterPage.jsx # 注册页
+│   │   └── ChatPage.jsx    # 聊天主页
 │   ├── store/              # 全局状态层
 │   │   ├── auth.js         # 用户认证、Session 状态
 │   │   └── chat.js         # 聊天列表、消息缓存、实时同步逻辑
 │   ├── dev/                # 开发辅助工具
 │   │   └── stream-source.js # 流式输出模拟 (AI/Typing 效果)
-│   └── App.jsx             # 根组件与路由配置
+│   ├── hooks/              # 自定义 React Hooks
+│   ├── styles/             # 样式文件 (Discord 暗色主题 CSS)
+│   ├── App.jsx             # 根组件与路由配置
+│   └── main.jsx            # 应用入口
 └── tests/                  # 测试用例
     └── e2e.spec.js         # Playwright 全链路测试
 ```

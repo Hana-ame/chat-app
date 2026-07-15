@@ -495,11 +495,11 @@ export function mockUploadAvatar(_token, file) {
   return { url: URL.createObjectURL(file) };
 }
 
-export function mockTogglePin(_token, chatId) {
+export function mockTogglePin(_token, chatId, pinned) {
   const d = ensureData();
   const chat = d.chats.find(c => c.id === chatId);
   if (!chat) return { ok: false };
-  chat.pinned = !chat.pinned;
+  chat.pinned = pinned;
   if (_store) _store.getState().onChatUpdate({ id: chatId, pinned: chat.pinned });
   return { ok: true, pinned: chat.pinned };
 }

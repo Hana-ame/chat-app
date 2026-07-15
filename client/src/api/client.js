@@ -138,7 +138,7 @@ export const api = {
   getReactions: (token, chatId, msgId) =>
     request('GET', '/api/chats/' + chatId + '/messages/' + msgId + '/reactions', token),
 
-  togglePin: (_token, chatId) => request('POST', '/api/chats/' + chatId + '/pin-toggle', _token),
+  togglePin: (_token, chatId, pinned) => request('POST', '/api/chats/' + chatId + '/pin-toggle', _token, { pinned }),
   markPinnedRead: (token, chatId) => request('POST', '/api/chats/' + chatId + '/pin-read', token, {}),
 
   // ── Uploads (external upload.moonchan.xyz) ──

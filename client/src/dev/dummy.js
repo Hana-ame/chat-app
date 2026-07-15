@@ -267,7 +267,7 @@ export function generateDummyData({ chatCount = 10, msgPerChat = 65 } = {}) {
       type: 'group',
       visibility: ci < 3 ? 'private' : 'public',
       pinned: ci === 0,
-      pinned_message: ci < 2 ? { id: mid(), content: '📌 Important notice for this channel!', pinned_at: timeAgo(3600) } : null,
+          pinned_message: ci < 2 ? { id: mid(), content: '📢 公告测试消息', pinned_at: timeAgo(3600) } : null,
       pinned_updated_at: ci < 2 ? timeAgo(1800) : null,
       member_count: members.length,
       members,

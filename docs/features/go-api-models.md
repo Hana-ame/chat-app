@@ -108,12 +108,13 @@ type editMsgReq struct {
 }
 ```
 
-### `readReq` — `POST /api/chats/{chatID}/read`
+### `readReq` — `POST /api/chats/{chatID}/read` ⚠️ Deprecated
 ```go
 type readReq struct {
-    MessageID string `json:"message_id"`
+	MessageID string `json:"message_id"`
 }
 ```
+> MarkRead 已不再读取 body，改为直接更新 `last_active_at`。`readReq` 保留仅为兼容，实际未使用。
 
 ---
 
@@ -125,14 +126,15 @@ type readReq struct {
 
 ```go
 type User struct {
-    ID          string    `json:"id"`
-    Email       string    `json:"email,omitempty"`
-    Username    string    `json:"username"`
-    AvatarColor string    `json:"avatar_color"`
-    AvatarURL   string    `json:"avatar_url,omitempty"`
-    Status      string    `json:"status"`           // "online" | "offline"
-    LastSeen    time.Time `json:"last_seen,omitempty"`
-    CreatedAt   time.Time `json:"created_at"`
+	ID          string    `json:"id"`
+	Email       string    `json:"email,omitempty"`
+	Username    string    `json:"username"`
+	AvatarColor string    `json:"avatar_color"`
+	AvatarURL   string    `json:"avatar_url,omitempty"`
+	Status      string    `json:"status"`           // "online" | "offline"
+	Role        string    `json:"role,omitempty"`
+	LastSeen    time.Time `json:"last_seen,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 ```
 
@@ -140,19 +142,25 @@ type User struct {
 
 ```go
 type Chat struct {
-    ID            string          `json:"id"`
-    Type          string          `json:"type"`            // "dm" | "group"
-    Name          string          `json:"name,omitempty"`
-    IconColor     string          `json:"icon_color,omitempty"`
-    Visibility    string          `json:"visibility,omitempty"`  // "public" | "unlisted" | "private"
-    OwnerID       string          `json:"owner_id,omitempty"`
-    CreatedAt     time.Time       `json:"created_at"`
-    LastMessageAt time.Time       `json:"last_message_at"`
-    MemberCount   int             `json:"member_count"`
-    PinnedMessage *PinnedContent  `json:"pinned_message,omitempty"`
-    LastMessageID string          `json:"last_message_id,omitempty"`
-    UnreadCount   int             `json:"unread_count"`          // Deprecated
-    LastMessage   *Message        `json:"last_message,omitempty"` // Deprecated
+	ID            string     `json:"id"`
+	Type          string     `json:"type"`            // "dm" | "group"
+	Name          string     `json:"name,omitempty"`
+	IconColor     string     `json:"icon_color,omitempty"`
+	Visibility    string     `json:"visibility,omitempty"`  // "public" | "unlisted" | "private"
+	OwnerID       string     `json:"owner_id,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
+	LastMessageAt time.Time  `json:"last_message_at"`
+	MemberCount   int        `json:"member_count"`
+	// Deprecated.
+	UnreadCount    int            `json:"unread_count"`
+	PinnedMessage  *PinnedContent `json:"pinned_message,omitempty"`
+	PinnedUpdatedAt *time.Time    `json:"pinned_updated_at,omitempty"`
+	PinnedLastReadAt *time.Time   `json:"pinned_last_read_at,omitempty"`
+	Pinned          bool          `json:"pinned"`
+	LastActiveAt    *time.Time    `json:"last_active_at,omitempty"`
+	LastMessageID  string         `json:"last_message_id,omitempty"`
+	// Deprecated.
+	LastMessage   *Message   `json:"last_message,omitempty"`
 }
 ```
 
@@ -160,12 +168,15 @@ type Chat struct {
 
 ```go
 type ChatMember struct {
-    ChatID   string    `json:"chat_id"`
-    UserID   string    `json:"user_id"`
-    Role     string    `json:"role"`      // "owner" | "admin" | ""
-    LastSeen time.Time `json:"last_seen,omitempty"`
-    JoinedAt time.Time `json:"joined_at"`
-    LastReadMessageID string `json:"last_read_message_id,omitempty"` // Deprecated
+	ChatID   string    `json:"chat_id"`
+	UserID   string    `json:"user_id"`
+	Role     string    `json:"role"`      // "owner" | "admin" | "member"
+	JoinedAt time.Time `json:"joined_at"`
+	LastActiveAt *time.Time `json:"last_active_at,omitempty"`
+	// Deprecated.
+	LastReadMessageID string     `json:"last_read_message_id,omitempty"`
+	Pinned          bool        `json:"pinned"`
+	PinnedLastReadAt *time.Time `json:"pinned_last_read_at,omitempty"`
 }
 ```
 
@@ -203,8 +214,10 @@ type PinnedContent struct {
 
 ```go
 type Reaction struct {
-    Emoji string `json:"emoji"`
-    Count int    `json:"count"`
+	Emoji   string   `json:"emoji"`
+	Count   int      `json:"count"`
+	UserIDs []string `json:"user_ids,omitempty"`
+	Me      bool     `json:"me"`
 }
 ```
 
@@ -218,6 +231,18 @@ type Attachment struct {
     MimeType  string `json:"mime_type"`
     Size      int64  `json:"size"`
     URL       string `json:"url"`
+}
+```
+
+### `models.RefreshToken`
+
+```go
+type RefreshToken struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	TokenHash string    `json:"-"`
+	ExpiresAt time.Time `json:"expires_at"`
+	CreatedAt time.Time `json:"created_at"`
 }
 ```
 
@@ -264,3 +289,12 @@ Response:
 | `sendMsgReq` | POST /api/chats/{chatID}/messages | |
 | `editMsgReq` | PATCH /api/chats/{chatID}/messages/{messageID} | |
 | `readReq` | POST /api/chats/{chatID}/read | ⚠️ Deprecated |
+| `joinReq` | POST /api/chats/{chatID}/join | internal |
+| `models.User` | Response for /users/* | |
+| `models.Chat` | Response for /chats/* | |
+| `models.ChatMember` | Response for /chats/{id}/members | |
+| `models.Message` | Response for /chats/{id}/messages | |
+| `models.Attachment` | Embedded in Message | |
+| `models.Reaction` | Response for reactions endpoints | |
+| `models.PinnedContent` | Embedded in Chat | |
+| `models.RefreshToken` | Internal (DB only) | |

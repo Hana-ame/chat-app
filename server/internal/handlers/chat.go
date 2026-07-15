@@ -428,10 +428,11 @@ func (s *Server) DeletePinnedChat(w http.ResponseWriter, r *http.Request) {
 
 // TogglePin godoc
 // @Summary      Toggle sidebar pinning
-// @Description  Toggle whether the chat appears at the top of the user's sidebar list
+// @Description  Pin or unpin the chat in the user's sidebar
 // @Tags         chats
 // @Security     BearerAuth
 // @Param        chatID  path  string  true  "Chat ID"
+// @Param        body  body  map[string]any  true  "{\"pinned\": true}"
 // @Success      200  {object}  map[string]any
 // @Router       /api/chats/{chatID}/pin-toggle [post]
 func (s *Server) TogglePin(w http.ResponseWriter, r *http.Request) {
@@ -451,7 +452,18 @@ func (s *Server) TogglePin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "forbidden", "")
 		return
 	}
-	if err := s.DB.TogglePinned(r.Context(), id, u.ID); err != nil {
+	var body struct {
+		Pinned *bool `json:"pinned"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
+	if body.Pinned == nil {
+		writeError(w, http.StatusBadRequest, "bad_request", "pinned is required")
+		return
+	}
+	if err := s.DB.SetPinned(r.Context(), id, u.ID, *body.Pinned); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
@@ -464,7 +476,7 @@ func (s *Server) TogglePin(w http.ResponseWriter, r *http.Request) {
 			s.Hub.BroadcastChatUpdated(updated)
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "pinned": *body.Pinned})
 }
 
 // MarkPinnedRead godoc

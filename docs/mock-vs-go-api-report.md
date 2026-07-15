@@ -31,6 +31,9 @@
 | `POST /api/chats/{id}/pin` | `PinChat` | `mockSetPinnedMessage` | ✅ 对齐（owner only、>=3 members、存 `{content, pinned_at}`、返回 `{ok:true}`） |
 | `PATCH /api/chats/{id}/pin` | `UpdatePinnedChat` | — | ✅ 同 `PinChat`，mock 共用 `mockSetPinnedMessage` |
 | `DELETE /api/chats/{id}/pin` | `DeletePinnedChat` | `mockClearPinnedMessage` | ✅ 对齐（owner/admin only、clear `pinned_message`、返回 `{ok:true}`） |
+| `POST /api/chats/{id}/pin-toggle` | `TogglePin` | `mockTogglePin` | ✅ 对齐。toggle `pinned` 字段，触发 `onChatUpdate` |
+| `POST /api/chats/{id}/pin-read` | `MarkPinnedRead` | `mockMarkPinnedRead` | ✅ 对齐。更新 `pinned_last_read_at` |
+| `POST /api/chats/{id}/visit` | `VisitChat` | — | ⚠️ Mock 无对应实现（非关键 UI 路径） |
 
 ## Members
 
@@ -56,12 +59,14 @@
 |---------|-----------|-----------|------|
 | `PUT .../reactions/{emoji}` | `AddReaction` | `mockAddReaction` | ⚠️ 差异。对齐：membership 校验、message 归属(404)、INSERT OR IGNORE、sync reactions JSON、broadcast；**mock 额外校验 emoji 非空 + ≤32 字（Go 无此校验）**；**Go 对 emoji 做 `url.PathUnescape`（mock 不做）** |
 | `DELETE .../reactions/{emoji}` | `RemoveReaction` | `mockRemoveReaction` | ✅ 基本对齐（membership 校验、删除、sync、broadcast）；mock 先校验 msg 存在(404)再删，Go 直接 `RemoveReaction` 后 `GetMessage` 返回更新 |
+| `GET .../reactions` | `ListReactions` | `mockGetReactions` | ✅ 对齐。聚合 reactions 返回 `{reactions: [{emoji,count,user_ids,me}]}` |
 
 ## Uploads
 
 | Go 端点 | Go Handler | Mock 函数 | 差异 |
 |---------|-----------|-----------|------|
 | `POST /api/uploads` | `Upload` | `mockUpload` | ❌ 重大差异。Go 有 MIME 白名单校验(`allowedMime`)+ 大小限制(`MaxUploadBytes`)+ 落盘 + 返回 `/uploads/{key}`；mock 用 `URL.createObjectURL` 无校验无限流。另：该 Go handler 已标 **Deprecated**（前端直传 `upload.moonchan.xyz`），实际不会被调用 |
+| — | — | `mockUploadAvatar` | ⚠️ Mock only。前端通过 `upload` 上传后提取 URL，无对应独立 Go handler |
 
 ## 实时事件 (Real-time)
 
@@ -77,6 +82,8 @@
 | `chat_delete` | `_store.getState().onChatUpdate({id, deleted: true})` | ✅ 对齐 |
 | `user_update` | `_store.getState().onChatUpdate({id, members})` 在每个 chat 上 | ⚠️ 差异。Go 用 `BroadcastUserUpdate` 全局广播；mock 逐 chat 遍历通知（语义等价，但 mock 仅通知当前用户已加入的 chat） |
 | `presence_update` | 未实现 | ❌ 差异。Go 有 WS 连接/断开的 online/offline broadcast；mock 模式无 presence |
+| `pin_toggle` | `_store.getState().onChatUpdate({id, pinned})` | ✅ 对齐（TogglePin 广播 chat_update，mock 直接调 onChatUpdate） |
+| `pinned_read` | `_store.getState().onChatUpdate({id, pinned_last_read_at})` | ✅ 对齐 |
 
 ## 未实现 (不涉及)
 
@@ -84,12 +91,14 @@
 - `GET /ws` — mock 模式走 memory-polling，不建 WS
 - `GET /api/events` — mock 模式不走 SSE
 - `GET /swagger/*` — 纯 API 文档
+- `GET /api/version` — 前端不直接调用
 - `GET /uploads/*` — 废弃
 - `GET /` (静态文件) — Go 有 SPA fallback
+- `POST /api/chats/{id}/visit` — mock 无对应实现
 
 ## 实现细节与逻辑区别分析
 
-> 本节从内部实现角度，剖析 mock API（内存态 JS）与 Go 真实 API（Postgres + WS hub）的深层逻辑差异。源码：`server/internal/handlers/*.go`、`server/internal/models/models.go`、`client/src/api/mock.js`、`client/src/store/chat.js`。
+> 本节从内部实现角度，剖析 mock API（内存态 JS）与 Go 真实 API（SQLite + WS hub）的深层逻辑差异。源码：`server/internal/handlers/*.go`、`server/internal/models/models.go`、`client/src/api/mock.js`、`client/src/store/chat.js`。
 
 ### 1. 身份与鉴权模型（根本差异）
 
@@ -105,7 +114,7 @@
 
 ### 2. 数据持久化与状态表示
 
-- **Go**：单一事实源 = Postgres（`users` / `chats` / `chat_members` / `messages` / `reactions` / `refresh_tokens` 表）。每次写都走 DB，多客户端可见。
+- **Go**：单一事实源 = SQLite（`users` / `chats` / `chat_members` / `messages` / `reactions` / `refresh_tokens` 表，`modernc.org/sqlite` 纯 Go 驱动）。每次写都走 DB，多客户端可见。
 - **Mock**：内存 JS 对象 `data = { users, chats, messages, reactions, chatMembers }`，进程重启即丢（但 `ensureData()` 每次重新 `generateDummyData` 生成 10 chat × 150 消息的假数据）。
 
 **双数据源问题**：Mock 的 chat 成员同时存在于两处——

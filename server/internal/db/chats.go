@@ -466,6 +466,18 @@ func (d *DB) UpdateLastActiveAt(ctx context.Context, chatID, userID string) erro
 	return err
 }
 
+func (d *DB) SetPinned(ctx context.Context, chatID, userID string, pinned bool) error {
+	v := 0
+	if pinned {
+		v = 1
+	}
+	_, err := d.ExecContext(ctx,
+		`UPDATE chat_members SET pinned = ? WHERE chat_id = ? AND user_id = ?`,
+		v, chatID, userID,
+	)
+	return err
+}
+
 func (d *DB) TogglePinned(ctx context.Context, chatID, userID string) error {
 	_, err := d.ExecContext(ctx,
 		`UPDATE chat_members SET pinned = CASE WHEN pinned = 0 THEN 1 ELSE 0 END WHERE chat_id = ? AND user_id = ?`,

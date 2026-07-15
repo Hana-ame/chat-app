@@ -61,7 +61,7 @@ All standard API calls pass through the `request(method, path, token, body?)` he
 | Method | Endpoint | Parameters | Token | Body |
 |---|---|---|---|---|
 | `GET` | `/api/chats/my` | — | `token` | — |
-| `GET` | `/api/chats/public` | — | `token` | — |
+| `GET` | `/api/chats/public` | `page` (int, default 1), `limit` (int, default 20) | `token` | — |
 | `POST` | `/api/chats` | — | `token` | `{ type: "group", name, member_ids[], visibility: "public" \| "unlisted" \| "private" }` |
 | `GET` | `/api/chats/{id}` | `id`: chat ID | `token` | — |
 | `DELETE` | `/api/chats/{id}` | `id`: chat ID | `token` | — |
@@ -71,11 +71,15 @@ All standard API calls pass through the `request(method, path, token, body?)` he
 | `POST` | `/api/chats/{id}/pin` | `id`: chat ID | `token` | `{ content: "..." }` |
 | `PATCH` | `/api/chats/{id}/pin` | `id`: chat ID | `token` | `{ content: "..." }` |
 | `DELETE` | `/api/chats/{id}/pin` | `id`: chat ID | `token` | — |
+| `POST` | `/api/chats/{id}/pin-toggle` | `id`: chat ID | `token` | — |
+| `POST` | `/api/chats/{id}/pin-read` | `id`: chat ID | `token` | — |
+| `POST` | `/api/chats/{id}/visit` | `id`: chat ID | `token` | — |
 
 ### Members
 
 | Method | Endpoint | Parameters | Token | Body |
 |---|---|---|---|---|
+| `GET` | `/api/chats/{chatId}/members` | `chatId` | `token` | — |
 | `POST` | `/api/chats/{chatId}/members` | `chatId` | `token` | `{ user_id }` |
 | `DELETE` | `/api/chats/{chatId}/members/{userId}` | `chatId`, `userId` | `token` | — |
 
@@ -83,11 +87,11 @@ All standard API calls pass through the `request(method, path, token, body?)` he
 
 | Method | Endpoint | Parameters | Token | Body |
 |---|---|---|---|---|
-| `GET` | `/api/chats/{chatId}/messages` | `limit` (default 50), `before` (cursor), `details` (bool) | `token` | — |
+| `GET` | `/api/chats/{chatId}/messages` | `limit` (int, default 50, max 100), `before` (cursor) | `token` | — |
 | `POST` | `/api/chats/{chatId}/messages` | `chatId` | `token` | `{ content, attachments[] }` ⚠️ 附件 URL 必须在 `upload.moonchan.xyz`，否则 400；返回 **201** |
 | `PATCH` | `/api/chats/{chatId}/messages/{msgId}` | `chatId`, `msgId` | `token` | `{ content }` |
 | `DELETE` | `/api/chats/{chatId}/messages/{msgId}` | `chatId`, `msgId` | `token` | — |
-| `POST` | `/api/chats/{chatId}/read` | `chatId` | `token` | `{ message_id }` ⚠️ Deprecated |
+| `POST` | `/api/chats/{chatId}/read` | `chatId` | `token` | `{}` ⚠️ Deprecated（不再读 body，改为更新 `last_active_at`） |
 
 ### Reactions
 
@@ -95,6 +99,7 @@ All standard API calls pass through the `request(method, path, token, body?)` he
 |---|---|---|---|---|
 | `PUT` | `/api/chats/{chatId}/messages/{msgId}/reactions/{emoji}` | `chatId`, `msgId`, `emoji` | `token` | — |
 | `DELETE` | `/api/chats/{chatId}/messages/{msgId}/reactions/{emoji}` | `chatId`, `msgId`, `emoji` | `token` | — |
+| `GET` | `/api/chats/{chatId}/messages/{msgId}/reactions` | `chatId`, `msgId` | `token` | — |
 
 ### Uploads
 
@@ -133,5 +138,7 @@ When mock is enabled, API 方法被替换为内存态实现（`client/src/api/mo
 | `api.listChats` | `mockListChats()` — returns `{ chats: [...] }` from dummy data |
 | `api.listMessages` | `mockListMessages(token, chatId, before?, limit?)` — paginated from dummy data |
 | `api.sendMessage` | `mockSendMessage(token, chatId, content, attachments?)` — creates user msg, 50% chance AI reply |
+
+**新增 mock 函数（与 Go 对齐）：** `mockTogglePin`, `mockMarkPinnedRead`, `mockGetReactions`, `mockUploadAvatar`, `mockVisitChat`。
 
 Helpers: `api.enableMock()`, `api.disableMock()`, `api.isMockEnabled()`, `resetMockData()`
