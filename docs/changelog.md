@@ -3654,3 +3654,49 @@ Handlers 直接调 `s.DB.*`，权限检查、Hub 广播、验证逻辑在每个 
 - `go test ./...`: ✅
 
 ---
+
+## 2026-07-15 实时连接重构 + Mock 解耦（第 15 轮）
+
+### 1. RealtimeCoordinator — 连接状态机
+
+**新增** `client/src/realtime/`
+- `coordinator.js` — 状态机 singleton（IDLE/CONNECTING/CONNECTED/DISCONNECTING），统一管理连接生命周期和自动重连
+- `transports/ws.js` — WebSocket 传输
+- `transports/sse.js` — SSE 传输
+- `transports/poll.js` — 轮询传输
+- `transports/mock.js` — Mock 传输
+
+**核心机制**：
+- 状态守卫锁：`connect()` 入口检查 CONNECTING/DISCONNECTING 则跳过，防止双通道
+- `_closeGuard`：手动 `disconnect()` 设 true，阻止 transport `onClose` 触发自动重连
+- 自动重连：transport `onClose` → 3s 后 `connect(mode, token)`（仅当状态仍为 IDLE）
+
+### 2. Proxy 替代 MOCKABLE 数组
+
+**修改** `api/client.js`
+- MOCKABLE 数组 + `save()`/`swap()` → `new Proxy(realApi, { get })`
+- `_mockHandlers` 字典：`{ methodName: mockFn }`，新增 API 只需加一行
+- 无缓存层，每次 `api.xxx` 返回新的包装函数
+
+### 3. 消除 `__setStoreRef` 循环依赖
+
+**修改** `api/mock.js`
+- `__setStoreRef`/`__getAuthUser` → `import('../store/chat')` 模块级动态 import
+- store 加载完成后自动设 `_store`，`if (_store)` 保护空窗期
+
+### 4. Store 瘦身
+
+**修改** `store/chat.js`
+- 移除 `connectWS` / `connectSSE` / `connectPolling` / `disconnect` / `_lastToken`
+- `setMode` / `connect` / `sendTyping` / `subscribe` / `wsRequest` → 薄代理到 coordinator
+
+### 5. 组件适配
+
+**修改** `ChatPage.jsx` — `connectWS/SSE/Polling` → `connect(token)`
+**删除** `dev/mock-ws.js`（已死代码）
+
+### 验证
+- Client build: ✅
+- Go build + vet: ✅
+
+---
