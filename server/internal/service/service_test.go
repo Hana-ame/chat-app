@@ -1,6 +1,7 @@
 package service_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/Hana-ame/chat-app/server/internal/db"
@@ -1176,5 +1177,571 @@ func TestChatService_CreateOrGetDM_UserNotFound(t *testing.T) {
 	_, _, err := f.Server.Services.Chat.CreateOrGetDM(f.Ctx(), a, "nonexistent")
 	if err != service.ErrNotFound {
 		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+}
+
+func TestAuthz_MustBeMember_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "mberr@x.com", "MbErr")
+	chat := createTestChat(t, f, "MbErrTest", a, []string{a})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := f.Server.Services.Chat.MustBeMember(ctx, chat.ID, a)
+	if err == nil {
+		t.Fatal("expected error from canceled context")
+	}
+}
+
+func TestAuthz_RequireOwnerOrAdmin_NotChatMember(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "roe_nm@x.com", "RoeNM")
+	b := createTestUser(t, f, "roe_nm2@x.com", "RoeNM2")
+	chat := createTestChat(t, f, "RoeNMTest", a, []string{a})
+	err := f.Server.Services.Chat.RequireOwnerOrAdmin(context.Background(), chat.ID, b)
+	if err != service.ErrForbidden {
+		t.Fatalf("want ErrForbidden, got %v", err)
+	}
+}
+
+func TestAuthz_RequireOwnerOrAdmin_AdminRole(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "roe_adm@x.com", "RoeAdm")
+	b := createTestUser(t, f, "roe_adm2@x.com", "RoeAdm2")
+	chat := createTestChat(t, f, "RoeAdmTest", a, []string{a, b})
+	_, err := f.DB.ExecContext(context.Background(),
+		`UPDATE chat_members SET role = 'admin' WHERE chat_id = ? AND user_id = ?`,
+		chat.ID, b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = f.Server.Services.Chat.RequireOwnerOrAdmin(context.Background(), chat.ID, b)
+	if err != nil {
+		t.Fatalf("expected nil, got %v", err)
+	}
+}
+
+func TestAuthz_RequireOwnerOrAdmin_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "roe_ce@x.com", "RoeCE")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := f.Server.Services.Chat.RequireOwnerOrAdmin(ctx, "chatid", a)
+	if err == nil {
+		t.Fatal("expected error from canceled context")
+	}
+}
+
+func TestChatService_Create_UserAlreadyInList(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "cal@x.com", "Cal")
+	chat, err := f.Server.Services.Chat.Create(context.Background(), a, "TestChat", "public", []string{a})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if chat.Name != "TestChat" {
+		t.Fatal("wrong name")
+	}
+}
+
+func TestChatService_Create_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "cc@x.com", "CC")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := f.Server.Services.Chat.Create(ctx, a, "Test", "public", nil)
+	if err == nil {
+		t.Fatal("expected error from canceled context")
+	}
+}
+
+func TestChatService_CreateOrGetDM_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "cdm@x.com", "CDM")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, _, err := f.Server.Services.Chat.CreateOrGetDM(ctx, a, "otherid")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestChatService_Rename_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "rnc@x.com", "RNC")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := f.Server.Services.Chat.Rename(ctx, "chatid", a, "NewName")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestChatService_Delete_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "delc@x.com", "DelC")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := f.Server.Services.Chat.Delete(ctx, "chatid", a)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestChatService_Join_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "jnc@x.com", "JNC")
+	b := createTestUser(t, f, "jnc2@x.com", "JNC2")
+	chat, _ := f.DB.CreateChat(context.Background(), "group", "JNCTest", "public", a, []string{a})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := f.Server.Services.Chat.Join(ctx, chat.ID, b)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestChatService_SetAnnouncement_DBError(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "sae@x.com", "SAE")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := f.Server.Services.Chat.SetAnnouncement(ctx, "chatid", a, "test")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestChatService_ClearAnnouncement_DBError(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "cae@x.com", "CAE")
+	b := createTestUser(t, f, "cae2@x.com", "CAE2")
+	chat := createTestChat(t, f, "CAETest", a, []string{a, b})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := f.Server.Services.Chat.ClearAnnouncement(ctx, chat.ID, a)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestChatService_SetPinned_DBError(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "spe@x.com", "SPE")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := f.Server.Services.Chat.SetPinned(ctx, "chatid", a, true)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestUserService_GetByID_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "uidc@x.com", "UIDC")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := f.Server.Services.User.GetByID(ctx, a)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestUserService_GetByEmail_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	createTestUser(t, f, "uemc@x.com", "UEMC")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, _, err := f.Server.Services.User.GetByEmail(ctx, "uemc@x.com")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestUserService_Create_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := f.Server.Services.User.Create(ctx, "ucc@x.com", "UCC", "hash")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestUserService_UpdateProfile_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "updc@x.com", "UPDC")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := f.Server.Services.User.UpdateProfile(ctx, a, "NewName", "#000", "")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestMemberService_Add_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "addc@x.com", "AddC")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := f.Server.Services.Member.Add(ctx, "chatid", a, a)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestMemberService_Remove_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "remc@x.com", "RemC")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := f.Server.Services.Member.Remove(ctx, "chatid", a, a)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestMessageService_Send_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "sndc@x.com", "SndC")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := f.Server.Services.Message.Send(ctx, "chatid", a, "test", nil)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestMessageService_Edit_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "edtc@x.com", "EdtC")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := f.Server.Services.Message.Edit(ctx, "chatid", "msgid", a, "new")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestMessageService_Delete_NotMember(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "msg_del8@x.com", "MsgDel8")
+	b := createTestUser(t, f, "msg_del9@x.com", "MsgDel9")
+	chat := createTestChat(t, f, "MsgDelete9", a, []string{a})
+	msg, _ := f.DB.CreateMessage(context.Background(), chat.ID, a, "test", nil, nil)
+
+	err := f.Server.Services.Message.Delete(context.Background(), chat.ID, msg.ID, b)
+	if err != service.ErrForbidden {
+		t.Fatalf("want ErrForbidden, got %v", err)
+	}
+}
+
+func TestMessageService_Delete_BroadcastError(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "msg_del10@x.com", "MsgDel10")
+	chat := createTestChat(t, f, "MsgDelete10", a, []string{a})
+	msg, _ := f.DB.CreateMessage(context.Background(), chat.ID, a, "test", nil, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := f.Server.Services.Message.Delete(ctx, chat.ID, msg.ID, a)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestMessageService_MarkRead_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "mrkc@x.com", "MrkC")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := f.Server.Services.Message.MarkRead(ctx, "chatid", a)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestChatService_MarkRead_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "chmrc@x.com", "ChMrC")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := f.Server.Services.Chat.MarkRead(ctx, "chatid", a)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestMemberService_List_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "lstc@x.com", "LstC")
+	chat := createTestChat(t, f, "LstCTest", a, []string{a})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := f.Server.Services.Member.List(ctx, chat.ID, a)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestMessageService_List_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "msglc@x.com", "MsgLC")
+	chat := createTestChat(t, f, "MsgLCTest", a, []string{a})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := f.Server.Services.Message.List(ctx, chat.ID, a, "", 10)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestMemberService_Remove_AdminRemovesMember(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "mem_admr@x.com", "MemAdmr")
+	b := createTestUser(t, f, "mem_admr2@x.com", "MemAdmr2")
+	c := createTestUser(t, f, "mem_admr3@x.com", "MemAdmr3")
+	chat := createTestChat(t, f, "MemAdmrTest", a, []string{a, b, c})
+	_, err := f.DB.ExecContext(context.Background(),
+		`UPDATE chat_members SET role = 'admin' WHERE chat_id = ? AND user_id = ?`,
+		chat.ID, b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = f.Server.Services.Member.Remove(context.Background(), chat.ID, b, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ok, _ := f.DB.IsChatMember(context.Background(), chat.ID, c)
+	if ok {
+		t.Fatal("c should no longer be a member")
+	}
+}
+
+func TestMemberService_Remove_NonAdminRemovesOther(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "mem_nar@x.com", "MemNAR")
+	b := createTestUser(t, f, "mem_nar2@x.com", "MemNAR2")
+	c := createTestUser(t, f, "mem_nar3@x.com", "MemNAR3")
+	chat := createTestChat(t, f, "MemNARTest", a, []string{a, b, c})
+	err := f.Server.Services.Member.Remove(context.Background(), chat.ID, b, c)
+	if err != service.ErrForbidden {
+		t.Fatalf("want ErrForbidden, got %v", err)
+	}
+}
+
+func TestMemberService_Remove_OwnerRemovesMember(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "mem_orm@x.com", "MemORM")
+	b := createTestUser(t, f, "mem_orm2@x.com", "MemORM2")
+	chat := createTestChat(t, f, "MemORMTest", a, []string{a, b})
+	err := f.Server.Services.Member.Remove(context.Background(), chat.ID, a, b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ok, _ := f.DB.IsChatMember(context.Background(), chat.ID, b)
+	if ok {
+		t.Fatal("b should no longer be a member")
+	}
+}
+
+func TestMemberService_Add_NotMember(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "mem_add9@x.com", "MemAdd9")
+	b := createTestUser(t, f, "mem_add10@x.com", "MemAdd10")
+	chat := createTestChat(t, f, "MemAddTest4", a, []string{a})
+	_, err := f.Server.Services.Member.Add(context.Background(), chat.ID, b, a)
+	if err != service.ErrForbidden {
+		t.Fatalf("want ErrForbidden, got %v", err)
+	}
+}
+
+func TestMessageService_Edit_Nonexistent(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "msg_ed5@x.com", "MsgEd5")
+	chat := createTestChat(t, f, "MsgEdit5", a, []string{a})
+	_, err := f.Server.Services.Message.Edit(context.Background(), chat.ID, "nonexistent", a, "edited")
+	if err != service.ErrNotFound {
+		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+}
+
+func TestMessageService_Edit_EmptyContent(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "msg_ed6@x.com", "MsgEd6")
+	chat := createTestChat(t, f, "MsgEdit6", a, []string{a})
+	msg, _ := f.DB.CreateMessage(context.Background(), chat.ID, a, "original", nil, nil)
+	_, err := f.Server.Services.Message.Edit(context.Background(), chat.ID, msg.ID, a, "")
+	if err == nil {
+		t.Fatal("expected error for empty content")
+	}
+}
+
+func TestMessageService_Delete_NonexistentMessage(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "msg_del11@x.com", "MsgDel11")
+	chat := createTestChat(t, f, "MsgDelete11", a, []string{a})
+	err := f.Server.Services.Message.Delete(context.Background(), chat.ID, "nonexistent", a)
+	if err == nil {
+		t.Fatal("expected error for deleting nonexistent message")
+	}
+}
+
+func TestMessageService_Delete_OtherUserMessageAsOwner(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "msg_del12@x.com", "MsgDel12")
+	b := createTestUser(t, f, "msg_del13@x.com", "MsgDel13")
+	chat := createTestChat(t, f, "MsgDelete12", a, []string{a, b})
+	msg, _ := f.DB.CreateMessage(context.Background(), chat.ID, b, "test", nil, nil)
+	err := f.Server.Services.Message.Delete(context.Background(), chat.ID, msg.ID, a)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMessageService_Send_CreateMessageError(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "msg_cme@x.com", "MsgCME")
+	chat := createTestChat(t, f, "MsgCMETest", a, []string{a})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := f.Server.Services.Message.Send(ctx, chat.ID, a, "test", nil)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestReactionService_Add_Success(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "rxn_add@x.com", "RxnAdd")
+	chat := createTestChat(t, f, "RxnAddTest", a, []string{a})
+	msg, _ := f.DB.CreateMessage(context.Background(), chat.ID, a, "hello", nil, nil)
+	updated, err := f.Server.Services.Reaction.Add(context.Background(), chat.ID, msg.ID, a, "👍")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.ID != msg.ID {
+		t.Fatal("wrong message returned")
+	}
+}
+
+func TestReactionService_Add_NotMember(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "rxn_add2@x.com", "RxnAdd2")
+	b := createTestUser(t, f, "rxn_add3@x.com", "RxnAdd3")
+	chat := createTestChat(t, f, "RxnAddTest2", a, []string{a})
+	msg, _ := f.DB.CreateMessage(context.Background(), chat.ID, a, "hello", nil, nil)
+	_, err := f.Server.Services.Reaction.Add(context.Background(), chat.ID, msg.ID, b, "👍")
+	if err != service.ErrForbidden {
+		t.Fatalf("want ErrForbidden, got %v", err)
+	}
+}
+
+func TestReactionService_Add_NonexistentMessage(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "rxn_add4@x.com", "RxnAdd4")
+	chat := createTestChat(t, f, "RxnAddTest3", a, []string{a})
+	_, err := f.Server.Services.Reaction.Add(context.Background(), chat.ID, "nonexistent", a, "👍")
+	if err != service.ErrNotFound {
+		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+}
+
+func TestReactionService_Remove_Success(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "rxn_rem@x.com", "RxnRem")
+	chat := createTestChat(t, f, "RxnRemTest", a, []string{a})
+	msg, _ := f.DB.CreateMessage(context.Background(), chat.ID, a, "hello", nil, nil)
+	f.DB.AddReaction(context.Background(), msg.ID, a, "👍")
+	_, err := f.Server.Services.Reaction.Remove(context.Background(), chat.ID, msg.ID, a, "👍")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReactionService_Remove_NotMember(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "rxn_rem2@x.com", "RxnRem2")
+	b := createTestUser(t, f, "rxn_rem3@x.com", "RxnRem3")
+	chat := createTestChat(t, f, "RxnRemTest2", a, []string{a})
+	msg, _ := f.DB.CreateMessage(context.Background(), chat.ID, a, "hello", nil, nil)
+	_, err := f.Server.Services.Reaction.Remove(context.Background(), chat.ID, msg.ID, b, "👍")
+	if err != service.ErrForbidden {
+		t.Fatalf("want ErrForbidden, got %v", err)
+	}
+}
+
+func TestReactionService_List_Success(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "rxn_lst@x.com", "RxnLst")
+	chat := createTestChat(t, f, "RxnLstTest", a, []string{a})
+	msg, _ := f.DB.CreateMessage(context.Background(), chat.ID, a, "hello", nil, nil)
+	f.DB.AddReaction(context.Background(), msg.ID, a, "👍")
+	reactions, err := f.Server.Services.Reaction.List(context.Background(), chat.ID, msg.ID, a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reactions) == 0 {
+		t.Fatal("expected at least 1 reaction")
+	}
+}
+
+func TestReactionService_List_NotMember(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "rxn_lst2@x.com", "RxnLst2")
+	b := createTestUser(t, f, "rxn_lst3@x.com", "RxnLst3")
+	chat := createTestChat(t, f, "RxnLstTest2", a, []string{a})
+	msg, _ := f.DB.CreateMessage(context.Background(), chat.ID, a, "hello", nil, nil)
+	_, err := f.Server.Services.Reaction.List(context.Background(), chat.ID, msg.ID, b)
+	if err != service.ErrForbidden {
+		t.Fatalf("want ErrForbidden, got %v", err)
+	}
+}
+
+func TestReactionService_Add_WrongChat(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "rxn_wc@x.com", "RxnWC")
+	chat1 := createTestChat(t, f, "RxnWCTest1", a, []string{a})
+	chat2 := createTestChat(t, f, "RxnWCTest2", a, []string{a})
+	msg, _ := f.DB.CreateMessage(context.Background(), chat1.ID, a, "hello", nil, nil)
+	_, err := f.Server.Services.Reaction.Add(context.Background(), chat2.ID, msg.ID, a, "👍")
+	if err != service.ErrNotFound {
+		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+}
+
+func TestReactionService_Add_EmptyEmoji(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "rxn_ee@x.com", "RxnEE")
+	chat := createTestChat(t, f, "RxnEETest", a, []string{a})
+	msg, _ := f.DB.CreateMessage(context.Background(), chat.ID, a, "hello", nil, nil)
+	_, err := f.Server.Services.Reaction.Add(context.Background(), chat.ID, msg.ID, a, "")
+	if err == nil {
+		t.Fatal("expected error for empty emoji")
+	}
+}
+
+func TestReactionService_Remove_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "rxn_rc@x.com", "RxnRC")
+	chat := createTestChat(t, f, "RxnRCTest", a, []string{a})
+	msg, _ := f.DB.CreateMessage(context.Background(), chat.ID, a, "hello", nil, nil)
+	f.DB.AddReaction(context.Background(), msg.ID, a, "👍")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := f.Server.Services.Reaction.Remove(ctx, chat.ID, msg.ID, a, "👍")
+	if err == nil {
+		t.Fatal("expected error from canceled context")
+	}
+}
+
+func TestReactionService_Add_CanceledContext(t *testing.T) {
+	f := testutil.New(t)
+	a := createTestUser(t, f, "rxn_ac@x.com", "RxnAC")
+	chat := createTestChat(t, f, "RxnACTest", a, []string{a})
+	msg, _ := f.DB.CreateMessage(context.Background(), chat.ID, a, "hello", nil, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := f.Server.Services.Reaction.Add(ctx, chat.ID, msg.ID, a, "👍")
+	if err == nil {
+		t.Fatal("expected error from canceled context")
 	}
 }

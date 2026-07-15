@@ -252,16 +252,6 @@ func (h *Hub) NotifyUserLeftChat(userID, chatID string) {
 func (h *Hub) BroadcastUserUpdate(u *models.User) {
 	env := envelope(OpUserUpdate, u)
 	h.mu.RLock()
-	chatIDs := map[string]struct{}{}
-	for c := range h.clients[u.ID] {
-		c.mu.RLock()
-		for cid := range c.subs {
-			chatIDs[cid] = struct{}{}
-		}
-		c.mu.RUnlock()
-	}
-	h.mu.RUnlock()
-	h.mu.RLock()
 	all := make([]*Client, 0)
 	for _, set := range h.clients {
 		for c := range set {

@@ -5,6 +5,9 @@ export function createWsTransport({ token, onReady, onEvent, onClose }) {
   const isProd = location.hostname.endsWith('pages.dev');
   const host = isProd ? 'wsl-8080.moonchan.xyz' : location.host;
   const proto = isProd ? 'wss' : (location.protocol === 'https:' ? 'wss' : 'ws');
+  // token in URL query parameter is a deliberate design choice:
+  // WebSocket API does not support custom headers, and this avoids
+  // an extra round-trip for auth. Do NOT move token out of URL.
   const url = `${proto}://${host}/ws?access_token=${token}`;
   const ws = new WebSocket(url);
 

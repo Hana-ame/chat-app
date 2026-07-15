@@ -1,10 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 import pkg from '../../package.json';
-import UserAvatar from './UserAvatar';
 import ChatListItem from './ChatListItem';
 import PublicChannelList from './PublicChannelList';
 import CreateGroupForm from './CreateGroupForm';
@@ -13,6 +12,7 @@ import ChatInfoModal from './ChatInfoModal';
 import ScrollArea from './ScrollArea';
 import EmptyState from './EmptyState';
 import ImagePreviewModal from './ImagePreviewModal';
+import SidebarFooter from './SidebarFooter';
 
 const MODES = [
   { key: 'ws', label: 'WS' },
@@ -169,14 +169,14 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
 
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(chatSearch.trim());
 
-  const filteredChats = chats.filter(c => {
+  const filteredChats = useMemo(() => chats.filter(c => {
     if (c.type === 'dm') return false;
     if (!chatSearch.trim()) return true;
     if (isUUID) return c.id === chatSearch.trim();
     const q = chatSearch.toLowerCase();
     const name = c.name || '';
     return name.toLowerCase().includes(q);
-  });
+  }), [chats, chatSearch, isUUID]);
 
   const uuidDM = isUUID && chatSearch.trim() ? chats.find(c => c.type === 'dm' && c.id === chatSearch.trim()) : null;
 
@@ -248,24 +248,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
         )}
       </ScrollArea>
 
-      <div className="sidebar-footer">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={(e) => { if (!e.target.closest('img')) setShowSettings(true); }}>
-          <UserAvatar user={user} size={32} onClick={(e) => { e.stopPropagation(); setPreviewUrl(user?.avatar_url); }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>{user?.username || 'Unknown'}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Online</div>
-          </div>
-          <button className="btn-ghost" onClick={(e) => { e.stopPropagation(); setShowSettings(true); }} title="Settings">⚙</button>
-          <button className="btn-ghost" onClick={onLogout}>↪</button>
-        </div>
-        {api.isMockEnabled() && (
-          <div style={{ marginTop: 4, borderTop: '1px solid var(--border)', paddingTop: 4 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', padding: '4px 0' }}>
-              ⚡ Using Mock API
-            </div>
-          </div>
-        )}
-      </div>
+      <SidebarFooter user={user} onLogout={onLogout} onSettings={() => setShowSettings(true)} onAvatarPreview={(url) => setPreviewUrl(url)} />
 
       {contextMenu && (
         <div className="context-menu" style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 1000, right: 'auto', width: 140 }}>

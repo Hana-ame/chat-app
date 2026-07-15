@@ -30,9 +30,15 @@ var (
 	currentLevel Level
 	logger       *log.Logger
 	mu           sync.Mutex
+	osExit       = os.Exit
 )
 
 func init() {
+	loadLevel()
+	logger = log.New(os.Stderr, "", 0)
+}
+
+func loadLevel() {
 	lvl := os.Getenv("LOG_LEVEL")
 	switch strings.ToUpper(lvl) {
 	case "DEBUG":
@@ -46,7 +52,6 @@ func init() {
 	default:
 		currentLevel = INFO
 	}
-	logger = log.New(os.Stderr, "", 0)
 }
 
 func output(calldepth int, level Level, format string, args ...interface{}) {
@@ -71,5 +76,5 @@ func Warn(format string, args ...interface{})  { output(2, WARN, format, args...
 func Error(format string, args ...interface{}) { output(2, ERROR, format, args...) }
 func Fatal(format string, args ...interface{}) {
 	output(2, ERROR, format, args...)
-	os.Exit(1)
+	osExit(1)
 }

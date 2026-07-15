@@ -25,7 +25,7 @@ export default function UserProfileModal({ user: profileUser, onClose, chatId })
         <h3 style={{ margin: '8px 0 4px' }}>{profileUser.username}</h3>
 
         {profileUser.status && (
-          <span style={{ fontSize: 13, color: profileUser.status === 'online' ? '#23a559' : 'var(--text-muted)' }}>
+          <span style={{ fontSize: 13, color: profileUser.status === 'online' ? 'var(--success)' : 'var(--text-muted)' }}>
             {profileUser.status === 'online' ? '● Online' : '○ Offline'}
           </span>
         )}

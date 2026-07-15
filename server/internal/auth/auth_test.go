@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Hana-ame/chat-app/server/internal/auth"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func TestHashAndVerifyPassword(t *testing.T) {
@@ -147,6 +148,28 @@ func TestUsernameBoundaries(t *testing.T) {
 		if n == "" {
 			t.Errorf("valid username %q returned empty", u)
 		}
+	}
+}
+
+func TestParseAccessToken_WrongSigningMethod(t *testing.T) {
+	svc := auth.New([]byte("secret"), time.Hour)
+	tok := jwt.NewWithClaims(jwt.SigningMethodNone, jwt.MapClaims{"uid": "test"})
+	tokenStr, _ := tok.SignedString(jwt.UnsafeAllowNoneSignatureType)
+	_, err := svc.ParseAccessToken(tokenStr)
+	if err != auth.ErrTokenInvalid {
+		t.Fatalf("want ErrTokenInvalid, got %v", err)
+	}
+}
+
+func TestParseAccessToken_EmptyUserID(t *testing.T) {
+	svc := auth.New([]byte("secret"), time.Hour)
+	tok, _, err := svc.IssueAccessToken("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = svc.ParseAccessToken(tok)
+	if err != auth.ErrTokenInvalid {
+		t.Fatalf("want ErrTokenInvalid, got %v", err)
 	}
 }
 

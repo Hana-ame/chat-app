@@ -3962,3 +3962,35 @@ CHAT_CSP_CONNECT_SRC="'self' ws://localhost:8080 wss://localhost:8080 http://loc
 - Client: `npm run build` — ✅ (316 KB)
 
 ---
+
+## 2026-07-16 前端代码质量：6 项审计修复（第 28 轮）
+
+### 问题
+前端审计发现 5 项问题：
+1. `ChatView.jsx` userMap 为空对象无用代码
+2. `ChatList.jsx` filteredChats 未 memo 每次渲染重新计算
+3. `Composer.jsx` attachment key 用数组索引
+4. 多处硬编码颜色未使用 CSS 变量
+5. `ChatList.jsx` sidebar-footer 组件过于庞大
+
+### 修复
+
+**1. ChatView.jsx — 删除无用 userMap**
+- 删除 `useMemo(() => ({}), [])`，传空对象 `{}` 给 `renderContent`
+
+**2. ChatList.jsx — filteredChats 用 useMemo**
+- 包裹 `useMemo`，依赖 `[chats, chatSearch, isUUID]`
+
+**3. Composer.jsx — attachment key 用唯一 ID**
+- 上传时用 `crypto.randomUUID()` 生成 `_key`，替换 `key={i}` → `key={a._key}`
+
+**4. 硬编码颜色 → CSS 变量**
+- 新增 `--accent-bg`、`--success-bg` CSS 变量
+- Toast/MemberPanel/ChatInfoModal/ChatListItem/ChatView/UserProfileModal 中的 `#5865F2`、`#23a559`、`#ed4245`、`rgba(88,101,242,0.15)` 等替换为对应 `var()`
+
+**5. ChatList.jsx — 拆分 SidebarFooter 子组件**
+- 新建 `SidebarFooter.jsx`，接收 `user`/`onLogout`/`onSettings`/`onAvatarPreview` 四个 props
+
+### 验证
+- Client: `npm run build` — ✅ (316 KB)
+- Server: `go build` + `go vet` + `go test` — ✅

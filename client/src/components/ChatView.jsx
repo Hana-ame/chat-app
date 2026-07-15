@@ -108,7 +108,6 @@ export default function ChatView({ chatId, onBack }) {
   }, [chatId, messages]);
 
   const name = chat ? getDMName(chat) : 'Loading...';
-  const userMap = useMemo(() => ({}), []);
 
   const handleSaveNotice = async () => {
     if (!noticeInput.trim()) return;
@@ -163,7 +162,7 @@ export default function ChatView({ chatId, onBack }) {
               <span style={{
                 position: 'absolute', top: 2, right: 2,
                 width: 8, height: 8, borderRadius: '50%',
-                background: '#ed4245',
+                background: 'var(--danger)',
               }}/>
             )}
           </button>
@@ -195,7 +194,7 @@ export default function ChatView({ chatId, onBack }) {
               ) : showNotice ? (
                 <div style={{flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
                   <strong style={{color:'var(--accent)',marginRight:6}}>📢 公告</strong>
-                  {renderContent(pinnedMessage[chatId]?.content, userMap)}
+                  {renderContent(pinnedMessage[chatId]?.content, {})}
                 </div>
               ) : null}
             </div>

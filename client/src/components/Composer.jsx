@@ -72,7 +72,7 @@ export default function Composer({ chatId }) {
       for (const f of files) {
         const file = await compressImage(f);
         const data = await api.upload(file);
-        results.push({ filename: data.filename, mime_type: data.mime_type, size: data.size, url: data.url });
+        results.push({ _key: crypto.randomUUID(), filename: data.filename, mime_type: data.mime_type, size: data.size, url: data.url });
       }
       setAttachments(prev => [...prev, ...results]);
     } catch (err) { notify('Upload failed', 'error'); }
@@ -87,7 +87,7 @@ export default function Composer({ chatId }) {
       const results = [];
       for (const f of files) {
         const data = await api.upload(f);
-        results.push({ filename: data.filename, mime_type: data.mime_type, size: data.size, url: data.url });
+        results.push({ _key: crypto.randomUUID(), filename: data.filename, mime_type: data.mime_type, size: data.size, url: data.url });
       }
       setAttachments(prev => [...prev, ...results]);
     } catch (err) { notify('Upload failed', 'error'); }
@@ -116,7 +116,7 @@ export default function Composer({ chatId }) {
       {attachments.length > 0 && (
         <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:8}}>
           {attachments.map((a, i) => (
-            <div key={i} className="file-attach" style={{fontSize:12}}>
+            <div key={a._key} className="file-attach" style={{fontSize:12}}>
               {a.filename}
               <button className="btn-ghost" style={{fontSize:14}} onClick={() => setAttachments(a => a.filter((_,j) => j!==i))}>×</button>
             </div>

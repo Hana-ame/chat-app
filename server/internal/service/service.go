@@ -8,12 +8,13 @@ import (
 )
 
 type Service struct {
-	DB      *db.DB
-	Hub     *ws.Hub
-	Chat    *ChatService
-	User    *UserService
-	Message *MessageService
-	Member  *MemberService
+	DB       *db.DB
+	Hub      *ws.Hub
+	Chat     *ChatService
+	User     *UserService
+	Message  *MessageService
+	Member   *MemberService
+	Reaction *ReactionService
 }
 
 func New(database *db.DB, hub *ws.Hub) *Service {
@@ -22,6 +23,7 @@ func New(database *db.DB, hub *ws.Hub) *Service {
 	s.User = &UserService{Service: s}
 	s.Message = &MessageService{Service: s}
 	s.Member = &MemberService{Service: s}
+	s.Reaction = &ReactionService{Service: s}
 	return s
 }
 

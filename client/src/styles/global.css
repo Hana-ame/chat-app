@@ -16,6 +16,8 @@
   --warning: #f0b232;
   --border: #3f4147;
   --radius: 8px;
+  --accent-bg: rgba(88,101,242,0.15);
+  --success-bg: rgba(35,165,89,0.15);
   --sidebar-w: 300px;
   --member-w: 240px;
 }
@@ -205,7 +207,7 @@ button { cursor: pointer; border: none; }
   display:flex; align-items:center; gap:3px;
 }
 .reaction-chip:hover { border-color: var(--accent); }
-.reaction-chip.me { border-color: var(--accent); background: rgba(88,101,242,0.15); }
+.reaction-chip.me { border-color: var(--accent); background: var(--accent-bg); }
 
 .emoji-picker { display:flex; flex-wrap:wrap; gap:4px; padding: 8px; background:var(--bg-tertiary); border-radius:var(--radius); position:absolute; bottom:100%; left:0; z-index:11; max-width:240px; box-shadow:0 2px 12px rgba(0,0,0,0.3); }
 .emoji-btn { background:none; font-size:20px; cursor:pointer; padding:4px; border-radius:4px; }

@@ -39,10 +39,12 @@ export default function MemberPanel({ chatId }) {
 
   const removeUser = async (userId) => {
     if (!confirm('Kick this member?')) return;
+    setMembers(prev => prev.filter(m => m.id !== userId));
     try {
       await api.removeMember(accessToken, chatId, userId);
     } catch (e) {
       notify('Failed to remove member', 'error');
+      setMembers(prev => [...prev, members.find(m => m.id === userId)].filter(Boolean));
     }
   };
 
@@ -62,7 +64,7 @@ export default function MemberPanel({ chatId }) {
             <span>{m.username}</span>
             <div style={{flex:1}} />
             <div style={{width:66,height:28,position:'relative',flexShrink:0}}>
-              {isAdmin(m) && <span style={{position:'absolute',right:22,top:'50%',transform:'translateY(-50%)',fontSize:10,padding:'0 5px',borderRadius:3,fontWeight:500,background:'rgba(88,101,242,0.15)',color:'#5865F2'}}>ADMIN</span>}
+              {isAdmin(m) && <span style={{position:'absolute',right:22,top:'50%',transform:'translateY(-50%)',fontSize:10,padding:'0 5px',borderRadius:3,fontWeight:500,background:'var(--accent-bg)',color:'var(--accent)'}}>ADMIN</span>}
               {chat?.owner_id === user.id && m.id !== user.id && chat?.type !== 'dm' && (
                 <button className="btn-ghost" style={{position:'absolute',right:0,top:'50%',transform:'translateY(-50%)',fontSize:12}} onClick={(e) => { e.stopPropagation(); removeUser(m.id); }}>×</button>
               )}

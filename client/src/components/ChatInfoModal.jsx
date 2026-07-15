@@ -67,7 +67,7 @@ export default function ChatInfoModal({ chatId, onClose }) {
             <span>{m.username}</span>
             <div style={{flex:1}} />
             <div style={{width:44,height:26,position:'relative',flexShrink:0}}>
-              {isAdmin(m) && <span style={{position:'absolute',right:0,top:'50%',transform:'translateY(-50%)',fontSize:10,padding:'0 5px',borderRadius:3,fontWeight:500,background:'rgba(88,101,242,0.15)',color:'#5865F2'}}>ADMIN</span>}
+              {isAdmin(m) && <span style={{position:'absolute',right:0,top:'50%',transform:'translateY(-50%)',fontSize:10,padding:'0 5px',borderRadius:3,fontWeight:500,background:'var(--accent-bg)',color:'var(--accent)'}}>ADMIN</span>}
             </div>
           </div>
         ))}

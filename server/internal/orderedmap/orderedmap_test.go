@@ -309,6 +309,86 @@ func TestReader(t *testing.T) {
 	}
 }
 
+func TestUnmarshalJSON_InvalidJSON(t *testing.T) {
+	var o orderedmap.OrderedMap
+	err := o.UnmarshalJSON([]byte(`{invalid}`))
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+}
+
+func TestUnmarshalJSON_Truncated(t *testing.T) {
+	var o orderedmap.OrderedMap
+	err := o.UnmarshalJSON([]byte(`{"a":`))
+	if err == nil {
+		t.Fatal("expected error for truncated JSON")
+	}
+}
+
+func TestUnmarshalJSONNestedObjectInArray(t *testing.T) {
+	raw := `{"arr":[{"x":1},{"y":2}]}`
+	var o orderedmap.OrderedMap
+	if err := json.Unmarshal([]byte(raw), &o); err != nil {
+		t.Fatal(err)
+	}
+	val, ok := o.Get("arr")
+	if !ok {
+		t.Fatal("missing arr key")
+	}
+	if _, isSlice := val.([]interface{}); !isSlice {
+		t.Fatalf("arr should be []interface{}, got %T", val)
+	}
+}
+
+func TestUnmarshalJSONNestedArrayInArray(t *testing.T) {
+	raw := `{"matrix":[[1,2],[3,4]]}`
+	var o orderedmap.OrderedMap
+	if err := json.Unmarshal([]byte(raw), &o); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUnmarshalJSONTwiceNested(t *testing.T) {
+	raw1 := `{"a":{"x":1},"b":2}`
+	var o orderedmap.OrderedMap
+	if err := json.Unmarshal([]byte(raw1), &o); err != nil {
+		t.Fatal(err)
+	}
+	// Second unmarshal hits the OrderedMap value branch in decodeOrderedMap
+	raw2 := `{"a":{"y":2},"b":3}`
+	if err := json.Unmarshal([]byte(raw2), &o); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUnmarshalJSONSliceWithObjectsTwice(t *testing.T) {
+	raw1 := `{"items":[{"id":1}]}`
+	var o orderedmap.OrderedMap
+	json.Unmarshal([]byte(raw1), &o)
+	raw2 := `{"items":[{"id":2}]}`
+	if err := json.Unmarshal([]byte(raw2), &o); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMarshalJSON_Error(t *testing.T) {
+	o := orderedmap.New()
+	o.Set("ch", make(chan int))
+	_, err := o.MarshalJSON()
+	if err == nil {
+		t.Fatal("expected error for non-serializable value")
+	}
+}
+
+func TestReader_Error(t *testing.T) {
+	o := orderedmap.New()
+	o.Set("ch", make(chan int))
+	_, err := o.Reader()
+	if err == nil {
+		t.Fatal("expected error for non-serializable value")
+	}
+}
+
 func TestByPairSort(t *testing.T) {
 	pairs := []*orderedmap.Pair{
 		orderedmap.NewPair("a", 3),

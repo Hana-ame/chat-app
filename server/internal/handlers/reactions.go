@@ -28,7 +28,8 @@ func (s *Server) AddReaction(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "bad emoji encoding")
 		return
 	}
-	if err := s.Services.Chat.MustBeMember(r.Context(), chatID, u.ID); err != nil {
+	updated, err := s.Services.Reaction.Add(r.Context(), chatID, msgID, u.ID, emoji)
+	if err != nil {
 		status, code := mapServiceError(err)
 		if status >= 500 {
 			w.Header().Set("X-Error", err.Error())
@@ -36,23 +37,7 @@ func (s *Server) AddReaction(w http.ResponseWriter, r *http.Request) {
 		writeError(w, status, code, "")
 		return
 	}
-	msg, err := s.DB.GetMessage(r.Context(), msgID)
-	if err != nil || msg.ChatID != chatID {
-		writeError(w, http.StatusNotFound, "not_found", "")
-		return
-	}
-	if err := s.DB.AddReaction(r.Context(), msgID, u.ID, emoji); err != nil {
-		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
-		return
-	}
 	logutil.Debug("reaction added: %s on %s by %s", emoji, msgID[:8], u.ID[:8])
-	updated, err := s.DB.GetMessage(r.Context(), msgID)
-	if err != nil {
-		w.Header().Set("X-Error", err.Error())
-	}
-	if s.Hub != nil {
-		s.Hub.BroadcastReaction(chatID, msgID, emoji, u.ID, true)
-	}
 	writeJSON(w, http.StatusOK, updated)
 }
 
@@ -76,7 +61,8 @@ func (s *Server) RemoveReaction(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "bad emoji encoding")
 		return
 	}
-	if err := s.Services.Chat.MustBeMember(r.Context(), chatID, u.ID); err != nil {
+	updated, err := s.Services.Reaction.Remove(r.Context(), chatID, msgID, u.ID, emoji)
+	if err != nil {
 		status, code := mapServiceError(err)
 		if status >= 500 {
 			w.Header().Set("X-Error", err.Error())
@@ -84,17 +70,7 @@ func (s *Server) RemoveReaction(w http.ResponseWriter, r *http.Request) {
 		writeError(w, status, code, "")
 		return
 	}
-	if err := s.DB.RemoveReaction(r.Context(), msgID, u.ID, emoji); err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	if s.Hub != nil {
-		s.Hub.BroadcastReaction(chatID, msgID, emoji, u.ID, false)
-	}
-	updated, err := s.DB.GetMessage(r.Context(), msgID)
-	if err != nil {
-		w.Header().Set("X-Error", err.Error())
-	}
+	logutil.Debug("reaction removed: %s from %s by %s", emoji, msgID[:8], u.ID[:8])
 	writeJSON(w, http.StatusOK, updated)
 }
 
@@ -111,17 +87,13 @@ func (s *Server) ListReactions(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	chatID := chi.URLParam(r, "chatID")
 	msgID := chi.URLParam(r, "messageID")
-	if err := s.Services.Chat.MustBeMember(r.Context(), chatID, u.ID); err != nil {
+	rxs, err := s.Services.Reaction.List(r.Context(), chatID, msgID, u.ID)
+	if err != nil {
 		status, code := mapServiceError(err)
 		if status >= 500 {
 			w.Header().Set("X-Error", err.Error())
 		}
 		writeError(w, status, code, "")
-		return
-	}
-	rxs, err := s.DB.ListReactions(r.Context(), msgID, u.ID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"reactions": rxs})

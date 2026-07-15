@@ -13,7 +13,7 @@ export default function Toast() {
           padding: '10px 14px', borderRadius: 8, fontSize: 14, lineHeight: 1.4,
           boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
           color: '#fff',
-          background: n.type === 'error' ? '#ed4245' : n.type === 'success' ? '#23a559' : '#5865F2',
+          background: n.type === 'error' ? 'var(--danger)' : n.type === 'success' ? 'var(--success)' : 'var(--accent)',
           animation: 'toastIn 0.2s ease-out',
         }}>
           {n.message}
