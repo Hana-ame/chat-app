@@ -1,11 +1,10 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 import { renderContent } from './renderContent';
 import UserAvatar from './UserAvatar';
 import UserProfileModal from './UserProfileModal';
-import ImagePreviewModal from './ImagePreviewModal';
 
 const COMMON_EMOJI = ['👍','❤️','😂','🎉','😢','😡','👀','🔥','✅','❌'];
 
@@ -13,6 +12,14 @@ function timeFormat(t) {
   if (!t) return '';
   const d = new Date(t);
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function fmtLastSeen(t) {
+  const diff = Date.now() - new Date(t).getTime();
+  if (diff < 60000) return '● Online';
+  if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+  return Math.floor(diff / 86400000) + 'd ago';
 }
 
 export default function MessageItem({ msg, sameAuthor, chatId }) {
@@ -24,7 +31,6 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
   const [editText, setEditText] = useState(msg.content);
   const [opPending, setOpPending] = useState(false);
   const [profileUser, setProfileUser] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
   const [reactions, setReactions] = useState(msg.reactions || []);
 
   const author = useMemo(() => {
@@ -109,16 +115,22 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
   return (
     <div className="msg-group">
       <div className={'msg-row' + (sameAuthor ? ' msg-continuation' : '')}>
-        {!sameAuthor && (
-          <div onClick={() => setProfileUser(author)} style={{ cursor: 'pointer' }}>
-            <UserAvatar user={author} size={40} onClick={(e) => { e.stopPropagation(); setPreviewUrl(author.avatar_url); }} />
-          </div>
-        )}
+          {!sameAuthor && (
+            <div onClick={() => setProfileUser(author)} style={{ cursor: 'pointer' }}>
+              <UserAvatar user={author} size={40} />
+            </div>
+          )}
         <div style={{flex:1,minWidth:0}}>
           {!sameAuthor && (
-            <div style={{display:'flex',alignItems:'baseline'}}>
+            <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
               <span className="msg-author" onClick={() => setProfileUser(author)} style={{cursor:'pointer'}}>{author.username}</span>
+              {(author.role === 'admin' || author.role === 'owner') && (
+                <span style={{fontSize:10,padding:'0 5px',borderRadius:3,fontWeight:500,background:'rgba(88,101,242,0.15)',color:'#5865F2',lineHeight:'18px'}}>ADMIN</span>
+              )}
               <span className="msg-time">{timeFormat(msg.created_at)}</span>
+              {author.last_seen && (
+                <span className="msg-time" style={{fontSize:11}}>{fmtLastSeen(author.last_seen)}</span>
+              )}
               {msg.edited_at && <span className="msg-time">(edited)</span>}
             </div>
           )}
@@ -185,10 +197,7 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
         </div>
       )}
       {profileUser && (
-        <UserProfileModal user={profileUser} onClose={() => setProfileUser(null)} />
-      )}
-      {previewUrl && (
-        <ImagePreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
+        <UserProfileModal user={profileUser} chatId={chatId} onClose={() => setProfileUser(null)} />
       )}
     </div>
   );
