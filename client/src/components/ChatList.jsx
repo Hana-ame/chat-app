@@ -83,11 +83,15 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     setContextMenu(null);
   };
 
-  const handleUnpin = async (chatId) => {
+  const handleDelete = async (chatId) => {
+    if (!confirm('Are you sure you want to delete this group chat? This cannot be undone.')) return;
     try {
-      await api.unpinChat(accessToken, chatId);
-      useChatStore.getState().onChatUpdate({ id: chatId, pinned: false });
-    } catch (e) { console.error('Unpin error:', e); }
+      await api.deleteChat(accessToken, chatId);
+      useChatStore.getState().onChatDelete({ chat_id: chatId });
+      if (chatId === activeId) {
+        navigate('/', { replace: true });
+      }
+    } catch (e) { console.error('Delete chat error:', e); }
     setContextMenu(null);
   };
 
@@ -239,9 +243,15 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
 
       {contextMenu && (
         <div className="context-menu" style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 1000, right: 'auto', width: 140 }}>
-          <button className="context-menu-item" onClick={() => handlePin(contextMenu.chatId)}>Pin</button>
-          <button className="context-menu-item" onClick={() => handleUnpin(contextMenu.chatId)}>Unpin</button>
+          {(() => { const c = chats.find(x => x.id === contextMenu.chatId); return c?.pinned
+            ? <button className="context-menu-item" onClick={() => handleUnpin(contextMenu.chatId)}>Unpin</button>
+            : <button className="context-menu-item" onClick={() => handlePin(contextMenu.chatId)}>Pin</button>;
+          })()}
           <button className="context-menu-item" onClick={() => { setShowChatInfo(contextMenu.chatId); setContextMenu(null); }}>View Info</button>
+          {(() => { const c = chats.find(x => x.id === contextMenu.chatId); return c?.type !== 'dm' && c?.owner_id === user.id
+            ? <button className="context-menu-item danger" onClick={() => handleDelete(contextMenu.chatId)}>Delete</button>
+            : null;
+          })()}
           <button className="context-menu-item danger" onClick={() => handleLeaveChat(contextMenu.chatId)}>Leave</button>
         </div>
       )}
