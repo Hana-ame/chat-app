@@ -82,7 +82,7 @@ coord.setHandlers({
         break;
       }
       case 'poll:chats': s.setChats(payload); break;
-      case 'poll:messages': set({ messages: (payload || []).map(m => get()._normalize(m)).reverse() }); break;
+      case 'poll:messages': set({ messages: (payload || []).map(m => get()._normalize(m)) }); break;
     }
   },
   onClose: () => {
@@ -271,7 +271,7 @@ export const useChatStore = create((set, get) => ({
     const loadId = ++get()._msgLoadId;
     try {
       const data = await api.listMessages(token, chatId, before);
-      const norm = (data.messages || []).map(m => get()._normalize(m)).reverse();
+      const norm = (data.messages || []).map(m => get()._normalize(m));
       set(s => {
         if (s._msgLoadId !== loadId) return {};
         return {
