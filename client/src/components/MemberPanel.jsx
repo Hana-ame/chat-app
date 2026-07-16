@@ -5,7 +5,6 @@ import { api } from '../api/client';
 import { notify } from '../store/notification';
 import UserAvatar from './UserAvatar';
 import UserProfileModal from './UserProfileModal';
-import ImagePreviewModal from './ImagePreviewModal';
 
 export default function MemberPanel({ chatId }) {
   const { user, accessToken } = useAuthStore();
@@ -18,7 +17,6 @@ export default function MemberPanel({ chatId }) {
   };
   const [members, setMembers] = useState([]);
   const [profileUser, setProfileUser] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
 
   useEffect(() => {
     if (!chatId || !accessToken) return;
@@ -60,7 +58,7 @@ export default function MemberPanel({ chatId }) {
           <div key={m.id} style={{display:'flex',alignItems:'center',gap:8,padding:'4px 0',fontSize:14,cursor:'pointer'}}
             onClick={() => setProfileUser(m)}>
             <span className={'status-dot ' + (isOnline(m) ? 'online' : 'offline')} />
-            <UserAvatar user={m} size={28} onClick={(e) => { e.stopPropagation(); setPreviewUrl(m.avatar_url); }} />
+            <UserAvatar user={m} size={28} />
             <span>{m.username}</span>
             <div style={{flex:1}} />
             <div style={{width:66,height:28,position:'relative',flexShrink:0}}>
@@ -74,9 +72,6 @@ export default function MemberPanel({ chatId }) {
       })()}
       {profileUser && (
         <UserProfileModal user={profileUser} onClose={() => setProfileUser(null)} chatId={chatId} />
-      )}
-      {previewUrl && (
-        <ImagePreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
       )}
     </div>
   );

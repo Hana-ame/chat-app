@@ -15,11 +15,8 @@ function timeFormat(t) {
 }
 
 function fmtLastSeen(t) {
-  const diff = Date.now() - new Date(t).getTime();
-  if (diff < 60000) return '● Online';
-  if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
-  if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
-  return Math.floor(diff / 86400000) + 'd ago';
+  const d = new Date(t);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 export default function MessageItem({ msg, sameAuthor, chatId }) {

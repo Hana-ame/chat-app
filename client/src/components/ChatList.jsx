@@ -7,12 +7,11 @@ import pkg from '../../package.json';
 import ChatListItem from './ChatListItem';
 import PublicChannelList from './PublicChannelList';
 import CreateGroupForm from './CreateGroupForm';
-import SettingsModal from './SettingsModal';
 import { notify } from '../store/notification';
 import ChatInfoModal from './ChatInfoModal';
+import UserProfileModal from './UserProfileModal';
 import ScrollArea from './ScrollArea';
 import EmptyState from './EmptyState';
-import ImagePreviewModal from './ImagePreviewModal';
 import SidebarFooter from './SidebarFooter';
 
 const MODES = [
@@ -34,10 +33,9 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const allPublicChats = useRef(null);
   const searchInputRef = useRef(null);
   const searchTermRef = useRef('');
-  const [contextMenu, setContextMenu] = useState(null); // { chatId, x, y }
-  const [showSettings, setShowSettings] = useState(false);
-  const [showChatInfo, setShowChatInfo] = useState(null); // chatId
-  const [previewUrl, setPreviewUrl] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null);
+  const [showChatInfo, setShowChatInfo] = useState(null);
+  const [showProfile, setShowProfile] = useState(false);
 
   const joinAction = chatSearch.trim() && /^(join|create)\s/i.test(chatSearch.trim())
     ? chatSearch.trim().startsWith('join') ? 'join' : 'create' : null;
@@ -156,27 +154,6 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     } catch (e) { alert(e.message); }
   };
 
-  const handleSaveSettings = async (name) => {
-    const payload = { username: name };
-    const file = document.getElementById('avatar-file-input')?.files?.[0];
-    if (file) {
-      const data = await api.uploadAvatar(accessToken, file);
-      payload.avatar_url = data.url + '?v=' + Date.now();
-    }
-    const updated = await api.updateProfile(accessToken, payload);
-    useAuthStore.getState().setUser(updated);
-    // Update avatar_url in cached chat data (last_message.author, etc.)
-    useChatStore.setState(s => ({
-      chats: s.chats.map(c => {
-        if (c.last_message?.author?.id === updated.user.id) {
-          return { ...c, last_message: { ...c.last_message, author: { ...c.last_message.author, avatar_url: updated.user.avatar_url } } };
-        }
-        return c;
-      }),
-    }));
-    setShowSettings(false);
-  };
-
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(chatSearch.trim());
 
   const filteredChats = useMemo(() => chats.filter(c => {
@@ -258,7 +235,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
         )}
       </ScrollArea>
 
-      <SidebarFooter user={user} onLogout={onLogout} onSettings={() => setShowSettings(true)} onAvatarPreview={(url) => setPreviewUrl(url)} />
+      <SidebarFooter user={user} onLogout={onLogout} onSettings={() => setShowProfile(true)} />
 
       {contextMenu && (
         <div className="context-menu" style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 1000, right: 'auto', width: 140 }}>
@@ -272,11 +249,8 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       {showChatInfo && (
         <ChatInfoModal chatId={showChatInfo} onClose={() => setShowChatInfo(null)} />
       )}
-      {showSettings && (
-        <SettingsModal user={user} onClose={() => setShowSettings(false)} onSave={handleSaveSettings} />
-      )}
-      {previewUrl && (
-        <ImagePreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
+      {showProfile && (
+        <UserProfileModal user={user} onClose={() => setShowProfile(false)} />
       )}
     </div>
   );
