@@ -103,7 +103,7 @@ func (d *DB) GetMessage(ctx context.Context, id string) (*models.Message, error)
 	m, err := d.fetchMessageRow(ctx,
 		`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted_at,
 		        m.attachment_count, m.mention_count, m.reaction_count, m.reactions, m.attachments, m.mentions,
-		        u.id, u.username, u.avatar_color, u.status, COALESCE(cm.role,'')
+		        u.id, u.username, u.avatar_color, u.avatar_url, u.status, u.last_seen, COALESCE(cm.role,'')
 		 FROM messages m JOIN users u ON u.id = m.user_id
 		 LEFT JOIN chat_members cm ON cm.chat_id = m.chat_id AND cm.user_id = m.user_id
 		 WHERE m.id = ?`,
@@ -132,13 +132,17 @@ func scanMessage(s scanner) (*models.Message, error) {
 		rxnCnt    int
 	)
 	var role string
+	var lastSeen sql.NullString
 	err := s.Scan(
 		&m.ID, &m.ChatID, &m.UserID, &m.Content, &created, &edited, &deletedAt,
 		&attCnt, &mentCnt, &rxnCnt, &rxnJSON, &attJSON, &mentJSON,
-		&author.ID, &author.Username, &author.AvatarColor, &author.Status, &role,
+		&author.ID, &author.Username, &author.AvatarColor, &author.AvatarURL, &author.Status, &lastSeen, &role,
 	)
 	if err != nil {
 		return nil, err
+	}
+	if lastSeen.Valid && lastSeen.String != "" {
+		author.LastSeen = parseTime(lastSeen.String)
 	}
 	m.CreatedAt = parseTime(created)
 	if edited.Valid && edited.String != "" {
@@ -194,7 +198,7 @@ func (d *DB) GetMessages(ctx context.Context, chatID, before string, limit int) 
 		rows, err = d.QueryContext(ctx,
 			`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted_at,
 			        m.attachment_count, m.mention_count, m.reaction_count, m.reactions, m.attachments, m.mentions,
-			        u.id, u.username, u.avatar_color, u.status, COALESCE(cm.role,'')
+			        u.id, u.username, u.avatar_color, u.avatar_url, u.status, u.last_seen, COALESCE(cm.role,'')
 			 FROM messages m JOIN users u ON u.id = m.user_id
 			 LEFT JOIN chat_members cm ON cm.chat_id = m.chat_id AND cm.user_id = m.user_id
 			 WHERE m.chat_id = ?
@@ -205,7 +209,7 @@ func (d *DB) GetMessages(ctx context.Context, chatID, before string, limit int) 
 		rows, err = d.QueryContext(ctx,
 			`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted_at,
 			        m.attachment_count, m.mention_count, m.reaction_count, m.reactions, m.attachments, m.mentions,
-			        u.id, u.username, u.avatar_color, u.status, COALESCE(cm.role,'')
+			        u.id, u.username, u.avatar_color, u.avatar_url, u.status, u.last_seen, COALESCE(cm.role,'')
 			 FROM messages m JOIN users u ON u.id = m.user_id
 			 LEFT JOIN chat_members cm ON cm.chat_id = m.chat_id AND cm.user_id = m.user_id
 			 WHERE m.chat_id = ? AND (m.created_at, m.id) < (
@@ -242,7 +246,7 @@ func (d *DB) LastMessage(ctx context.Context, chatID string) (*models.Message, e
 	m, err := d.fetchMessageRow(ctx,
 		`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted_at,
 		        m.attachment_count, m.mention_count, m.reaction_count, m.reactions, m.attachments, m.mentions,
-		        u.id, u.username, u.avatar_color, u.status, COALESCE(cm.role,'')
+		        u.id, u.username, u.avatar_color, u.avatar_url, u.status, u.last_seen, COALESCE(cm.role,'')
 		 FROM messages m JOIN users u ON u.id = m.user_id
 		 LEFT JOIN chat_members cm ON cm.chat_id = m.chat_id AND cm.user_id = m.user_id
 		 WHERE m.chat_id = ?
