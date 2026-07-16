@@ -23,6 +23,7 @@ export default function ChatListItem({ chat, activeId, onSelectChat, onContextMe
 
   const handleMenu = (e) => {
     e.stopPropagation();
+    if (!onContextMenu) return;
     const rect = btnRef.current?.getBoundingClientRect();
     onContextMenu({ chatId: chat.id, x: rect?.right || 0, y: rect?.bottom || 0 });
   };
