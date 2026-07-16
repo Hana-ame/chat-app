@@ -95,6 +95,14 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     setContextMenu(null);
   };
 
+  const handleUnpin = async (chatId) => {
+    try {
+      await api.unpinChat(accessToken, chatId);
+      useChatStore.getState().onChatUpdate({ id: chatId, pinned: false });
+    } catch (e) { console.error('Unpin error:', e); }
+    setContextMenu(null);
+  };
+
   const loadAllPublicChats = async () => {
     if (allPublicChats.current) {
       const q = searchTermRef.current;
