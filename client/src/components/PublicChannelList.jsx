@@ -24,8 +24,8 @@ export default function PublicChannelList({ results, searching, onJoin }) {
       </div>
       {results.map(c => (
         <div key={c.id} className="chat-item" onClick={() => onJoin(c.id)}>
-          <div className="chat-item-avatar" style={{ background: c.icon_color }}>
-            {c.name ? c.name[0].toUpperCase() : '?'}
+          <div className="chat-item-avatar" style={{ background: c.avatar_url ? 'none' : (c.icon_color || '#5865F2') }}>
+            {c.avatar_url ? <img src={c.avatar_url} alt="" className="chat-item-avatar-img" /> : (c.name ? c.name[0].toUpperCase() : '?')}
           </div>
           <div className="chat-item-info">
             <div className="chat-item-name">{c.name}</div>
