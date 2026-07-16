@@ -461,14 +461,14 @@ func TestChatService_SetAnnouncement_NotOwnerOrAdmin(t *testing.T) {
 	}
 }
 
-func TestChatService_SetAnnouncement_LessThan3Members(t *testing.T) {
+func TestChatService_SetAnnouncement_SmallGroup(t *testing.T) {
 	f := testutil.New(t)
 	a := createTestUser(t, f, "ann_lt@x.com", "AnnLt")
 	chat := createTestChat(t, f, "AnnTest3", a, []string{a})
 
 	err := f.Server.Services.Chat.SetAnnouncement(f.Ctx(), chat.ID, a, "test")
-	if err != service.ErrInvalidInput {
-		t.Fatalf("want ErrInvalidInput, got %v", err)
+	if err != nil {
+		t.Fatalf("small group pin: want nil, got %v", err)
 	}
 }
 

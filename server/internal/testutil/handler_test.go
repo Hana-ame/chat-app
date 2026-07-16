@@ -970,7 +970,7 @@ func TestPinMessage(t *testing.T) {
 		}
 	})
 
-	t.Run("not enough members", func(t *testing.T) {
+	t.Run("small group can pin", func(t *testing.T) {
 		res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 			"type": "group", "name": "SmallChat", "member_ids": []string{},
 		})
@@ -979,11 +979,11 @@ func TestPinMessage(t *testing.T) {
 		res.Body.Close()
 
 		res2 := f.Do(t, "POST", "/api/chats/"+small.ID+"/announcement", alice.AccessToken, map[string]string{
-			"content": "should fail",
+			"content": "should succeed",
 		})
 		defer res2.Body.Close()
-		if res2.StatusCode != 400 {
-			t.Fatalf("small group pin: want 400 got %d", res2.StatusCode)
+		if res2.StatusCode != 200 {
+			t.Fatalf("small group pin: want 200 got %d", res2.StatusCode)
 		}
 	})
 }

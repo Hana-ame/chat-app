@@ -114,6 +114,10 @@ func (d *DB) Migrate() error {
 		return err
 	}
 
+	if err := d.ensureBannerOpacityColumn(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -187,6 +191,24 @@ func (d *DB) ensureChatBannerBackgroundColumn(ctx context.Context) error {
 		}
 	}
 	logutil.Info("chats.banner_url, background_url columns added")
+	return nil
+}
+
+func (d *DB) ensureBannerOpacityColumn(ctx context.Context) error {
+	var cnt int
+	if err := d.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM pragma_table_info('chats') WHERE name='banner_opacity'`).Scan(&cnt); err != nil {
+		return fmt.Errorf("check banner_opacity: %w", err)
+	}
+	if cnt > 0 {
+		return nil
+	}
+	logutil.Info("migrating chats: add banner_opacity column")
+	if _, err := d.ExecContext(ctx,
+		`ALTER TABLE chats ADD COLUMN banner_opacity REAL NOT NULL DEFAULT 0.35`); err != nil {
+		return fmt.Errorf("add banner_opacity: %w", err)
+	}
+	logutil.Info("chats.banner_opacity column added")
 	return nil
 }
 
