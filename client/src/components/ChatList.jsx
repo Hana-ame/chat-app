@@ -179,6 +179,14 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
 
   const uuidDM = isUUID && chatSearch.trim() ? chats.find(c => c.type === 'dm' && c.id === chatSearch.trim()) : null;
 
+  const mergedPublic = useMemo(() => {
+    if (!publicResults) return null;
+    return publicResults.map(c => {
+      const storeChat = chats.find(sc => sc.id === c.id);
+      return storeChat ? { ...c, ...storeChat } : c;
+    });
+  }, [publicResults, chats]);
+
   return (
     <div className="sidebar">
       <div className="sidebar-header">
@@ -232,7 +240,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       </div>
 
       <ScrollArea className="sidebar-body">
-        {showPublicList && <PublicChannelList results={publicResults} searching={publicSearching} onJoin={handleJoinPublic} />}
+        {showPublicList && <PublicChannelList results={mergedPublic} searching={publicSearching} onJoin={handleJoinPublic} />}
 
         {!showPublicList && (uuidDM ? (
           <ChatListItem key={uuidDM.id} chat={uuidDM} activeId={activeId} onSelectChat={onSelectChat}
