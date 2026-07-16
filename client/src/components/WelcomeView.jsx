@@ -51,10 +51,13 @@ export default function WelcomeView() {
             No public chats yet. Create a group and set it to public!
           </div>
         ) : (
-          publicChats.map(c => (
+          publicChats.map(c => {
+            const storeChat = chats.find(sc => sc.id === c.id);
+            const merged = storeChat ? { ...c, ...storeChat } : c;
+            return (
             <div key={c.id} className="public-chat-card" onClick={() => handleEnter(c.id)}>
-              <div className="chat-item-avatar" style={{ background: c.icon_color || '#5865F2' }}>
-                {c.name ? c.name[0].toUpperCase() : '?'}
+              <div className="chat-item-avatar" style={{ background: merged.avatar_url ? 'none' : (merged.icon_color || '#5865F2') }}>
+                {merged.avatar_url ? <img src={merged.avatar_url} alt="" className="chat-item-avatar-img" /> : (merged.name ? merged.name[0].toUpperCase() : '?')}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -70,8 +73,8 @@ export default function WelcomeView() {
                 {chats.some(x => x.id === c.id) ? 'Open' : 'Join'}
               </button>
             </div>
-          ))
-        )}
+          );
+          }))}
         {publicChats.length > 0 && (
           <div style={{ display: 'flex', justifyContent: 'center', gap: 12, padding: '16px 0' }}>
             <button className="btn-ghost" style={{ fontSize: 13 }} disabled={page <= 1 || loading} onClick={() => setPage(p => p - 1)}>
