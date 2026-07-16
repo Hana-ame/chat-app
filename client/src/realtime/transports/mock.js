@@ -1,7 +1,7 @@
 export function createMockTransport({ token, onReady }) {
   let timer = null;
 
-  onReady({ onlineUserIds: ['dev-self', 'dev-bob'], chats: [] });
+  onReady({ onlineUserIds: [], chats: [] });
 
   timer = setInterval(async () => {
     const { useChatStore } = await import('../../store/chat');

@@ -76,7 +76,8 @@ const MOCK_USERS = [
 function ensureData() {
   if (!data) {
     const gen = generateDummyData({ chatCount: 10, msgPerChat: 150 });
-    data = { chats: gen.chats, messages: [...(gen.messages || [])] };
+    data = { chats: gen.chats, messages: [...(gen.messages || [])], onlineUserIds: gen.onlineUserIds || [] };
+    if (_store) _store.setState({ onlineUserIds: data.onlineUserIds });
   }
   return data;
 }
