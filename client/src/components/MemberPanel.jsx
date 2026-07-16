@@ -8,13 +8,7 @@ import UserProfileModal from './UserProfileModal';
 
 export default function MemberPanel({ chatId }) {
   const { user, accessToken } = useAuthStore();
-  const { chats, wsReady, mode, wsRequest } = useChatStore();
-  const ONLINE_THRESHOLD = 300000; // 5 min
-
-  const isOnline = (m) => {
-    if (!m.last_seen) return false;
-    return Date.now() - new Date(m.last_seen).getTime() < ONLINE_THRESHOLD;
-  };
+  const { chats, onlineUserIds, wsReady, mode, wsRequest } = useChatStore();
   const [members, setMembers] = useState([]);
   const [profileUser, setProfileUser] = useState(null);
 
@@ -57,9 +51,9 @@ export default function MemberPanel({ chatId }) {
         return members.map(m => (
           <div key={m.id} style={{display:'flex',alignItems:'center',gap:8,padding:'4px 0',fontSize:14,cursor:'pointer'}}
             onClick={() => setProfileUser(m)}>
-            <span className={'status-dot ' + (isOnline(m) ? 'online' : 'offline')} />
+            <span className={'status-dot ' + (onlineUserIds.includes(m.id) ? 'online' : 'offline')} />
             <UserAvatar user={m} size={28} />
-            <span>{m.username}</span>
+            <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.username}</span>
             <div style={{flex:1}} />
             <div style={{width:66,height:28,position:'relative',flexShrink:0}}>
               {isAdmin(m) && <span style={{position:'absolute',right:22,top:'50%',transform:'translateY(-50%)',fontSize:10,padding:'0 5px',borderRadius:3,fontWeight:500,background:'var(--accent-bg)',color:'var(--accent)'}}>ADMIN</span>}

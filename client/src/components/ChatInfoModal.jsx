@@ -12,7 +12,7 @@ function fmtTime(t) {
 
 export default function ChatInfoModal({ chatId, onClose }) {
   const { accessToken } = useAuthStore();
-  const { chats } = useChatStore();
+  const { chats, onlineUserIds } = useChatStore();
   const [members, setMembers] = useState([]);
   const [profileUser, setProfileUser] = useState(null);
 
@@ -64,10 +64,11 @@ export default function ChatInfoModal({ chatId, onClose }) {
         <h4 style={{fontSize:12,textTransform:'uppercase',color:'var(--text-muted)',marginBottom:8}}>Members — {chat.member_count || 0}</h4>
         {members.map(m => (
           <div key={m.id} onClick={() => setProfileUser(m)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', fontSize: 14, cursor: 'pointer' }}>
+            <span className={'status-dot ' + (onlineUserIds.includes(m.id) ? 'online' : 'offline')} />
             <div className="msg-avatar" style={{ width: 26, height: 26, fontSize: 11, background: m.avatar_color || '#5865F2' }}>
               {m.username ? m.username[0].toUpperCase() : '?'}
             </div>
-            <span>{m.username}</span>
+            <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.username}</span>
             <div style={{flex:1}} />
             <div style={{width:44,height:26,position:'relative',flexShrink:0}}>
               {isAdmin(m) && <span style={{position:'absolute',right:0,top:'50%',transform:'translateY(-50%)',fontSize:10,padding:'0 5px',borderRadius:3,fontWeight:500,background:'var(--accent-bg)',color:'var(--accent)'}}>ADMIN</span>}
