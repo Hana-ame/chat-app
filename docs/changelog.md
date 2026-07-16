@@ -4116,3 +4116,19 @@ API 返回 `ORDER BY created_at DESC`（最新在前），但 `onMessageCreate` 
 ### 验证
 - Client build: ✅
 - Go build + vet: ✅
+
+## 2026-07-16 Frontend CI Playwright 测试修复（第 34 轮）
+
+### 问题
+SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 selector：
+- `text=Settings` → 新 modal 用 `aria-label="Settings"`，没有可见的 "Settings" 文本
+- `.settings-avatar-placeholder` → 头像上传改为点击 "Click to upload" 文本
+
+### 修复
+`client/tests/ci.spec.mjs`：
+- `text=Settings` → `[aria-label="Settings"]`
+- `.settings-avatar-placeholder` → `text=Click to upload`
+
+### 验证
+- Frontend CI: ✅
+- Backend CI: ✅
