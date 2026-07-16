@@ -1,0 +1,17 @@
+{
+  "name": "WebChat",
+  "short_name": "WebChat",
+  "description": "Chat application",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1e1e2e",
+  "theme_color": "#5865F2",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
