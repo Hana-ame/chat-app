@@ -189,7 +189,7 @@ const _apiMethods = {
   },
   /** @param {string} token @param {string} chatId @param {string} content @param {Attachment[]} [attachments] @returns {Promise<Message>} */
   sendMessage: (token, chatId, content, attachments) =>
-    request('POST', '/api/chats/' + chatId + '/messages', token, { content, attachments: attachments || [] }),
+    request('POST', '/api/chats/' + chatId + '/messages', token, { content, attachments: (attachments || []).map(({ _key, ...a }) => a) }),
   /** @param {string} token @param {string} chatId @param {string} msgId @param {string} content @returns {Promise<ApiResponse>} */
   editMessage: (token, chatId, msgId, content) =>
     request('PATCH', '/api/chats/' + chatId + '/messages/' + msgId, token, { content }),
