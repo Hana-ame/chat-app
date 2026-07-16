@@ -15,6 +15,7 @@ import (
 	"github.com/Hana-ame/chat-app/server/internal/models"
 	"github.com/Hana-ame/chat-app/server/internal/service"
 	"github.com/Hana-ame/chat-app/server/internal/ws"
+	"github.com/go-chi/chi/v5"
 )
 
 type ctxKey string
@@ -157,5 +158,17 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), ctxKeyUser, u)
 		ctx = context.WithValue(ctx, ctxKeyToken, tok)
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// trackLastActive updates chat_members.last_active_at on every request to a chat endpoint.
+func (s *Server) trackLastActive(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		chatID := chi.URLParam(r, "chatID")
+		u := userFrom(r.Context())
+		if chatID != "" && u != nil {
+			go s.DB.UpdateLastActiveAt(r.Context(), chatID, u.ID)
+		}
+		next.ServeHTTP(w, r)
 	})
 }

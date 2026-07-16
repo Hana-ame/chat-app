@@ -168,7 +168,7 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
                 }
               </div>
             ))}
-          {reactions.length > 0 && (
+          {!msg.deleted && reactions.length > 0 && (
             <div className="reaction-bar">
               {reactions.map(r => (
                 <div key={r.emoji} className={'reaction-chip' + (r.me ? ' me' : '')}

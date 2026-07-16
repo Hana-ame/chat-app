@@ -20,9 +20,6 @@ export default function ChatPage() {
   // sync URL → store for internal unread/message logic
   useEffect(() => {
     useChatStore.setState({ activeChatId: urlChatId || null });
-    if (urlChatId && accessToken) {
-      api.visitChat(accessToken, urlChatId).catch(() => {});
-    }
   }, [urlChatId, accessToken]);
 
   useEffect(() => {

@@ -192,10 +192,6 @@ const _apiMethods = {
   /** @param {string} token @param {string} chatId @returns {Promise<ApiResponse>} */
   markRead: (token, chatId) =>
     request('POST', '/api/chats/' + chatId + '/read', token, {}),
-  /** @param {string} token @param {string} chatId @returns {Promise<ApiResponse>} */
-  visitChat: (token, chatId) =>
-    request('POST', '/api/chats/' + chatId + '/visit', token, {}),
-
   // ── Reactions ──
   /** @param {string} token @param {string} chatId @param {string} msgId @param {string} emoji @returns {Promise<ApiResponse>} */
   addReaction: (token, chatId, msgId, emoji) =>

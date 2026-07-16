@@ -310,17 +310,3 @@ func (s *Server) MarkPinnedRead(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-func (s *Server) VisitChat(w http.ResponseWriter, r *http.Request) {
-	u := userFrom(r.Context())
-	if u == nil {
-		writeError(w, http.StatusUnauthorized, "unauthorized", "")
-		return
-	}
-	id := chi.URLParam(r, "chatID")
-	if err := s.Services.Chat.Visit(r.Context(), id, u.ID); err != nil {
-		status, code := mapServiceError(err)
-		writeError(w, status, code, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
-}
