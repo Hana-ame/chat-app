@@ -249,20 +249,24 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
 
       <SidebarFooter user={user} onLogout={onLogout} onSettings={() => setShowProfile(true)} />
 
-      {contextMenu && (
-        <div className="context-menu" style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 1000, right: 'auto', width: 140 }}>
-          {(() => { const c = chats.find(x => x.id === contextMenu.chatId); return c?.pinned
+      {contextMenu && (() => {
+        const menuW = 140, menuH = 180;
+        const cx = Math.min(contextMenu.x, window.innerWidth - menuW - 8);
+        const cy = Math.min(contextMenu.y, window.innerHeight - menuH - 8);
+        const c = chats.find(x => x.id === contextMenu.chatId);
+        return (
+        <div className="context-menu" style={{ position: 'fixed', left: cx, top: cy, zIndex: 1000, width: menuW }}>
+          {c?.pinned
             ? <button className="context-menu-item" onClick={() => handleUnpin(contextMenu.chatId)}>Unpin</button>
-            : <button className="context-menu-item" onClick={() => handlePin(contextMenu.chatId)}>Pin</button>;
-          })()}
+            : <button className="context-menu-item" onClick={() => handlePin(contextMenu.chatId)}>Pin</button>}
+          <button className="context-menu-item" onClick={() => { navigator.clipboard.writeText(contextMenu.chatId).catch(() => {}); setContextMenu(null); }}>Copy Chat ID</button>
           <button className="context-menu-item" onClick={() => { setShowChatInfo(contextMenu.chatId); setContextMenu(null); }}>View Info</button>
-          {(() => { const c = chats.find(x => x.id === contextMenu.chatId); return c?.type !== 'dm' && c?.owner_id === user.id
-            ? <button className="context-menu-item danger" onClick={() => handleDelete(contextMenu.chatId)}>Delete</button>
-            : null;
-          })()}
+          {c?.type !== 'dm' && c?.owner_id === user.id && (
+            <button className="context-menu-item danger" onClick={() => handleDelete(contextMenu.chatId)}>Delete</button>
+          )}
           <button className="context-menu-item danger" onClick={() => handleLeaveChat(contextMenu.chatId)}>Leave</button>
-        </div>
-      )}
+        </div>);
+      })()}
 
       {showChatInfo && (
         <ChatInfoModal chatId={showChatInfo} onClose={() => setShowChatInfo(null)} />

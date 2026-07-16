@@ -121,10 +121,18 @@ func (d *DB) UpdateUserProfile(ctx context.Context, id, username, avatarColor, a
 	if avatarColor == "" {
 		avatarColor = PickColor(username)
 	}
-	_, err := d.ExecContext(ctx,
-		`UPDATE users SET username = ?, avatar_color = ?, avatar_url = ? WHERE id = ?`,
-		username, avatarColor, avatarURL, id,
-	)
+	var err error
+	if avatarURL == "" {
+		_, err = d.ExecContext(ctx,
+			`UPDATE users SET username = ?, avatar_color = ? WHERE id = ?`,
+			username, avatarColor, id,
+		)
+	} else {
+		_, err = d.ExecContext(ctx,
+			`UPDATE users SET username = ?, avatar_color = ?, avatar_url = ? WHERE id = ?`,
+			username, avatarColor, avatarURL, id,
+		)
+	}
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
 			return nil, ErrConflict

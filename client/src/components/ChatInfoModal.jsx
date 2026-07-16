@@ -55,6 +55,9 @@ export default function ChatInfoModal({ chatId, onClose }) {
           <div>{chat.name || chat.id}</div>
         </div>
 
+        <InfoRow label="ID"
+          value={<span style={{cursor:'pointer',textDecoration:'underline dotted'}} onClick={() => { navigator.clipboard.writeText(chatId); }} title="Click to copy">{chatId}</span>} />
+
         <InfoRow label="Created at" value={fmtTime(chat.created_at)} />
         <InfoRow label="Last message" value={fmtTime(chat.last_message_at)} />
 

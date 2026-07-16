@@ -27,6 +27,8 @@ export default function UserProfileModal({ user: profileUser, onClose, chatId })
       if (file) {
         const data = await api.uploadAvatar(accessToken, file);
         payload.avatar_url = data.url + '?v=' + Date.now();
+      } else if (me.avatar_url) {
+        payload.avatar_url = me.avatar_url;
       }
       const updated = await api.updateProfile(accessToken, payload);
       useAuthStore.getState().setUser(updated);
