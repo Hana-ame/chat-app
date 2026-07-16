@@ -116,9 +116,11 @@ export default function Composer({ chatId }) {
       {attachments.length > 0 && (
         <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:8}}>
           {attachments.map((a, i) => (
-            <div key={a._key} className="file-attach" style={{position:'relative',fontSize:12}}>
-              <img src={a.url} alt="" style={{maxWidth:120,maxHeight:80,borderRadius:4,display:'block'}} />
-              <button className="btn-ghost" style={{position:'absolute',top:-6,right:-6,fontSize:12,lineHeight:1,width:18,height:18,borderRadius:'50%',padding:0,background:'var(--bg-primary)'}} onClick={() => setAttachments(a => a.filter((_,j) => j!==i))}>×</button>
+            <div key={a._key} className="file-attach" style={{position:'relative',fontSize:12,display:'flex',alignItems:'center',gap:4}}>
+              {a.mime_type?.startsWith('image/')
+                ? <img src={a.url} alt="" style={{maxWidth:120,maxHeight:80,borderRadius:4}} />
+                : <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:120}}>{a.filename}</span>}
+              <button className="btn-ghost" style={{fontSize:14,lineHeight:1,width:18,height:18,borderRadius:'50%',padding:0,flexShrink:0}} onClick={() => setAttachments(a => a.filter((_,j) => j!==i))}>×</button>
             </div>
           ))}
         </div>
