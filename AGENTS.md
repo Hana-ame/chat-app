@@ -32,3 +32,11 @@ Chat application with Go backend + React frontend.
 ## Release (Tag & Build)
 - `git tag build-$(git rev-parse --short HEAD)` — tag with short commit hash
 - `git push --tags` — triggers CI (go-build + release job only runs on `main` or tags)
+- After push, run `gh run list --branch <tag> --limit 3` to confirm CI passes
+
+## Workflow (每次修改后)
+1. `git add` + `git commit`
+2. `git push` (push to remote)
+3. `git tag build-$(git rev-parse --short HEAD)` — tag with short commit hash
+4. `git push --tags`
+5. `gh run list --branch <tag> --limit 3` — confirm CI passes
