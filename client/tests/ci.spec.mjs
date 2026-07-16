@@ -154,7 +154,7 @@ test.describe('Mock API Mode (CI)', () => {
   test('mock open settings and close', async ({ page }) => {
     await mockLogin(page);
     await page.click('button[title="Settings"]');
-    await expect(page.locator('text=Settings')).toBeVisible({ timeout: 3000 });
+    await expect(page.locator('[aria-label="Settings"]')).toBeVisible({ timeout: 3000 });
     await page.locator('.modal-overlay').first().click({ force: true }).catch(() => {});
     await page.waitForTimeout(300);
   });
@@ -174,15 +174,15 @@ test.describe('Mock API Mode (CI)', () => {
   test('mock upload avatar in settings', async ({ page }) => {
     await mockLogin(page);
     await page.click('button[title="Settings"]');
-    await expect(page.locator('text=Settings')).toBeVisible({ timeout: 3000 });
-    const avatarEl = page.locator('.settings-avatar-placeholder').first();
-    const isVis = await avatarEl.isVisible({ timeout: 1000 }).catch(() => false);
+    await expect(page.locator('[aria-label="Settings"]')).toBeVisible({ timeout: 3000 });
+    const avatarUploadEl = page.locator('text=Click to upload').first();
+    const isVis = await avatarUploadEl.isVisible({ timeout: 1000 }).catch(() => false);
     if (!isVis) {
       await page.locator('.modal-overlay').first().click({ force: true }).catch(() => {});
       return;
     }
     const fileChooserPromise = page.waitForEvent('filechooser', { timeout: 3000 }).catch(() => null);
-    await avatarEl.click();
+    await avatarUploadEl.click();
     const fileChooser = await fileChooserPromise;
     if (!fileChooser) {
       await page.locator('.modal-overlay').first().click({ force: true }).catch(() => {});
