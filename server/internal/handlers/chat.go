@@ -230,6 +230,11 @@ type updateAvatarReq struct {
 	AvatarURL string `json:"avatar_url"`
 }
 
+type updateBannerReq struct {
+	AvatarURL     string  `json:"avatar_url"`
+	BannerOpacity float64 `json:"banner_opacity"`
+}
+
 func (s *Server) UpdateChatAvatar(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	if u == nil {
@@ -258,12 +263,12 @@ func (s *Server) UpdateChatBanner(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	chatID := chi.URLParam(r, "chatID")
-	var req updateAvatarReq
+	var req updateBannerReq
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
-	updated, err := s.Services.Chat.UpdateBanner(r.Context(), chatID, u.ID, req.AvatarURL)
+	updated, err := s.Services.Chat.UpdateBanner(r.Context(), chatID, u.ID, req.AvatarURL, req.BannerOpacity)
 	if err != nil {
 		status, code := mapServiceError(err)
 		writeError(w, status, code, err.Error())

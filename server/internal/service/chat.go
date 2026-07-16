@@ -128,7 +128,7 @@ func (s *ChatService) UpdateAvatar(ctx context.Context, chatID, userID, avatarUR
 	return updated, nil
 }
 
-func (s *ChatService) UpdateBanner(ctx context.Context, chatID, userID, bannerURL string) (*models.Chat, error) {
+func (s *ChatService) UpdateBanner(ctx context.Context, chatID, userID, bannerURL string, opacity float64) (*models.Chat, error) {
 	chat, err := s.DB.GetChat(ctx, chatID)
 	if err != nil {
 		if isNotFound(err) {
@@ -144,6 +144,11 @@ func (s *ChatService) UpdateBanner(ctx context.Context, chatID, userID, bannerUR
 	}
 	if err := s.DB.UpdateChatBanner(ctx, chatID, bannerURL); err != nil {
 		return nil, err
+	}
+	if opacity > 0 {
+		if err := s.DB.UpdateChatBannerOpacity(ctx, chatID, opacity); err != nil {
+			return nil, err
+		}
 	}
 	updated, err := s.DB.GetChat(ctx, chatID)
 	if err != nil {
@@ -227,13 +232,6 @@ func (s *ChatService) Join(ctx context.Context, chatID, userID string) (*models.
 func (s *ChatService) SetAnnouncement(ctx context.Context, chatID, userID, content string) error {
 	if err := s.RequireOwnerOrAdmin(ctx, chatID, userID); err != nil {
 		return err
-	}
-	n, err := s.DB.ChatMemberCount(ctx, chatID)
-	if err != nil {
-		return err
-	}
-	if n < 3 {
-		return ErrInvalidInput
 	}
 	if err := s.DB.SetPinnedMessage(ctx, chatID, content); err != nil {
 		return err

@@ -106,10 +106,10 @@ func (d *DB) GetChat(ctx context.Context, id string) (*models.Chat, error) {
 		memberCount    int
 	)
 	err := d.QueryRowContext(ctx,
-		`SELECT id, type, name, icon_color, avatar_url, banner_url, background_url, visibility, owner_id, created_at, last_message_at, last_message_id, pinned_message, pinned_updated_at, member_count
+		`SELECT id, type, name, icon_color, avatar_url, banner_url, banner_opacity, background_url, visibility, owner_id, created_at, last_message_at, last_message_id, pinned_message, pinned_updated_at, member_count
 		 FROM chats WHERE id = ?`,
 		id,
-	).Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.AvatarURL, &c.BannerURL, &c.BackgroundURL, &c.Visibility, &owner, &createdAt, &lastMsgAt, &lastMsgID, &pinnedMsg, &pinnedUpdAt, &memberCount)
+	).Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.AvatarURL, &c.BannerURL, &c.BannerOpacity, &c.BackgroundURL, &c.Visibility, &owner, &createdAt, &lastMsgAt, &lastMsgID, &pinnedMsg, &pinnedUpdAt, &memberCount)
 	if errors.Is(err, sql.ErrNoRows) {
 		logutil.Debug("chat not found: %s", id)
 		return nil, ErrNotFound
@@ -152,7 +152,7 @@ func (d *DB) GetChat(ctx context.Context, id string) (*models.Chat, error) {
 
 func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, error) {
 	rows, err := d.QueryContext(ctx,
-		`SELECT c.id, c.type, c.name, c.icon_color, c.avatar_url, c.banner_url, c.background_url, c.visibility, c.owner_id, c.created_at, c.last_message_at, c.last_message_id,
+		`SELECT c.id, c.type, c.name, c.icon_color, c.avatar_url, c.banner_url, c.banner_opacity, c.background_url, c.visibility, c.owner_id, c.created_at, c.last_message_at, c.last_message_id,
 		        cm.last_read_message_id, c.pinned_message, c.pinned_updated_at, c.member_count,
 		        cm.pinned_last_read_at, cm.pinned, cm.last_active_at
 		 FROM chat_members cm JOIN chats c ON c.id = cm.chat_id
@@ -179,7 +179,7 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 		var created string
 		var memberCount int
 		var pinnedBool bool
-		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.AvatarURL, &c.BannerURL, &c.BackgroundURL, &visibility, &owner, &created, &lastMsg, &lastMsgID, &lastRead, &pinnedMsg, &pinnedUpdAt, &memberCount, &pinnedLastReadAt, &pinnedBool, &lastActiveAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.AvatarURL, &c.BannerURL, &c.BannerOpacity, &c.BackgroundURL, &visibility, &owner, &created, &lastMsg, &lastMsgID, &lastRead, &pinnedMsg, &pinnedUpdAt, &memberCount, &pinnedLastReadAt, &pinnedBool, &lastActiveAt); err != nil {
 			return nil, err
 		}
 		c.Name = name.String
@@ -293,6 +293,20 @@ func (d *DB) UpdateChatBanner(ctx context.Context, chatID, bannerURL string) err
 	_, err := d.ExecContext(ctx, `UPDATE chats SET banner_url = ? WHERE id = ?`, bannerURL, chatID)
 	if err == nil {
 		logutil.Info("updated chat %s banner", chatID)
+	}
+	return err
+}
+
+func (d *DB) UpdateChatBannerOpacity(ctx context.Context, chatID string, opacity float64) error {
+	if opacity < 0 {
+		opacity = 0
+	}
+	if opacity > 1 {
+		opacity = 1
+	}
+	_, err := d.ExecContext(ctx, `UPDATE chats SET banner_opacity = ? WHERE id = ?`, opacity, chatID)
+	if err == nil {
+		logutil.Info("updated chat %s banner opacity to %.2f", chatID, opacity)
 	}
 	return err
 }
