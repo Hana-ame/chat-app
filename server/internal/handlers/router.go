@@ -119,6 +119,9 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 				r.Post("/announcement/read", s.MarkPinnedRead)
 				r.Post("/pin", s.PinChatList)
 				r.Post("/unpin", s.UnpinChatList)
+				r.Put("/avatar", s.UpdateChatAvatar)
+				r.Put("/banner", s.UpdateChatBanner)
+				r.Put("/background", s.UpdateChatBackground)
 
 			})
 

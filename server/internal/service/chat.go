@@ -101,6 +101,87 @@ func (s *ChatService) Rename(ctx context.Context, chatID, userID, name string) (
 	return updated, nil
 }
 
+func (s *ChatService) UpdateAvatar(ctx context.Context, chatID, userID, avatarURL string) (*models.Chat, error) {
+	chat, err := s.DB.GetChat(ctx, chatID)
+	if err != nil {
+		if isNotFound(err) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	if chat.Type == "dm" {
+		return nil, ErrInvalidInput
+	}
+	if chat.OwnerID != userID {
+		return nil, ErrForbidden
+	}
+	if err := s.DB.UpdateChatAvatar(ctx, chatID, avatarURL); err != nil {
+		return nil, err
+	}
+	updated, err := s.DB.GetChat(ctx, chatID)
+	if err != nil {
+		return nil, err
+	}
+	if s.Hub != nil {
+		s.Hub.BroadcastChatUpdated(updated)
+	}
+	return updated, nil
+}
+
+func (s *ChatService) UpdateBanner(ctx context.Context, chatID, userID, bannerURL string) (*models.Chat, error) {
+	chat, err := s.DB.GetChat(ctx, chatID)
+	if err != nil {
+		if isNotFound(err) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	if chat.Type == "dm" {
+		return nil, ErrInvalidInput
+	}
+	if chat.OwnerID != userID {
+		return nil, ErrForbidden
+	}
+	if err := s.DB.UpdateChatBanner(ctx, chatID, bannerURL); err != nil {
+		return nil, err
+	}
+	updated, err := s.DB.GetChat(ctx, chatID)
+	if err != nil {
+		return nil, err
+	}
+	if s.Hub != nil {
+		s.Hub.BroadcastChatUpdated(updated)
+	}
+	return updated, nil
+}
+
+func (s *ChatService) UpdateBackground(ctx context.Context, chatID, userID, backgroundURL string) (*models.Chat, error) {
+	chat, err := s.DB.GetChat(ctx, chatID)
+	if err != nil {
+		if isNotFound(err) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	if chat.Type == "dm" {
+		return nil, ErrInvalidInput
+	}
+	if chat.OwnerID != userID {
+		return nil, ErrForbidden
+	}
+	if err := s.DB.UpdateChatBackground(ctx, chatID, backgroundURL); err != nil {
+		return nil, err
+	}
+	updated, err := s.DB.GetChat(ctx, chatID)
+	if err != nil {
+		return nil, err
+	}
+	if s.Hub != nil {
+		s.Hub.BroadcastChatUpdated(updated)
+	}
+	return updated, nil
+}
+
 func (s *ChatService) Delete(ctx context.Context, chatID, userID string) error {
 	chat, err := s.DB.GetChat(ctx, chatID)
 	if err != nil {

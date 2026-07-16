@@ -14,13 +14,19 @@ function getDMName(chat) {
 
 export default function ChatView({ chatId, onBack }) {
   const { user, accessToken } = useAuthStore();
-  const { chats, messages, loadMessages, subscribe, markRead, pinnedMessage, setAnnouncement, clearAnnouncement, markAnnouncementRead } = useChatStore();
+  const { chats, messages, loadMessages, subscribe, markRead, pinnedMessage, setAnnouncement, clearAnnouncement, markAnnouncementRead, onChatUpdate } = useChatStore();
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [noticeInput, setNoticeInput] = useState('');
   const [isEditingNotice, setIsEditingNotice] = useState(false);
   const [showNotice, setShowNotice] = useState(true);
   const [memberCount, setMemberCount] = useState(0);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [uploadingBg, setUploadingBg] = useState(false);
+  const avatarInputRef = useRef(null);
+  const bannerInputRef = useRef(null);
+  const bgInputRef = useRef(null);
   const bodyRef = useRef(null);
   const loadingMoreRef = useRef(false);
   const prevChatIdRef = useRef(null);
@@ -131,12 +137,81 @@ export default function ChatView({ chatId, onBack }) {
     }
   };
 
+  const handleAvatarClick = () => {
+    avatarInputRef.current?.click();
+  };
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingAvatar(true);
+    try {
+      const { url } = await api.uploadAvatar(accessToken, file);
+      await api.updateChatAvatar(accessToken, chatId, url + '?v=' + Date.now());
+      useChatStore.getState().onChatUpdate({ id: chatId, avatar_url: url + '?v=' + Date.now() });
+    } catch (e) {
+      notify('error', 'Failed to update avatar');
+    } finally {
+      setUploadingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = '';
+    }
+  };
+
+  const handleBannerUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingBanner(true);
+    try {
+      const { url } = await api.uploadAvatar(accessToken, file);
+      await api.updateChatBanner(accessToken, chatId, url + '?v=' + Date.now());
+      useChatStore.getState().onChatUpdate({ id: chatId, banner_url: url + '?v=' + Date.now() });
+    } catch (e) {
+      notify('error', 'Failed to update banner');
+    } finally {
+      setUploadingBanner(false);
+      if (bannerInputRef.current) bannerInputRef.current.value = '';
+    }
+  };
+
+  const handleBgUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingBg(true);
+    try {
+      const { url } = await api.uploadAvatar(accessToken, file);
+      await api.updateChatBackground(accessToken, chatId, url + '?v=' + Date.now());
+      useChatStore.getState().onChatUpdate({ id: chatId, background_url: url + '?v=' + Date.now() });
+    } catch (e) {
+      notify('error', 'Failed to update background');
+    } finally {
+      setUploadingBg(false);
+      if (bgInputRef.current) bgInputRef.current.value = '';
+    }
+  };
+
   if (!chat) return null;
 
   return (
     <div className="main">
       <div className="chat-header">
+        <input ref={avatarInputRef} type="file" accept="image/*" style={{display:'none'}} onChange={handleAvatarUpload}/>
+        <input ref={bannerInputRef} type="file" accept="image/*" style={{display:'none'}} onChange={handleBannerUpload}/>
+        <input ref={bgInputRef} type="file" accept="image/*" style={{display:'none'}} onChange={handleBgUpload}/>
         {onBack && <button className="btn-ghost" onClick={onBack} style={{fontSize:18}}>←</button>}
+        {chat.type !== 'dm' && chat.owner_id === user.id ? (
+          <div className="chat-header-avatar" style={{position:'relative',cursor:'pointer'}} onClick={handleAvatarClick}>
+            {chat.avatar_url
+              ? <img src={chat.avatar_url} alt="" className="chat-header-avatar-img" />
+              : <div className="chat-header-avatar-letter" style={{background:chat.icon_color||'#5865F2'}}>{name ? name[0].toUpperCase() : '?'}</div>}
+            <div className="chat-header-avatar-overlay">📷</div>
+          </div>
+        ) : (
+          <div className="chat-header-avatar">
+            {chat.avatar_url
+              ? <img src={chat.avatar_url} alt="" className="chat-header-avatar-img" />
+              : <div className="chat-header-avatar-letter" style={{background:chat.icon_color||'#5865F2'}}>{name ? name[0].toUpperCase() : '?'}</div>}
+          </div>
+        )}
         <div style={{flex:1}}>
             <div style={{fontWeight:600}}>{name}</div>
             <div style={{fontSize:12,color:'var(--text-muted)'}}>
@@ -175,6 +250,24 @@ export default function ChatView({ chatId, onBack }) {
               }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 5v14M5 12h14"/>
+              </svg>
+            </button>
+          )}
+          {chat?.owner_id === user.id && (
+            <button className="btn-ghost" style={{padding:'6px 8px',lineHeight:0,borderRadius:4}} title="Upload banner" onClick={() => bannerInputRef.current?.click()} disabled={uploadingBanner}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+            </button>
+          )}
+          {chat?.owner_id === user.id && (
+            <button className="btn-ghost" style={{padding:'6px 8px',lineHeight:0,borderRadius:4}} title="Upload background" onClick={() => bgInputRef.current?.click()} disabled={uploadingBg}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <path d="M21 15l-5-5L5 21"/>
               </svg>
             </button>
           )}
@@ -219,7 +312,14 @@ export default function ChatView({ chatId, onBack }) {
           </div>
         )}
 
-        <div className="chat-body" ref={bodyRef}>
+        <div className={'chat-body' + (chat?.background_url ? ' has-bg' : '')} ref={bodyRef} style={
+          chat?.background_url ? {
+            backgroundImage: `url(${chat.background_url})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundAttachment: 'fixed',
+          } : undefined
+        }>
 
 
         <div>

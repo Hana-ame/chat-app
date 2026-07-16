@@ -21,7 +21,7 @@ func (d *DB) ListPublicChats(ctx context.Context, page, limit int) ([]models.Cha
 	offset := (page - 1) * limit
 	logutil.Debug("list public chats: page=%d limit=%d", page, limit)
 	rows, err := d.QueryContext(ctx,
-		`SELECT c.id, c.type, c.name, c.icon_color, COALESCE(c.visibility,'private'), c.owner_id, c.created_at, c.last_message_at, c.pinned_message, c.pinned_updated_at,
+		`SELECT c.id, c.type, c.name, c.icon_color, c.avatar_url, c.banner_url, c.background_url, COALESCE(c.visibility,'private'), c.owner_id, c.created_at, c.last_message_at, c.pinned_message, c.pinned_updated_at,
 		        (SELECT COUNT(*) FROM chat_members WHERE chat_id = c.id) AS member_count,
 		        (SELECT content FROM messages WHERE chat_id = c.id AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1) AS last_message_content
 		 FROM chats c WHERE c.type = 'group' AND c.visibility = 'public'
@@ -38,7 +38,7 @@ func (d *DB) ListPublicChats(ctx context.Context, page, limit int) ([]models.Cha
 		var name, owner, lastMsg, pinnedMsg, pinnedUpdAt, lastMsgContent sql.NullString
 		var created string
 		var memberCount int
-		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.Visibility, &owner, &created, &lastMsg, &pinnedMsg, &pinnedUpdAt, &memberCount, &lastMsgContent); err != nil {
+		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.AvatarURL, &c.BannerURL, &c.BackgroundURL, &c.Visibility, &owner, &created, &lastMsg, &pinnedMsg, &pinnedUpdAt, &memberCount, &lastMsgContent); err != nil {
 			return nil, err
 		}
 		c.Name = name.String

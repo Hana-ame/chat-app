@@ -17,7 +17,7 @@ export default function ChatListItem({ chat, activeId, onSelectChat, onContextMe
   const btnRef = useRef(null);
 
   const name = chat.name || chat.id;
-  const avatar = chat.icon_color || '#5865F2';
+  const bgColor = chat.icon_color || '#5865F2';
   const raw = chat.unread_count || 0;
   const unread = raw >= 99 ? '99+' : raw;
 
@@ -27,11 +27,17 @@ export default function ChatListItem({ chat, activeId, onSelectChat, onContextMe
     onContextMenu({ chatId: chat.id, x: rect?.right || 0, y: rect?.bottom || 0 });
   };
 
+  const bannerStyle = chat.banner_url ? {
+    backgroundImage: `linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)), url(${chat.banner_url})`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+  } : {};
+
   return (
     <div key={chat.id} className={'chat-item' + (chat.id === activeId ? ' active' : '') + (chat.pinned ? ' pinned' : '') + (chat.visibility === 'public' ? ' public' : '') + (chat.owner_id === user.id ? ' owner' : '')}
-      onClick={() => onSelectChat(chat.id)}>
-      <div className="chat-item-avatar" style={{ background: avatar }}>
-        {name ? name[0].toUpperCase() : '?'}
+      onClick={() => onSelectChat(chat.id)} style={bannerStyle}>
+      <div className="chat-item-avatar" style={{ background: chat.avatar_url ? 'none' : bgColor }}>
+        {chat.avatar_url ? <img src={chat.avatar_url} alt="" className="chat-item-avatar-img" /> : (name ? name[0].toUpperCase() : '?')}
       </div>
       <div className="chat-item-info">
         <div style={{display:'flex',alignItems:'center',gap:4}}>

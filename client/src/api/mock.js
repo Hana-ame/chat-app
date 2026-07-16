@@ -706,6 +706,51 @@ export function mockMarkAnnouncementRead(_token, chatId) {
 
 /**
  * @param {string} _token
+ * @param {string} chatId
+ * @param {string} avatarUrl
+ * @returns {{ id: string, avatar_url: string }}
+ */
+export function mockUpdateChatAvatar(_token, chatId, avatarUrl) {
+  const d = ensureData();
+  const chat = d.chats.find(c => c.id === chatId);
+  if (!chat) return { id: chatId, avatar_url: avatarUrl };
+  chat.avatar_url = avatarUrl;
+  if (_store) _store.getState().onChatUpdate({ id: chatId, avatar_url: avatarUrl });
+  return { id: chatId, avatar_url: avatarUrl };
+}
+
+/**
+ * @param {string} _token
+ * @param {string} chatId
+ * @param {string} bannerUrl
+ * @returns {{ id: string, banner_url: string }}
+ */
+export function mockUpdateChatBanner(_token, chatId, bannerUrl) {
+  const d = ensureData();
+  const chat = d.chats.find(c => c.id === chatId);
+  if (!chat) return { id: chatId, banner_url: bannerUrl };
+  chat.banner_url = bannerUrl;
+  if (_store) _store.getState().onChatUpdate({ id: chatId, banner_url: bannerUrl });
+  return { id: chatId, banner_url: bannerUrl };
+}
+
+/**
+ * @param {string} _token
+ * @param {string} chatId
+ * @param {string} backgroundUrl
+ * @returns {{ id: string, background_url: string }}
+ */
+export function mockUpdateChatBackground(_token, chatId, backgroundUrl) {
+  const d = ensureData();
+  const chat = d.chats.find(c => c.id === chatId);
+  if (!chat) return { id: chatId, background_url: backgroundUrl };
+  chat.background_url = backgroundUrl;
+  if (_store) _store.getState().onChatUpdate({ id: chatId, background_url: backgroundUrl });
+  return { id: chatId, background_url: backgroundUrl };
+}
+
+/**
+ * @param {string} _token
  * @param {string} _chatId
  * @param {string} msgId
  * @returns {{ reactions: Reaction[] }}

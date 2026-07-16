@@ -34,7 +34,7 @@ import {
   mockListMessages, mockSendMessage, mockEditMessage, mockDeleteMessage,
   mockMarkRead, mockAddReaction, mockRemoveReaction, mockGetReactions,
   mockUpload, mockUploadAvatar,
-  mockPinChat, mockUnpinChat, mockMarkAnnouncementRead,
+  mockPinChat, mockUnpinChat, mockMarkAnnouncementRead, mockUpdateChatAvatar, mockUpdateChatBanner, mockUpdateChatBackground,
   resetMockData,
 } from './mock';
 import { createStreamSource } from '../dev/stream-source';
@@ -161,6 +161,13 @@ const _apiMethods = {
   setAnnouncement: (token, chatId, content) => request('POST', '/api/chats/' + chatId + '/announcement', token, { content }),
   /** @param {string} token @param {string} chatId @returns {Promise<ApiResponse>} */
   clearAnnouncement: (token, chatId) => request('DELETE', '/api/chats/' + chatId + '/announcement', token),
+  /** @param {string} token @param {string} chatId @param {string} avatarUrl @returns {Promise<ApiResponse>} */
+  updateChatAvatar: (token, chatId, avatarUrl) =>
+    request('PUT', '/api/chats/' + chatId + '/avatar', token, { avatar_url: avatarUrl }),
+  updateChatBanner: (token, chatId, bannerUrl) =>
+    request('PUT', '/api/chats/' + chatId + '/banner', token, { avatar_url: bannerUrl }),
+  updateChatBackground: (token, chatId, backgroundUrl) =>
+    request('PUT', '/api/chats/' + chatId + '/background', token, { avatar_url: backgroundUrl }),
 
   // ── Members ──
   /** @param {string} token @param {string} chatId @returns {Promise<ListMembersResponse>} */
@@ -260,7 +267,7 @@ const _mockHandlers = {
   listChats: mockListChats, listPublicChats: mockListPublicChats,
   createChat: mockCreateChat, getChat: mockGetChat, deleteChat: mockDeleteChat,
   renameChat: mockRenameChat, createDM: mockCreateDM, joinChat: mockJoinChat,
-  setAnnouncement: mockSetAnnouncement, clearAnnouncement: mockClearAnnouncement,
+  setAnnouncement: mockSetAnnouncement, clearAnnouncement: mockClearAnnouncement, updateChatAvatar: mockUpdateChatAvatar, updateChatBanner: mockUpdateChatBanner, updateChatBackground: mockUpdateChatBackground,
   addMember: mockAddMember, removeMember: mockRemoveMember,
   listMembers: mockListMembers, listMessages: mockListMessages,
   sendMessage: mockSendMessage, editMessage: mockEditMessage, deleteMessage: mockDeleteMessage,

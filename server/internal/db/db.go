@@ -106,6 +106,14 @@ func (d *DB) Migrate() error {
 		return err
 	}
 
+	if err := d.ensureChatAvatarColumn(ctx); err != nil {
+		return err
+	}
+
+	if err := d.ensureChatBannerBackgroundColumn(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -131,6 +139,54 @@ func (d *DB) ensureLastActiveColumn(ctx context.Context) error {
 		return fmt.Errorf("rename last_visited_at: %w", err)
 	}
 	logutil.Info("chat_members.last_visited_at → last_active_at done")
+	return nil
+}
+
+func (d *DB) ensureChatAvatarColumn(ctx context.Context) error {
+	var cnt int
+	if err := d.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM pragma_table_info('chats') WHERE name='avatar_url'`).Scan(&cnt); err != nil {
+		return fmt.Errorf("check avatar_url: %w", err)
+	}
+	if cnt > 0 {
+		return nil
+	}
+	logutil.Info("migrating chats: add avatar_url column")
+	if _, err := d.ExecContext(ctx,
+		`ALTER TABLE chats ADD COLUMN avatar_url TEXT NOT NULL DEFAULT ''`); err != nil {
+		return fmt.Errorf("add avatar_url: %w", err)
+	}
+	logutil.Info("chats.avatar_url column added")
+	return nil
+}
+
+func (d *DB) ensureChatBannerBackgroundColumn(ctx context.Context) error {
+	var hasBanner, hasBg int
+	if err := d.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM pragma_table_info('chats') WHERE name='banner_url'`).Scan(&hasBanner); err != nil {
+		return fmt.Errorf("check banner_url: %w", err)
+	}
+	if err := d.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM pragma_table_info('chats') WHERE name='background_url'`).Scan(&hasBg); err != nil {
+		return fmt.Errorf("check background_url: %w", err)
+	}
+	if hasBanner > 0 && hasBg > 0 {
+		return nil
+	}
+	logutil.Info("migrating chats: add banner_url, background_url columns")
+	if hasBanner == 0 {
+		if _, err := d.ExecContext(ctx,
+			`ALTER TABLE chats ADD COLUMN banner_url TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("add banner_url: %w", err)
+		}
+	}
+	if hasBg == 0 {
+		if _, err := d.ExecContext(ctx,
+			`ALTER TABLE chats ADD COLUMN background_url TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("add background_url: %w", err)
+		}
+	}
+	logutil.Info("chats.banner_url, background_url columns added")
 	return nil
 }
 

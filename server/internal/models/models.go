@@ -27,6 +27,9 @@ type Chat struct {
 	Type          string     `json:"type"`
 	Name          string     `json:"name,omitempty"`
 	IconColor     string     `json:"icon_color,omitempty"`
+	AvatarURL     string     `json:"avatar_url,omitempty"`
+	BannerURL     string     `json:"banner_url,omitempty"`
+	BackgroundURL string     `json:"background_url,omitempty"`
 	Visibility    string     `json:"visibility,omitempty"`
 	OwnerID       string     `json:"owner_id,omitempty"`
 	CreatedAt     time.Time  `json:"created_at"`

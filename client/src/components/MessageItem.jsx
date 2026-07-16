@@ -11,12 +11,12 @@ const COMMON_EMOJI = ['👍','❤️','😂','🎉','😢','😡','👀','🔥',
 function timeFormat(t) {
   if (!t) return '';
   const d = new Date(t);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-function fmtLastSeen(t) {
-  const d = new Date(t);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const now = new Date();
+  const diff = now - d;
+  if (diff < 60e3) return 'now';
+  if (diff < 3600e3) return Math.floor(diff / 60e3) + 'm';
+  if (diff < 86400e3) return Math.floor(diff / 3600e3) + 'h';
+  return d.toLocaleDateString();
 }
 
 export default function MessageItem({ msg, sameAuthor, chatId }) {
@@ -30,11 +30,11 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
   const [profileUser, setProfileUser] = useState(null);
   const [reactions, setReactions] = useState(msg.reactions || []);
 
+  const chat = useMemo(() => chats.find(c => c.id === chatId), [chats, chatId]);
   const author = useMemo(() => {
-    const chat = chats.find(c => c.id === chatId);
     if (msg.user_id === user.id) return user;
     return chat?.members?.find(m => m.id === msg.user_id) || msg.author || { username: 'Unknown', avatar_color: '#5865F2', id: msg.user_id };
-  }, [chats, chatId, msg.user_id, msg.author, user]);
+  }, [chat, msg.user_id, msg.author, user]);
   const pickerRef = useRef(null);
   const emojiBtnRef = useRef(null);
   const [pickerPos, setPickerPos] = useState(null);
@@ -121,13 +121,10 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
           {!sameAuthor && (
             <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
               <span className="msg-author" onClick={() => setProfileUser(author)} style={{cursor:'pointer'}}>{author.username}</span>
-              {(author.role === 'admin' || author.role === 'owner') && (
+              {(author.role === 'admin' || author.role === 'owner' || author.id === chat?.owner_id) && (
                 <span style={{fontSize:10,padding:'0 5px',borderRadius:3,fontWeight:500,background:'rgba(88,101,242,0.15)',color:'#5865F2',lineHeight:'18px'}}>ADMIN</span>
               )}
               <span className="msg-time">{timeFormat(msg.created_at)}</span>
-              {author.last_seen && (
-                <span className="msg-time" style={{fontSize:11}}>{fmtLastSeen(author.last_seen)}</span>
-              )}
               {msg.edited_at && <span className="msg-time">(edited)</span>}
             </div>
           )}

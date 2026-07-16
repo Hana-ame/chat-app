@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAuthStore } from '../store/auth';
+import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 import UserAvatar from './UserAvatar';
 
 export default function UserProfileModal({ user: profileUser, onClose, chatId }) {
   const { user: me, accessToken } = useAuthStore();
+  const { chats } = useChatStore();
   const isMe = profileUser.id === me.id;
+  const chat = useMemo(() => chats.find(c => c.id === chatId), [chats, chatId]);
 
   const [name, setName] = useState(profileUser.username);
   const [saving, setSaving] = useState(false);
@@ -33,7 +36,7 @@ export default function UserProfileModal({ user: profileUser, onClose, chatId })
   };
 
   if (!profileUser) return null;
-  const role = profileUser.role;
+  const role = profileUser.role || (chat && profileUser.id === chat.owner_id ? 'owner' : 'member');
 
   return (
     <div className="modal-overlay" onClick={onClose}>
