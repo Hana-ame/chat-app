@@ -4132,3 +4132,71 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 ### 验证
 - Frontend CI: ✅
 - Backend CI: ✅
+
+---
+
+## 2026-07-17 生产环境批量修复（第 35 轮）
+
+### 35-1: 消息顺序双重重排导致最新消息置顶
+
+**问题**: 后端 `GetMessages` 已反转 SQL DESC 结果为 ASC，但前端 `loadMessages` / `poll:messages` / `loadMore` 又额外调用 `.reverse()`，造成双重重排 → 最新消息出现在顶部。
+
+**修复**: 移除 `client/src/store/chat.js` 中 `poll:messages` 和 `loadMessages` 的 `.reverse()`，以及 `ChatView.jsx` 中 `loadMore` 的 `.reverse()`。
+
+### 35-2: 公开聊天卡片头像不显示
+
+**问题**: `WelcomeView.jsx` 公聊卡片硬编码首字母 avatar，从不检查 `avatar_url`。
+
+**修复**: 卡片渲染时优先使用 `chat.avatar_url`（图片），fallback 到字母占位。同时从 store 合并实时数据。
+
+### 35-3: ChatListItem 头像不同步
+
+**问题**: `ChatListItem` 使用父组件缓存的 `chat` 数据，用户修改 avatar_url 后列表不刷新。
+
+**修复**: `ChatListItem` 通过 `useChatStore()` 直接读取 store 中的最新 `avatar_url`/`banner_url`，覆盖 props 传入的缓存数据。
+
+### 35-4: 粘贴上传被 CSP 拦截
+
+**问题**: CSP `img-src` 缺少 `blob:`，`compressImage` 的 `URL.createObjectURL()` 被浏览器阻止。
+
+**修复**: `server/internal/handlers/router.go` CSP header 中 `img-src` 加入 `blob:`。
+
+### 35-5: 粘贴附件 `_key` 字段引发后端解析错误
+
+**问题**: `api.sendMessage` 发送附件时保留 `_key` 字段，后端 `json: unknown field "_key"` 报错。
+
+**修复**: `client/src/api/client.js` 的 `sendMessage` 中 strip 掉 `_key` 字段（`const { _key, ...rest } = a`）。
+
+### 35-6: 粘贴附件预览始终显示文件名
+
+**问题**: Composer 粘贴后附件预览对图片也仅显示文件名，无缩略图。
+
+**修复**: 根据 `mime_type` 决定渲染：`image/*` 显示 `<img>`，其他显示文件名文本。
+
+### 35-7: PWA 清单缺失
+
+**问题**: 移动端浏览器无安装提示。
+
+**修复**: 新增 `client/public/manifest.json`、`icon.svg`（💬 + #5865F2 背景）、HTML head 添加 Apple meta tags。
+
+### 35-8: 保存 Profile 时头像被清空
+
+**问题**: 后端 `UPDATE users SET avatar_url = ?` 用空字符串覆盖已有头像。
+
+**修复**: 前端 Profile Save 请求包含 `me.avatar_url` 字段；后端 `UpdateUserProfile` 在 `avatar_url` 为空字符串时跳过该字段的 UPDATE。
+
+### 35-9: Context 菜单溢出 viewport
+
+**问题**: Context menu `position: fixed` 使用原始鼠标坐标，在屏幕右侧/底部溢出。
+
+**修复**: left/top 用 `Math.min` 钳制到 viewport 边界。
+
+### 35-10: 右键菜单加入复制 Chat ID
+
+**问题**: 无便捷方式复制聊天 ID。
+
+**修复**: Context menu 新增 "Copy Chat ID" 项（`navigator.clipboard.writeText`）；ChatInfoModal 中 Chat ID 行可点击复制。
+
+### 验证
+- Go build + vet: ✅
+- Client build: ✅
