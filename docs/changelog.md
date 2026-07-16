@@ -4094,3 +4094,25 @@ _normalize(m) {
 ### 验证
 - Go build + vet: ✅
 - Client build: ✅
+
+## 2026-07-16 多窗口消息不同步修复（第 33 轮）
+
+### 根因
+API 返回 `ORDER BY created_at DESC`（最新在前），但 `onMessageCreate` 用 `[...s.messages, msg]` 追加到末尾。导致：
+- 初始加载得到的数组为 `[msg3(newest), msg2, msg1(oldest)]`（DESC）
+- WebSocket 收到新消息后数组变为 `[msg3, msg2, msg1, msg4]`（混合顺序）
+- 另一窗口刷新后从 API 加载得到 `[msg4, msg3, msg2, msg1]`（纯 DESC）
+- 两个窗口消息顺序不一致 → 同步失败
+
+### 修复
+将 store 中 `messages` 数组统一为 **ASC 顺序**（oldest first）：
+- `loadMessages`（`client/src/store/chat.js:274`）：反转 API 响应（DESC → ASC）
+- `loadMore`（`client/src/components/ChatView.jsx:67`）：反转 API 响应后前置到现有数组
+- `onMessageCreate`（`client/src/store/chat.js:190,192`）：追加到末尾（新消息=最后=底端）
+- `poll:messages` 处理（`client/src/store/chat.js:85`）：反转负载
+
+现在两个窗口始终得到相同顺序的消息。
+
+### 验证
+- Client build: ✅
+- Go build + vet: ✅

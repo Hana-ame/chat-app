@@ -64,7 +64,7 @@ export default function ChatView({ chatId, onBack }) {
 
     try {
       const msgs = await api.listMessages(accessToken, chatId, messages[0]?.id, 100);
-      const list = msgs.messages || [];
+      const list = (msgs.messages || []).reverse();
       if (list.length) {
         useChatStore.setState(s => ({ messages: [...list, ...s.messages] }));
         requestAnimationFrame(() => {
