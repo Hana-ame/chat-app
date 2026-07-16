@@ -262,19 +262,6 @@ export default function ChatView({ chatId, onBack }) {
               </svg>
             </button>
           )}
-          {chat?.owner_id === user.id && chat?.banner_url && (
-            <div style={{display:'flex',alignItems:'center',gap:4}} title="Banner opacity">
-              <input type="range" min="0" max="1" step="0.05" defaultValue={chat.banner_opacity ?? 0.35}
-                onChange={async (e) => {
-                  const v = parseFloat(e.target.value);
-                  try {
-                    await api.updateChatBanner(accessToken, chatId, chat.banner_url, v);
-                    useChatStore.getState().onChatUpdate({ id: chatId, banner_opacity: v });
-                  } catch(e) { notify('error', 'Failed to update opacity'); }
-                }}
-                style={{width:60,height:4,cursor:'pointer'}}/>
-            </div>
-          )}
           {chat?.owner_id === user.id && (
             <button className="btn-ghost" style={{padding:'6px 8px',lineHeight:0,borderRadius:4}} title="Upload background" onClick={() => bgInputRef.current?.click()} disabled={uploadingBg}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

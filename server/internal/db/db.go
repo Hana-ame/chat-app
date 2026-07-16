@@ -205,7 +205,7 @@ func (d *DB) ensureBannerOpacityColumn(ctx context.Context) error {
 	}
 	logutil.Info("migrating chats: add banner_opacity column")
 	if _, err := d.ExecContext(ctx,
-		`ALTER TABLE chats ADD COLUMN banner_opacity REAL NOT NULL DEFAULT 0.35`); err != nil {
+		`ALTER TABLE chats ADD COLUMN banner_opacity REAL NOT NULL DEFAULT 0.9`); err != nil {
 		return fmt.Errorf("add banner_opacity: %w", err)
 	}
 	logutil.Info("chats.banner_opacity column added")
