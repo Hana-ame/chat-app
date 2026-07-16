@@ -164,8 +164,8 @@ const _apiMethods = {
   /** @param {string} token @param {string} chatId @param {string} avatarUrl @returns {Promise<ApiResponse>} */
   updateChatAvatar: (token, chatId, avatarUrl) =>
     request('PUT', '/api/chats/' + chatId + '/avatar', token, { avatar_url: avatarUrl }),
-  updateChatBanner: (token, chatId, bannerUrl) =>
-    request('PUT', '/api/chats/' + chatId + '/banner', token, { avatar_url: bannerUrl }),
+  updateChatBanner: (token, chatId, bannerUrl, bannerOpacity) =>
+    request('PUT', '/api/chats/' + chatId + '/banner', token, { avatar_url: bannerUrl, banner_opacity: bannerOpacity }),
   updateChatBackground: (token, chatId, backgroundUrl) =>
     request('PUT', '/api/chats/' + chatId + '/background', token, { avatar_url: backgroundUrl }),
 

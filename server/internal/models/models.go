@@ -29,6 +29,7 @@ type Chat struct {
 	IconColor     string     `json:"icon_color,omitempty"`
 	AvatarURL     string     `json:"avatar_url,omitempty"`
 	BannerURL     string     `json:"banner_url,omitempty"`
+	BannerOpacity float64    `json:"banner_opacity"`
 	BackgroundURL string     `json:"background_url,omitempty"`
 	Visibility    string     `json:"visibility,omitempty"`
 	OwnerID       string     `json:"owner_id,omitempty"`

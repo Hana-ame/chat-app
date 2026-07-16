@@ -28,7 +28,7 @@ export default function ChatListItem({ chat, activeId, onSelectChat, onContextMe
   };
 
   const bannerStyle = chat.banner_url ? {
-    backgroundImage: `linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)), url(${chat.banner_url})`,
+    backgroundImage: `linear-gradient(rgba(0,0,0,${chat.banner_opacity ?? 0.35}),rgba(0,0,0,${chat.banner_opacity ?? 0.35})), url(${chat.banner_url})`,
     backgroundSize: 'cover',
     backgroundPosition: 'center',
   } : {};
