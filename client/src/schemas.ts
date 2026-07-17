@@ -45,7 +45,7 @@ export const MessageSchema = z.object({
   reactions: z.array(ReactionSchema).optional(),
   reaction_count: z.number().optional(),
   streaming: z.boolean().optional(),
-  source: z.function().optional(),
+  source: z.function().args().returns(z.void()).optional(),
 });
 
 export const ChatSchema = z.object({
@@ -72,6 +72,20 @@ export const AuthResponseSchema = z.object({
   access_token: z.string(),
   expires_in: z.number(),
 });
+
+export type User = z.infer<typeof UserSchema>;
+export type Reaction = z.infer<typeof ReactionSchema>;
+export type Attachment = z.infer<typeof AttachmentSchema>;
+export type PinnedContent = z.infer<typeof PinnedContentSchema>;
+export type Message = z.infer<typeof MessageSchema>;
+export type Chat = z.infer<typeof ChatSchema>;
+export type AuthResponse = z.infer<typeof AuthResponseSchema>;
+
+export interface StreamSource {
+  type?: 'mock' | 'sse';
+  fn?: () => void;
+  url?: string;
+}
 
 export function validate<T>(schema: z.ZodType<T>, data: unknown, label: string): T {
   const result = schema.safeParse(data);

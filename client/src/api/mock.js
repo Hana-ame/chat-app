@@ -1,10 +1,10 @@
 /**
- * @typedef {import('../types').User} User
- * @typedef {import('../types').Chat} Chat
- * @typedef {import('../types').Message} Message
- * @typedef {import('../types').Reaction} Reaction
- * @typedef {import('../types').Attachment} Attachment
- * @typedef {import('../types').PinnedContent} PinnedContent
+ * @typedef {import('../schemas').User} User
+ * @typedef {import('../schemas').Chat} Chat
+ * @typedef {import('../schemas').Message} Message
+ * @typedef {import('../schemas').Reaction} Reaction
+ * @typedef {import('../schemas').Attachment} Attachment
+ * @typedef {import('../schemas').PinnedContent} PinnedContent
  */
 
 import { generateDummyData } from '../dev/dummy';
@@ -750,30 +750,4 @@ export function mockUpdateChatBackground(_token, chatId, backgroundUrl) {
   return { id: chatId, background_url: backgroundUrl };
 }
 
-/**
- * @param {string} _token
- * @param {string} _chatId
- * @param {string} msgId
- * @returns {{ reactions: Reaction[] }}
- */
-export function mockGetReactions(_token, _chatId, msgId) {
-  const d = ensureData();
-  const cu = currentUser();
-  const msg = d.messages.find(m => m.id === msgId);
-  if (!msg) return { reactions: [] };
-  const raw = (msg.reactions || []).slice();
-  const grouped = {};
-  const order = [];
-  for (const r of raw) {
-    if (!grouped[r.emoji]) {
-      grouped[r.emoji] = { emoji: r.emoji, count: 0, user_ids: [], me: false };
-      order.push(r.emoji);
-    }
-    grouped[r.emoji].count = r.count;
-    grouped[r.emoji].user_ids = r.user_ids || [];
-  }
-  for (const grp of Object.values(grouped)) {
-    if (grp.user_ids.includes(cu.id)) grp.me = true;
-  }
-  return { reactions: order.map(e => grouped[e]) };
-}
+

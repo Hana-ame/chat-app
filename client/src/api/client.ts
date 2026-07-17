@@ -14,7 +14,7 @@ import { createStreamSource } from '../dev/stream-source';
 import { useAuthStore } from '../store/auth';
 import { API_BASE, UPLOAD_BASE, validateEnv } from '../config';
 import { AuthResponseSchema, validate } from '../schemas';
-import type { User, Chat, Message, Attachment, StreamSource } from '../types';
+import type { User, Chat, Message, Attachment, StreamSource } from '../schemas';
 validateEnv();
 
 function buildUploadUrl(data: Attachment, filename: string): string {
@@ -118,7 +118,7 @@ const _apiMethods = {
   joinChat: (token: string, chatId: string) =>
     request<ApiError>('POST', '/api/chats/' + chatId + '/join', token),
   setAnnouncement: (token: string, chatId: string, content: string) =>
-    request<{ pinned_message?: import('../types').PinnedContent; pinned_updated_at?: string }>('POST', '/api/chats/' + chatId + '/announcement', token, { content }),
+    request<{ pinned_message?: import('../schemas').PinnedContent; pinned_updated_at?: string }>('POST', '/api/chats/' + chatId + '/announcement', token, { content }),
   clearAnnouncement: (token: string, chatId: string) =>
     request<ApiError>('DELETE', '/api/chats/' + chatId + '/announcement', token),
   updateChatAvatar: (token: string, chatId: string, avatarUrl: string) =>

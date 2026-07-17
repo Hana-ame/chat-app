@@ -4516,3 +4516,4 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 - Go build + vet: ✅
 - Go test ./...: ✅ (all packages pass)
 - 162 modules transformed
+- **后续优化**：使用 `z.infer<typeof Schema>` 替代手写 `types.ts`，删除 `types.ts`（85 行），全部 6 个类型 + `StreamSource` 集中在 `schemas.ts`；`mock.js`、`chat.js` 的 JSDoc 引用更新路径。

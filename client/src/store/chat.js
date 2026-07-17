@@ -1,8 +1,8 @@
 /**
- * @typedef {import('../types').Chat} Chat
- * @typedef {import('../types').Message} Message
- * @typedef {import('../types').User} User
- * @typedef {import('../types').PinnedContent} PinnedContent
+ * @typedef {import('../schemas').Chat} Chat
+ * @typedef {import('../schemas').Message} Message
+ * @typedef {import('../schemas').User} User
+ * @typedef {import('../schemas').PinnedContent} PinnedContent
  */
 
 /**
@@ -27,7 +27,7 @@
  * @property {(payload: {message_id:string, emoji:string, user_id:string}, added: boolean) => void} onReaction
  * @property {(token: string) => Promise<void>} loadChats
  * @property {(token: string, chatId: string, before?: string) => Promise<void>} loadMessages
- * @property {(token: string, chatId: string, content: string, attachments?: import('../types').Attachment[]) => Promise<void>} sendMessage
+ * @property {(token: string, chatId: string, content: string, attachments?: import('../schemas').Attachment[]) => Promise<void>} sendMessage
  * @property {(msgId: string) => void} finishStreaming
  * @property {(msg: Message) => void} startConsumingStream
  * @property {(chatId: string) => void} sendTyping
@@ -60,7 +60,7 @@ function sortChats(a, b) {
 }
 
 coord.setHandlers({
-  /** @param {{ onlineUserIds?: string[], chats?: import('../types').Chat[] }} payload */
+  /** @param {{ onlineUserIds?: string[], chats?: import('../schemas').Chat[] }} payload */
   onReady: ({ onlineUserIds, chats }) => {
     set({ onlineUserIds, wsReady: true, sseReady: true });
     get().setChats(chats || []);
@@ -127,7 +127,7 @@ export const useChatStore = create((set, get) => ({
     coord.connect(mode, token);
   },
 
-  /** @param {import('../types').Chat[]} chats */
+  /** @param {import('../schemas').Chat[]} chats */
   setChats(chats) {
     set(s => {
       const existing = new Map(s.chats.map(c => [c.id, c]));
@@ -150,7 +150,7 @@ export const useChatStore = create((set, get) => ({
     });
   },
 
-  /** @param {Partial<import('../types').Chat>} chat */
+  /** @param {Partial<import('../schemas').Chat>} chat */
   onChatUpdate(chat) {
     set(s => {
       const idx = s.chats.findIndex(c => c.id === chat.id);
@@ -188,7 +188,7 @@ export const useChatStore = create((set, get) => ({
     }));
   },
 
-  /** @param {import('../types').Message} msg */
+  /** @param {import('../schemas').Message} msg */
   onMessageCreate(msg) {
     set(s => {
       const chat = s.chats.find(c => c.id === msg.chat_id);
@@ -203,7 +203,7 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  /** @param {import('../types').Message} msg */
+  /** @param {import('../schemas').Message} msg */
   startConsumingStream(msg) {
     api.startStreaming(msg.source)
       .onChunk(chunk => {
@@ -218,7 +218,7 @@ export const useChatStore = create((set, get) => ({
       });
   },
 
-  /** @param {Partial<import('../types').Message>} msg */
+  /** @param {Partial<import('../schemas').Message>} msg */
   onMessageUpdate(msg) {
     set(s => ({ messages: s.messages.map(m => m.id === msg.id ? { ...m, ...msg } : m) }));
   },
@@ -259,7 +259,7 @@ export const useChatStore = create((set, get) => ({
     } catch (e) { console.error('loadChats error:', e); }
   },
 
-  /** @param {import('../types').Message} m */
+  /** @param {import('../schemas').Message} m */
   _normalize(m) {
     if (m.deleted_at) {
       return { ...m, deleted: true, content: '' };
@@ -286,7 +286,7 @@ export const useChatStore = create((set, get) => ({
     } catch (e) { console.error('loadMessages error:', e); }
   },
 
-  /** @param {string} token @param {string} chatId @param {string} content @param {import('../types').Attachment[]} [attachments] */
+  /** @param {string} token @param {string} chatId @param {string} content @param {import('../schemas').Attachment[]} [attachments] */
   async sendMessage(token, chatId, content, attachments) {
     await api.sendMessage(token, chatId, content, attachments);
   },
