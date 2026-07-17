@@ -136,8 +136,12 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const handleSearchChange = (q) => {
     searchTermRef.current = q;
     setChatSearch(q);
-    if (allPublicChats.current) {
-      setPublicResults(q.trim() ? filterPublicChats(allPublicChats.current, q) : allPublicChats.current);
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(q.trim());
+    if (isUuid || q.trim()) {
+      setShowPublicList(false);
+    } else {
+      setShowPublicList(true);
+      if (allPublicChats.current) setPublicResults(allPublicChats.current);
     }
   };
 
@@ -177,7 +181,10 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     return name.toLowerCase().includes(q);
   }), [chats, chatSearch, isUUID]);
 
-  const uuidDM = isUUID && chatSearch.trim() ? chats.find(c => c.type === 'dm' && c.id === chatSearch.trim()) : null;
+  const uuidChat = isUUID && chatSearch.trim()
+    ? (chats.find(c => c.id === chatSearch.trim())
+      || allPublicChats.current?.find(c => c.id === chatSearch.trim()))
+    : null;
 
   return (
     <div className="sidebar">
@@ -232,17 +239,20 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       </div>
 
       <ScrollArea className="sidebar-body">
-        {showPublicList && <PublicChannelList results={publicResults} searching={publicSearching} onJoin={handleJoinPublic} />}
-
-        {!showPublicList && (uuidDM ? (
-          <ChatListItem key={uuidDM.id} chat={uuidDM} activeId={activeId} onSelectChat={onSelectChat}
+        {uuidChat ? (
+          <ChatListItem key={uuidChat.id} chat={uuidChat} activeId={activeId}
+            onSelectChat={chats.find(c => c.id === uuidChat.id) ? onSelectChat : () => handleJoinPublic(uuidChat.id)}
             onContextMenu={setContextMenu} />
-        ) : filteredChats.map(c => (
-          <ChatListItem key={c.id} chat={c} activeId={activeId} onSelectChat={onSelectChat}
-            onContextMenu={setContextMenu} />
-        )))}
+        ) : showPublicList && !chatSearch.trim() ? (
+          <PublicChannelList results={publicResults} searching={publicSearching} onJoin={handleJoinPublic} />
+        ) : !showPublicList ? (
+          filteredChats.map(c => (
+            <ChatListItem key={c.id} chat={c} activeId={activeId} onSelectChat={onSelectChat}
+              onContextMenu={setContextMenu} />
+          ))
+        ) : null}
 
-        {!showPublicList && chats.length === 0 && (
+        {!showPublicList && !uuidChat && chats.length === 0 && (
           <EmptyState message="No conversations yet. Create a new group!" />
         )}
       </ScrollArea>
