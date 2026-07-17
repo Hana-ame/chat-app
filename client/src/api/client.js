@@ -94,6 +94,7 @@ async function request(method, path, token, body) {
           return retryData;
         }
       } catch (e) {
+        console.error('[API] refresh failed:', e);
       } finally {
         _refreshing = false;
       }
@@ -103,7 +104,10 @@ async function request(method, path, token, body) {
   if (res.status === 429) {
     throw { status: 429, error: 'too_many_requests', message: 'Too many requests, please try again later' };
   }
-  if (!res.ok) throw { status: res.status, ...data };
+  if (!res.ok) {
+    console.error(`[API Error] ${method} ${path} → ${res.status}`, data.error || '');
+    throw { status: res.status, ...data };
+  }
   return data;
 }
 
