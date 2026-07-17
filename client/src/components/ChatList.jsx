@@ -171,7 +171,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(chatSearch.trim());
 
   const filteredChats = useMemo(() => chats.filter(c => {
-    if (c.type === 'dm') return false;
+    if (c.type === 'dm') return false; // @deprecated DM 已下线，保留类型守卫防止旧数据冒泡
     if (!chatSearch.trim()) return true;
     if (isUUID) return c.id === chatSearch.trim();
     const q = chatSearch.toLowerCase();

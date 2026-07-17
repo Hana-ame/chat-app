@@ -1,6 +1,6 @@
 # api — HTTP 请求封装
 
-**文件**: `client.js`
+**文件**: `client.ts`
 
 所有后端通信统一经过此模块，由 `request()` 函数封装：
 
@@ -35,7 +35,6 @@
 | `getChat(token, id)` | GET `/api/chats/:id` | 聊天详情 |
 | `deleteChat(token, id)` | DELETE `/api/chats/:id` | 删除聊天 |
 | `renameChat(token, id, name)` | PATCH `/api/chats/:id` | 重命名 |
-| `createDM(token, userId)` | POST `/api/dms` | 发起私聊 |
 | `joinChat(token, chatId)` | POST `/api/chats/:id/join` | 加入公开群 |
 | `pinChat(token, chatId)` / `unpinChat` | POST `/api/chats/:id/pin\|unpin` | 置顶 / 取消 |
 
