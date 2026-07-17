@@ -4,6 +4,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Mock API Mode (CI)', () => {
 
   async function mockLogin(page) {
+    await page.addInitScript(() => localStorage.clear());
     await page.goto('/login');
     await page.waitForSelector('.form-box');
     await page.evaluate(() => window.__mockLogin());
