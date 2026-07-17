@@ -30,7 +30,7 @@ import {
   mockListChats, mockListPublicChats, mockCreateChat, mockGetChat,
   mockDeleteChat, mockJoinChat,
   mockSetAnnouncement, mockClearAnnouncement,
-  mockRemoveMember, mockListMembers, mockSearchUsers, mockUpdateProfile,
+  mockAddMember, mockRemoveMember, mockListMembers, mockSearchUsers, mockUpdateProfile,
   mockListMessages, mockSendMessage, mockEditMessage, mockDeleteMessage,
   mockMarkRead, mockAddReaction, mockRemoveReaction, mockGetReactions,
   mockUpload, mockUploadAvatar,
