@@ -9,9 +9,17 @@ import pkg from '../package.json'
 export default function App() {
   useEffect(() => { console.log('chat-app version:', pkg.version) }, [])
   const token = useAuthStore((s) => s.accessToken)
+  const booting = useAuthStore((s) => s.boot)
   const logout = useAuthStore((s) => s.logout)
   const navigate = useNavigate()
   const unauthGuard = useRef(false)
+  const booted = useRef(false)
+
+  useEffect(() => {
+    if (booted.current) return
+    booted.current = true
+    booting()
+  }, [booting])
 
   useEffect(() => {
     const onUnauth = () => {
@@ -23,6 +31,15 @@ export default function App() {
     window.addEventListener('auth:unauthorized', onUnauth)
     return () => window.removeEventListener('auth:unauthorized', onUnauth)
   }, [logout, navigate])
+
+  const bootingState = useAuthStore((s) => s.booting)
+  if (bootingState) {
+    return (
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'var(--bg-primary)' }}>
+        <div className="spinner" />
+      </div>
+    )
+  }
 
   return (
     <Routes>

@@ -1,32 +1,44 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
 
-const storage = {
-  get: () => { try { return JSON.parse(localStorage.getItem('auth') || '{}'); } catch { return {}; } },
-  set: (v) => localStorage.setItem('auth', JSON.stringify(v)),
-  clear: () => localStorage.removeItem('auth'),
-};
+const MOCK_FLAG = 'chat:mock';
 
 export const useAuthStore = create((set, get) => {
-  const saved = storage.get();
-  if (saved.accessToken === 'mock-token') {
+  if (localStorage.getItem(MOCK_FLAG) === 'true') {
     api.enableMock();
   }
   return {
-    user: saved.user || null,
-    accessToken: saved.accessToken || null,
+    user: null,
+    accessToken: null,
+    booting: true,
     loading: false,
     error: null,
+
+    boot: async () => {
+      if (api.isMockEnabled()) {
+        const { useChatStore } = await import('./chat');
+        useChatStore.getState().setMode('poll');
+        set({
+          user: { id: 'dev-self', username: 'Alice', email: 'alice@test.com', avatar_color: '#5865F2' },
+          accessToken: 'mock-token',
+          booting: false,
+        });
+        return;
+      }
+      try {
+        const data = await api.refresh();
+        set({ user: data.user, accessToken: data.access_token, booting: false });
+      } catch {
+        set({ booting: false });
+      }
+    },
 
     register: async (email, username, password) => {
       set({ loading: true, error: null });
       try {
         const data = await api.register(email, username, password);
-        const payload = { user: data.user, accessToken: data.access_token };
-        storage.set(payload);
-        set({ ...payload, loading: false });
+        set({ user: data.user, accessToken: data.access_token, loading: false });
       } catch (e) {
-        storage.clear();
         set({ user: null, accessToken: null, loading: false, error: e.message || 'Registration failed' });
         throw e;
       }
@@ -36,11 +48,8 @@ export const useAuthStore = create((set, get) => {
       set({ loading: true, error: null });
       try {
         const data = await api.login(email, password);
-        const payload = { user: data.user, accessToken: data.access_token };
-        storage.set(payload);
-        set({ ...payload, loading: false });
+        set({ user: data.user, accessToken: data.access_token, loading: false });
       } catch (e) {
-        storage.clear();
         set({ user: null, accessToken: null, loading: false, error: e.message || 'Login failed' });
         throw e;
       }
@@ -49,50 +58,41 @@ export const useAuthStore = create((set, get) => {
     refreshAuth: async () => {
       try {
         const data = await api.refresh();
-        const payload = { user: data.user, accessToken: data.access_token };
-        storage.set(payload);
-        set(payload);
+        set({ user: data.user, accessToken: data.access_token });
       } catch {
-        storage.clear();
         set({ user: null, accessToken: null });
       }
     },
 
     logout: async () => {
       api.disableMock();
+      localStorage.removeItem(MOCK_FLAG);
       if (get().accessToken) {
         try { await api.logout(get().accessToken); } catch (e) { console.error('Logout error:', e); }
       }
       const { useChatStore } = await import('./chat');
       useChatStore.getState().reset();
-      storage.clear();
       set({ user: null, accessToken: null });
     },
 
     setUser: (user) => {
       set({ user });
-      const s = storage.get();
-      s.user = user;
-      storage.set(s);
     },
 
-    debugMode: saved.debugMode || false,
+    debugMode: false,
     setDebugMode: (v) => {
       set({ debugMode: v });
-      const s = storage.get();
-      s.debugMode = v;
-      storage.set(s);
     },
 
     mockLogin: () => {
+      localStorage.setItem(MOCK_FLAG, 'true');
       api.enableMock();
       import('./chat').then(m => m.useChatStore.getState().setMode('poll'));
-      const payload = {
+      set({
         user: { id: 'dev-self', username: 'Alice', email: 'alice@test.com', avatar_color: '#5865F2' },
         accessToken: 'mock-token',
-      };
-      storage.set(payload);
-      set({ ...payload, loading: false, error: null });
+        loading: false, error: null,
+      });
     },
   };
 });
