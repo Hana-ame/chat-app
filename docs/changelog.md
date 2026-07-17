@@ -4517,3 +4517,4 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 - Go test ./...: ✅ (all packages pass)
 - 162 modules transformed
 - **后续优化**：使用 `z.infer<typeof Schema>` 替代手写 `types.ts`，删除 `types.ts`（85 行），全部 6 个类型 + `StreamSource` 集中在 `schemas.ts`；`mock.js`、`chat.js` 的 JSDoc 引用更新路径。
+- **修复**：`MessageSchema.source` 原用 `z.function().args().returns(z.void())`，但 Zod v4 无 `.args()`/`.returns()` 方法，导致运行时抛出 TypeError，Frontend CI 全部 25 个测试超时。改为 `z.function().optional()` + `interface Message extends z.infer<typeof MessageSchema> { source?: () => void }` 解决。
