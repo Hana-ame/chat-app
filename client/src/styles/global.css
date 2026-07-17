@@ -177,20 +177,6 @@ button { cursor: pointer; border: none; }
 .context-menu-item.danger { color: var(--danger); }
 .context-menu-item.danger:hover { background: rgba(218,55,60,0.1); }
 
-.user-avatar-img {
-  width:32px; height:32px; border-radius:50%; object-fit:cover; flex-shrink:0;
-}
-.settings-avatar-img {
-  width:80px; height:80px; border-radius:50%; object-fit:cover;
-}
-.settings-avatar-placeholder {
-  width:80px; height:80px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-  font-weight:700; color:#fff; font-size:32px; cursor:pointer;
-}
-.msg-avatar-img {
-  width:40px; height:40px; border-radius:50%; object-fit:cover; flex-shrink:0;
-}
-
 .input-field {
   width:100%; background: var(--bg-tertiary); color: var(--text-primary);
   border: 1px solid var(--border); border-radius: var(--radius);
@@ -203,7 +189,6 @@ button { cursor: pointer; border: none; }
   background: var(--bg-primary); border-radius: var(--radius);
   padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,0.3);
 }
-.form-box h1 { font-size: 24px; margin-bottom: 8px; }
 .form-box p { color: var(--text-muted); margin-bottom: 20px; }
 .form-label { display:block; font-size: 12px; font-weight: 700; text-transform:uppercase; color: var(--text-secondary); margin: 12px 0 6px; }
 .form-error { color: var(--danger); font-size: 13px; margin-top: 8px; }
@@ -235,20 +220,12 @@ button { cursor: pointer; border: none; }
 .status-dot.online { background: var(--success); }
 .status-dot.offline { background: var(--text-muted); }
 
-.typing-indicator { font-size: 12px; color: var(--text-muted); padding: 2px 0; }
-
 .mention {
   background: rgba(88, 101, 242, 0.25);
   color: var(--accent);
   border-radius: 3px;
   padding: 0 4px;
   font-weight: 500;
-}
-.file-download-link {
-  color: var(--accent);
-  text-decoration: underline;
-  cursor: pointer;
-  font-size: 13px;
 }
 .file-attach { display:flex; align-items:center; gap:8px; margin: 4px 0; }
 .file-pill { display:flex; align-items:center; gap:8px; padding: 8px; background: var(--bg-tertiary); border-radius: var(--radius); margin: 4px 0; }

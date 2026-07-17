@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -93,7 +94,9 @@ func writeJSON(w http.ResponseWriter, status int, body interface{}) {
 	if body == nil {
 		return
 	}
-	_ = json.NewEncoder(w).Encode(body)
+	if err := json.NewEncoder(w).Encode(body); err != nil {
+		log.Printf("writeJSON encode error: %v", err)
+	}
 }
 
 func writeError(w http.ResponseWriter, status int, code, message string) {
@@ -167,7 +170,12 @@ func (s *Server) trackLastActive(next http.Handler) http.Handler {
 		chatID := chi.URLParam(r, "chatID")
 		u := userFrom(r.Context())
 		if chatID != "" && u != nil {
-			go s.DB.UpdateLastActiveAt(r.Context(), chatID, u.ID)
+			id := u.ID
+			go func() {
+				if err := s.DB.UpdateLastActiveAt(r.Context(), chatID, id); err != nil {
+					log.Printf("trackLastActive error: %v", err)
+				}
+			}()
 		}
 		next.ServeHTTP(w, r)
 	})

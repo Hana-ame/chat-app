@@ -26,11 +26,11 @@
  */
 
 import {
-  mockRegister, mockLogin, mockRefresh, mockLogout, mockMe,
+  mockRegister, mockLogin, mockRefresh, mockLogout,
   mockListChats, mockListPublicChats, mockCreateChat, mockGetChat,
-  mockDeleteChat, mockRenameChat, mockCreateDM, mockJoinChat,
+  mockDeleteChat, mockJoinChat,
   mockSetAnnouncement, mockClearAnnouncement,
-  mockAddMember, mockRemoveMember, mockListMembers, mockSearchUsers, mockUpdateProfile,
+  mockRemoveMember, mockListMembers, mockSearchUsers, mockUpdateProfile,
   mockListMessages, mockSendMessage, mockEditMessage, mockDeleteMessage,
   mockMarkRead, mockAddReaction, mockRemoveReaction, mockGetReactions,
   mockUpload, mockUploadAvatar,
@@ -122,8 +122,6 @@ const _apiMethods = {
   /** @param {string} token @returns {Promise<ApiResponse>} */
   logout: (token) =>
     request('POST', '/api/auth/logout', token),
-  /** @param {string} token @returns {Promise<{ user: User }>} */
-  me: (token) => request('GET', '/api/users/me', token),
   /** @param {string} token @param {{ username?: string, avatar_color?: string, avatar_url?: string }} data @returns {Promise<{ user: User }>} */
   updateProfile: (token, data) => request('PATCH', '/api/users/me', token, data),
   /** @param {string} token @param {string} q @returns {Promise<SearchUsersResponse>} */
@@ -148,13 +146,6 @@ const _apiMethods = {
   getChat: (token, id) => request('GET', '/api/chats/' + id, token),
   /** @param {string} token @param {string} id @returns {Promise<ApiResponse>} */
   deleteChat: (token, id) => request('DELETE', '/api/chats/' + id, token),
-  /** @param {string} token @param {string} id @param {string} name @returns {Promise<ApiResponse>} */
-  renameChat: (token, id, name) =>
-    request('PATCH', '/api/chats/' + id, token, { name }),
-  // @deprecated
-  /** @param {string} token @param {string} userId @returns {Promise<Chat>} */
-  createDM: (token, userId) =>
-    request('POST', '/api/dms', token, { user_id: userId }),
   /** @param {string} token @param {string} chatId @returns {Promise<ApiResponse>} */
   joinChat: (token, chatId) => request('POST', '/api/chats/' + chatId + '/join', token),
   /** @param {string} token @param {string} chatId @param {string} content @returns {Promise<AnnouncementResponse>} */
@@ -263,10 +254,10 @@ const _apiMethods = {
 
 const _mockHandlers = {
   register: mockRegister, login: mockLogin, refresh: mockRefresh, logout: mockLogout,
-  me: mockMe, updateProfile: mockUpdateProfile, searchUsers: mockSearchUsers,
+  updateProfile: mockUpdateProfile, searchUsers: mockSearchUsers,
   listChats: mockListChats, listPublicChats: mockListPublicChats,
   createChat: mockCreateChat, getChat: mockGetChat, deleteChat: mockDeleteChat,
-  renameChat: mockRenameChat, createDM: mockCreateDM, joinChat: mockJoinChat,
+  joinChat: mockJoinChat,
   setAnnouncement: mockSetAnnouncement, clearAnnouncement: mockClearAnnouncement, updateChatAvatar: mockUpdateChatAvatar, updateChatBanner: mockUpdateChatBanner, updateChatBackground: mockUpdateChatBackground,
   addMember: mockAddMember, removeMember: mockRemoveMember,
   listMembers: mockListMembers, listMessages: mockListMessages,

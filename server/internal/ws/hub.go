@@ -77,8 +77,12 @@ func (h *Hub) register(c *Client) {
 	h.mu.Unlock()
 	logutil.Info("ws client registered: user=%s (total=%d)", c.userID[:8], h.ClientCount())
 	if wasOffline && h.db != nil {
-		_ = h.db.UpdateUserStatus(context.Background(), c.userID, "online")
-		_ = h.db.UpdateUserLastSeen(context.Background(), c.userID)
+		if err := h.db.UpdateUserStatus(context.Background(), c.userID, "online"); err != nil {
+			logutil.Error("presence: failed to set online for %s: %v", c.userID[:8], err)
+		}
+		if err := h.db.UpdateUserLastSeen(context.Background(), c.userID); err != nil {
+			logutil.Error("presence: failed to update last_seen for %s: %v", c.userID[:8], err)
+		}
 		logutil.Debug("presence: %s -> online", c.userID[:8])
 		h.broadcastPresence(c.userID, "online")
 	}
@@ -97,8 +101,12 @@ func (h *Hub) unregister(c *Client) {
 	h.mu.Unlock()
 	logutil.Info("ws client unregistered: user=%s (total=%d)", c.userID[:8], h.ClientCount())
 	if wasLast && h.db != nil {
-		_ = h.db.UpdateUserStatus(context.Background(), c.userID, "offline")
-		_ = h.db.UpdateUserLastSeen(context.Background(), c.userID)
+		if err := h.db.UpdateUserStatus(context.Background(), c.userID, "offline"); err != nil {
+			logutil.Error("presence: failed to set offline for %s: %v", c.userID[:8], err)
+		}
+		if err := h.db.UpdateUserLastSeen(context.Background(), c.userID); err != nil {
+			logutil.Error("presence: failed to update last_seen for %s: %v", c.userID[:8], err)
+		}
 		logutil.Debug("presence: %s -> offline", c.userID[:8])
 		h.broadcastPresence(c.userID, "offline")
 	}

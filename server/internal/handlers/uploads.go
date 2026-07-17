@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"net/http"
 	"os"
@@ -24,7 +25,9 @@ var allowedMime = map[string]bool{
 
 func randomKey(n int) string {
 	b := make([]byte, n)
-	_, _ = rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		log.Printf("randomKey rand.Read error: %v", err)
+	}
 	return hex.EncodeToString(b)
 }
 
