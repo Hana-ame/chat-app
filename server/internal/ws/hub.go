@@ -176,14 +176,26 @@ func (h *Hub) sendToChat(chatID string, env Envelope, exceptUser string) {
 		h.setCachedMembers(chatID, members)
 	}
 	b, _ := json.Marshal(env)
+	h.mu.RLock()
+	clients := make([]*Client, 0)
+	sseTargets := make([]string, 0, len(members))
 	for _, m := range members {
 		if m.ID == exceptUser {
 			continue
 		}
-		for _, c := range h.snapshotForUser(m.ID) {
-			c.queue(env)
+		sseTargets = append(sseTargets, m.ID)
+		if set, ok := h.clients[m.ID]; ok {
+			for c := range set {
+				clients = append(clients, c)
+			}
 		}
-		h.sseSend(m.ID, b)
+	}
+	h.mu.RUnlock()
+	for _, c := range clients {
+		c.queue(env)
+	}
+	for _, uid := range sseTargets {
+		h.sseSend(uid, b)
 	}
 }
 

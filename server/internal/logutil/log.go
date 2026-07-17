@@ -1,13 +1,13 @@
 package logutil
 
 import (
+	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 )
 
 type Level int
@@ -26,16 +26,20 @@ var levelNames = map[Level]string{
 	ERROR: "ERROR",
 }
 
+var levelMap = map[Level]slog.Level{
+	DEBUG: slog.LevelDebug,
+	INFO:  slog.LevelInfo,
+	WARN:  slog.LevelWarn,
+	ERROR: slog.LevelError,
+}
+
 var (
 	currentLevel Level
-	logger       *log.Logger
-	mu           sync.Mutex
 	osExit       = os.Exit
 )
 
 func init() {
 	loadLevel()
-	logger = log.New(os.Stderr, "", 0)
 }
 
 func loadLevel() {
@@ -58,16 +62,15 @@ func output(calldepth int, level Level, format string, args ...interface{}) {
 	if level < currentLevel {
 		return
 	}
-	mu.Lock()
-	defer mu.Unlock()
 	_, file, line, ok := runtime.Caller(calldepth)
 	if !ok {
 		file = "???"
 		line = 0
 	}
-	short := filepath.Base(file)
 	msg := fmt.Sprintf(format, args...)
-	logger.Printf("[%s] %s:%d: %s", levelNames[level], short, line, msg)
+	slog.Log(context.Background(), levelMap[level], msg,
+		"source", fmt.Sprintf("%s:%d", filepath.Base(file), line),
+	)
 }
 
 func Debug(format string, args ...interface{}) { output(2, DEBUG, format, args...) }

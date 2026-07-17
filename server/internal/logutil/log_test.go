@@ -2,16 +2,21 @@ package logutil
 
 import (
 	"bytes"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"testing"
 )
 
-func TestLevelFiltering(t *testing.T) {
+func captureOutput(fn func()) string {
 	var buf bytes.Buffer
-	logger = log.New(&buf, "", 0)
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	fn()
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
+	return buf.String()
+}
 
+func TestLevelFiltering(t *testing.T) {
 	tests := []struct {
 		name       string
 		setLevel   Level
@@ -29,69 +34,62 @@ func TestLevelFiltering(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			buf.Reset()
 			currentLevel = tc.setLevel
-			output(2, tc.callLevel, "test %s", "msg")
-			got := buf.String()
-			hasLog := strings.Contains(got, "test msg")
+			out := captureOutput(func() {
+				output(2, tc.callLevel, "test %s", "msg")
+			})
+			hasLog := strings.Contains(out, "test msg")
 			if hasLog != tc.expectLog {
 				t.Fatalf("currentLevel=%d callLevel=%d: expectLog=%v got=%q",
-					tc.setLevel, tc.callLevel, tc.expectLog, got)
+					tc.setLevel, tc.callLevel, tc.expectLog, out)
 			}
 		})
 	}
 }
 
 func TestOutputLineFormat(t *testing.T) {
-	var buf bytes.Buffer
-	logger = log.New(&buf, "", 0)
 	currentLevel = DEBUG
-	buf.Reset()
-
-	output(1, INFO, "hello %d", 42)
-	line := buf.String()
-
-	if !strings.Contains(line, "[INFO]") {
-		t.Fatalf("missing level tag: %s", line)
+	out := captureOutput(func() {
+		output(1, INFO, "hello %d", 42)
+	})
+	if !strings.Contains(out, "level=INFO") {
+		t.Fatalf("missing level: %s", out)
 	}
-	if !strings.Contains(line, "log_test.go") {
-		t.Fatalf("missing caller file: %s", line)
+	if !strings.Contains(out, "hello 42") {
+		t.Fatalf("missing message: %s", out)
 	}
-	if !strings.Contains(line, "hello 42") {
-		t.Fatalf("missing message: %s", line)
+	if !strings.Contains(out, "log_test.go") {
+		t.Fatalf("missing caller location: %s", out)
 	}
 }
 
 func TestDebugInfoWarnError(t *testing.T) {
-	var buf bytes.Buffer
-	logger = log.New(&buf, "", 0)
 	currentLevel = DEBUG
-	buf.Reset()
-
-	Debug("debug msg")
-	Info("info msg")
-	Warn("warn msg")
-	Error("error msg")
-	out := buf.String()
-
-	for _, s := range []string{"[DEBUG]", "[INFO]", "[WARN]", "[ERROR]"} {
+	out := captureOutput(func() {
+		Debug("debug msg")
+		Info("info msg")
+		Warn("warn msg")
+		Error("error msg")
+	})
+	for _, s := range []string{"level=DEBUG", "level=INFO", "level=WARN", "level=ERROR"} {
 		if !strings.Contains(out, s) {
-			t.Fatalf("missing %s in output", s)
+			t.Fatalf("missing %s in output: %s", s, out)
+		}
+	}
+	for _, s := range []string{"debug msg", "info msg", "warn msg", "error msg"} {
+		if !strings.Contains(out, s) {
+			t.Fatalf("missing %q in output: %s", s, out)
 		}
 	}
 }
 
 func TestRuntimeCallerFallback(t *testing.T) {
-	var buf bytes.Buffer
-	logger = log.New(&buf, "", 0)
 	currentLevel = DEBUG
-	buf.Reset()
-
-	// output with a calldepth that will fail runtime.Caller
-	output(99, INFO, "fallback")
-	line := buf.String()
-	if !strings.Contains(line, "???:0:") {
-		t.Fatalf("expected fallback format, got: %s", line)
+	out := captureOutput(func() {
+		output(99, INFO, "fallback")
+	})
+	if !strings.Contains(out, "???:0") {
+		t.Fatalf("expected fallback, got: %s", out)
 	}
 }
 
@@ -152,10 +150,7 @@ func TestInitEmptyLevel(t *testing.T) {
 }
 
 func TestFatal(t *testing.T) {
-	var buf bytes.Buffer
-	logger = log.New(&buf, "", 0)
 	currentLevel = ERROR
-
 	exited := false
 	osExit = func(code int) {
 		exited = true
@@ -165,25 +160,24 @@ func TestFatal(t *testing.T) {
 	}
 	defer func() { osExit = os.Exit }()
 
-	Fatal("fatal %s", "err")
+	out := captureOutput(func() {
+		Fatal("fatal %s", "err")
+	})
 	if !exited {
 		t.Fatal("Fatal should call osExit")
 	}
-	if !strings.Contains(buf.String(), "fatal err") {
-		t.Fatalf("missing fatal message: %s", buf.String())
+	if !strings.Contains(out, "fatal err") {
+		t.Fatalf("missing fatal message: %s", out)
 	}
 }
 
-func TestFatalLevelFiltered(t *testing.T) {
-	var buf bytes.Buffer
-	logger = log.New(&buf, "", 0)
+func TestFatalAlwaysExits(t *testing.T) {
 	currentLevel = ERROR
-
 	called := false
 	osExit = func(code int) { called = true }
 	defer func() { osExit = os.Exit }()
 
-	Fatal("should output")
+	Fatal("should exit")
 	if !called {
 		t.Fatal("Fatal should always call osExit")
 	}

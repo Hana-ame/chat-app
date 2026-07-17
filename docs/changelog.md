@@ -4352,3 +4352,84 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 ### 验证
 - Client build: ✅ (322.19kB → 320.54kB)
 - CI: `build-7a70cf0` ✅
+
+---
+
+## 2026-07-17 Frontend CI Playwright 测试修复（第 37 轮）
+
+### 问题: `mockLogin` 回归导致全部测试 timeout
+
+**现象**: Frontend CI `mock-test` 全部 26 个 test timeout（30s），错误堆栈停在 `waitForSelector('.form-box')`。CI 自 commit `25d29a0` 起持续红。
+
+**根因 — 双重**:
+
+1. **首因** (`25d29a0`): 死代码清理时删了 `mockAddMember` 的 `import`，但 `_mockHandlers` 中仍引用 `addMember: mockAddMember`。模块加载时 `ReferenceError` 同步抛出，`main.jsx` 无法完成初始化，`#root` 始终为空 → 登录页 `.form-box` 永不渲染。
+
+2. **次因** (`88faab6`): 即使修复 import，Playwright 各 test 共享同一 browser context，`__mockLogin()` 写入 `localStorage` 的 token 泄漏到后续 test。下一个 test 打开 `/login` 时读到残留 token，路由守卫立即重定向到 `/`，`.form-box` 同样不可见。
+
+### 修复
+
+- `client/src/api/client.js:33` — 补回 `mockAddMember` import
+- `client/tests/ci.spec.mjs` + `client/tests/real-time.spec.mjs` — `mockLogin()` 内添加 `page.addInitScript(() => localStorage.clear())`，每次导航前清除 localStorage
+
+### 验证
+- 本地 `npx playwright test tests/ci.spec.mjs tests/real-time.spec.mjs --reporter=list` → 26 passed, 1 skipped
+- CI (`build-da8ea9f`): go-build + go-test ✅, Frontend CI (mock-test + full-e2e) ✅
+
+### 文件
+- `client/src/api/client.js` — import 补回 `mockAddMember`
+- `client/tests/ci.spec.mjs` — `mockLogin()` 加 `addInitScript`
+- `client/tests/real-time.spec.mjs` — `mockLogin()` 加 `addInitScript`
+
+---
+
+## 2026-07-17 提取 MessageList 组件（第 38 轮）
+
+### 背景
+
+为将来替换虚拟列表（react-virtuoso / react-window）做准备，先将消息列表的渲染和滚动逻辑从 ChatView 中拆出，使 ChatView 不必感知消息列表的实现细节。
+
+### 改动
+
+- **新建** `client/src/components/MessageList.jsx`（71 行）
+  - Props: `messages`, `hasMore`, `loading`, `onLoadMore`, `chatId`, `backgroundStyle`, `hasBackground`
+  - 内部封装 `bodyRef` 管理滚动容器
+  - 自动滚底（新消息、切换 chat）
+  - load-more 滚动保持（点击「Load older messages」后记录 scrollHeight/scrollTop，新消息 prepend 后恢复）
+  - 渲染加载按钮、loading 指示器、空状态、消息列表
+
+- **重构** `client/src/components/ChatView.jsx`
+  - 移除：`bodyRef`, `loadingMoreRef`, `prevChatIdRef`, `MessageItem` import, auto-scroll effect
+  - 简化 `loadMore`：去掉滚动操作（交给 MessageList 处理）
+  - 替换 `chat-body` div + `filtered.map` 为 `<MessageList>`
+
+### 验证
+- Client build: ✅ (321.04kB)
+- `npx playwright test tests/ci.spec.mjs tests/real-time.spec.mjs` → 26 passed, 1 skipped
+
+### 文件
+- `client/src/components/MessageList.jsx` — 新增
+- `client/src/components/ChatView.jsx` — 重构
+
+---
+
+## 2026-07-17 MessageItem 加 React.memo（第 39 轮）
+
+### 问题
+
+`MessageItem` 没有 `React.memo`。`ChatView` 订阅了整个 `useChatStore()`，任何 store 变更（包括其他 chat 的消息到达）都会导致全部 MessageItem 重渲染。Mock 数据 150 条消息意味着每次无用 diff 150 个组件。
+
+### 修复
+
+`client/src/components/MessageItem.jsx`:
+- 导入 `memo`
+- `export default function MessageItem` → `const MessageItem = memo(function MessageItem ...)` + `export default MessageItem`
+
+默认 shallow 比较即可覆盖 `msg`（对象引用稳定）、`sameAuthor`（boolean）、`chatId`（string）三个 props。
+
+### 验证
+- Client build: ✅ (321.06kB)
+- `npx playwright test tests/ci.spec.mjs tests/real-time.spec.mjs` → 26 passed, 1 skipped
+
+### 文件
+- `client/src/components/MessageItem.jsx` — 加 `memo` 包装

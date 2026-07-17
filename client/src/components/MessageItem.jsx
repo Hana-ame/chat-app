@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, memo } from 'react';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
@@ -19,7 +19,7 @@ function timeFormat(t) {
   return d.toLocaleDateString();
 }
 
-export default function MessageItem({ msg, sameAuthor, chatId }) {
+const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId }) {
   const { user, accessToken } = useAuthStore();
   const { pinnedMessage, chats } = useChatStore();
   const isMe = msg.user_id === user.id;
@@ -198,4 +198,6 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
       )}
     </div>
   );
-}
+});
+
+export default MessageItem;

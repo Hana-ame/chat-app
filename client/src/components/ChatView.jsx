@@ -3,7 +3,7 @@ import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 import { notify } from '../store/notification';
-import MessageItem from './MessageItem';
+import MessageList from './MessageList';
 import Composer from './Composer';
 import { renderContent } from './renderContent';
 
@@ -27,9 +27,6 @@ export default function ChatView({ chatId, onBack }) {
   const avatarInputRef = useRef(null);
   const bannerInputRef = useRef(null);
   const bgInputRef = useRef(null);
-  const bodyRef = useRef(null);
-  const loadingMoreRef = useRef(false);
-  const prevChatIdRef = useRef(null);
 
   const chat = useMemo(() => chats.find(c => c.id === chatId), [chats, chatId]);
 
@@ -64,23 +61,11 @@ export default function ChatView({ chatId, onBack }) {
   const loadMore = useCallback(async () => {
     if (loading || !hasMore) return;
     setLoading(true);
-    loadingMoreRef.current = true;
-    const prevScrollHeight = bodyRef.current?.scrollHeight || 0;
-    const prevScrollTop = bodyRef.current?.scrollTop || 0;
-
     try {
       const msgs = await api.listMessages(accessToken, chatId, messages[0]?.id, 100);
       const list = (msgs.messages || []);
       if (list.length) {
         useChatStore.setState(s => ({ messages: [...list, ...s.messages] }));
-        requestAnimationFrame(() => {
-          if (bodyRef.current) {
-            bodyRef.current.scrollTop = bodyRef.current.scrollHeight - prevScrollHeight + prevScrollTop;
-          }
-          loadingMoreRef.current = false;
-        });
-      } else {
-        loadingMoreRef.current = false;
       }
       if (list.length < 50) setHasMore(false);
     } catch (e) {
@@ -89,29 +74,9 @@ export default function ChatView({ chatId, onBack }) {
       } else {
         console.error('Load more error:', e);
       }
-      loadingMoreRef.current = false;
     }
     setLoading(false);
   }, [loading, hasMore, chatId, accessToken, messages]);
-
-  const filtered = messages.filter(m => m.chat_id === chatId);
-
-  useEffect(() => {
-    if (loadingMoreRef.current) return;
-    if (filtered.length > 0 && bodyRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = bodyRef.current;
-      const isNewChat = prevChatIdRef.current !== chatId;
-
-      if (isNewChat || (scrollHeight - scrollTop - clientHeight < 300)) {
-        requestAnimationFrame(() => {
-          if (bodyRef.current) {
-            bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
-          }
-        });
-        prevChatIdRef.current = chatId;
-      }
-    }
-  }, [chatId, messages]);
 
   const name = chat ? getDMName(chat) : 'Loading...';
 
@@ -312,36 +277,20 @@ export default function ChatView({ chatId, onBack }) {
           </div>
         )}
 
-        <div className={'chat-body' + (chat?.background_url ? ' has-bg' : '')} ref={bodyRef} style={
-          chat?.background_url ? {
+        <MessageList
+          messages={messages.filter(m => m.chat_id === chatId)}
+          hasMore={hasMore}
+          loading={loading}
+          onLoadMore={loadMore}
+          chatId={chatId}
+          backgroundStyle={chat?.background_url ? {
             backgroundImage: `url(${chat.background_url})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundAttachment: 'fixed',
-          } : undefined
-        }>
-
-
-        <div>
-          {hasMore && !loading && filtered.length > 0 && (
-            <div style={{textAlign:'center',padding:8}}>
-              <button className="btn-ghost" onClick={loadMore} style={{fontSize:13}}>Load older messages</button>
-            </div>
-          )}
-          {loading && <div style={{textAlign:'center',padding:8,color:'var(--text-muted)',fontSize:13}}>Loading...</div>}
-          {!loading && filtered.length === 0 && (
-            <div style={{textAlign:'center',padding: '40px 20px',color:'var(--text-muted)',fontSize:14,lineHeight:1.6}}>
-              <div style={{fontSize:24,marginBottom:8}}>💬</div>
-              <div>No messages yet. Start the conversation!</div>
-            </div>
-          )}
-           {filtered.map((msg, i) => {
-             const prev = i > 0 ? filtered[i - 1] : null;
-             const sameAuthor = prev && prev.user_id === msg.user_id && !prev.deleted && !msg.deleted;
-             return <MessageItem key={msg.id || `msg-${i}`} msg={msg} sameAuthor={sameAuthor} chatId={chatId} />;
-           })}
-        </div>
-      </div>
+          } : undefined}
+          hasBackground={!!chat?.background_url}
+        />
       <Composer chatId={chatId} />
     </div>
   );
