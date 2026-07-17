@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
@@ -41,8 +41,6 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
     ? chatSearch.trim().startsWith('join') ? 'join' : 'create' : null;
 
   const navigate = useNavigate();
-
-  const closeContextMenu = useCallback(() => setContextMenu(null), []);
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -245,7 +243,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
             onContextMenu={setContextMenu} />
         ) : showPublicList && !chatSearch.trim() ? (
           <PublicChannelList results={publicResults} searching={publicSearching} onJoin={handleJoinPublic} />
-        ) : !showPublicList ? (
+        ) : !showPublicList || chatSearch.trim() ? (
           filteredChats.map(c => (
             <ChatListItem key={c.id} chat={c} activeId={activeId} onSelectChat={onSelectChat}
               onContextMenu={setContextMenu} />
