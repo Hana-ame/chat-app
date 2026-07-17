@@ -203,8 +203,31 @@ export function mockDeleteChat(_token, id) {
   return { ok: true };
 }
 
-// @deprecated DM 功能已下线。保留为注释供日后恢复参考：
-// export function mockCreateDM(_token, userId) { ... }
+// @deprecated DM 已下线。保留函数体供日后恢复。
+export function mockCreateDM(_token, userId) {
+  const d = ensureData();
+  const cu = currentUser();
+  const existing = d.chats.find(c => c.type === 'dm' && c.members?.some(m => m.id === userId));
+  if (existing) return existing;
+  const dmMembers = [
+    { id: cu.id, ...userById(cu.id), role: '' },
+    { id: userId, ...userById(userId), role: '' },
+  ];
+  const newDM = {
+    id: randid(),
+    type: 'dm',
+    name: '',
+    icon_color: '#5865F2',
+    owner_id: '',
+    visibility: 'private',
+    created_at: new Date().toISOString(),
+    member_count: dmMembers.length,
+    members: dmMembers,
+  };
+  d.chats.unshift(newDM);
+  if (_store) _store.getState().onChatUpdate(newDM);
+  return newDM;
+}
 
 /** @param {Partial<Chat>} chat */
 function syncChatToStore(chat) {

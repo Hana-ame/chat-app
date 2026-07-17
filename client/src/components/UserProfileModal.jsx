@@ -11,7 +11,10 @@ export default function UserProfileModal({ user: profileUser, onClose, chatId })
   const chat = useMemo(() => chats.find(c => c.id === chatId), [chats, chatId]);
 
   const [name, setName] = useState(profileUser.username);
+  const [color, setColor] = useState(profileUser.avatar_color || '');
   const [saving, setSaving] = useState(false);
+
+  const COLORS = ['#5865F2','#ed4245','#faa61a','#23a559','#eb459f','#57F287','#00b0f4','#949cf7','#FF73FA','#fee75c'];
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose?.(); };
@@ -22,7 +25,7 @@ export default function UserProfileModal({ user: profileUser, onClose, chatId })
   const handleSave = async () => {
     setSaving(true);
     try {
-      const payload = { username: name };
+      const payload = { username: name, avatar_color: color || undefined };
       const file = document.getElementById('profile-avatar-input')?.files?.[0];
       if (file) {
         const data = await api.uploadAvatar(accessToken, file);
@@ -58,6 +61,15 @@ export default function UserProfileModal({ user: profileUser, onClose, chatId })
             </>
           )}
         </div>
+
+        {isMe && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', margin: '4px 0 0' }}>
+            {COLORS.map(c => (
+              <div key={c} onClick={() => setColor(c === color ? '' : c)}
+                style={{ width: 22, height: 22, borderRadius: '50%', background: c, cursor: 'pointer', border: c === color ? '2px solid var(--text-primary)' : '2px solid transparent', boxSizing: 'border-box' }} />
+            ))}
+          </div>
+        )}
 
         {isMe ? (
           <input className="input-field" value={name} onChange={e => setName(e.target.value)}
