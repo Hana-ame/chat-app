@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useChatStore } from '../store/chat';
 import { useAuthStore } from '../store/auth';
-import { api } from '../api/client';
-import { notify } from '../store/notification';
 import { useEscapeKey } from '../hooks/useEscapeKey';
+import { useMembers } from '../hooks/useMembers';
+import MemberList from './MemberList';
 import UserProfileModal from './UserProfileModal';
 
 function fmtTime(t) {
@@ -12,32 +12,15 @@ function fmtTime(t) {
 }
 
 export default function ChatInfoModal({ chatId, onClose }) {
-  const { accessToken } = useAuthStore();
-  const { chats, onlineUserIds } = useChatStore();
-  const [members, setMembers] = useState([]);
+  const { user } = useAuthStore();
+  const { chats } = useChatStore();
+  const { members } = useMembers(chatId);
   const [profileUser, setProfileUser] = useState(null);
 
   useEscapeKey(onClose);
 
-  useEffect(() => {
-    if (!chatId || !accessToken) return;
-    const fetch = () => {
-      const { wsReady, mode, wsRequest } = useChatStore.getState();
-      if (mode === 'ws' && wsReady) {
-        wsRequest('list_members', { chat_id: chatId }).then(d => setMembers(d.members || [])).catch(() => notify('Failed to load members', 'error'));
-      } else {
-        api.listMembers(accessToken, chatId).then(d => setMembers(d.members || [])).catch(() => notify('Failed to load members', 'error'));
-      }
-    };
-    fetch();
-    const id = setInterval(fetch, 60000);
-    return () => clearInterval(id);
-  }, [chatId, accessToken]);
-
   const chat = chats.find(c => c.id === chatId);
   if (!chat) return null;
-
-  const isAdmin = m => m.role === 'admin' || m.id === chat.owner_id;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -59,19 +42,12 @@ export default function ChatInfoModal({ chatId, onClose }) {
         <InfoRow label="Last message" value={fmtTime(chat.last_message_at)} />
 
         <h4 style={{fontSize:12,textTransform:'uppercase',color:'var(--text-muted)',marginBottom:8}}>Members — {chat.member_count || 0}</h4>
-        {members.map(m => (
-          <div key={m.id} onClick={() => setProfileUser(m)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', fontSize: 14, cursor: 'pointer' }}>
-            <span className={'status-dot ' + (onlineUserIds.includes(m.id) ? 'online' : 'offline')} />
-            <div className="msg-avatar" style={{ width: 26, height: 26, fontSize: 11, background: m.avatar_color || '#5865F2' }}>
-              {m.username ? m.username[0].toUpperCase() : '?'}
-            </div>
-            <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.username}</span>
-            <div style={{flex:1}} />
-            <div style={{width:44,height:26,position:'relative',flexShrink:0}}>
-              {isAdmin(m) && <span style={{position:'absolute',right:0,top:'50%',transform:'translateY(-50%)',fontSize:10,padding:'0 5px',borderRadius:3,fontWeight:500,background:'var(--accent-bg)',color:'var(--accent)'}}>ADMIN</span>}
-            </div>
-          </div>
-        ))}
+        <MemberList
+          members={members}
+          chat={chat}
+          currentUserId={user.id}
+          onProfile={setProfileUser}
+        />
       </div>
       {profileUser && (
         <UserProfileModal user={profileUser} onClose={() => setProfileUser(null)} />
