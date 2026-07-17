@@ -4200,3 +4200,42 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 ### 验证
 - Go build + vet: ✅
 - Client build: ✅
+
+---
+
+## 2026-07-17 重构收尾（第 36 轮）
+
+---
+
+### H1: 抽取 useMembers hook + MemberList 组件
+
+**问题**: MemberPanel 和 ChatInfoModal 有重复的成员获取逻辑（useEffect + 60s 轮询 + WS/API 回退 + online 合并）。
+
+**修复**:
+- `hooks/useMembers.js` — 共享 hook，封装成员获取、60s 轮询、WS/API 回退、onlineUserIds 合并
+- `components/MemberList.jsx` — 共享成员行组件（status dot + UserAvatar + username + admin badge + 可选 kick 按钮）
+- MemberPanel 和 ChatInfoModal 均改用 useMembers + MemberList
+
+### X2 frontend: API 错误日志拦截
+
+**修复** (`client/src/api/client.js`):
+- `request()` 函数中 `!res.ok` 分支加 `console.error('[API Error] method path → status', msg)`
+- refresh 空 catch 加 `console.error('[API] refresh failed:', e)`
+
+### .env.example
+
+**新增** (`client/.env.example`): 环境变量模板，供开发者复制。
+
+### 变更文件
+| 文件 | 操作 |
+|------|------|
+| `client/src/hooks/useMembers.js` | 新增 |
+| `client/src/components/MemberList.jsx` | 新增 |
+| `client/src/components/MemberPanel.jsx` | 重构 |
+| `client/src/components/ChatInfoModal.jsx` | 重构 |
+| `client/src/api/client.js` | X2日志 |
+| `client/.env.example` | 新增 |
+
+### 验证
+- Client build: ✅ (320.54kB)
+- CI: `build-7a70cf0` in_progress
