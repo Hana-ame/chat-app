@@ -4207,23 +4207,147 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 
 ---
 
-### 与用户对齐的完整报告
+### H2: `notify()` 参数顺序错误
 
-| 项 | 改动 | 文件 |
-|----|------|------|
-| H2 | `notify('error', '...')` 参数交换 → 改为 `notify('...')`（type 默认 error） | ChatView.jsx:153,169,185 |
-| H4 | 移除本地 `useState(msg.reactions)` 双源冲突，改用 `displayReactions`（优先 API fetched 数据，fallback store msg.reactions） | MessageItem.jsx |
-| X1 | WS 协议改用 `import.meta.env.VITE_WS_URL`，fallback 自动检测 `wss://` | ws.js:6 |
-| X3 | 创建 `.env`，API_BASE/UPLOAD_BASE/WS_URL 全部可通过 VITE_* 覆写 | client/.env + client.js:44-45 + ws.js:6 |
-| H3 | `auth.js ↔ chat.js` 循环依赖解除：chat.js 改用 `getLocalAuth()` 读 localStorage；auth.js 改用 `import('./chat')` 动态加载 | store/chat.js + store/auth.js |
-| M3 | 提取 `useEscapeKey` hook，替换 4 个 modal 中的重复实现 | hooks/useEscapeKey.js + ChatInfoModal/SettingsModal/UserProfileModal/ImagePreviewModal |
-| M4 | 提取 `formatRelativeTime` 工具函数，替换 MessageItem/ChatListItem 中的重复实现 | utils/time.js + MessageItem.jsx + ChatListItem.jsx |
-| M5 | 删除 7 个未使用的 CSS 类（-0.65kB） | client/src/styles/global.css |
-| M1 | 删除 `me` `createDM` `renameChat` 3 个死方法 + 对应 mock 引用 | client/src/api/client.js |
-| X2(backend) | `writeJSON` 编码错误 + `trackLastActive` goroutine 错误 + `randomKey` rand.Read 错误 + `register`/`unregister` presence 错误 → 全部 `log.Printf` | handler.go + uploads.go + hub.go |
-| X2(frontend) | `request()` 非 200 分支 + refresh catch 空异常 → 加 `console.error` | client/src/api/client.js |
-| — | 创建 `.env.example` 模板文件 | client/.env.example |
-| **H1** | **抽取 `useMembers` hook + `MemberList` 组件：MemberPanel 和 ChatInfoModal 统一** | **hooks/useMembers.js + components/MemberList.jsx + MemberPanel.jsx + ChatInfoModal.jsx** |
+**问题**: `ChatView.jsx` 中 3 处调用 `notify('error', msg)` 将 type 和 message 参数交换，`notify` 签名是 `notify(message, type)`，导致错误提示不显示或显示错误内容。
+
+**根因**: 旧签名 `notify(type, message)` 与新签名 `notify(message, type)` 不兼容，且有 3 处未更新。
+
+**修复** (`client/src/components/ChatView.jsx:153,169,185`): 参数统一改为 `notify(msg)`，利用 `type` 默认值 `'error'`。
+
+**文件**: `client/src/components/ChatView.jsx`
+
+---
+
+### H4: Reaction 双源冲突
+
+**问题**: `MessageItem` 中 reaction 数据同时来自 `useState(msg.reactions || [])` 和 store `msg.reactions`，且轮询刷新时 store 的硬编码 `me` 覆盖了用户操作的 `me` 状态。
+
+**根因**: 本地 state + store 双源未同步，轮询返回的 `reactions` 含旧 `me` 值。
+
+**修复** (`client/src/components/MessageItem.jsx`): 移除 `useState(msg.reactions)`，改用 `displayReactions`（优先 API `getReactions` fetched 数据，fallback store `msg.reactions`）。
+
+**文件**: `client/src/components/MessageItem.jsx`
+
+---
+
+### X1: WS 协议自动检测
+
+**问题**: WS URL 硬编码 `ws://`，生产环境 HTTPS 下浏览器阻止混合内容。
+
+**修复** (`client/src/realtime/transports/ws.js:6`): 优先使用 `import.meta.env.VITE_WS_URL`，fallback 根据 `location.protocol` 自动选择 `wss://` 或 `ws://`。
+
+**文件**: `client/src/realtime/transports/ws.js`
+
+---
+
+### X3: 环境变量规范化
+
+**问题**: API_BASE、UPLOAD_BASE、WS_URL 全部硬编码在源码中，部署不同环境需改代码。
+
+**修复**: 创建 `client/.env`，三个端点全部可通过 `VITE_API_BASE` / `VITE_UPLOAD_BASE` / `VITE_WS_URL` 覆写，代码 fallback 到原自动检测逻辑。
+
+**文件**: `client/.env` + `client/src/api/client.js:44-45` + `client/src/realtime/transports/ws.js:6`
+
+---
+
+### H3: `auth.js` ↔ `chat.js` 循环依赖
+
+**问题**: `auth.js` 静态 import `chat.js`，`chat.js` 静态 import `auth.js`，形成闭环。打包后 runtime 出现 `undefined` store 引用。
+
+**修复**:
+- `store/chat.js`: 不再 import `useAuthStore`，改用 `getLocalAuth()` 从 localStorage 直接读取 token/user
+- `store/auth.js`: 静态 `import { useChatStore }` → 动态 `await import('./chat')`，仅在 action 调用时加载
+
+**文件**: `client/src/store/chat.js` + `client/src/store/auth.js`
+
+---
+
+### M3: 提取 `useEscapeKey` hook
+
+**问题**: ChatInfoModal、SettingsModal、UserProfileModal、ImagePreviewModal 4 个 modal 各自实现 Escape key 监听，代码重复。
+
+**修复**: 提取 `hooks/useEscapeKey.js`，统一 `addEventListener('keydown', ...)` + `removeEventListener` 清理，4 处替换。
+
+**文件**: `client/src/hooks/useEscapeKey.js` + ChatInfoModal + SettingsModal + UserProfileModal + ImagePreviewModal
+
+---
+
+### M4: 提取 `formatRelativeTime` 工具
+
+**问题**: MessageItem 和 ChatListItem 分别实现 `timeAgo` / `formatTime` 函数，逻辑重复。
+
+**修复**: 提取 `utils/time.js` 导出 `formatRelativeTime(t)`（含 just now / Nm / Nh / Nd / date 层级回退），两组件统一引用。
+
+**文件**: `client/src/utils/time.js` + `client/src/components/MessageItem.jsx` + `client/src/components/ChatListItem.jsx`
+
+---
+
+### M5: 删除无用 CSS 类
+
+**问题**: CSS bundle 中包含 7 个从未被引用的类（`.user-avatar-img`、`.settings-avatar-img`、`.settings-avatar-placeholder`、`.msg-avatar-img`、`.typing-indicator`、`.file-download-link`、`.emoji-picker`）。
+
+**修复**: 物理删除，CSS bundle 10.86kB → 10.21kB（-0.65kB）。
+
+**文件**: `client/src/styles/global.css`
+
+---
+
+### M1: 删除死 API 方法
+
+**问题**: `api.me`（无后端对应端点）、`api.createDM`（DM 已废弃）、`api.renameChat`（前端无 UI 调用，且后端无路由）占用 bundle + mock 维护成本。
+
+**修复**: 删除 3 个方法和对应 mock 函数引用，JS bundle 322.19kB → 321.21kB。
+
+**文件**: `client/src/api/client.js`
+
+---
+
+### X2(backend): 错误吞咽日志补全
+
+**问题**: Go 后端 5 处 `_ = fn()` 静默忽略错误，线上故障无法追溯。
+
+**修复**:
+- `server/internal/handlers/handler.go:96` — `writeJSON` 编码错误 → `log.Printf`
+- `server/internal/handlers/handler.go:170` — `trackLastActive` goroutine → `log.Printf`
+- `server/internal/handlers/uploads.go:27` — `randomKey` 中 `rand.Read` → `log.Printf`
+- `server/internal/ws/hub.go:80,100` — `UpdateUserStatus` / `UpdateUserLastSeen` → `logutil.Error`
+
+**文件**: `server/internal/handlers/handler.go` + `server/internal/handlers/uploads.go` + `server/internal/ws/hub.go`
+
+---
+
+### X2(frontend): API 错误日志拦截
+
+**问题**: `request()` 函数中对非 200 响应直接 `throw`，不记录任何日志；refresh 失败的空 catch 也完全静默，线上错误无迹可查。
+
+**修复** (`client/src/api/client.js`):
+- `!res.ok` 分支加 `console.error('[API Error]', method, path, status, data.error)`
+- refresh 的 `catch(e) {}` 改为 `catch(e) { console.error('[API] refresh failed:', e) }`
+
+**文件**: `client/src/api/client.js`
+
+---
+
+### .env.example
+
+**新增**: 创建 `client/.env.example` 模板文件，供开发者 `cp .env.example .env` 后按需配置。含 `VITE_API_BASE` / `VITE_UPLOAD_BASE` / `VITE_WS_URL` 三个变量及注释。
+
+**文件**: `client/.env.example`
+
+---
+
+### H1: 抽取 `useMembers` hook + `MemberList` 组件
+
+**问题**: MemberPanel 和 ChatInfoModal 有完整的重复代码——相同的 `useEffect` + 60s 轮询 + WS/API 回退 + `onlineUserIds` 合并 + 成员行渲染（status dot + avatar + username + admin badge）。
+
+**修复**:
+- `hooks/useMembers.js` — 共享 hook，封装 `fetchMembers`（WS/API 按 mode 回退）、60s 轮询清理、`onlineUserIds` 合并为 `isOnline` 字段；暴露 `setLocalMembers` 支持乐观更新
+- `components/MemberList.jsx` — 共享成员行组件：status-dot + UserAvatar + username ellipsis + ADMIN badge（absolute 右对齐）+ 可选 kick 按钮
+- MemberPanel：改用 hook + 组件，`removeUser` 保持乐观删除 + rollback 行为
+- ChatInfoModal：简化，移除内联 fetch + inline avatar 渲染，统一用 MemberList
+
+**文件**: `client/src/hooks/useMembers.js`（新增）+ `client/src/components/MemberList.jsx`（新增）+ `client/src/components/MemberPanel.jsx`（重构）+ `client/src/components/ChatInfoModal.jsx`（重构）
 
 ### 验证
 - Client build: ✅ (322.19kB → 320.54kB)
