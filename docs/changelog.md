@@ -4207,35 +4207,24 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 
 ---
 
-### H1: 抽取 useMembers hook + MemberList 组件
+### 与用户对齐的完整报告
 
-**问题**: MemberPanel 和 ChatInfoModal 有重复的成员获取逻辑（useEffect + 60s 轮询 + WS/API 回退 + online 合并）。
-
-**修复**:
-- `hooks/useMembers.js` — 共享 hook，封装成员获取、60s 轮询、WS/API 回退、onlineUserIds 合并
-- `components/MemberList.jsx` — 共享成员行组件（status dot + UserAvatar + username + admin badge + 可选 kick 按钮）
-- MemberPanel 和 ChatInfoModal 均改用 useMembers + MemberList
-
-### X2 frontend: API 错误日志拦截
-
-**修复** (`client/src/api/client.js`):
-- `request()` 函数中 `!res.ok` 分支加 `console.error('[API Error] method path → status', msg)`
-- refresh 空 catch 加 `console.error('[API] refresh failed:', e)`
-
-### .env.example
-
-**新增** (`client/.env.example`): 环境变量模板，供开发者复制。
-
-### 变更文件
-| 文件 | 操作 |
-|------|------|
-| `client/src/hooks/useMembers.js` | 新增 |
-| `client/src/components/MemberList.jsx` | 新增 |
-| `client/src/components/MemberPanel.jsx` | 重构 |
-| `client/src/components/ChatInfoModal.jsx` | 重构 |
-| `client/src/api/client.js` | X2日志 |
-| `client/.env.example` | 新增 |
+| 项 | 改动 | 文件 |
+|----|------|------|
+| H2 | `notify('error', '...')` 参数交换 → 改为 `notify('...')`（type 默认 error） | ChatView.jsx:153,169,185 |
+| H4 | 移除本地 `useState(msg.reactions)` 双源冲突，改用 `displayReactions`（优先 API fetched 数据，fallback store msg.reactions） | MessageItem.jsx |
+| X1 | WS 协议改用 `import.meta.env.VITE_WS_URL`，fallback 自动检测 `wss://` | ws.js:6 |
+| X3 | 创建 `.env`，API_BASE/UPLOAD_BASE/WS_URL 全部可通过 VITE_* 覆写 | client/.env + client.js:44-45 + ws.js:6 |
+| H3 | `auth.js ↔ chat.js` 循环依赖解除：chat.js 改用 `getLocalAuth()` 读 localStorage；auth.js 改用 `import('./chat')` 动态加载 | store/chat.js + store/auth.js |
+| M3 | 提取 `useEscapeKey` hook，替换 4 个 modal 中的重复实现 | hooks/useEscapeKey.js + ChatInfoModal/SettingsModal/UserProfileModal/ImagePreviewModal |
+| M4 | 提取 `formatRelativeTime` 工具函数，替换 MessageItem/ChatListItem 中的重复实现 | utils/time.js + MessageItem.jsx + ChatListItem.jsx |
+| M5 | 删除 7 个未使用的 CSS 类（-0.65kB） | client/src/styles/global.css |
+| M1 | 删除 `me` `createDM` `renameChat` 3 个死方法 + 对应 mock 引用 | client/src/api/client.js |
+| X2(backend) | `writeJSON` 编码错误 + `trackLastActive` goroutine 错误 + `randomKey` rand.Read 错误 + `register`/`unregister` presence 错误 → 全部 `log.Printf` | handler.go + uploads.go + hub.go |
+| X2(frontend) | `request()` 非 200 分支 + refresh catch 空异常 → 加 `console.error` | client/src/api/client.js |
+| — | 创建 `.env.example` 模板文件 | client/.env.example |
+| **H1** | **抽取 `useMembers` hook + `MemberList` 组件：MemberPanel 和 ChatInfoModal 统一** | **hooks/useMembers.js + components/MemberList.jsx + MemberPanel.jsx + ChatInfoModal.jsx** |
 
 ### 验证
-- Client build: ✅ (320.54kB)
-- CI: `build-7a70cf0` in_progress
+- Client build: ✅ (322.19kB → 320.54kB)
+- CI: `build-7a70cf0` ✅
