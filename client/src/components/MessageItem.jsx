@@ -28,7 +28,6 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
   const [editText, setEditText] = useState(msg.content);
   const [opPending, setOpPending] = useState(false);
   const [profileUser, setProfileUser] = useState(null);
-  const [reactions, setReactions] = useState(msg.reactions || []);
 
   const chat = useMemo(() => chats.find(c => c.id === chatId), [chats, chatId]);
   const author = useMemo(() => {
@@ -69,16 +68,20 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
     return map;
   }, [chats, chatId]);
 
+  const [reactions, setReactions] = useState(null);
   useEffect(() => {
     if (msg.reaction_count > 0) {
       api.getReactions(accessToken, chatId, msg.id).then(res => {
         if (res?.reactions) setReactions(res.reactions);
       }).catch(() => {});
+    } else {
+      setReactions(null);
     }
-  }, [msg.id, msg.reaction_count, chatId, accessToken]);
+  }, [msg.id, msg.reaction_count, chatId, accessToken, msg.reactions]);
+  const displayReactions = reactions || msg.reactions || [];
 
   const handleReaction = async (emoji) => {
-    const has = reactions?.find(r => r.emoji === emoji && r.me);
+    const has = displayReactions.find(r => r.emoji === emoji && r.me);
     try {
       if (has) await api.removeReaction(accessToken, chatId, msg.id, emoji);
       else await api.addReaction(accessToken, chatId, msg.id, emoji);
@@ -165,9 +168,9 @@ export default function MessageItem({ msg, sameAuthor, chatId }) {
                 }
               </div>
             ))}
-          {!msg.deleted && reactions.length > 0 && (
+          {!msg.deleted && displayReactions.length > 0 && (
             <div className="reaction-bar">
-              {reactions.map(r => (
+              {displayReactions.map(r => (
                 <div key={r.emoji} className={'reaction-chip' + (r.me ? ' me' : '')}
                   onClick={() => handleReaction(r.emoji)}>
                   <span>{r.emoji}</span>

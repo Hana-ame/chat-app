@@ -150,7 +150,7 @@ export default function ChatView({ chatId, onBack }) {
       await api.updateChatAvatar(accessToken, chatId, url + '?v=' + Date.now());
       useChatStore.getState().onChatUpdate({ id: chatId, avatar_url: url + '?v=' + Date.now() });
     } catch (e) {
-      notify('error', 'Failed to update avatar');
+      notify('Failed to update avatar');
     } finally {
       setUploadingAvatar(false);
       if (avatarInputRef.current) avatarInputRef.current.value = '';
@@ -166,7 +166,7 @@ export default function ChatView({ chatId, onBack }) {
       await api.updateChatBanner(accessToken, chatId, url + '?v=' + Date.now());
       useChatStore.getState().onChatUpdate({ id: chatId, banner_url: url + '?v=' + Date.now() });
     } catch (e) {
-      notify('error', 'Failed to update banner');
+      notify('Failed to update banner');
     } finally {
       setUploadingBanner(false);
       if (bannerInputRef.current) bannerInputRef.current.value = '';
@@ -182,7 +182,7 @@ export default function ChatView({ chatId, onBack }) {
       await api.updateChatBackground(accessToken, chatId, url + '?v=' + Date.now());
       useChatStore.getState().onChatUpdate({ id: chatId, background_url: url + '?v=' + Date.now() });
     } catch (e) {
-      notify('error', 'Failed to update background');
+      notify('Failed to update background');
     } finally {
       setUploadingBg(false);
       if (bgInputRef.current) bgInputRef.current.value = '';

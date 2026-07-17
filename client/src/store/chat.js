@@ -41,10 +41,15 @@
 
 import { create } from 'zustand';
 import { api } from '../api/client';
-import { useAuthStore } from './auth';
 import { getCoordinator } from '../realtime/coordinator';
 
 const coord = getCoordinator();
+
+function getLocalAuth() {
+  try {
+    return JSON.parse(localStorage.getItem('auth') || '{}');
+  } catch { return {}; }
+}
 
 function sortChats(a, b) {
   const pa = !!a.pinned, pb = !!b.pinned;
@@ -225,7 +230,7 @@ export const useChatStore = create((set, get) => ({
 
   /** @param {{ message_id: string, emoji: string, user_id: string }} payload @param {boolean} added */
   onReaction(payload, added) {
-    const myId = useAuthStore.getState().user?.id;
+    const myId = getLocalAuth().user?.id;
     set(s => ({ messages: s.messages.map(m => {
       if (m.id !== payload.message_id) return m;
       const rxs = m.reactions || [];
@@ -321,7 +326,7 @@ export const useChatStore = create((set, get) => ({
 
   /** @param {string} chatId */
   async markAnnouncementRead(chatId) {
-    const { accessToken } = useAuthStore.getState();
+    const { accessToken } = getLocalAuth();
     try { await api.markAnnouncementRead(accessToken, chatId); } catch (e) { console.error('markAnnouncementRead error:', e); }
     set(s => ({
       chats: s.chats.map(c => c.id === chatId ? { ...c, pinned_last_read_at: new Date().toISOString() } : c),

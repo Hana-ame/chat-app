@@ -41,8 +41,8 @@ import { createStreamSource } from '../dev/stream-source';
 import { useAuthStore } from '../store/auth';
 
 const IS_PAGES = typeof window !== 'undefined' && window.location.hostname.endsWith('pages.dev');
-const API_BASE = IS_PAGES ? 'https://chat.moonchan.xyz' : '';
-const UPLOAD_BASE = 'https://upload.moonchan.xyz';
+const API_BASE = import.meta.env.VITE_API_BASE || (IS_PAGES ? 'https://chat.moonchan.xyz' : '');
+const UPLOAD_BASE = import.meta.env.VITE_UPLOAD_BASE || 'https://upload.moonchan.xyz';
 
 /**
  * @param {import('../types').Attachment} data

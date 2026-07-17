@@ -3,6 +3,7 @@ import { useChatStore } from '../store/chat';
 import { useAuthStore } from '../store/auth';
 import { api } from '../api/client';
 import { notify } from '../store/notification';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import UserProfileModal from './UserProfileModal';
 
 function fmtTime(t) {
@@ -16,11 +17,7 @@ export default function ChatInfoModal({ chatId, onClose }) {
   const [members, setMembers] = useState([]);
   const [profileUser, setProfileUser] = useState(null);
 
-  useEffect(() => {
-    const handler = (e) => { if (e.key === 'Escape') onClose?.(); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
+  useEscapeKey(onClose);
 
   useEffect(() => {
     if (!chatId || !accessToken) return;

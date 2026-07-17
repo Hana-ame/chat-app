@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
-import { useChatStore } from './chat';
 
 const storage = {
   get: () => { try { return JSON.parse(localStorage.getItem('auth') || '{}'); } catch { return {}; } },
@@ -64,6 +63,7 @@ export const useAuthStore = create((set, get) => {
       if (get().accessToken) {
         try { await api.logout(get().accessToken); } catch (e) { console.error('Logout error:', e); }
       }
+      const { useChatStore } = await import('./chat');
       useChatStore.getState().reset();
       storage.clear();
       set({ user: null, accessToken: null });
@@ -86,7 +86,7 @@ export const useAuthStore = create((set, get) => {
 
     mockLogin: () => {
       api.enableMock();
-      useChatStore.getState().setMode('poll');
+      import('./chat').then(m => m.useChatStore.getState().setMode('poll'));
       const payload = {
         user: { id: 'dev-self', username: 'Alice', email: 'alice@test.com', avatar_color: '#5865F2' },
         accessToken: 'mock-token',
