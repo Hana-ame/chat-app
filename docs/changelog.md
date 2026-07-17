@@ -4433,3 +4433,86 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 
 ### 文件
 - `client/src/components/MessageItem.jsx` — 加 `memo` 包装
+
+---
+
+## 2026-07-17 消除 Chat UI 闪烁 + localStorage Token 移除（第 40 轮）
+
+### 问题
+
+1. **Chat UI 闪烁**：用户打开 app 后，因 localStorage 中存有过期/无效 token，App 直接渲染 `<ChatPage />`，随后 API 401 跳转到登录页，用户短暂看到聊天界面。
+2. **Token 存 localStorage 不安全**：XSS 攻击可窃取 token。后端已支持 httpOnly Cookie 认证，前端无需持久化 token。
+3. **无加载态**：app 启动后没有等待 auth 确认，直接渲染路由。
+
+### 修复
+
+#### client/src/store/auth.js
+- 移除 `storage.get()` 从 store creator 读取 token（根因）
+- 移除所有 `storage.set()` / `storage.clear()` 调用（不再持久化 token）
+- Store 初始化为 `{ user: null, accessToken: null, booting: true }`
+- 新增 `boot()` action：
+  - Mock 模式：通过 `localStorage.getItem('chat:mock')` 布尔标记检测，调用 `mockLogin` 等效逻辑
+  - 生产模式：调用 `api.refresh()` 验证 httpOnly Cookie，成功则恢复 session，失败则留在登录页
+- Mock 模式改用 `localStorage.setItem('chat:mock', 'true')` 标记（仅存布尔值，不存 token）
+- `logout()` 清除 `chat:mock` 标记
+
+#### client/src/App.jsx
+- 新增 boot phase：`useEffect` 调用 `boot()` 一次，`booting: true` 时渲染 spinner，完成后才渲染 Routes
+- 路由守卫依赖的 `token` 在 boot 完成后决定流向
+
+#### client/src/styles/global.css
+- 新增 `.spinner` 样式 + `@keyframes spin` 动画
+
+#### client/src/api/client.js
+- 在 `VITE_API_BASE` / `VITE_UPLOAD_BASE` 未设置时输出 `console.warn` 提示
+
+#### client/src/realtime/transports/ws.js
+- 在 `VITE_WS_URL` 未设置时输出 `console.warn` 提示
+
+### 影响
+- 旧方式 `storage.get()` 读到的过期 token → app 直接显示 ChatPage → 401 闪烁
+- 新方式 `boot()` 先验证 → 确定有效 session 才显示 ChatPage → 零闪烁
+- mock 测试中的 `addInitScript(() => localStorage.clear())` + `page.evaluate(mockLogin)` 流程不受影响
+
+### 验证
+- Client build: ✅ (321.58kB + 10.41kB CSS)
+- Go build + vet: ✅
+- CI: ✅
+- Frontend CI: ✅
+
+---
+
+## 2026-07-17 批量修复 items 8-12（第 41 轮）
+
+### 8. MessageItem Reactions 双源风险
+- **根因**：`MessageItem.jsx:71-80` 使用 `useState(null)` 本地缓存 reactions，并通过 `useEffect` 独立调 API 获取，与 WebSocket `onReaction` 推送产生竞争。
+- **修复**：完全移除本地 `reactions` state 和对应的 `useEffect`，`displayReactions` 直接取自 `msg.reactions || []`。`handleReaction` 中 add/remove 后不再手动 `getReactions`（WS 事件会自动更新 store）。
+- **死代码清理**：`api.getReactions`、`mockGetReactions`、`ListReactionsResponse` typedef 全部移除（-0.75 kB bundle）。
+
+### 9. 环境变量运行时校验
+- 新增 `client/src/config.js`：导出 `validateEnv()`、`API_BASE`、`UPLOAD_BASE`。
+- `validateEnv()` 在 dev 模式下检查 `VITE_API_BASE` / `VITE_UPLOAD_BASE` / `VITE_WS_URL`，缺失时 `console.error` 报错。
+- `client.js` / `ws.js` 的 `import.meta.env` 直接读取迁移到 config.js 集中管理。
+- 新增 `client/.env.example` 文档化三个变量。
+
+### 10. 错误日志结构化
+- `server/internal/handlers/handler.go:98,176` + `uploads.go:29` 三处 `log.Printf` → `logutil.Error`。
+- 移除 `"log"` import（两个文件均不再使用）。
+
+### 11. 表驱动测试
+- `TestAuthz_MustBeMember`：合并 4 个 case（success / not_member / empty_user_id / canceled_context）。
+- `TestAuthz_RequireOwnerOrAdmin`：合并 6 个 case（owner / admin_role / not_owner / not_chat_member / chat_not_found / canceled_context）。
+- 删除 5 个旧的独立测试函数。
+
+### 12. TypeScript 迁移（API 层 + Zod 校验）
+- 安装依赖：`zod`、`typescript`、`@types/react`、`@types/react-dom`。
+- 创建 `client/src/types.ts`：`interface User`、`Chat`、`Message`、`Reaction`、`Attachment`、`PinnedContent`、`StreamSource`、`AuthResponse`。
+- 创建 `client/src/schemas.ts`：对应 zod schemas + `validate()` 工具函数。
+- 转换 `client/src/api/client.js` → `client.ts`：全部参数/返回值加上 TypeScript 类型标注；`register` / `login` / `refresh` 调用 `validate(AuthResponseSchema)` 做运行时校验。
+- 更新 `tsconfig.json`：`include` 加入 `.ts` / `.tsx`。
+
+### 验证
+- Client build: ✅ (394.43kB JS + 10.41kB CSS)
+- Go build + vet: ✅
+- Go test ./...: ✅ (all packages pass)
+- 162 modules transformed

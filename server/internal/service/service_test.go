@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/Hana-ame/chat-app/server/internal/db"
@@ -1070,68 +1071,155 @@ func TestUserService_Search_EmptyQuery(t *testing.T) {
 	}
 }
 
-func TestAuthz_MustBeMember_Success(t *testing.T) {
-	f := testutil.New(t)
-	a := createTestUser(t, f, "authz1@x.com", "Authz1")
-	chat := createTestChat(t, f, "AuthzTest", a, []string{a})
-
-	err := f.Server.Services.Chat.MustBeMember(f.Ctx(), chat.ID, a)
-	if err != nil {
-		t.Fatal(err)
+func TestAuthz_MustBeMember(t *testing.T) {
+	tests := []struct {
+		name   string
+		setup  func(f *testutil.Fixture) (chatID, userID string, ctx context.Context)
+		wantOK bool
+	}{
+		{
+			name: "success",
+			setup: func(f *testutil.Fixture) (string, string, context.Context) {
+				u := createTestUser(t, f, "m1@x.com", "M1")
+				c := createTestChat(t, f, "M1", u, []string{u})
+				return c.ID, u, f.Ctx()
+			},
+			wantOK: true,
+		},
+		{
+			name: "not member",
+			setup: func(f *testutil.Fixture) (string, string, context.Context) {
+				u := createTestUser(t, f, "m2@x.com", "M2")
+				v := createTestUser(t, f, "m3@x.com", "M3")
+				c := createTestChat(t, f, "M2", u, []string{u})
+				return c.ID, v, f.Ctx()
+			},
+			wantOK: false,
+		},
+		{
+			name: "empty user id",
+			setup: func(f *testutil.Fixture) (string, string, context.Context) {
+				u := createTestUser(t, f, "m4@x.com", "M4")
+				c := createTestChat(t, f, "M4", u, []string{u})
+				return c.ID, "", f.Ctx()
+			},
+			wantOK: false,
+		},
+		{
+			name: "canceled context",
+			setup: func(f *testutil.Fixture) (string, string, context.Context) {
+				u := createTestUser(t, f, "m5@x.com", "M5")
+				c := createTestChat(t, f, "M5", u, []string{u})
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				return c.ID, u, ctx
+			},
+			wantOK: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := testutil.New(t)
+			chatID, userID, ctx := tt.setup(f)
+			err := f.Server.Services.Chat.MustBeMember(ctx, chatID, userID)
+			if tt.wantOK && err != nil {
+				t.Fatalf("want nil, got %v", err)
+			}
+			if !tt.wantOK && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+		})
 	}
 }
 
-func TestAuthz_MustBeMember_NotMember(t *testing.T) {
-	f := testutil.New(t)
-	a := createTestUser(t, f, "authz2@x.com", "Authz2")
-	b := createTestUser(t, f, "authz3@x.com", "Authz3")
-	chat := createTestChat(t, f, "AuthzTest2", a, []string{a})
-
-	err := f.Server.Services.Chat.MustBeMember(f.Ctx(), chat.ID, b)
-	if err != service.ErrForbidden {
-		t.Fatalf("want ErrForbidden, got %v", err)
+func TestAuthz_RequireOwnerOrAdmin(t *testing.T) {
+	tests := []struct {
+		name   string
+		setup  func(f *testutil.Fixture) (chatID, userID string, ctx context.Context)
+		wantOK bool
+		wantErr error
+	}{
+		{
+			name: "owner",
+			setup: func(f *testutil.Fixture) (string, string, context.Context) {
+				u := createTestUser(t, f, "r1@x.com", "R1")
+				c := createTestChat(t, f, "R1", u, []string{u})
+				return c.ID, u, f.Ctx()
+			},
+			wantOK: true,
+		},
+		{
+			name: "admin role",
+			setup: func(f *testutil.Fixture) (string, string, context.Context) {
+				u := createTestUser(t, f, "r2@x.com", "R2")
+				v := createTestUser(t, f, "r3@x.com", "R3")
+				c := createTestChat(t, f, "R2", u, []string{u, v})
+				if _, err := f.DB.ExecContext(context.Background(),
+					`UPDATE chat_members SET role = 'admin' WHERE chat_id = ? AND user_id = ?`,
+					c.ID, v); err != nil {
+					t.Fatal(err)
+				}
+				return c.ID, v, context.Background()
+			},
+			wantOK: true,
+		},
+		{
+			name: "not owner",
+			setup: func(f *testutil.Fixture) (string, string, context.Context) {
+				u := createTestUser(t, f, "r4@x.com", "R4")
+				v := createTestUser(t, f, "r5@x.com", "R5")
+				c := createTestChat(t, f, "R4", u, []string{u, v})
+				return c.ID, v, f.Ctx()
+			},
+			wantErr: service.ErrForbidden,
+		},
+		{
+			name: "not chat member",
+			setup: func(f *testutil.Fixture) (string, string, context.Context) {
+				u := createTestUser(t, f, "r6@x.com", "R6")
+				v := createTestUser(t, f, "r7@x.com", "R7")
+				c := createTestChat(t, f, "R6", u, []string{u})
+				return c.ID, v, context.Background()
+			},
+			wantErr: service.ErrForbidden,
+		},
+		{
+			name: "chat not found",
+			setup: func(f *testutil.Fixture) (string, string, context.Context) {
+				u := createTestUser(t, f, "r8@x.com", "R8")
+				return "nonexistent", u, f.Ctx()
+			},
+			wantErr: service.ErrNotFound,
+		},
+		{
+			name: "canceled context",
+			setup: func(f *testutil.Fixture) (string, string, context.Context) {
+				u := createTestUser(t, f, "r9@x.com", "R9")
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				return "chatid", u, ctx
+			},
+			wantErr: nil, // any error is acceptable
+		},
 	}
-}
-
-func TestAuthz_MustBeMember_EmptyUserID(t *testing.T) {
-	f := testutil.New(t)
-	a := createTestUser(t, f, "authz_empty@x.com", "AuthzEmpty")
-	chat := createTestChat(t, f, "AuthzTest3", a, []string{a})
-	err := f.Server.Services.Chat.MustBeMember(f.Ctx(), chat.ID, "")
-	if err != service.ErrForbidden {
-		t.Fatalf("want ErrForbidden, got %v", err)
-	}
-}
-
-func TestAuthz_RequireOwnerOrAdmin_Owner(t *testing.T) {
-	f := testutil.New(t)
-	a := createTestUser(t, f, "authz4@x.com", "Authz4")
-	chat := createTestChat(t, f, "AuthzTest4", a, []string{a})
-
-	err := f.Server.Services.Chat.RequireOwnerOrAdmin(f.Ctx(), chat.ID, a)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestAuthz_RequireOwnerOrAdmin_NotOwner(t *testing.T) {
-	f := testutil.New(t)
-	a := createTestUser(t, f, "authz5@x.com", "Authz5")
-	b := createTestUser(t, f, "authz6@x.com", "Authz6")
-	chat := createTestChat(t, f, "AuthzTest5", a, []string{a, b})
-
-	err := f.Server.Services.Chat.RequireOwnerOrAdmin(f.Ctx(), chat.ID, b)
-	if err != service.ErrForbidden {
-		t.Fatalf("want ErrForbidden, got %v", err)
-	}
-}
-
-func TestAuthz_RequireOwnerOrAdmin_NotFound(t *testing.T) {
-	f := testutil.New(t)
-	a := createTestUser(t, f, "authz7@x.com", "Authz7")
-	err := f.Server.Services.Chat.RequireOwnerOrAdmin(f.Ctx(), "nonexistent", a)
-	if err != service.ErrNotFound {
-		t.Fatalf("want ErrNotFound, got %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := testutil.New(t)
+			chatID, userID, ctx := tt.setup(f)
+			err := f.Server.Services.Chat.RequireOwnerOrAdmin(ctx, chatID, userID)
+			if tt.wantOK {
+				if err != nil {
+					t.Fatalf("want nil, got %v", err)
+				}
+				return
+			}
+			if tt.wantErr != nil && !errors.Is(err, tt.wantErr) {
+				t.Fatalf("want %v, got %v", tt.wantErr, err)
+			}
+			if tt.wantErr == nil && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+		})
 	}
 }
 
@@ -1177,57 +1265,6 @@ func TestChatService_CreateOrGetDM_UserNotFound(t *testing.T) {
 	_, _, err := f.Server.Services.Chat.CreateOrGetDM(f.Ctx(), a, "nonexistent")
 	if err != service.ErrNotFound {
 		t.Fatalf("want ErrNotFound, got %v", err)
-	}
-}
-
-func TestAuthz_MustBeMember_CanceledContext(t *testing.T) {
-	f := testutil.New(t)
-	a := createTestUser(t, f, "mberr@x.com", "MbErr")
-	chat := createTestChat(t, f, "MbErrTest", a, []string{a})
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	err := f.Server.Services.Chat.MustBeMember(ctx, chat.ID, a)
-	if err == nil {
-		t.Fatal("expected error from canceled context")
-	}
-}
-
-func TestAuthz_RequireOwnerOrAdmin_NotChatMember(t *testing.T) {
-	f := testutil.New(t)
-	a := createTestUser(t, f, "roe_nm@x.com", "RoeNM")
-	b := createTestUser(t, f, "roe_nm2@x.com", "RoeNM2")
-	chat := createTestChat(t, f, "RoeNMTest", a, []string{a})
-	err := f.Server.Services.Chat.RequireOwnerOrAdmin(context.Background(), chat.ID, b)
-	if err != service.ErrForbidden {
-		t.Fatalf("want ErrForbidden, got %v", err)
-	}
-}
-
-func TestAuthz_RequireOwnerOrAdmin_AdminRole(t *testing.T) {
-	f := testutil.New(t)
-	a := createTestUser(t, f, "roe_adm@x.com", "RoeAdm")
-	b := createTestUser(t, f, "roe_adm2@x.com", "RoeAdm2")
-	chat := createTestChat(t, f, "RoeAdmTest", a, []string{a, b})
-	_, err := f.DB.ExecContext(context.Background(),
-		`UPDATE chat_members SET role = 'admin' WHERE chat_id = ? AND user_id = ?`,
-		chat.ID, b)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = f.Server.Services.Chat.RequireOwnerOrAdmin(context.Background(), chat.ID, b)
-	if err != nil {
-		t.Fatalf("expected nil, got %v", err)
-	}
-}
-
-func TestAuthz_RequireOwnerOrAdmin_CanceledContext(t *testing.T) {
-	f := testutil.New(t)
-	a := createTestUser(t, f, "roe_ce@x.com", "RoeCE")
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	err := f.Server.Services.Chat.RequireOwnerOrAdmin(ctx, "chatid", a)
-	if err == nil {
-		t.Fatal("expected error from canceled context")
 	}
 }
 

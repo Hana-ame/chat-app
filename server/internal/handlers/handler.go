@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -13,6 +12,7 @@ import (
 	"github.com/Hana-ame/chat-app/server/internal/auth"
 	"github.com/Hana-ame/chat-app/server/internal/config"
 	"github.com/Hana-ame/chat-app/server/internal/db"
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/Hana-ame/chat-app/server/internal/models"
 	"github.com/Hana-ame/chat-app/server/internal/service"
 	"github.com/Hana-ame/chat-app/server/internal/ws"
@@ -95,7 +95,7 @@ func writeJSON(w http.ResponseWriter, status int, body interface{}) {
 		return
 	}
 	if err := json.NewEncoder(w).Encode(body); err != nil {
-		log.Printf("writeJSON encode error: %v", err)
+		logutil.Error("writeJSON encode error: %v", err)
 	}
 }
 
@@ -173,7 +173,7 @@ func (s *Server) trackLastActive(next http.Handler) http.Handler {
 			id := u.ID
 			go func() {
 				if err := s.DB.UpdateLastActiveAt(r.Context(), chatID, id); err != nil {
-					log.Printf("trackLastActive error: %v", err)
+					logutil.Error("trackLastActive error: %v", err)
 				}
 			}()
 		}
