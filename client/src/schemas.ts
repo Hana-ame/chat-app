@@ -45,7 +45,7 @@ export const MessageSchema = z.object({
   reactions: z.array(ReactionSchema).optional(),
   reaction_count: z.number().optional(),
   streaming: z.boolean().optional(),
-  source: z.function().args().returns(z.void()).optional(),
+  source: z.function().optional(),
 });
 
 export const ChatSchema = z.object({
@@ -77,7 +77,9 @@ export type User = z.infer<typeof UserSchema>;
 export type Reaction = z.infer<typeof ReactionSchema>;
 export type Attachment = z.infer<typeof AttachmentSchema>;
 export type PinnedContent = z.infer<typeof PinnedContentSchema>;
-export type Message = z.infer<typeof MessageSchema>;
+export interface Message extends z.infer<typeof MessageSchema> {
+  source?: () => void;
+}
 export type Chat = z.infer<typeof ChatSchema>;
 export type AuthResponse = z.infer<typeof AuthResponseSchema>;
 
