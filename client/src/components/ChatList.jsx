@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
-import pkg from '../../package.json';
+
 import ChatListItem from './ChatListItem';
 import PublicChannelList from './PublicChannelList';
 import CreateGroupForm from './CreateGroupForm';
@@ -187,7 +187,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   return (
     <div className="sidebar">
       <div className="sidebar-header">
-        <h3 style={{ fontSize: 13, fontWeight: 700 }}>{pkg.version}</h3>
+        <h3 style={{ fontSize: 13, fontWeight: 700 }}>{__APP_VERSION__}</h3>
         <div style={{ display: 'flex', gap: 4, alignItems: 'stretch' }}>
           <button className="btn-ghost" style={{ fontSize: 9, fontWeight: 700, minWidth: 34, textAlign: 'center', padding: '4px 2px', lineHeight: 1.2 }}
             onClick={() => setMode(MODES[(MODES.findIndex(m => m.key === mode) + 1) % MODES.length].key)} title={'Click to switch: ' + ['WS', 'SSE', 'Poll'][(['ws', 'sse', 'poll'].indexOf(mode) + 1) % 3]}>
