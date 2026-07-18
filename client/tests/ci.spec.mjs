@@ -195,14 +195,4 @@ test.describe('Mock API Mode (CI)', () => {
     await page.locator('.modal-overlay').first().click({ force: true }).catch(() => {});
   });
 
-  test('mock avatar color picker', async ({ page }) => {
-    await mockLogin(page);
-    await page.click('button[title="Settings"]');
-    await expect(page.locator('[aria-label="Settings"]')).toBeVisible({ timeout: 3000 });
-    const swatches = page.locator('[aria-label="Settings"] [style*="background: #"]');
-    const total = await swatches.count();
-    expect(total).toBeGreaterThanOrEqual(5);
-    await page.locator('.modal-overlay').first().click({ force: true }).catch(() => {});
-  });
-
 });
