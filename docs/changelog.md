@@ -4546,3 +4546,28 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 - Client build: ✅ (395.10kB JS + 10.41kB CSS)
 - CI: ✅
 - Frontend CI: ✅
+
+---
+
+## 2026-07-18 前端版本号注入 + 后端 tag 联动（第 43 轮）
+
+### APP_VERSION 注入（前端 ldflags）
+- `vite.config.js`: 新增 `define.__APP_VERSION__`，值取自 `process.env.APP_VERSION`
+- `ChatList.jsx`: 移除 `import pkg from '../../package.json'`，改用 `__APP_VERSION__` 全局常量
+- `frontend-ci.yml` + `ci.yml`: 构建时注入 `APP_VERSION`——tag 推送时取 tag 名，branch 推送时取 `build-{sha}`
+
+### 后端 tag 联动
+- `ci.yml` go-build 步骤：`ldflags -X main.Version` 改为 `${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build-{0}', github.sha) }}`
+- Release 标题同理跟随 tag 名
+
+### 行为对照
+
+| 场景 | 后端 `/api/version` | 侧栏 | Release 标题 |
+|------|-------------------|------|-------------|
+| `git tag v0.3.1` | `v0.3.1` | `v0.3.1` | `v0.3.1` |
+| `git push`（branch） | `build-abc123` | `build-abc123` | `Build abc123` |
+
+### 验证
+- Client build: ✅ (395.11kB JS + 10.41kB CSS)
+- CI: ✅
+- Frontend CI: ✅
