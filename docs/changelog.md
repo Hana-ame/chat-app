@@ -4518,3 +4518,31 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 - 162 modules transformed
 - **后续优化**：使用 `z.infer<typeof Schema>` 替代手写 `types.ts`，删除 `types.ts`（85 行），全部 6 个类型 + `StreamSource` 集中在 `schemas.ts`；`mock.js`、`chat.js` 的 JSDoc 引用更新路径。
 - **修复**：`MessageSchema.source` 原用 `z.function().args().returns(z.void())`，但 Zod v4 无 `.args()`/`.returns()` 方法，导致运行时抛出 TypeError，Frontend CI 全部 25 个测试超时。改为 `z.function().optional()` + `interface Message extends z.infer<typeof MessageSchema> { source?: () => void }` 解决。
+
+---
+
+## 2026-07-18 搜索重构 + DM 清理 + 颜色选择器 + 版本号（第 42 轮）
+
+### 搜索行为重构
+- **空输入 + 焦点** → 显示公共频道（不变）
+- **有输入** → 过滤自己的已加入频道（之前错误地显示公共频道的过滤结果）
+- **输入完整 UUID** → 无视任何限制，从已加入 + 公共缓存中直接显示对应 chat；未加入的 chat 点击即 join
+- **修复竞态**：`handleSearchFocus` + `loadAllPublicChats` 设置 `showPublicList=true` 时，若输入已有文字，render 三个分支全部错过导致空白。改为 `!showPublicList || chatSearch.trim()` 兜底
+- 移除死代码 `closeContextMenu`（从未被引用）
+
+### DM 废弃处理
+- `mock.js`: `mockCreateDM` 函数体 + `@deprecated` 标记保留不删（可能日后恢复）
+- `README.md`: 删除 `createDM` 文档行；`client.js` → `client.ts`
+- `ChatList.jsx`: `filteredChats` DM 过滤加 `@deprecated` 注释
+
+### 头像颜色选择器
+- `UserProfileModal.jsx`: 新增 10 色预设选色器（Discord 风格色盘），当前色高亮边框，点同一色取消
+- `handleSave` 加入 `avatar_color` 字段提交
+
+### 版本号
+- `0.2.0` → `0.3.0`（自 0.2.0 以来 30+ 轮迭代）
+
+### 验证
+- Client build: ✅ (395.10kB JS + 10.41kB CSS)
+- CI: ✅
+- Frontend CI: ✅
