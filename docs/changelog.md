@@ -4571,3 +4571,23 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 - Client build: ✅ (395.11kB JS + 10.41kB CSS)
 - CI: ✅
 - Frontend CI: ✅
+
+## 2026-07-18 成员列表数据源统一 + last_seen 绿点（第 44 轮）
+
+### 数据源统一
+- `useMembers` 改从 store `chats[*].members` 读取，store 为唯一数据源
+- 首次加载时 fetch 一次写入 store，移除 60s 轮询
+- `setChats` merge 保留 `members` 不被 poll 覆盖
+- `onEvent` 新增 `case 'user_update'`：更新 `chats[*].members[*]`，profile 修改后 member list 自动同步
+
+### 绿点改用 last_seen
+- 移除 `onlineUserIds` 依赖，绿点判断改为 `last_seen` 5分钟内算在线
+- `onlineUserIds`/`presence_update` 保留不动
+
+### 版本
+- `0.3.0` → `0.3.1`
+
+### 验证
+- Client build: ✅
+- go vet: ✅
+- go test: ✅

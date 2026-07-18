@@ -86,6 +86,16 @@ coord.setHandlers({
         });
         break;
       }
+      case 'user_update': {
+        set(s => ({
+          chats: s.chats.map(c => ({
+            ...c,
+            members: c.members?.map(m => m.id === payload.id ? { ...m, ...payload } : m),
+          })),
+          userUpdateVer: (s.userUpdateVer || 0) + 1,
+        }));
+        break;
+      }
       case 'poll:chats': s.setChats(payload); break;
       case 'poll:messages': set({ messages: (payload || []).map(m => get()._normalize(m)) }); break;
     }
@@ -139,7 +149,7 @@ export const useChatStore = create((set, get) => ({
       }
       const lm = (c.last_message?.content?.trim() ? c.last_message : null) || (old.last_message?.content?.trim() ? old.last_message : null);
       const lma = c.last_message_at || old.last_message_at || c.created_at;
-      return { ...c, last_message_at: lma, last_message: lm, unread_count: c.unread_count ?? 0 };
+      return { ...c, last_message_at: lma, last_message: lm, unread_count: c.unread_count ?? 0, members: old.members };
     });
       const sorted = merged.sort(sortChats);
       const pinned = {};
