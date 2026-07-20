@@ -17,11 +17,6 @@ type editMsgReq struct {
 	Content string `json:"content"`
 }
 
-// Deprecated: no longer needed; MarkRead now uses last_active_at.
-type readReq struct {
-	MessageID string `json:"message_id"`
-}
-
 // ListMessages godoc
 // @Summary      List messages in a chat
 // @Description  Get paginated messages for a chat the user is a member of

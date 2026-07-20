@@ -124,9 +124,9 @@ const _apiMethods = {
   updateChatAvatar: (token: string, chatId: string, avatarUrl: string) =>
     request<ApiError>('PUT', '/api/chats/' + chatId + '/avatar', token, { avatar_url: avatarUrl }),
   updateChatBanner: (token: string, chatId: string, bannerUrl: string, bannerOpacity?: number) =>
-    request<ApiError>('PUT', '/api/chats/' + chatId + '/banner', token, { avatar_url: bannerUrl, banner_opacity: bannerOpacity }),
+    request<ApiError>('PUT', '/api/chats/' + chatId + '/banner', token, { banner_url: bannerUrl, banner_opacity: bannerOpacity }),
   updateChatBackground: (token: string, chatId: string, backgroundUrl: string) =>
-    request<ApiError>('PUT', '/api/chats/' + chatId + '/background', token, { avatar_url: backgroundUrl }),
+    request<ApiError>('PUT', '/api/chats/' + chatId + '/background', token, { background_url: backgroundUrl }),
 
   // ── Members ──
   listMembers: (token: string, chatId: string) =>
@@ -203,31 +203,6 @@ const _apiMethods = {
   },
 };
 
-const _mockHandlers: Record<string, (...args: unknown[]) => unknown> = {
-  register: mockRegister, login: mockLogin, refresh: mockRefresh, logout: mockLogout,
-  updateProfile: mockUpdateProfile, searchUsers: mockSearchUsers,
-  listChats: mockListChats, listPublicChats: mockListPublicChats,
-  createChat: mockCreateChat, getChat: mockGetChat, deleteChat: mockDeleteChat,
-  joinChat: mockJoinChat,
-  setAnnouncement: mockSetAnnouncement, clearAnnouncement: mockClearAnnouncement, updateChatAvatar: mockUpdateChatAvatar, updateChatBanner: mockUpdateChatBanner, updateChatBackground: mockUpdateChatBackground,
-  addMember: mockAddMember, removeMember: mockRemoveMember,
-  listMembers: mockListMembers, listMessages: mockListMessages,
-  sendMessage: mockSendMessage, editMessage: mockEditMessage, deleteMessage: mockDeleteMessage,
-  markRead: mockMarkRead, addReaction: mockAddReaction, removeReaction: mockRemoveReaction,
-  pinChat: mockPinChat, unpinChat: mockUnpinChat,
-  markAnnouncementRead: mockMarkAnnouncementRead,
-  upload: mockUpload, uploadAvatar: mockUploadAvatar,
-};
-
-let _mockEnabled = false;
-
-function mockCallLog(key: string, fn: (...args: unknown[]) => unknown, args: unknown[]) {
-  console.log(`[Mock API] ${key}(`, ...args, ')');
-  const result = fn(...args);
-  const p = result && typeof (result as Promise<unknown>).then === 'function' ? (result as Promise<unknown>) : Promise.resolve(result);
-  return p.then(v => { console.log(`[Mock API] ${key} =>`, v); return v; });
-}
-
 export type ApiType = typeof _apiMethods & {
   enableMock: () => void;
   disableMock: () => void;
@@ -235,25 +210,53 @@ export type ApiType = typeof _apiMethods & {
   uploadAvatar: (token: string, file: File) => Promise<{ url: string }>;
 };
 
-export const api = new Proxy(_apiMethods, {
-  get(target, prop: string) {
-    if (_mockEnabled && prop in _mockHandlers) {
-      return (...args: unknown[]) => mockCallLog(prop, _mockHandlers[prop], args);
-    }
-    return (target as Record<string, unknown>)[prop];
-  },
-}) as ApiType;
+function buildMockProxy(target: typeof _apiMethods): ApiType {
+  const mockHandlers: Record<string, (...args: unknown[]) => unknown> = {
+    register: mockRegister, login: mockLogin, refresh: mockRefresh, logout: mockLogout,
+    updateProfile: mockUpdateProfile, searchUsers: mockSearchUsers,
+    listChats: mockListChats, listPublicChats: mockListPublicChats,
+    createChat: mockCreateChat, getChat: mockGetChat, deleteChat: mockDeleteChat,
+    joinChat: mockJoinChat,
+    setAnnouncement: mockSetAnnouncement, clearAnnouncement: mockClearAnnouncement,
+    updateChatAvatar: mockUpdateChatAvatar, updateChatBanner: mockUpdateChatBanner, updateChatBackground: mockUpdateChatBackground,
+    addMember: mockAddMember, removeMember: mockRemoveMember,
+    listMembers: mockListMembers, listMessages: mockListMessages,
+    sendMessage: mockSendMessage, editMessage: mockEditMessage, deleteMessage: mockDeleteMessage,
+    markRead: mockMarkRead, addReaction: mockAddReaction, removeReaction: mockRemoveReaction,
+    pinChat: mockPinChat, unpinChat: mockUnpinChat,
+    markAnnouncementRead: mockMarkAnnouncementRead,
+    upload: mockUpload, uploadAvatar: mockUploadAvatar,
+  };
+  let mockEnabled = false;
 
-api.uploadAvatar = async (_token: string, file: File) => {
-  const data = await api.upload(file);
-  return { url: data.url };
-};
+  const p = new Proxy(target, {
+    get(t, prop: string) {
+      if (mockEnabled && prop in mockHandlers) {
+        return (...args: unknown[]) => {
+          const fn = mockHandlers[prop];
+          console.log(`[Mock API] ${prop}(`, ...args, ')');
+          const result = fn(...args);
+          const promise = result && typeof (result as Promise<unknown>).then === 'function'
+            ? (result as Promise<unknown>) : Promise.resolve(result);
+          return promise.then(v => { console.log(`[Mock API] ${prop} =>`, v); return v; });
+        };
+      }
+      return (t as Record<string, unknown>)[prop];
+    },
+  }) as ApiType;
 
-api.enableMock = () => {
-  if (_mockEnabled) return;
-  _mockEnabled = true;
-  resetMockData();
-};
+  p.uploadAvatar = async (_token: string, file: File) => {
+    const data = await p.upload(file);
+    return { url: data.url };
+  };
+  p.enableMock = () => {
+    if (mockEnabled) return;
+    mockEnabled = true;
+    resetMockData();
+  };
+  p.disableMock = () => { mockEnabled = false; };
+  p.isMockEnabled = () => mockEnabled;
+  return p;
+}
 
-api.disableMock = () => { _mockEnabled = false; };
-api.isMockEnabled = () => _mockEnabled;
+export const api = buildMockProxy(_apiMethods);

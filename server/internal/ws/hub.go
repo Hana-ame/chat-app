@@ -154,8 +154,12 @@ func (h *Hub) snapshotForUser(userID string) []*Client {
 }
 
 func (h *Hub) sendToUser(userID string, env Envelope) {
-	for _, c := range h.snapshotForUser(userID) {
+	clients := h.snapshotForUser(userID)
+	for _, c := range clients {
 		c.queue(env)
+	}
+	if len(clients) > 0 {
+		return
 	}
 	b, _ := json.Marshal(env)
 	h.sseSend(userID, b)
@@ -183,11 +187,12 @@ func (h *Hub) sendToChat(chatID string, env Envelope, exceptUser string) {
 		if m.ID == exceptUser {
 			continue
 		}
-		sseTargets = append(sseTargets, m.ID)
-		if set, ok := h.clients[m.ID]; ok {
+		if set, ok := h.clients[m.ID]; ok && len(set) > 0 {
 			for c := range set {
 				clients = append(clients, c)
 			}
+		} else {
+			sseTargets = append(sseTargets, m.ID)
 		}
 	}
 	h.mu.RUnlock()
@@ -273,9 +278,17 @@ func (h *Hub) BroadcastUserUpdate(u *models.User) {
 	env := envelope(OpUserUpdate, u)
 	h.mu.RLock()
 	all := make([]*Client, 0)
+	wsUserIDs := make(map[string]struct{})
 	for _, set := range h.clients {
 		for c := range set {
 			all = append(all, c)
+			wsUserIDs[c.userID] = struct{}{}
+		}
+	}
+	sseUserIDs := make([]string, 0, len(h.sseClients))
+	for uid := range h.sseClients {
+		if _, ok := wsUserIDs[uid]; !ok {
+			sseUserIDs = append(sseUserIDs, uid)
 		}
 	}
 	h.mu.RUnlock()
@@ -283,7 +296,9 @@ func (h *Hub) BroadcastUserUpdate(u *models.User) {
 		c.queue(env)
 	}
 	b, _ := json.Marshal(env)
-	h.sendToAllSSE(b)
+	for _, uid := range sseUserIDs {
+		h.sseSend(uid, b)
+	}
 }
 
 func (h *Hub) sendToAllSSE(b []byte) {
@@ -304,9 +319,17 @@ func (h *Hub) broadcastPresence(userID, status string) {
 	})
 	h.mu.RLock()
 	all := make([]*Client, 0)
+	wsUserIDs := make(map[string]struct{})
 	for _, set := range h.clients {
 		for c := range set {
 			all = append(all, c)
+			wsUserIDs[c.userID] = struct{}{}
+		}
+	}
+	sseUserIDs := make([]string, 0, len(h.sseClients))
+	for uid := range h.sseClients {
+		if _, ok := wsUserIDs[uid]; !ok {
+			sseUserIDs = append(sseUserIDs, uid)
 		}
 	}
 	h.mu.RUnlock()
@@ -314,7 +337,9 @@ func (h *Hub) broadcastPresence(userID, status string) {
 		c.queue(env)
 	}
 	b, _ := json.Marshal(env)
-	h.sendToAllSSE(b)
+	for _, uid := range sseUserIDs {
+		h.sseSend(uid, b)
+	}
 }
 
 func (h *Hub) BroadcastTyping(chatID, userID string) {

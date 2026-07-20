@@ -16,7 +16,7 @@ func (s *ChatService) ListForUser(ctx context.Context, userID string) ([]models.
 }
 
 func (s *ChatService) GetByID(ctx context.Context, chatID, userID string) (*models.Chat, error) {
-	if err := s.MustBeMember(ctx, chatID, userID); err != nil {
+	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return nil, err
 	}
 	chat, err := s.DB.GetChat(ctx, chatID)
@@ -230,7 +230,7 @@ func (s *ChatService) Join(ctx context.Context, chatID, userID string) (*models.
 }
 
 func (s *ChatService) SetAnnouncement(ctx context.Context, chatID, userID, content string) error {
-	if err := s.RequireOwnerOrAdmin(ctx, chatID, userID); err != nil {
+	if err := s.Authz.RequireOwnerOrAdmin(ctx, chatID, userID); err != nil {
 		return err
 	}
 	if err := s.DB.SetPinnedMessage(ctx, chatID, content); err != nil {
@@ -245,7 +245,7 @@ func (s *ChatService) SetAnnouncement(ctx context.Context, chatID, userID, conte
 }
 
 func (s *ChatService) ClearAnnouncement(ctx context.Context, chatID, userID string) error {
-	if err := s.RequireOwnerOrAdmin(ctx, chatID, userID); err != nil {
+	if err := s.Authz.RequireOwnerOrAdmin(ctx, chatID, userID); err != nil {
 		return err
 	}
 	if err := s.DB.ClearPinnedMessage(ctx, chatID); err != nil {
@@ -264,7 +264,7 @@ func (s *ChatService) MarkAnnouncementRead(ctx context.Context, chatID, userID s
 }
 
 func (s *ChatService) SetPinned(ctx context.Context, chatID, userID string, pinned bool) error {
-	if err := s.MustBeMember(ctx, chatID, userID); err != nil {
+	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return err
 	}
 	if err := s.DB.SetPinned(ctx, chatID, userID, pinned); err != nil {
@@ -283,7 +283,7 @@ func (s *ChatService) Visit(ctx context.Context, chatID, userID string) error {
 }
 
 func (s *ChatService) MarkRead(ctx context.Context, chatID, userID string) error {
-	if err := s.MustBeMember(ctx, chatID, userID); err != nil {
+	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return err
 	}
 	return s.DB.UpdateLastActiveAt(ctx, chatID, userID)

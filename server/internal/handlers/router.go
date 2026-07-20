@@ -95,7 +95,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 			r.Get("/chats/my", s.ListChats)
 			r.Get("/chats/public", s.ListPublicChats)
 			r.Post("/chats", s.CreateChat)
-			r.Post("/dms", s.CreateOrGetDM) // Deprecated.
+			r.Post("/dms", s.CreateOrGetDM)
 			r.Route("/chats/{chatID}", func(r chi.Router) {
 				r.Use(s.trackLastActive)
 				r.Get("/", s.GetChat)
@@ -125,7 +125,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 
 			})
 
-			r.Post("/uploads", s.Upload) // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
+			r.Post("/uploads", s.Upload) // Deprecated: frontend uploads directly to upload.moonchan.xyz.
 		})
 	})
 
@@ -145,7 +145,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 		w.Write(swaggerJSON)
 	})
 
-	r.Get("/uploads/*", s.serveUpload) // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
+	r.Get("/uploads/*", s.serveUpload) // Deprecated: frontend uploads directly to upload.moonchan.xyz.
 	if s.Cfg.StaticDir != "" {
 		r.NotFound(s.serveStatic)
 	}

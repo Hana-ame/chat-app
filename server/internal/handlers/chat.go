@@ -13,17 +13,8 @@ type createChatReq struct {
 	MemberIDs  []string `json:"member_ids"`
 }
 
-// Deprecated.
-type createDMReq struct {
-	UserID string `json:"user_id"`
-}
-
 type renameChatReq struct {
 	Name string `json:"name"`
-}
-
-type joinReq struct {
-	ChatID string `json:"chat_id"`
 }
 
 // ListChats godoc
@@ -62,10 +53,6 @@ func (s *Server) CreateChat(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "type must be group or dm")
 		return
 	}
-	if req.Type == "dm" {
-		writeError(w, http.StatusBadRequest, "bad_request", "use POST /api/dms for direct messages")
-		return
-	}
 	chat, err := s.Services.Chat.Create(r.Context(), u.ID, req.Name, req.Visibility, req.MemberIDs)
 	if err != nil {
 		status, code := mapServiceError(err)
@@ -75,19 +62,13 @@ func (s *Server) CreateChat(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, chat)
 }
 
-// Deprecated.
-// CreateOrGetDM godoc
-// @Summary      Create or get DM chat
-// @Description  Find existing DM or create a new one with another user
-// @Tags         chats
-// @Security     BearerAuth
-// @Param        body  body  createDMReq  true  "Target user ID"
-// @Success      200  {object}  models.Chat
-// @Success      201  {object}  models.Chat
-// @Router       /api/dms [post]
+// CreateOrGetDM creates or retrieves a direct message chat.
+// Deprecated: use POST /api/chats with type=dm and member_ids=[otherUserID].
 func (s *Server) CreateOrGetDM(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
-	var req createDMReq
+	var req struct {
+		UserID string `json:"user_id"`
+	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
@@ -231,8 +212,12 @@ type updateAvatarReq struct {
 }
 
 type updateBannerReq struct {
-	AvatarURL     string  `json:"avatar_url"`
+	BannerURL     string  `json:"banner_url"`
 	BannerOpacity float64 `json:"banner_opacity"`
+}
+
+type updateBackgroundReq struct {
+	BackgroundURL string `json:"background_url"`
 }
 
 func (s *Server) UpdateChatAvatar(w http.ResponseWriter, r *http.Request) {
@@ -268,7 +253,7 @@ func (s *Server) UpdateChatBanner(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
-	updated, err := s.Services.Chat.UpdateBanner(r.Context(), chatID, u.ID, req.AvatarURL, req.BannerOpacity)
+	updated, err := s.Services.Chat.UpdateBanner(r.Context(), chatID, u.ID, req.BannerURL, req.BannerOpacity)
 	if err != nil {
 		status, code := mapServiceError(err)
 		writeError(w, status, code, err.Error())
@@ -284,12 +269,12 @@ func (s *Server) UpdateChatBackground(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	chatID := chi.URLParam(r, "chatID")
-	var req updateAvatarReq
+	var req updateBackgroundReq
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
-	updated, err := s.Services.Chat.UpdateBackground(r.Context(), chatID, u.ID, req.AvatarURL)
+	updated, err := s.Services.Chat.UpdateBackground(r.Context(), chatID, u.ID, req.BackgroundURL)
 	if err != nil {
 		status, code := mapServiceError(err)
 		writeError(w, status, code, err.Error())

@@ -10,6 +10,7 @@ import (
 type Service struct {
 	DB       *db.DB
 	Hub      *ws.Hub
+	Authz    *Authz
 	Chat     *ChatService
 	User     *UserService
 	Message  *MessageService
@@ -18,7 +19,7 @@ type Service struct {
 }
 
 func New(database *db.DB, hub *ws.Hub) *Service {
-	s := &Service{DB: database, Hub: hub}
+	s := &Service{DB: database, Hub: hub, Authz: &Authz{DB: database}}
 	s.Chat = &ChatService{Service: s}
 	s.User = &UserService{Service: s}
 	s.Message = &MessageService{Service: s}

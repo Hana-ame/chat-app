@@ -13,14 +13,14 @@ type MessageService struct {
 }
 
 func (s *MessageService) List(ctx context.Context, chatID, userID string, before string, limit int) ([]models.Message, error) {
-	if err := s.Chat.MustBeMember(ctx, chatID, userID); err != nil {
+	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return nil, err
 	}
 	return s.DB.GetMessages(ctx, chatID, before, limit)
 }
 
 func (s *MessageService) Send(ctx context.Context, chatID, userID, content string, attachments []models.Attachment) (*models.Message, error) {
-	if err := s.Chat.MustBeMember(ctx, chatID, userID); err != nil {
+	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(content) == "" && len(attachments) == 0 {
@@ -52,7 +52,7 @@ func (s *MessageService) Send(ctx context.Context, chatID, userID, content strin
 }
 
 func (s *MessageService) Edit(ctx context.Context, chatID, messageID, userID, content string) (*models.Message, error) {
-	if err := s.Chat.MustBeMember(ctx, chatID, userID); err != nil {
+	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return nil, err
 	}
 	msg, err := s.DB.UpdateMessage(ctx, messageID, userID, content)
@@ -72,7 +72,7 @@ func (s *MessageService) Edit(ctx context.Context, chatID, messageID, userID, co
 }
 
 func (s *MessageService) Delete(ctx context.Context, chatID, messageID, userID string) error {
-	if err := s.Chat.MustBeMember(ctx, chatID, userID); err != nil {
+	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return err
 	}
 	existing, err := s.DB.GetMessage(ctx, messageID)
@@ -84,7 +84,7 @@ func (s *MessageService) Delete(ctx context.Context, chatID, messageID, userID s
 	}
 	canDeleteAny := false
 	if chat, err := s.DB.GetChat(ctx, chatID); err == nil {
-		canDeleteAny = chat.OwnerID == userID || s.Chat.RequireOwnerOrAdmin(ctx, chatID, userID) == nil
+		canDeleteAny = chat.OwnerID == userID || s.Authz.RequireOwnerOrAdmin(ctx, chatID, userID) == nil
 	}
 	if existing.UserID != userID && !canDeleteAny {
 		return ErrForbidden
@@ -99,7 +99,7 @@ func (s *MessageService) Delete(ctx context.Context, chatID, messageID, userID s
 }
 
 func (s *MessageService) MarkRead(ctx context.Context, chatID, userID string) error {
-	if err := s.Chat.MustBeMember(ctx, chatID, userID); err != nil {
+	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return err
 	}
 	return s.DB.UpdateLastActiveAt(ctx, chatID, userID)

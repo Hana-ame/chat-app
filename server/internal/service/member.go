@@ -11,7 +11,7 @@ type MemberService struct {
 }
 
 func (s *MemberService) List(ctx context.Context, chatID, userID string) ([]models.User, error) {
-	if err := s.Chat.MustBeMember(ctx, chatID, userID); err != nil {
+	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return nil, err
 	}
 	return s.DB.GetChatMembers(ctx, chatID)
@@ -28,7 +28,7 @@ func (s *MemberService) Add(ctx context.Context, chatID, userID, targetID string
 	if chat.Type == "dm" {
 		return nil, ErrInvalidInput
 	}
-	if err := s.Chat.MustBeMember(ctx, chatID, userID); err != nil {
+	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return nil, err
 	}
 	if _, err := s.DB.GetUserByID(ctx, targetID); err != nil {
@@ -69,7 +69,7 @@ func (s *MemberService) Remove(ctx context.Context, chatID, userID, targetID str
 		return ErrForbidden
 	}
 	if targetID != userID {
-		if err := s.Chat.RequireOwnerOrAdmin(ctx, chatID, userID); err != nil {
+		if err := s.Authz.RequireOwnerOrAdmin(ctx, chatID, userID); err != nil {
 			return err
 		}
 	}

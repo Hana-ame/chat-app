@@ -1121,7 +1121,7 @@ func TestAuthz_MustBeMember(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := testutil.New(t)
 			chatID, userID, ctx := tt.setup(f)
-			err := f.Server.Services.Chat.MustBeMember(ctx, chatID, userID)
+			err := f.Server.Services.Authz.MustBeMember(ctx, chatID, userID)
 			if tt.wantOK && err != nil {
 				t.Fatalf("want nil, got %v", err)
 			}
@@ -1206,7 +1206,7 @@ func TestAuthz_RequireOwnerOrAdmin(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := testutil.New(t)
 			chatID, userID, ctx := tt.setup(f)
-			err := f.Server.Services.Chat.RequireOwnerOrAdmin(ctx, chatID, userID)
+			err := f.Server.Services.Authz.RequireOwnerOrAdmin(ctx, chatID, userID)
 			if tt.wantOK {
 				if err != nil {
 					t.Fatalf("want nil, got %v", err)

@@ -107,7 +107,7 @@ func HashRefreshToken(raw string) string {
 
 func HashPassword(password string) (string, error) {
 	if len(password) > 72 {
-		password = password[:72]
+		return "", errors.New("password too long (max 72 bytes)")
 	}
 	b, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {

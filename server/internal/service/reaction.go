@@ -11,7 +11,7 @@ type ReactionService struct {
 }
 
 func (s *ReactionService) Add(ctx context.Context, chatID, messageID, userID, emoji string) (*models.Message, error) {
-	if err := s.Chat.MustBeMember(ctx, chatID, userID); err != nil {
+	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return nil, err
 	}
 	msg, err := s.DB.GetMessage(ctx, messageID)
@@ -38,7 +38,7 @@ func (s *ReactionService) Add(ctx context.Context, chatID, messageID, userID, em
 }
 
 func (s *ReactionService) Remove(ctx context.Context, chatID, messageID, userID, emoji string) (*models.Message, error) {
-	if err := s.Chat.MustBeMember(ctx, chatID, userID); err != nil {
+	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return nil, err
 	}
 	if err := s.DB.RemoveReaction(ctx, messageID, userID, emoji); err != nil {
@@ -55,7 +55,7 @@ func (s *ReactionService) Remove(ctx context.Context, chatID, messageID, userID,
 }
 
 func (s *ReactionService) List(ctx context.Context, chatID, messageID, viewerID string) ([]models.Reaction, error) {
-	if err := s.Chat.MustBeMember(ctx, chatID, viewerID); err != nil {
+	if err := s.Authz.MustBeMember(ctx, chatID, viewerID); err != nil {
 		return nil, err
 	}
 	return s.DB.ListReactions(ctx, messageID, viewerID)

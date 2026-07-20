@@ -8,11 +8,15 @@ import (
 	"github.com/Hana-ame/chat-app/server/internal/db"
 )
 
-func (s *ChatService) MustBeMember(ctx context.Context, chatID, userID string) error {
+type Authz struct {
+	DB *db.DB
+}
+
+func (a *Authz) MustBeMember(ctx context.Context, chatID, userID string) error {
 	if userID == "" {
 		return ErrForbidden
 	}
-	ok, err := s.DB.IsChatMember(ctx, chatID, userID)
+	ok, err := a.DB.IsChatMember(ctx, chatID, userID)
 	if err != nil {
 		return err
 	}
@@ -22,8 +26,8 @@ func (s *ChatService) MustBeMember(ctx context.Context, chatID, userID string) e
 	return nil
 }
 
-func (s *ChatService) RequireOwnerOrAdmin(ctx context.Context, chatID, userID string) error {
-	chat, err := s.DB.GetChat(ctx, chatID)
+func (a *Authz) RequireOwnerOrAdmin(ctx context.Context, chatID, userID string) error {
+	chat, err := a.DB.GetChat(ctx, chatID)
 	if err != nil {
 		if isNotFound(err) {
 			return ErrNotFound
@@ -33,7 +37,7 @@ func (s *ChatService) RequireOwnerOrAdmin(ctx context.Context, chatID, userID st
 	if chat.OwnerID == userID {
 		return nil
 	}
-	role, err := s.DB.GetChatMemberRole(ctx, chatID, userID)
+	role, err := a.DB.GetChatMemberRole(ctx, chatID, userID)
 	if err != nil {
 		if isNotFound(err) {
 			return ErrForbidden

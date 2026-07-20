@@ -5,6 +5,9 @@ import { createMockTransport } from './transports/mock';
 
 const STATE = { IDLE: 0, CONNECTING: 1, CONNECTED: 2, DISCONNECTING: 3 };
 
+const MAX_RETRY_DELAY = 30000;
+const BASE_RETRY_DELAY = 1000;
+
 class RealtimeCoordinator {
   constructor() {
     this._state = STATE.IDLE;
@@ -12,7 +15,9 @@ class RealtimeCoordinator {
     this._token = null;
     this._transport = null;
     this._handlers = {};
-    this._closeGuard = false;
+    this._reconnectTimer = null;
+    this._reconnectAttempt = 0;
+    this._gen = 0;
   }
 
   setHandlers(h) { this._handlers = h; }
@@ -22,8 +27,10 @@ class RealtimeCoordinator {
   get token() { return this._token; }
 
   connect(mode, token) {
+    this._cancelReconnect();
+    this._gen++;
     if (this._state === STATE.CONNECTING || this._state === STATE.DISCONNECTING) return;
-    this._closeGuard = false;
+    this._reconnectAttempt = 0;
     this._teardown();
     this._state = STATE.CONNECTING;
     this._mode = mode;
@@ -32,8 +39,28 @@ class RealtimeCoordinator {
   }
 
   disconnect() {
-    this._closeGuard = true;
+    this._cancelReconnect();
+    this._gen++;
     this._teardown();
+  }
+
+  _cancelReconnect() {
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
+  }
+
+  _scheduleReconnect() {
+    this._reconnectAttempt++;
+    const delay = Math.min(BASE_RETRY_DELAY * Math.pow(2, this._reconnectAttempt - 1), MAX_RETRY_DELAY);
+    const gen = this._gen;
+    this._reconnectTimer = setTimeout(() => {
+      this._reconnectTimer = null;
+      if (this._gen !== gen) return;
+      if (this._state === STATE.IDLE && this._mode && this._token)
+        this.connect(this._mode, this._token);
+    }, delay);
   }
 
   _teardown() {
@@ -45,24 +72,23 @@ class RealtimeCoordinator {
   }
 
   _initTransport(mode, token) {
+    const gen = this._gen;
     const ctx = {
       token,
       onReady: (data) => {
+        if (this._gen !== gen) return;
         if (this._state !== STATE.CONNECTING) return;
         this._state = STATE.CONNECTED;
+        this._reconnectAttempt = 0;
         this._handlers.onReady?.(data);
       },
       onEvent: (op, payload) => this._handlers.onEvent?.(op, payload),
       onClose: () => {
-        if (this._closeGuard) return;
+        if (this._gen !== gen) return;
         this._state = STATE.IDLE;
         this._transport = null;
         this._handlers.onClose?.();
-        setTimeout(() => {
-          if (this._closeGuard) return;
-          if (this._state === STATE.IDLE && this._mode && this._token)
-            this.connect(this._mode, this._token);
-        }, 3000);
+        this._scheduleReconnect();
       },
     };
 
