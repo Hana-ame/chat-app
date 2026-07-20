@@ -32,7 +32,7 @@ export default function Composer({ chatId }) {
   const [aiMode, setAiMode] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSource, setAiSource] = useState('default');
-  const [showSourcePicker, setShowSourcePicker] = useState(false);
+  const [aiModel, setAiModel] = useState('');
   const fileInput = useRef(null);
   const typingTimer = useRef(null);
   const textRef = useRef(null);
@@ -66,14 +66,16 @@ export default function Composer({ chatId }) {
     };
     useChatStore.getState().onMessageCreate(botMsg);
     try {
-      const res = await api.aiChat(accessToken, {
+      const body = {
         source: aiSource,
         messages: [{ role: 'user', content }],
         stream: true,
         temperature: 0.7,
         max_tokens: 32768,
         top_p: 1,
-      });
+      };
+      if (aiModel.trim()) body.model = aiModel.trim();
+      const res = await api.aiChat(accessToken, body);
       const { cancel } = streamAI(res,
         (chunk) => {
           if (chunk.type === 'content') {
@@ -211,14 +213,15 @@ export default function Composer({ chatId }) {
               AI{aiMode ? ' ▼' : ''}
             </button>
             {aiMode && (
-              <div style={{position:'absolute',bottom:'100%',left:0,marginBottom:4,display:'flex',gap:4,background:'var(--bg-tertiary)',padding:4,borderRadius:6,border:'1px solid var(--border)'}}>
-                {['default','siliconflow','openai','local'].map(s => (
-                  <button key={s} className="btn-ghost" style={{
-                    fontSize:11,padding:'2px 6px',borderRadius:4,
-                    background: aiSource === s ? 'var(--accent)' : 'transparent',
-                    color: aiSource === s ? '#fff' : 'var(--text)',
-                  }} onClick={() => setAiSource(s)}>{s}</button>
-                ))}
+              <div style={{position:'absolute',bottom:'100%',left:0,marginBottom:4,display:'flex',flexDirection:'column',gap:4,background:'var(--bg-tertiary)',padding:6,borderRadius:6,border:'1px solid var(--border)',fontSize:12,whiteSpace:'nowrap'}}>
+                <label>source:
+                  <input value={aiSource} onChange={e => setAiSource(e.target.value)}
+                    style={{marginLeft:6,width:120,fontSize:12,padding:'1px 4px'}} />
+                </label>
+                <label>model:
+                  <input value={aiModel} onChange={e => setAiModel(e.target.value)}
+                    placeholder="(default)" style={{marginLeft:6,width:200,fontSize:12,padding:'1px 4px'}} />
+                </label>
               </div>
             )}
           </div>

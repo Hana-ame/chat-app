@@ -15,18 +15,19 @@ import (
 )
 
 type Config struct {
-	Addr             string
-	DBPath           string
-	UploadDir        string        // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
-	BaseURL          string
-	JWTSecret        []byte
-	AccessTokenTTL   time.Duration
-	RefreshTokenTTL  time.Duration
-	MaxUploadBytes   int64         // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
-	StaticDir        string
-	AllowOrigins     []string
-	CSPConnectSrc    string
-	AISources        []ai.SourceConfig
+	Addr            string
+	DBPath          string
+	BaseURL         string
+	JWTSecret       []byte
+	AccessTokenTTL  time.Duration
+	RefreshTokenTTL time.Duration
+	StaticDir       string
+	AllowOrigins    []string
+	CSPConnectSrc   string
+	AISources       []ai.SourceConfig
+
+	UploadDir      string // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
+	MaxUploadBytes int64  // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
 }
 
 func getenv(key, def string) string {

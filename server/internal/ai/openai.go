@@ -51,10 +51,11 @@ func (p *OpenAIProvider) ChatStream(ctx context.Context, req ChatRequest) (<-cha
 }
 
 func (p *OpenAIProvider) buildBody(req ChatRequest) []byte {
-	// use model from config, override if request specifies one
 	var raw map[string]json.RawMessage
 	json.Unmarshal(req.Raw, &raw)
-	raw["model"] = mustJSON(p.cfg.Model)
+	if _, ok := raw["model"]; !ok {
+		raw["model"] = mustJSON(p.cfg.Model)
+	}
 	if raw["stream"] == nil {
 		raw["stream"] = mustJSON(true)
 	}
