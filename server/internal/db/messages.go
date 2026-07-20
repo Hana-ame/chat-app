@@ -14,6 +14,35 @@ import (
 	"github.com/Hana-ame/chat-app/server/internal/models"
 )
 
+func (d *DB) CreateAIMessage(ctx context.Context, chatID, msgID, content string) (*models.Message, error) {
+	if msgID == "" {
+		msgID = NewID()
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	_, err := d.ExecContext(ctx,
+		`INSERT INTO messages (id, chat_id, user_id, content, created_at, attachment_count, mention_count) VALUES (?,?,?,?,?,0,0)`,
+		msgID, chatID, "ai", content, now,
+	)
+	if err != nil {
+		return nil, err
+	}
+	_, err = d.ExecContext(ctx,
+		`UPDATE chats SET last_message_at = ?, last_message_id = ? WHERE id = ?`,
+		now, msgID, chatID,
+	)
+	if err != nil {
+		// non-critical
+		logutil.Warn("CreateAIMessage: update chats: %v", err)
+	}
+	return &models.Message{
+		ID:        msgID,
+		ChatID:    chatID,
+		UserID:    "ai",
+		Content:   content,
+		CreatedAt: time.Now().UTC(),
+	}, nil
+}
+
 // ── Messages ─────────────────────────────────────────────────────────
 
 func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, mentions []string, attachments []models.Attachment) (*models.Message, error) {

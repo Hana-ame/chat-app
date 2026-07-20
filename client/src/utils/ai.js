@@ -2,6 +2,7 @@ export function streamAI(response, onChunk, onDone, onError) {
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  let cancelled = false;
 
   function parseSSE(line) {
     if (!line.startsWith('data: ')) return;
@@ -16,7 +17,9 @@ export function streamAI(response, onChunk, onDone, onError) {
   }
 
   function pump() {
+    if (cancelled) return;
     reader.read().then(({ done, value }) => {
+      if (cancelled) return;
       if (done) {
         if (buffer.trim()) parseSSE(buffer.trim());
         onDone?.();
@@ -30,9 +33,12 @@ export function streamAI(response, onChunk, onDone, onError) {
         if (trimmed) parseSSE(trimmed);
       }
       pump();
-    }).catch(err => onError?.(err));
+    }).catch(err => {
+      if (err.name === 'AbortError') return;
+      onError?.(err);
+    });
   }
 
   pump();
-  return { cancel: () => reader.cancel() };
+  return { cancel: () => { cancelled = true; reader.cancel(); } };
 }

@@ -19,6 +19,20 @@ func (s *MessageService) List(ctx context.Context, chatID, userID string, before
 	return s.DB.GetMessages(ctx, chatID, before, limit)
 }
 
+func (s *MessageService) SendAI(ctx context.Context, chatID, content, msgID string) (*models.Message, error) {
+	if strings.TrimSpace(content) == "" {
+		return nil, ErrInvalidInput
+	}
+	msg, err := s.DB.CreateAIMessage(ctx, chatID, msgID, content)
+	if err != nil {
+		return nil, err
+	}
+	if s.Hub != nil {
+		s.Hub.BroadcastMessageCreate(msg)
+	}
+	return msg, nil
+}
+
 func (s *MessageService) Send(ctx context.Context, chatID, userID, content string, attachments []models.Attachment) (*models.Message, error) {
 	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return nil, err

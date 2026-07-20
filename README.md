@@ -7,6 +7,7 @@ chat-app/
 ├── server/                    # Go backend (chi + gorilla/ws + jwt + sqlite)
 │   ├── cmd/chatd/main.go      # 入口
 │   ├── internal/
+│   │   ├── ai/                # AI provider interface + OpenAI-compatible impl
 │   │   ├── auth/              # bcrypt + JWT
 │   │   ├── db/                # SQLite DAO (users/chats/messages/reactions)
 │   │   ├── db/migrations/     # 嵌入式SQL DDL
@@ -21,6 +22,7 @@ chat-app/
 │   │   ├── components/        # ChatList/ChatView/MessageItem/Composer/MemberPanel
 │   │   ├── store/             # Zustand stores (auth + chat)
 │   │   ├── api/               # HTTP client
+│   │   ├── utils/             # AI SSE parser
 │   │   └── styles/            # Discord dark theme CSS
 │   ├── tests/                 # Playwright E2E
 │   └── dist/                  # Build output
@@ -84,6 +86,7 @@ cd server && go test ./... -cover -count=1 -timeout 120s
 | PUT | `/api/chats/:id/messages/:mid/reactions/:emoji` | Bearer | Add reaction |
 | DELETE | `/api/chats/:id/messages/:mid/reactions/:emoji` | Bearer | Remove |
 | PUT | `upload.moonchan.xyz/api/upload` | - | External file upload (binary stream) |
+| POST | `/api/ai/chat` | Bearer | AI Chat (streaming SSE, multi-source) |
 | GET | `/ws?access_token=` | - | WebSocket gateway |
 | GET | `/api/events?access_token=` | - | SSE event stream |
 
@@ -119,6 +122,10 @@ Server → Client:  {op:"pong"} / {op:"ready",payload:{user,chats,online_user_id
 | CHAT_REFRESH_TTL | 720h | Refresh token TTL |
 | CHAT_MAX_UPLOAD | 20971520 | Max upload size (bytes) |
 | CHAT_STATIC_DIR | ../client/dist | Frontend static files |
+| CHAT_AI_SOURCES | - | JSON array of AI sources `[{"name","key","base_url","model"}]` |
+| CHAT_AI_KEY | - | Single AI API key (legacy, overridden by SOURCES) |
+| CHAT_AI_BASE_URL | https://api.siliconflow.cn/v1 | AI base URL (legacy) |
+| CHAT_AI_MODEL | deepseek-ai/Deepseek-V4-Flash | Default model (legacy) |
 
 ## Deploy
 
@@ -131,6 +138,53 @@ cd server && CHAT_JWT_SECRET=your-fixed-secret nohup go run ./cmd/chatd &
 
 # 首次编译 modernc.org/sqlite 需 3-5min
 # 用 go run 而非 go build: go build 首次也会卡在 link
+```
+
+## AI Chat
+
+支持多 provider，客户端通过 `source` 字段选择，`model` 字段指定模型（空则用默认）。
+
+### 配置
+
+```json
+# 单 provider
+CHAT_AI_KEY=sk-xxx
+CHAT_AI_BASE_URL=https://api.siliconflow.cn/v1
+CHAT_AI_MODEL=deepseek-ai/Deepseek-V4-Flash
+
+# 多 provider（覆盖单 source 配置）
+CHAT_AI_SOURCES=[{"name":"siliconflow","key":"sk-xxx","base_url":"https://api.siliconflow.cn/v1","model":"deepseek-ai/Deepseek-V4-Flash"}]
+```
+
+### 请求
+
+```
+POST /api/ai/chat
+Authorization: Bearer <token>
+{
+  "source": "siliconflow",
+  "chat_id": "...",
+  "msg_id": "client-generated-uuid",
+  "model": "deepseek-ai/Deepseek-V4-Flash",
+  "messages": [
+    {"role": "user", "content": "hi"}
+  ],
+  "stream": true
+}
+```
+
+返回 SSE 流：`data: {"content":"..."}\n\n`，结束标记 `data: [DONE]\n\n`。
+
+流结束后后端自动将完整回复存为 `user_id='ai'` 的消息并通过 WS 广播。
+
+### 新增 Provider
+
+实现 `server/internal/ai/provider.go` 的 `Provider` 接口：
+
+```go
+type Provider interface {
+  ChatStream(ctx context.Context, req ChatRequest) (<-chan Chunk, error)
+}
 ```
 
 ## ⚠️ 重要：每次修改后必须 Push

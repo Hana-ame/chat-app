@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -16,7 +17,7 @@ type aiSourceProvider struct {
 }
 
 type AIHandler struct {
-	mu       sync.RWMutex
+	mu        sync.RWMutex
 	providers map[string]*aiSourceProvider
 }
 
@@ -55,8 +56,9 @@ func (s *Server) AIChat(w http.ResponseWriter, r *http.Request) {
 
 	var req struct {
 		Source   string          `json:"source"`
+		ChatID   string          `json:"chat_id"`
+		MsgID    string          `json:"msg_id"`
 		Messages json.RawMessage `json:"messages"`
-		Stream   bool            `json:"stream"`
 	}
 	if err := json.Unmarshal(body, &req); err != nil || len(req.Messages) == 0 {
 		writeError(w, http.StatusBadRequest, "bad_request", "messages required")
@@ -65,7 +67,6 @@ func (s *Server) AIChat(w http.ResponseWriter, r *http.Request) {
 
 	sourceName := req.Source
 	if sourceName == "" {
-		sourceName = "default"
 		for name := range s.aiHandler.providers {
 			sourceName = name
 			break
@@ -79,7 +80,7 @@ func (s *Server) AIChat(w http.ResponseWriter, r *http.Request) {
 
 	ch, err := p.prov.ChatStream(r.Context(), ai.ChatRequest{
 		Messages: req.Messages,
-		Stream:   req.Stream,
+		Stream:   true,
 		Raw:      body,
 	})
 	if err != nil {
@@ -98,10 +99,13 @@ func (s *Server) AIChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var buf bytes.Buffer
+
 	for chunk := range ch {
 		if chunk.Done {
 			break
 		}
+		buf.WriteString(chunk.Content)
 		data, _ := json.Marshal(map[string]string{"content": chunk.Content})
 		_, _ = w.Write([]byte("data: "))
 		_, _ = w.Write(data)
@@ -110,6 +114,13 @@ func (s *Server) AIChat(w http.ResponseWriter, r *http.Request) {
 	}
 	_, _ = w.Write([]byte("data: [DONE]\n\n"))
 	flusher.Flush()
+
+	if req.ChatID != "" && buf.Len() > 0 {
+		go func() {
+			_, err := s.Services.Message.SendAI(r.Context(), req.ChatID, buf.String(), req.MsgID)
+			if err != nil {
+				logutil.Error("ai: save message failed: %v", err)
+			}
+		}()
+	}
 }
-
-

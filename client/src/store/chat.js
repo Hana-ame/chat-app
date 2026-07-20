@@ -201,6 +201,15 @@ export const useChatStore = create((set, get) => ({
   /** @param {import('../schemas').Message} msg */
   onMessageCreate(msg) {
     set(s => {
+      const exists = s.messages.find(m => m.id === msg.id);
+      if (exists) {
+        return {
+          messages: s.activeChatId === msg.chat_id
+            ? s.messages.map(m => m.id === msg.id ? { ...m, ...msg, streaming: m.streaming || msg.streaming } : m)
+            : s.messages,
+          chats: s.chats.map(c => c.id === msg.chat_id ? { ...c, last_message: msg, last_message_at: msg.created_at, unread_count: s.activeChatId === msg.chat_id ? 0 : (c.unread_count || 0) + 1 } : c).sort(sortChats),
+        };
+      }
       const chat = s.chats.find(c => c.id === msg.chat_id);
       if (!chat) return { messages: s.activeChatId === msg.chat_id ? [...s.messages, msg] : s.messages };
       return {

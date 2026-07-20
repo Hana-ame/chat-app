@@ -23,6 +23,8 @@ function compressImage(file) {
   });
 }
 
+const CONTEXT_LIMIT = 40;
+
 export default function Composer({ chatId }) {
   const { user, accessToken } = useAuthStore();
   const { sendMessage, sendTyping } = useChatStore();
@@ -33,6 +35,7 @@ export default function Composer({ chatId }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSource, setAiSource] = useState('default');
   const [aiModel, setAiModel] = useState('');
+  const aiAbort = useRef(null);
   const fileInput = useRef(null);
   const typingTimer = useRef(null);
   const textRef = useRef(null);
@@ -52,8 +55,27 @@ export default function Composer({ chatId }) {
     typingTimer.current = setTimeout(() => {}, 2000);
   };
 
+  const cancelAI = () => {
+    if (aiAbort.current) {
+      aiAbort.current.abort();
+      aiAbort.current = null;
+    }
+  };
+
+  const buildContext = (msgs) => {
+    const context = [];
+    for (const m of msgs) {
+      if (context.length >= CONTEXT_LIMIT) break;
+      if (m.user_id === 'ai') {
+        context.push({ role: 'assistant', content: m.content });
+      } else if (m.user_id && m.content) {
+        context.push({ role: 'user', content: m.content });
+      }
+    }
+    return context;
+  };
+
   const handleAISend = async (content) => {
-    setAiLoading(true);
     const msgId = crypto.randomUUID();
     const botMsg = {
       id: msgId,
@@ -65,16 +87,28 @@ export default function Composer({ chatId }) {
       author: { id: 'ai', username: 'AI', avatar_color: '#10a37f' },
     };
     useChatStore.getState().onMessageCreate(botMsg);
+    setAiLoading(true);
+
+    const store = useChatStore.getState();
+    const messages = store.messages;
+    const context = content ? [...buildContext(messages), { role: 'user', content }] : [];
+
+    const controller = new AbortController();
+    aiAbort.current = controller;
+
+    const body = {
+      source: aiSource,
+      chat_id: chatId,
+      msg_id: msgId,
+      messages: context,
+      stream: true,
+      temperature: 0.7,
+      max_tokens: 32768,
+      top_p: 1,
+    };
+    if (aiModel.trim()) body.model = aiModel.trim();
+
     try {
-      const body = {
-        source: aiSource,
-        messages: [{ role: 'user', content }],
-        stream: true,
-        temperature: 0.7,
-        max_tokens: 32768,
-        top_p: 1,
-      };
-      if (aiModel.trim()) body.model = aiModel.trim();
       const res = await api.aiChat(accessToken, body);
       const { cancel } = streamAI(res,
         (chunk) => {
@@ -93,6 +127,7 @@ export default function Composer({ chatId }) {
             ),
           }));
           setAiLoading(false);
+          aiAbort.current = null;
         },
         () => {
           notify('AI response failed', 'error');
@@ -102,9 +137,21 @@ export default function Composer({ chatId }) {
             ),
           }));
           setAiLoading(false);
+          aiAbort.current = null;
         },
       );
+      controller.signal.addEventListener('abort', () => {
+        cancel();
+        useChatStore.setState(s => ({
+          messages: s.messages.map(m =>
+            m.id === msgId ? { ...m, streaming: false } : m
+          ),
+        }));
+        setAiLoading(false);
+        aiAbort.current = null;
+      });
     } catch (e) {
+      if (e.name === 'AbortError') return;
       notify('AI request failed', 'error');
       useChatStore.setState(s => ({
         messages: s.messages.map(m =>
@@ -112,6 +159,7 @@ export default function Composer({ chatId }) {
         ),
       }));
       setAiLoading(false);
+      aiAbort.current = null;
     }
   };
 
@@ -225,18 +273,23 @@ export default function Composer({ chatId }) {
               </div>
             )}
           </div>
-          <button className="btn-ghost" style={{padding:'4px 10px',lineHeight:0}}
-            disabled={(!text.trim() && attachments.length === 0) || uploading || aiLoading}
-            onClick={handleSend} title={aiMode ? 'Send + AI reply' : 'Send'}>
-            {uploading ? <span style={{fontSize:14}}>...</span> : aiLoading ? (
-              <span style={{fontSize:14}}>⟳</span>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12"/>
-                <polyline points="12 5 19 12 12 19"/>
-              </svg>
-            )}
-          </button>
+          {aiLoading ? (
+            <button className="btn-ghost" style={{padding:'4px 10px',lineHeight:0,color:'var(--danger)'}}
+              onClick={cancelAI} title="Cancel">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          ) : (
+            <button className="btn-ghost" style={{padding:'4px 10px',lineHeight:0}}
+              disabled={(!text.trim() && attachments.length === 0) || uploading}
+              onClick={handleSend} title={aiMode ? 'Send + AI reply' : 'Send'}>
+              {uploading ? <span style={{fontSize:14}}>...</span> : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                  <polyline points="12 5 19 12 12 19"/>
+                </svg>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>
