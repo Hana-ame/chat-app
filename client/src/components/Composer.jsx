@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 import { notify } from '../store/notification';
+import { streamAI } from '../utils/ai';
 
 function compressImage(file) {
   return new Promise((resolve) => {
@@ -23,11 +24,15 @@ function compressImage(file) {
 }
 
 export default function Composer({ chatId }) {
-  const { accessToken } = useAuthStore();
+  const { user, accessToken } = useAuthStore();
   const { sendMessage, sendTyping } = useChatStore();
   const [text, setText] = useState('');
   const [uploading, setUploading] = useState(false);
   const [attachments, setAttachments] = useState([]);
+  const [aiMode, setAiMode] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSource, setAiSource] = useState('default');
+  const [showSourcePicker, setShowSourcePicker] = useState(false);
   const fileInput = useRef(null);
   const typingTimer = useRef(null);
   const textRef = useRef(null);
@@ -47,6 +52,67 @@ export default function Composer({ chatId }) {
     typingTimer.current = setTimeout(() => {}, 2000);
   };
 
+  const handleAISend = async (content) => {
+    setAiLoading(true);
+    const msgId = crypto.randomUUID();
+    const botMsg = {
+      id: msgId,
+      chat_id: chatId,
+      user_id: 'ai',
+      content: '',
+      created_at: new Date().toISOString(),
+      streaming: true,
+      author: { id: 'ai', username: 'AI', avatar_color: '#10a37f' },
+    };
+    useChatStore.getState().onMessageCreate(botMsg);
+    try {
+      const res = await api.aiChat(accessToken, {
+        source: aiSource,
+        messages: [{ role: 'user', content }],
+        stream: true,
+        temperature: 0.7,
+        max_tokens: 32768,
+        top_p: 1,
+      });
+      const { cancel } = streamAI(res,
+        (chunk) => {
+          if (chunk.type === 'content') {
+            useChatStore.setState(s => ({
+              messages: s.messages.map(m =>
+                m.id === msgId ? { ...m, content: m.content + chunk.content } : m
+              ),
+            }));
+          }
+        },
+        () => {
+          useChatStore.setState(s => ({
+            messages: s.messages.map(m =>
+              m.id === msgId ? { ...m, streaming: false } : m
+            ),
+          }));
+          setAiLoading(false);
+        },
+        () => {
+          notify('AI response failed', 'error');
+          useChatStore.setState(s => ({
+            messages: s.messages.map(m =>
+              m.id === msgId ? { ...m, streaming: false } : m
+            ),
+          }));
+          setAiLoading(false);
+        },
+      );
+    } catch (e) {
+      notify('AI request failed', 'error');
+      useChatStore.setState(s => ({
+        messages: s.messages.map(m =>
+          m.id === msgId ? { ...m, streaming: false } : m
+        ),
+      }));
+      setAiLoading(false);
+    }
+  };
+
   const handleSend = async () => {
     const content = text.trim();
     if (!content && attachments.length === 0) return;
@@ -54,6 +120,9 @@ export default function Composer({ chatId }) {
       await sendMessage(accessToken, chatId, content, attachments);
       setText('');
       setAttachments([]);
+      if (aiMode && content) {
+        await handleAISend(content);
+      }
     } catch (e) { notify('Failed to send message', 'error'); }
   };
 
@@ -127,7 +196,7 @@ export default function Composer({ chatId }) {
       )}
       <div className="chat-input">
         <div style={{display:'flex',gap:6,alignItems:'stretch'}}>
-          <textarea rows={1} placeholder={'Message #chat'} value={text}
+          <textarea rows={1} placeholder={aiMode ? 'Ask AI...' : 'Message #chat'} value={text}
             ref={textRef}
             onChange={e => { setText(e.target.value); handleTyping(); autoResize(); }}
             onKeyDown={handleKey}
@@ -135,10 +204,30 @@ export default function Composer({ chatId }) {
             style={{flex:1,resize:'none',minHeight:36}} />
           <input type="file" ref={fileInput} onChange={handleFile} style={{display:'none'}} multiple />
           <button className="btn-ghost" style={{fontSize:18,padding:'4px 6px',lineHeight:0}} onClick={() => fileInput.current?.click()} title="Attach file">📎</button>
+          <div style={{position:'relative'}}>
+            <button className={'btn-ghost' + (aiMode ? ' active' : '')} style={{fontSize:13,padding:'4px 6px',lineHeight:0,fontWeight:aiMode?600:400,color:aiMode?'var(--accent)':'var(--text-muted)'}}
+              onClick={() => setAiMode(!aiMode)} title="Toggle AI mode"
+              disabled={aiLoading}>
+              AI{aiMode ? ' ▼' : ''}
+            </button>
+            {aiMode && (
+              <div style={{position:'absolute',bottom:'100%',left:0,marginBottom:4,display:'flex',gap:4,background:'var(--bg-tertiary)',padding:4,borderRadius:6,border:'1px solid var(--border)'}}>
+                {['default','siliconflow','openai','local'].map(s => (
+                  <button key={s} className="btn-ghost" style={{
+                    fontSize:11,padding:'2px 6px',borderRadius:4,
+                    background: aiSource === s ? 'var(--accent)' : 'transparent',
+                    color: aiSource === s ? '#fff' : 'var(--text)',
+                  }} onClick={() => setAiSource(s)}>{s}</button>
+                ))}
+              </div>
+            )}
+          </div>
           <button className="btn-ghost" style={{padding:'4px 10px',lineHeight:0}}
-            disabled={(!text.trim() && attachments.length === 0) || uploading}
-            onClick={handleSend} title="Send">
-            {uploading ? <span style={{fontSize:14}}>...</span> : (
+            disabled={(!text.trim() && attachments.length === 0) || uploading || aiLoading}
+            onClick={handleSend} title={aiMode ? 'Send + AI reply' : 'Send'}>
+            {uploading ? <span style={{fontSize:14}}>...</span> : aiLoading ? (
+              <span style={{fontSize:14}}>⟳</span>
+            ) : (
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="5" y1="12" x2="19" y2="12"/>
                 <polyline points="12 5 19 12 12 19"/>

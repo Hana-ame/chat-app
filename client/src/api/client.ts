@@ -179,6 +179,14 @@ const _apiMethods = {
     };
   },
 
+  // ── AI Chat ──
+  aiChat: (token: string, body: { source?: string; messages: { role: string; content: string }[]; stream?: boolean; [key: string]: unknown }) =>
+    fetch(API_BASE + '/api/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(body),
+    }).then(r => { if (!r.ok) throw r; return r; }),
+
   // ── Misc ──
   sseUrl: (token: string) => API_BASE + '/api/events?access_token=' + encodeURIComponent(token),
 

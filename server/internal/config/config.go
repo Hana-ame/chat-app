@@ -3,11 +3,13 @@ package config
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strconv"
 	"time"
 
+	"github.com/Hana-ame/chat-app/server/internal/ai"
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/joho/godotenv"
 )
@@ -24,6 +26,7 @@ type Config struct {
 	StaticDir        string
 	AllowOrigins     []string
 	CSPConnectSrc    string
+	AISources        []ai.SourceConfig
 }
 
 func getenv(key, def string) string {
@@ -78,6 +81,23 @@ func Load() *Config {
 		uploadDir = abs
 	}
 
+	var aiSources []ai.SourceConfig
+	if s := os.Getenv("CHAT_AI_SOURCES"); s != "" {
+		if err := json.Unmarshal([]byte(s), &aiSources); err != nil {
+			logutil.Warn("CHAT_AI_SOURCES invalid JSON: %v", err)
+		}
+	}
+	if len(aiSources) == 0 {
+		if key := os.Getenv("CHAT_AI_KEY"); key != "" {
+			aiSources = []ai.SourceConfig{{
+				Name:    "default",
+				Key:     key,
+				BaseURL: getenv("CHAT_AI_BASE_URL", "https://api.siliconflow.cn/v1"),
+				Model:   getenv("CHAT_AI_MODEL", "deepseek-ai/Deepseek-V4-Flash"),
+			}}
+		}
+	}
+
 	cfg := &Config{
 		Addr:            getenv("CHAT_ADDR", ":8080"),
 		DBPath:          dbPath,
@@ -90,6 +110,7 @@ func Load() *Config {
 		StaticDir:       getenv("CHAT_STATIC_DIR", "../client/dist"),
 		AllowOrigins:    []string{"*"},
 		CSPConnectSrc:   getenv("CHAT_CSP_CONNECT_SRC", "'self' wss://wsl-8080.moonchan.xyz https://upload.moonchan.xyz"),
+		AISources:       aiSources,
 	}
 	logutil.Debug("config loaded: addr=%s db=%s upload_dir=%s static_dir=%s base_url=%s",
 		cfg.Addr, cfg.DBPath, cfg.UploadDir, cfg.StaticDir, cfg.BaseURL)

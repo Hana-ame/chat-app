@@ -135,6 +135,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 		logutil.Warn("WebSocket gateway is nil, /ws disabled")
 	}
 	r.Get("/api/events", s.SSE)
+	r.With(s.authMiddleware).Post("/api/ai/chat", s.AIChat)
 
 	r.Get("/swagger/*", httpSwagger.Handler(
 		httpSwagger.URL("/swagger/swagger.json"),
