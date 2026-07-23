@@ -15,6 +15,7 @@ import (
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/Hana-ame/chat-app/server/internal/models"
 	"github.com/Hana-ame/chat-app/server/internal/service"
+	localfs "github.com/Hana-ame/chat-app/server/internal/storage/local"
 	"github.com/Hana-ame/chat-app/server/internal/ws"
 	"github.com/go-chi/chi/v5"
 )
@@ -34,10 +35,11 @@ type Server struct {
 	Hub          *ws.Hub
 	Version      string
 	Services     *service.Service
-	refreshMu       sync.Mutex
-	loginLimiter    *loginRateLimiter
-	registerLimiter *registerLimiter
-	aiHandler    *AIHandler
+	aapiLocalDriver  *localfs.Driver
+	refreshMu        sync.Mutex
+	loginLimiter     *loginRateLimiter
+	registerLimiter  *registerLimiter
+	aiHandler        *AIHandler
 }
 
 // New creates a new Server.
@@ -47,7 +49,7 @@ func New(cfg *config.Config, database *db.DB, authSvc *auth.Service, hub *ws.Hub
 		DB:           database,
 		Auth:         authSvc,
 		Hub:          hub,
-		Services:     service.New(database, hub),
+		Services:     service.New(database, hub, cfg),
 		loginLimiter:    newLoginRateLimiter(5, 1*time.Hour),
 		registerLimiter: newRegisterLimiter(100, 24*time.Hour),
 	}

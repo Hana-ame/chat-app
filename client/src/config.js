@@ -11,4 +11,4 @@ export function validateEnv() {
 }
 
 export const API_BASE = import.meta.env.VITE_API_BASE || (IS_PAGES ? 'https://chat.moonchan.xyz' : '');
-export const UPLOAD_BASE = import.meta.env.VITE_UPLOAD_BASE || 'https://upload.moonchan.xyz';
+export const UPLOAD_BASE = import.meta.env.VITE_UPLOAD_BASE || '';

@@ -47,7 +47,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 				"default-src 'self'; "+
 					"script-src 'self' 'unsafe-inline'; "+
 					"style-src 'self' 'unsafe-inline'; "+
-					"img-src 'self' https://upload.moonchan.xyz data: blob:; "+
+					"img-src 'self' data: blob:; "+
 					"connect-src "+s.Cfg.CSPConnectSrc+"; "+
 					"font-src 'self' data:;")
 			w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -136,6 +136,11 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 	}
 	r.Get("/api/events", s.SSE)
 	r.With(s.authMiddleware).Post("/api/ai/chat", s.AIChat)
+
+	r.Put("/api/upload", s.AAPIUpload)
+	r.Put("/api/upload/*", s.AAPIUpload)
+	r.Post("/api/upload", s.AAPIUpload)
+	r.Get("/api/local/*", s.AAPILocalFile)
 
 	r.Get("/swagger/*", httpSwagger.Handler(
 		httpSwagger.URL("/swagger/swagger.json"),

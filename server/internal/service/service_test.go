@@ -602,7 +602,7 @@ func TestMessageService_Send_AttachmentOnly(t *testing.T) {
 	chat := createTestChat(t, f, "MsgAttTest", a, []string{a})
 
 	atts := []models.Attachment{
-		{Filename: "file.pdf", MimeType: "application/pdf", Size: 100, URL: "https://upload.moonchan.xyz/file.pdf"},
+		{Filename: "file.pdf", MimeType: "application/pdf", Size: 100, URL: "http://localhost:8080/api/local/1234567890/file.pdf"},
 	}
 	msg, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, "", atts)
 	if err != nil {
@@ -647,7 +647,7 @@ func TestMessageService_Send_DefaultMimeType(t *testing.T) {
 	chat := createTestChat(t, f, "MsgAttTest4", a, []string{a})
 
 	atts := []models.Attachment{
-		{Filename: "file.bin", URL: "https://upload.moonchan.xyz/file.bin"},
+		{Filename: "file.bin", URL: "http://localhost:8080/api/local/1234567890/file.bin"},
 	}
 	msg, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, "test", atts)
 	if err != nil {

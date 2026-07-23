@@ -26,8 +26,10 @@ type Config struct {
 	CSPConnectSrc   string
 	AISources       []ai.SourceConfig
 
-	UploadDir      string // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
-	MaxUploadBytes int64  // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
+	UploadDir        string
+	MaxUploadBytes   int64
+	UploadSalt       string
+	UploadPublicURL  string
 }
 
 func getenv(key, def string) string {
@@ -99,6 +101,11 @@ func Load() *Config {
 		}
 	}
 
+	uploadSalt := getenv("CHAT_UPLOAD_SALT", "")
+	if uploadSalt == "" {
+		uploadSalt = randomHex(16)
+	}
+
 	cfg := &Config{
 		Addr:            getenv("CHAT_ADDR", ":8080"),
 		DBPath:          dbPath,
@@ -108,9 +115,11 @@ func Load() *Config {
 		AccessTokenTTL:  getenvDuration("CHAT_ACCESS_TTL", 30*time.Minute),
 		RefreshTokenTTL: getenvDuration("CHAT_REFRESH_TTL", 365*24*time.Hour),
 		MaxUploadBytes:  getenvInt64("CHAT_MAX_UPLOAD", 20<<20),
+		UploadSalt:      uploadSalt,
+		UploadPublicURL: getenv("CHAT_UPLOAD_PUBLIC_URL", ""),
 		StaticDir:       getenv("CHAT_STATIC_DIR", "../client/dist"),
 		AllowOrigins:    []string{"*"},
-		CSPConnectSrc:   getenv("CHAT_CSP_CONNECT_SRC", "'self' wss://wsl-8080.moonchan.xyz https://upload.moonchan.xyz"),
+		CSPConnectSrc:   getenv("CHAT_CSP_CONNECT_SRC", "'self' wss://wsl-8080.moonchan.xyz"),
 		AISources:       aiSources,
 	}
 	logutil.Debug("config loaded: addr=%s db=%s upload_dir=%s static_dir=%s base_url=%s",

@@ -36,6 +36,7 @@ func New(t *testing.T) *Fixture {
 		AccessTokenTTL:  15 * time.Minute,
 		RefreshTokenTTL: 24 * time.Hour,
 		MaxUploadBytes:  5 << 20,
+		UploadSalt:      "test-salt",
 		StaticDir:       "",
 		AllowOrigins:    []string{"*"},
 	}

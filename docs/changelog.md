@@ -4591,3 +4591,35 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 - Client build: ✅
 - go vet: ✅
 - go test: ✅
+
+## 2026-07-23 本地文件上传 /aapi/（第 45 轮）
+
+### 目标
+用本地存储替换 `upload.moonchan.xyz` 外部上传服务，API 格式对齐 `Hana-ame/azure-go` 的 `?dest=local` 模式。
+
+### 新增
+- `server/internal/storage/driver.go` — `StorageDriver` 接口（Put/Get/Delete/Head）
+- `server/internal/storage/local/local.go` — 本地文件系统驱动（文件存 `UploadDir/<ts>/<fn>`，MD5 ETag）
+- `server/internal/handlers/aapi.go` — 上传/下载/删除处理器，匹配 azure-go 响应格式：
+  - `PUT /aapi/upload` — 裸 body 上传
+  - `PUT /aapi/upload/*` — 带文件名上传
+  - `POST /aapi/upload` — multipart form-data 上传
+  - `GET /aapi/local/*` — 文件下载
+  - `GET /aapi/local/*?delete=<hash>` — 带 key 删除
+- 响应格式：`{ id, path, url, delete_url }`（`id` = sha256(path + salt)[:8]）
+
+### 修改
+- `config.go` — 新增 `UploadSalt`、`UploadPublicURL`；移除过期注释
+- `handler.go` — Server 结构体新增 `aapiLocalDriver` 字段
+- `router.go` — 注册 `/aapi/*` 路由；CSP 移除 `upload.moonchan.xyz`
+- `service/message.go` — 附件 URL 校验改为检查 `/aapi/local/` 前缀
+- `service/service.go` — Service 注入 `*config.Config`
+- `client/src/config.js` — `UPLOAD_BASE` 默认值改为空（同源）
+- `client/src/api/client.ts` — 上传端点改为 `/aapi/upload`；`buildUploadUrl` 直接取 `data.url`
+- `client/vite.config.js` — dev proxy 添加 `/aapi`
+- `client/.env.example` — `VITE_UPLOAD_BASE` 默认值更新
+- 所有测试中的 `upload.moonchan.xyz` URL 替换为新格式
+
+### 验证
+- Server: `go build` / `go vet` / `go test` — all ✅
+- Client: `npm run build` — ✅

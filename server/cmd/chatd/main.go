@@ -38,7 +38,7 @@ func main() {
 	srv.Version = Version
 	r := srv.Router(gateway)
 
-	if err := os.MkdirAll(cfg.UploadDir, 0o755); err != nil { // Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
+	if err := os.MkdirAll(cfg.UploadDir, 0o755); err != nil {
 		logutil.Fatal("upload dir: %v", err)
 	}
 

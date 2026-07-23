@@ -17,8 +17,8 @@ import { AuthResponseSchema, validate } from '../schemas';
 import type { User, Chat, Message, Attachment, StreamSource } from '../schemas';
 validateEnv();
 
-function buildUploadUrl(data: Attachment, filename: string): string {
-  return UPLOAD_BASE + '/api/' + data.id + '/' + encodeURIComponent(filename);
+function buildUploadUrl(data: Record<string, unknown>): string {
+  return (data.url as string) || (UPLOAD_BASE + '/api/local/' + (data.path as string));
 }
 
 let _refreshing = false;
@@ -163,7 +163,7 @@ const _apiMethods = {
   markAnnouncementRead: (token: string, chatId: string) =>
     request<ApiError>('POST', '/api/chats/' + chatId + '/announcement/read', token, {}),
 
-  // ── Uploads (external upload.moonchan.xyz) ──
+  // ── Uploads ──
   upload: async (file: File) => {
     const res = await fetch(UPLOAD_BASE + '/api/upload', {
       method: 'PUT',
@@ -175,7 +175,7 @@ const _apiMethods = {
       filename: file.name,
       mime_type: file.type || 'application/octet-stream',
       size: file.size,
-      url: buildUploadUrl(data as unknown as Attachment, file.name),
+      url: buildUploadUrl(data),
     };
   },
 

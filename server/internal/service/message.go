@@ -44,7 +44,7 @@ func (s *MessageService) Send(ctx context.Context, chatID, userID, content strin
 		if a.URL == "" || a.Filename == "" {
 			return nil, ErrInvalidInput
 		}
-		if !strings.HasPrefix(a.URL, "https://upload.moonchan.xyz/") {
+		if !strings.Contains(a.URL, "/api/local/") {
 			return nil, ErrInvalidInput
 		}
 		if a.MimeType == "" {

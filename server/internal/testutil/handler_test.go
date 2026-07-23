@@ -869,7 +869,7 @@ func TestSendMessageWithAttachments(t *testing.T) {
 		res := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", alice.AccessToken, map[string]any{
 			"content": "bad attach",
 			"attachments": []map[string]any{
-				{"url": "https://upload.moonchan.xyz/file.png"},
+				{"url": "http://localhost:8080/api/local/123/file.png"},
 			},
 		})
 		defer res.Body.Close()
@@ -895,7 +895,7 @@ func TestSendMessageWithAttachments(t *testing.T) {
 		res := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", alice.AccessToken, map[string]any{
 			"content": "with attach",
 			"attachments": []map[string]any{
-				{"url": "https://upload.moonchan.xyz/foo.png", "filename": "foo.png"},
+				{"url": "http://localhost:8080/api/local/123/foo.png", "filename": "foo.png"},
 			},
 		})
 		defer res.Body.Close()

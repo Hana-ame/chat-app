@@ -231,10 +231,10 @@ function expandMessages(topicMsgs) {
 
 const aliceImgUrl = 'https://proxy.moonchan.xyz/mw2000/78318f19gy1id3yg7ubx0j20k00hkdhr.jpg?proxy_host=wx2.sinaimg.cn&proxy_referer=https%3A%2F%2Fweibo.com%2F';
 const dummyFiles = [
-  { name: 'project-spec.pdf', mime: 'application/pdf', size: 512000, url: 'https://upload.moonchan.xyz/api/test/spec.pdf' },
-  { name: 'archive.zip', mime: 'application/zip', size: 2048000, url: 'https://upload.moonchan.xyz/api/test/arc.zip' },
-  { name: 'meeting-notes.txt', mime: 'text/plain', size: 10240, url: 'https://upload.moonchan.xyz/api/test/notes.txt' },
-  { name: 'budget.xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', size: 307200, url: 'https://upload.moonchan.xyz/api/test/budget.xlsx' },
+  { name: 'project-spec.pdf', mime: 'application/pdf', size: 512000, url: '/api/local/1700000000/spec.pdf' },
+  { name: 'archive.zip', mime: 'application/zip', size: 2048000, url: '/api/local/1700000000/arc.zip' },
+  { name: 'meeting-notes.txt', mime: 'text/plain', size: 10240, url: '/api/local/1700000000/notes.txt' },
+  { name: 'budget.xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', size: 307200, url: '/api/local/1700000000/budget.xlsx' },
 ];
 
 export function generateDummyData({ chatCount = 10, msgPerChat = 65 } = {}) {
@@ -296,8 +296,8 @@ export function generateDummyData({ chatCount = 10, msgPerChat = 65 } = {}) {
         edited_at: !isDeleted && mi === 3 ? createdAt : null,
         deleted: isDeleted,
         attachments: mi === 4 ? [
-          { id: id(), filename: 'photo.png', mime_type: 'image/png', size: 204800, url: 'https://upload.moonchan.xyz/api/test/photo.png' },
-          { id: id(), filename: 'document.pdf', mime_type: 'application/pdf', size: 1024000, url: 'https://upload.moonchan.xyz/api/test/doc.pdf' },
+          { id: id(), filename: 'photo.png', mime_type: 'image/png', size: 204800, url: '/api/local/1700000000/photo.png' },
+          { id: id(), filename: 'document.pdf', mime_type: 'application/pdf', size: 1024000, url: '/api/local/1700000000/doc.pdf' },
         ] : [],
         reactions: [],
       };
