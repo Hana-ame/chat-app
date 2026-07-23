@@ -352,6 +352,30 @@ func (s *Server) UnpinChatList(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "pinned": false})
 }
 
+type updateNotifyReq struct {
+	Enabled bool `json:"enabled"`
+}
+
+func (s *Server) UpdateNotify(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r.Context())
+	if u == nil {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "")
+		return
+	}
+	id := chi.URLParam(r, "chatID")
+	var req updateNotifyReq
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
+	if err := s.Services.Chat.SetNotifyEnabled(r.Context(), id, u.ID, req.Enabled); err != nil {
+		status, code := mapServiceError(err)
+		writeError(w, status, code, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "enabled": req.Enabled})
+}
+
 func (s *Server) MarkPinnedRead(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	if u == nil {

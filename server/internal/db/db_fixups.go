@@ -80,6 +80,42 @@ func (d *DB) ensureChatBannerBackgroundColumn(ctx context.Context) error {
 	return nil
 }
 
+func (d *DB) ensureNotifyEnabledColumn(ctx context.Context) error {
+	var cnt int
+	if err := d.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM pragma_table_info('chat_members') WHERE name='notify_enabled'`).Scan(&cnt); err != nil {
+		return fmt.Errorf("check notify_enabled: %w", err)
+	}
+	if cnt > 0 {
+		return nil
+	}
+	logutil.Info("migrating chat_members: add notify_enabled column")
+	if _, err := d.ExecContext(ctx,
+		`ALTER TABLE chat_members ADD COLUMN notify_enabled INTEGER NOT NULL DEFAULT 1`); err != nil {
+		return fmt.Errorf("add notify_enabled: %w", err)
+	}
+	logutil.Info("chat_members.notify_enabled column added")
+	return nil
+}
+
+func (d *DB) ensureNotifyBlockedColumn(ctx context.Context) error {
+	var cnt int
+	if err := d.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM pragma_table_info('users') WHERE name='notify_blocked'`).Scan(&cnt); err != nil {
+		return fmt.Errorf("check notify_blocked: %w", err)
+	}
+	if cnt > 0 {
+		return nil
+	}
+	logutil.Info("migrating users: add notify_blocked column")
+	if _, err := d.ExecContext(ctx,
+		`ALTER TABLE users ADD COLUMN notify_blocked TEXT NOT NULL DEFAULT '[]'`); err != nil {
+		return fmt.Errorf("add notify_blocked: %w", err)
+	}
+	logutil.Info("users.notify_blocked column added")
+	return nil
+}
+
 func (d *DB) ensureBannerOpacityColumn(ctx context.Context) error {
 	var cnt int
 	if err := d.QueryRowContext(ctx,

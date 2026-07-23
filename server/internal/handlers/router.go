@@ -122,6 +122,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 				r.Put("/avatar", s.UpdateChatAvatar)
 				r.Put("/banner", s.UpdateChatBanner)
 				r.Put("/background", s.UpdateChatBackground)
+				r.Put("/notify", s.UpdateNotify)
 
 			})
 

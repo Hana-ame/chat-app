@@ -59,6 +59,16 @@ func (s *UserService) UpdateProfile(ctx context.Context, id, username, avatarCol
 	return u, nil
 }
 
+func (s *UserService) UpdateNotifyBlocked(ctx context.Context, userID string, blocked []string) (*models.User, error) {
+	if blocked == nil {
+		blocked = []string{}
+	}
+	if err := s.DB.SetUserNotifyBlocked(ctx, userID, blocked); err != nil {
+		return nil, err
+	}
+	return s.DB.GetUserByID(ctx, userID)
+}
+
 func (s *UserService) Search(ctx context.Context, query string, limit int) ([]models.User, error) {
 	return s.DB.SearchUsers(ctx, query, limit)
 }

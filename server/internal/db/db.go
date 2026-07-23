@@ -118,6 +118,14 @@ func (d *DB) Migrate() error {
 		return err
 	}
 
+	if err := d.ensureNotifyEnabledColumn(ctx); err != nil {
+		return err
+	}
+
+	if err := d.ensureNotifyBlockedColumn(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
 

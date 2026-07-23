@@ -13,8 +13,9 @@ type User struct {
 	AvatarURL   string    `json:"avatar_url,omitempty"`
 	Status      string    `json:"status"`
 	Role        string    `json:"role,omitempty"`
-	LastSeen    time.Time `json:"last_seen,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
+	LastSeen    time.Time  `json:"last_seen,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	NotifyBlocked []string `json:"notify_blocked,omitempty"`
 }
 
 type PinnedContent struct {
@@ -42,6 +43,7 @@ type Chat struct {
 	PinnedUpdatedAt *time.Time    `json:"pinned_updated_at,omitempty"`
 	PinnedLastReadAt *time.Time   `json:"pinned_last_read_at,omitempty"`
 	Pinned          bool          `json:"pinned"`
+	NotifyEnabled   bool          `json:"notify_enabled"`
 	LastActiveAt    *time.Time    `json:"last_active_at,omitempty"`
 	LastMessageID  string         `json:"last_message_id,omitempty"`
 	// Deprecated.

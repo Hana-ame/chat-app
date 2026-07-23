@@ -42,6 +42,7 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
 import { getCoordinator } from '../realtime/coordinator';
+import { requestNotifyPermission, sendBrowserNotification } from '../utils/browserNotify';
 
 const coord = getCoordinator();
 
@@ -110,6 +111,10 @@ coord.setHandlers({
 const set = (fn) => useChatStore.setState(fn);
 const get = () => useChatStore.getState();
 
+function getAccessToken() {
+  try { const a = JSON.parse(localStorage.getItem('auth') || '{}'); return a.accessToken; } catch { return null; }
+}
+
 /** @type {import('zustand').StateCreator<ChatStore>} */
 export const useChatStore = create((set, get) => ({
   chats: [],
@@ -117,6 +122,7 @@ export const useChatStore = create((set, get) => ({
   messages: [],
   pinnedMessage: {},
   onlineUserIds: [],
+  notifyEnabled: {},
 
   mode: 'ws',
   wsReady: false,
@@ -153,10 +159,12 @@ export const useChatStore = create((set, get) => ({
     });
       const sorted = merged.sort(sortChats);
       const pinned = {};
+      const notify = {};
       for (const c of sorted) {
         if (c.pinned_message?.content) pinned[c.id] = c.pinned_message;
+        if (c.notify_enabled !== undefined) notify[c.id] = c.notify_enabled;
       }
-      return { chats: sorted, pinnedMessage: { ...s.pinnedMessage, ...pinned } };
+      return { chats: sorted, pinnedMessage: { ...s.pinnedMessage, ...pinned }, notifyEnabled: { ...s.notifyEnabled, ...notify } };
     });
   },
 
@@ -198,6 +206,18 @@ export const useChatStore = create((set, get) => ({
     }));
   },
 
+  /** @param {string} chatId */
+  setNotifyEnabled(chatId, enabled) {
+    const token = getAccessToken();
+    if (token) {
+      api.setNotifyEnabled(token, chatId, enabled).catch(e => console.error('setNotifyEnabled error:', e));
+    }
+    set(s => {
+      const next = { ...s.notifyEnabled, [chatId]: enabled };
+      return { notifyEnabled: next };
+    });
+  },
+
   /** @param {import('../schemas').Message} msg */
   onMessageCreate(msg) {
     set(s => {
@@ -219,6 +239,33 @@ export const useChatStore = create((set, get) => ({
     });
     if (msg.streaming && msg.source) {
       get().startConsumingStream(msg);
+    }
+    const st = get();
+    if (msg.chat_id !== st.activeChatId && msg.user_id !== 'ai') {
+      const uid = getLocalAuth().user?.id;
+      const token = getLocalAuth().accessToken;
+      const blocked = getLocalAuth().user?.notify_blocked || [];
+      if (blocked.includes(msg.user_id)) return;
+      const mentioned = uid && msg.content?.includes(`<@${uid}>`);
+      const chatName = st.chats.find(c => c.id === msg.chat_id)?.name || 'Chat';
+      const authorName = msg.author?.username || 'Someone';
+      if (mentioned) {
+        requestNotifyPermission().then(() => {
+          sendBrowserNotification(`@mentioned in ${chatName}`, msg.content?.replace(/<@[^>]+>/g, '').slice(0, 120) || '', () => {
+            const s = get();
+            s.setActiveChatId(msg.chat_id);
+            s.loadMessages(token, msg.chat_id);
+          });
+        });
+      } else if (st.notifyEnabled?.[msg.chat_id]) {
+        requestNotifyPermission().then(() => {
+          sendBrowserNotification(authorName + ' — ' + chatName, msg.content?.slice(0, 120) || '(attachment)', () => {
+            const s = get();
+            s.setActiveChatId(msg.chat_id);
+            s.loadMessages(token, msg.chat_id);
+          });
+        });
+      }
     }
   },
 
@@ -352,7 +399,22 @@ export const useChatStore = create((set, get) => ({
     }));
   },
 
+  /** @param {string|null} id */
+  setActiveChatId(id) {
+    set(s => {
+      if (id && s.activeChatId !== id) {
+        return {
+          activeChatId: id,
+          messages: [],
+          chats: s.chats.map(c => c.id === id ? { ...c, unread_count: 0 } : c),
+        };
+      }
+      return { activeChatId: id };
+    });
+  },
+
   reset() {
     set({ chats: [], activeChatId: null, messages: [], pinnedMessage: {} });
   },
+
 }));

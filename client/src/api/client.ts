@@ -160,6 +160,8 @@ const _apiMethods = {
     request<{ pinned: boolean }>('POST', '/api/chats/' + chatId + '/pin', _token),
   unpinChat: (_token: string, chatId: string) =>
     request<{ pinned: boolean }>('POST', '/api/chats/' + chatId + '/unpin', _token),
+  setNotifyEnabled: (_token: string, chatId: string, enabled: boolean) =>
+    request<{ enabled: boolean }>('PUT', '/api/chats/' + chatId + '/notify', _token, { enabled }),
   markAnnouncementRead: (token: string, chatId: string) =>
     request<ApiError>('POST', '/api/chats/' + chatId + '/announcement/read', token, {}),
 

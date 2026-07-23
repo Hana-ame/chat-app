@@ -154,7 +154,8 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 	rows, err := d.QueryContext(ctx,
 		`SELECT c.id, c.type, c.name, c.icon_color, c.avatar_url, c.banner_url, c.banner_opacity, c.background_url, c.visibility, c.owner_id, c.created_at, c.last_message_at, c.last_message_id,
 		        cm.last_read_message_id, c.pinned_message, c.pinned_updated_at, c.member_count,
-		        cm.pinned_last_read_at, cm.pinned, cm.last_active_at
+		        cm.pinned_last_read_at, cm.pinned, cm.last_active_at,
+		        cm.notify_enabled
 		 FROM chat_members cm JOIN chats c ON c.id = cm.chat_id
 		 WHERE cm.user_id = ?
 		 ORDER BY COALESCE(c.last_message_at, c.created_at) DESC`,
@@ -178,8 +179,8 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 		var visibility sql.NullString
 		var created string
 		var memberCount int
-		var pinnedBool bool
-		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.AvatarURL, &c.BannerURL, &c.BannerOpacity, &c.BackgroundURL, &visibility, &owner, &created, &lastMsg, &lastMsgID, &lastRead, &pinnedMsg, &pinnedUpdAt, &memberCount, &pinnedLastReadAt, &pinnedBool, &lastActiveAt); err != nil {
+		var pinnedBool, notifyEnabled bool
+		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.AvatarURL, &c.BannerURL, &c.BannerOpacity, &c.BackgroundURL, &visibility, &owner, &created, &lastMsg, &lastMsgID, &lastRead, &pinnedMsg, &pinnedUpdAt, &memberCount, &pinnedLastReadAt, &pinnedBool, &lastActiveAt, &notifyEnabled); err != nil {
 			return nil, err
 		}
 		c.Name = name.String
@@ -206,6 +207,7 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 			c.LastActiveAt = &t
 		}
 		c.Pinned = pinnedBool
+		c.NotifyEnabled = notifyEnabled
 		c.MemberCount = memberCount
 		c.LastMessageID = lastMsgID.String
 		rows2 = append(rows2, row{chat: c, lastRead: lastRead, pinnedLastReadAt: pinnedLastReadAt})

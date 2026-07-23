@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 import { notify } from '../store/notification';
+import { requestNotifyPermission } from '../utils/browserNotify';
 import MessageList from './MessageList';
 import Composer from './Composer';
 import { renderContent } from './renderContent';
@@ -24,6 +25,8 @@ export default function ChatView({ chatId, onBack }) {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [uploadingBg, setUploadingBg] = useState(false);
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const headerMenuRef = useRef(null);
   const avatarInputRef = useRef(null);
   const bannerInputRef = useRef(null);
   const bgInputRef = useRef(null);
@@ -154,6 +157,35 @@ export default function ChatView({ chatId, onBack }) {
     }
   };
 
+  useEffect(() => {
+    if (!showHeaderMenu) return;
+    const close = (e) => {
+      if (headerMenuRef.current && !headerMenuRef.current.contains(e.target)) setShowHeaderMenu(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showHeaderMenu]);
+
+  const handlePinToggle = async () => {
+    try {
+      if (chat?.pinned) {
+        await api.unpinChat(accessToken, chatId);
+        useChatStore.getState().onChatUpdate({ id: chatId, pinned: false });
+      } else {
+        await api.pinChat(accessToken, chatId);
+        useChatStore.getState().onChatUpdate({ id: chatId, pinned: true });
+      }
+    } catch (e) { console.error('pin toggle error:', e); }
+    setShowHeaderMenu(false);
+  };
+
+  const handleNotifyToggle = () => {
+    requestNotifyPermission().then(() => {
+      useChatStore.getState().setNotifyEnabled(chatId, !useChatStore.getState().notifyEnabled[chatId]);
+    });
+    setShowHeaderMenu(false);
+  };
+
   if (!chat) return null;
 
   return (
@@ -218,24 +250,36 @@ export default function ChatView({ chatId, onBack }) {
               </svg>
             </button>
           )}
-          {chat?.owner_id === user.id && (
-            <button className="btn-ghost" style={{padding:'6px 8px',lineHeight:0,borderRadius:4}} title="Upload banner" onClick={() => bannerInputRef.current?.click()} disabled={uploadingBanner}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                <circle cx="8.5" cy="8.5" r="1.5"/>
-                <polyline points="21 15 16 10 5 21"/>
-              </svg>
-            </button>
-          )}
-          {chat?.owner_id === user.id && (
-            <button className="btn-ghost" style={{padding:'6px 8px',lineHeight:0,borderRadius:4}} title="Upload background" onClick={() => bgInputRef.current?.click()} disabled={uploadingBg}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                <circle cx="8.5" cy="8.5" r="1.5"/>
-                <path d="M21 15l-5-5L5 21"/>
-              </svg>
-            </button>
-          )}
+          <button className="btn-ghost" style={{
+            padding:'6px 8px',lineHeight:0,borderRadius:4,
+            color: useChatStore.getState().notifyEnabled[chatId] ? 'var(--accent)' : undefined,
+          }} title={useChatStore.getState().notifyEnabled[chatId] ? 'Notifications on' : 'Notifications off'}
+            onClick={handleNotifyToggle}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+          </button>
+          <div ref={headerMenuRef} style={{position:'relative'}}>
+            <button className="btn-ghost" style={{padding:'6px 8px',lineHeight:0,borderRadius:4,fontSize:18,fontWeight:700,letterSpacing:0}}
+              onClick={() => setShowHeaderMenu(v => !v)} title="More">⋮</button>
+            {showHeaderMenu && (
+              <div className="context-menu" style={{position:'absolute',right:0,top:'100%',zIndex:50}}>
+                <button className="context-menu-item" onClick={handlePinToggle}>
+                  {chat?.pinned ? 'Unpin' : 'Pin'}
+                </button>
+                {chat?.owner_id === user.id && (
+                  <>
+                    <button className="context-menu-item" onClick={() => { bannerInputRef.current?.click(); setShowHeaderMenu(false); }} disabled={uploadingBanner}>
+                      Upload banner
+                    </button>
+                    <button className="context-menu-item" onClick={() => { bgInputRef.current?.click(); setShowHeaderMenu(false); }} disabled={uploadingBg}>
+                      Upload background
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {((showNotice && pinnedMessage[chatId]) || isEditingNotice) && (

@@ -278,6 +278,13 @@ func (s *ChatService) SetPinned(ctx context.Context, chatID, userID string, pinn
 	return nil
 }
 
+func (s *ChatService) SetNotifyEnabled(ctx context.Context, chatID, userID string, enabled bool) error {
+	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
+		return err
+	}
+	return s.DB.SetNotifyEnabled(ctx, chatID, userID, enabled)
+}
+
 func (s *ChatService) Visit(ctx context.Context, chatID, userID string) error {
 	return s.DB.UpdateLastActiveAt(ctx, chatID, userID)
 }

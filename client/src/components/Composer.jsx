@@ -39,6 +39,8 @@ export default function Composer({ chatId }) {
   const fileInput = useRef(null);
   const typingTimer = useRef(null);
   const textRef = useRef(null);
+  const [mentionQuery, setMentionQuery] = useState(null);
+  const [mentionIdx, setMentionIdx] = useState(0);
 
   const autoResize = useCallback(() => {
     const el = textRef.current;
@@ -53,6 +55,52 @@ export default function Composer({ chatId }) {
     sendTyping(chatId);
     if (typingTimer.current) clearTimeout(typingTimer.current);
     typingTimer.current = setTimeout(() => {}, 2000);
+  };
+
+  const mentionMembers = (() => {
+    if (!mentionQuery) return [];
+    const chat = useChatStore.getState().chats.find(c => c.id === chatId);
+    if (!chat?.members) return [];
+    const q = mentionQuery.toLowerCase();
+    return chat.members.filter(m => m.id !== user.id && m.username.toLowerCase().includes(q)).slice(0, 10);
+  })();
+
+  const handleMentionSelect = (m) => {
+    const el = textRef.current;
+    if (!el) return;
+    const pos = el.selectionStart;
+    const before = text.slice(0, pos);
+    const after = text.slice(pos);
+    const atIdx = before.lastIndexOf('@');
+    if (atIdx === -1) return;
+    const newText = before.slice(0, atIdx) + `<@${m.id}> ` + after;
+    setText(newText);
+    setMentionQuery(null);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.selectionStart = el.selectionEnd = atIdx + `<@${m.id}> `.length;
+    });
+  };
+
+  const handleTextChange = (e) => {
+    const val = e.target.value;
+    setText(val);
+    handleTyping();
+    autoResize();
+    const el = textRef.current;
+    if (!el) return;
+    const pos = el.selectionStart;
+    const before = val.slice(0, pos);
+    const atIdx = before.lastIndexOf('@');
+    if (atIdx >= 0 && (atIdx === 0 || before[atIdx - 1] === ' ' || before[atIdx - 1] === '\n')) {
+      const q = before.slice(atIdx + 1);
+      if (q && !q.includes(' ') && !q.includes('\n') && !q.includes('<')) {
+        setMentionQuery(q);
+        setMentionIdx(0);
+        return;
+      }
+    }
+    setMentionQuery(null);
   };
 
   const cancelAI = () => {
@@ -177,6 +225,13 @@ export default function Composer({ chatId }) {
   };
 
   const handleKey = (e) => {
+    const members = mentionMembers;
+    if (members.length > 0) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIdx(i => Math.min(i + 1, members.length - 1)); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIdx(i => Math.max(i - 1, 0)); return; }
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); handleMentionSelect(members[mentionIdx]); return; }
+      if (e.key === 'Escape') { setMentionQuery(null); return; }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -245,10 +300,21 @@ export default function Composer({ chatId }) {
         </div>
       )}
       <div className="chat-input">
-        <div style={{display:'flex',gap:6,alignItems:'stretch'}}>
+        <div style={{display:'flex',gap:6,alignItems:'stretch',position:'relative'}}>
+          {mentionQuery !== null && mentionMembers.length > 0 && (
+            <div className="mention-dropdown">
+              {mentionMembers.map((m, i) => (
+                <div key={m.id} className={'mention-item' + (i === mentionIdx ? ' active' : '')}
+                  onMouseDown={e => { e.preventDefault(); handleMentionSelect(m); }}
+                  onMouseEnter={() => setMentionIdx(i)}>
+                  {m.username}
+                </div>
+              ))}
+            </div>
+          )}
           <textarea rows={1} placeholder={aiMode ? 'Ask AI...' : 'Message #chat'} value={text}
             ref={textRef}
-            onChange={e => { setText(e.target.value); handleTyping(); autoResize(); }}
+            onChange={handleTextChange}
             onKeyDown={handleKey}
             onPaste={handlePaste}
             style={{flex:1,resize:'none',minHeight:36}} />

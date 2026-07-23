@@ -8,6 +8,7 @@ import ChatListItem from './ChatListItem';
 import PublicChannelList from './PublicChannelList';
 import CreateGroupForm from './CreateGroupForm';
 import { notify } from '../store/notification';
+import { requestNotifyPermission } from '../utils/browserNotify';
 import ChatInfoModal from './ChatInfoModal';
 import UserProfileModal from './UserProfileModal';
 import ScrollArea from './ScrollArea';
@@ -98,6 +99,14 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
       await api.unpinChat(accessToken, chatId);
       useChatStore.getState().onChatUpdate({ id: chatId, pinned: false });
     } catch (e) { console.error('Unpin error:', e); }
+    setContextMenu(null);
+  };
+
+  const handleNotifyToggle = (chatId) => {
+    const st = useChatStore.getState();
+    requestNotifyPermission().then(() => {
+      st.setNotifyEnabled(chatId, !st.notifyEnabled[chatId]);
+    });
     setContextMenu(null);
   };
 
@@ -269,6 +278,9 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
             : <button className="context-menu-item" onClick={() => handlePin(contextMenu.chatId)}>Pin</button>}
           <button className="context-menu-item" onClick={() => { navigator.clipboard.writeText(contextMenu.chatId).catch(() => {}); setContextMenu(null); }}>Copy Chat ID</button>
           <button className="context-menu-item" onClick={() => { setShowChatInfo(contextMenu.chatId); setContextMenu(null); }}>View Info</button>
+          <button className="context-menu-item" onClick={() => handleNotifyToggle(contextMenu.chatId)}>
+            {useChatStore.getState().notifyEnabled[contextMenu.chatId] ? '🔔 Notifications' : '🔕 Notifications'}
+          </button>
           {c?.type !== 'dm' && c?.owner_id === user.id && (
             <button className="context-menu-item danger" onClick={() => handleDelete(contextMenu.chatId)}>Delete</button>
           )}

@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -71,14 +72,15 @@ func (d *DB) CreateUser(ctx context.Context, email, username, passwordHash strin
 
 func (d *DB) GetUserByID(ctx context.Context, id string) (*models.User, error) {
 	var (
-		u         models.User
-		lastSeen  string
-		createdAt string
+		u            models.User
+		lastSeen     string
+		createdAt    string
+		notifyBlocked sql.NullString
 	)
 	err := d.QueryRowContext(ctx,
-		`SELECT id, email, username, avatar_color, avatar_url, status, last_seen, created_at FROM users WHERE id = ?`,
+		`SELECT id, email, username, avatar_color, avatar_url, status, last_seen, created_at, notify_blocked FROM users WHERE id = ?`,
 		id,
-	).Scan(&u.ID, &u.Email, &u.Username, &u.AvatarColor, &u.AvatarURL, &u.Status, &lastSeen, &createdAt)
+	).Scan(&u.ID, &u.Email, &u.Username, &u.AvatarColor, &u.AvatarURL, &u.Status, &lastSeen, &createdAt, &notifyBlocked)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -87,21 +89,29 @@ func (d *DB) GetUserByID(ctx context.Context, id string) (*models.User, error) {
 	}
 	u.LastSeen = parseTime(lastSeen)
 	u.CreatedAt = parseTime(createdAt)
+	if notifyBlocked.Valid && notifyBlocked.String != "" {
+		if err := json.Unmarshal([]byte(notifyBlocked.String), &u.NotifyBlocked); err != nil {
+			u.NotifyBlocked = []string{}
+		}
+	} else {
+		u.NotifyBlocked = []string{}
+	}
 	return &u, nil
 }
 
 func (d *DB) GetUserByEmail(ctx context.Context, email string) (*models.User, string, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	var (
-		u         models.User
-		pwHash    string
-		lastSeen  string
-		createdAt string
+		u            models.User
+		pwHash       string
+		lastSeen     string
+		createdAt    string
+		notifyBlocked sql.NullString
 	)
 	err := d.QueryRowContext(ctx,
-		`SELECT id, email, username, avatar_color, avatar_url, status, last_seen, created_at, password_hash FROM users WHERE email = ?`,
+		`SELECT id, email, username, avatar_color, avatar_url, status, last_seen, created_at, password_hash, notify_blocked FROM users WHERE email = ?`,
 		email,
-	).Scan(&u.ID, &u.Email, &u.Username, &u.AvatarColor, &u.AvatarURL, &u.Status, &lastSeen, &createdAt, &pwHash)
+	).Scan(&u.ID, &u.Email, &u.Username, &u.AvatarColor, &u.AvatarURL, &u.Status, &lastSeen, &createdAt, &pwHash, &notifyBlocked)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, "", ErrNotFound
 	}
@@ -110,6 +120,13 @@ func (d *DB) GetUserByEmail(ctx context.Context, email string) (*models.User, st
 	}
 	u.LastSeen = parseTime(lastSeen)
 	u.CreatedAt = parseTime(createdAt)
+	if notifyBlocked.Valid && notifyBlocked.String != "" {
+		if err := json.Unmarshal([]byte(notifyBlocked.String), &u.NotifyBlocked); err != nil {
+			u.NotifyBlocked = []string{}
+		}
+	} else {
+		u.NotifyBlocked = []string{}
+	}
 	return &u, pwHash, nil
 }
 
@@ -150,6 +167,35 @@ func (d *DB) UpdateUserStatus(ctx context.Context, id, status string) error {
 func (d *DB) UpdateUserLastSeen(ctx context.Context, id string) error {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	_, err := d.ExecContext(ctx, `UPDATE users SET last_seen = ? WHERE id = ?`, now, id)
+	return err
+}
+
+func (d *DB) GetUserNotifyBlocked(ctx context.Context, userID string) ([]string, error) {
+	var raw string
+	err := d.QueryRowContext(ctx,
+		`SELECT COALESCE(notify_blocked, '[]') FROM users WHERE id = ?`, userID,
+	).Scan(&raw)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	var ids []string
+	if err := json.Unmarshal([]byte(raw), &ids); err != nil {
+		ids = []string{}
+	}
+	return ids, nil
+}
+
+func (d *DB) SetUserNotifyBlocked(ctx context.Context, userID string, blocked []string) error {
+	b, err := json.Marshal(blocked)
+	if err != nil {
+		return err
+	}
+	_, err = d.ExecContext(ctx,
+		`UPDATE users SET notify_blocked = ? WHERE id = ?`, string(b), userID,
+	)
 	return err
 }
 

@@ -8,9 +8,10 @@ import (
 )
 
 type updateProfileReq struct {
-	Username    string `json:"username"`
-	AvatarColor string `json:"avatar_color"`
-	AvatarURL   string `json:"avatar_url"`
+	Username      string   `json:"username"`
+	AvatarColor   string   `json:"avatar_color"`
+	AvatarURL     string   `json:"avatar_url"`
+	NotifyBlocked []string `json:"notify_blocked,omitempty"`
 }
 
 // UpdateMe godoc
@@ -60,6 +61,13 @@ func (s *Server) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		}
 		writeError(w, status, code, err.Error())
 		return
+	}
+	if req.NotifyBlocked != nil {
+		updated, err = s.Services.User.UpdateNotifyBlocked(r.Context(), u.ID, req.NotifyBlocked)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "internal", err.Error())
+			return
+		}
 	}
 	logutil.Info("profile updated: user=%s username=%s", u.ID[:8], name)
 	if s.Hub != nil {
