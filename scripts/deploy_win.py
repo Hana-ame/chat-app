@@ -32,7 +32,11 @@ def find_asset(release):
 def download(asset, dst):
     url = asset["browser_download_url"]
     print(f"downloading {url}")
-    urllib.request.urlretrieve(url, dst)
+    tmp = dst + ".tmp"
+    if os.path.isfile(dst):
+        os.remove(dst)
+    urllib.request.urlretrieve(url, tmp)
+    os.replace(tmp, dst)
     print(f"saved to {dst}")
 
 
