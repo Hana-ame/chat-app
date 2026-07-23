@@ -45,10 +45,10 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Security-Policy",
 				"default-src 'self'; "+
-					"script-src 'self' 'unsafe-inline'; "+
+					"script-src 'self' 'unsafe-inline' https://esm.sh; "+
 					"style-src 'self' 'unsafe-inline'; "+
 					"img-src 'self' data: blob:; "+
-					"connect-src "+s.Cfg.CSPConnectSrc+"; "+
+					"connect-src "+s.Cfg.CSPConnectSrc+" https://esm.sh; "+
 					"font-src 'self' data:;")
 			w.Header().Set("X-Content-Type-Options", "nosniff")
 			next.ServeHTTP(w, r)
