@@ -4,11 +4,13 @@ import os
 import shutil
 import subprocess
 import sys
+import tarfile
 import urllib.request
 from urllib.request import ProxyHandler, build_opener, install_opener
 
 REPO = "Hana-ame/chat-app"
 BINARY = "chatd-windows-amd64.exe"
+CLIENT_ARCHIVE = "client-dist.tar.gz"
 CWD = os.getcwd()
 
 
@@ -35,12 +37,12 @@ def latest_release():
     return releases[0]
 
 
-def find_asset(release):
+def find_asset(release, name):
     for a in release.get("assets", []):
-        if a["name"] == BINARY:
+        if a["name"] == name:
             print(f"[deploy] found asset: {a['name']} ({a['size']} bytes)")
             return a
-    print(f"[deploy] ERROR: asset {BINARY} not found in release {release['tag_name']}")
+    print(f"[deploy] ERROR: asset {name} not found in release {release['tag_name']}")
     print(f"[deploy] available assets: {[a['name'] for a in release.get('assets', [])]}")
     sys.exit(1)
 
@@ -97,8 +99,17 @@ def main():
 
     if cmd in ("download", "all"):
         rel = latest_release()
-        a = find_asset(rel)
-        download(a, dst, proxy)
+        binary_asset = find_asset(rel, BINARY)
+        download(binary_asset, dst, proxy)
+        client_asset = find_asset(rel, CLIENT_ARCHIVE)
+        client_dst = os.path.join(CWD, CLIENT_ARCHIVE)
+        download(client_asset, client_dst, proxy)
+        client_dir = os.path.join(CWD, "client", "dist")
+        os.makedirs(client_dir, exist_ok=True)
+        print(f"[deploy] extracting {CLIENT_ARCHIVE} -> {client_dir}")
+        with tarfile.open(client_dst) as tf:
+            tf.extractall(client_dir)
+        os.remove(client_dst)
         print(f"[deploy] download complete (tag: {rel['tag_name']})")
 
     if cmd in ("run", "all"):
