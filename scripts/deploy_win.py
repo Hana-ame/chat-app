@@ -70,7 +70,7 @@ def load_env(env_file):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("cmd", nargs="?", default="all", choices=["download", "run", "all"])
-    parser.add_argument("--proxy", default="", help="proxy URL, e.g. http://localhost:10809")
+    parser.add_argument("--proxy", default="http://localhost:10809", help="proxy URL")
     args = parser.parse_args()
 
     cmd = args.cmd
