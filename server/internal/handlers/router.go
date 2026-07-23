@@ -138,6 +138,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 	r.Get("/api/events", s.SSE)
 	r.With(s.authMiddleware).Post("/api/ai/chat", s.AIChat)
 
+	r.Get("/api/upload", s.AAPIUpload)
 	r.Put("/api/upload", s.AAPIUpload)
 	r.Put("/api/upload/*", s.AAPIUpload)
 	r.Post("/api/upload", s.AAPIUpload)

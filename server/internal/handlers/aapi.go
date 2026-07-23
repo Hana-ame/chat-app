@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"crypto/sha256"
+	_ "embed"
 	"fmt"
 	"io"
 	"mime"
@@ -15,6 +16,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
+
+//go:embed upload.html
+var uploadHTML string
 
 var contentTypeExt = map[string]string{
 	"image/jpeg":           ".jpg",
@@ -78,6 +82,13 @@ func (s *Server) aapiUploadResp(w http.ResponseWriter, r *http.Request, path str
 }
 
 func (s *Server) AAPIUpload(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(uploadHTML))
+		return
+	}
+
 	drv := s.aapiUploadDriver()
 	if drv == nil {
 		writeError(w, http.StatusInternalServerError, "internal", "upload storage not available")
