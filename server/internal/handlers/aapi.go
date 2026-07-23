@@ -84,6 +84,13 @@ func (s *Server) aapiUploadResp(w http.ResponseWriter, r *http.Request, path str
 func (s *Server) AAPIUpload(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Content-Security-Policy",
+			"default-src 'self'; "+
+				"script-src 'self' 'unsafe-inline' https://esm.sh; "+
+				"style-src 'self' 'unsafe-inline'; "+
+				"img-src 'self' data: blob:; "+
+				"connect-src 'self' https://esm.sh; "+
+				"font-src 'self' data:;")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(uploadHTML))
 		return
