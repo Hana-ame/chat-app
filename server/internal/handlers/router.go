@@ -85,6 +85,13 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 		r.With(httprate.LimitByIP(5, 1*time.Minute)).Post("/auth/register", s.Register)
 		r.Post("/auth/refresh", s.Refresh)
 
+		// Upload routes — no auth required, on /api/upload and /api/local/*
+		r.Get("/upload", s.AAPIUpload)
+		r.Put("/upload", s.AAPIUpload)
+		r.Put("/upload/*", s.AAPIUpload)
+		r.Post("/upload", s.AAPIUpload)
+		r.Get("/local/*", s.AAPILocalFile)
+
 		r.Group(func(r chi.Router) {
 			r.Use(s.authMiddleware)
 			r.Post("/auth/logout", s.Logout)
@@ -127,22 +134,17 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 			})
 
 			r.Post("/uploads", s.Upload) // Deprecated: frontend uploads directly to upload.moonchan.xyz.
-		})
-	})
+		}) // end auth group
+
+		r.Get("/events", s.SSE)
+		r.With(s.authMiddleware).Post("/ai/chat", s.AIChat)
+	}) // end /api route
 
 	if gateway != nil {
 		r.Get("/ws", gateway.ServeHTTP)
 	} else {
 		logutil.Warn("WebSocket gateway is nil, /ws disabled")
 	}
-	r.Get("/api/events", s.SSE)
-	r.With(s.authMiddleware).Post("/api/ai/chat", s.AIChat)
-
-	r.Get("/api/upload", s.AAPIUpload)
-	r.Put("/api/upload", s.AAPIUpload)
-	r.Put("/api/upload/*", s.AAPIUpload)
-	r.Post("/api/upload", s.AAPIUpload)
-	r.Get("/api/local/*", s.AAPILocalFile)
 
 	r.Get("/swagger/*", httpSwagger.Handler(
 		httpSwagger.URL("/swagger/swagger.json"),
