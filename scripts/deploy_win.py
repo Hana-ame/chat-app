@@ -32,11 +32,9 @@ def find_asset(release):
 def download(asset, dst):
     url = asset["browser_download_url"]
     print(f"downloading {url}")
-    tmp = dst + ".tmp"
     if os.path.isfile(dst):
         os.remove(dst)
-    urllib.request.urlretrieve(url, tmp)
-    os.replace(tmp, dst)
+    subprocess.run(["curl.exe", "-sLo", dst, url], check=True)
     print(f"saved to {dst}")
 
 
