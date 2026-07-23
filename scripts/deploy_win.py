@@ -72,13 +72,8 @@ def main():
                 shutil.copy2(example, env_file)
                 print(f"created {env_file} from .env.example")
         env = load_env(env_file)
-        flags = 0
-        if hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
-            flags |= subprocess.CREATE_NEW_PROCESS_GROUP
-        if hasattr(subprocess, "DETACHED_PROCESS"):
-            flags |= subprocess.DETACHED_PROCESS
-        p = subprocess.Popen([dst], env=env, creationflags=flags)
-        print(f"started pid={p.pid}")
+        os.chdir(CWD)
+        subprocess.run([dst], env=env)
 
     if cmd not in ("download", "run", "all"):
         print(f"usage: python {sys.argv[0]} [download|run|all]")
