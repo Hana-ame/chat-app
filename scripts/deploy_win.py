@@ -51,7 +51,7 @@ def download(asset, dst, proxy):
     if os.path.isfile(dst):
         print(f"[deploy] removing existing file: {dst}")
         os.remove(dst)
-    cmd = ["curl.exe", "-L", "-o", dst]
+    cmd = ["curl.exe", "-L", "--progress-bar", "-o", dst]
     if proxy:
         cmd += ["-x", proxy]
     cmd += [url]
