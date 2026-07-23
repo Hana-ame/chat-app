@@ -15,4 +15,4 @@ server/chatd
 chatd
 
 docs/*.pptx
-server/docs/swagger/swagger.json
+server/docs/swagger/swagger.jsonscripts/__pycache__/
