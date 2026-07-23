@@ -1,13 +1,24 @@
+import argparse
 import json
 import os
 import shutil
 import subprocess
 import sys
 import urllib.request
+from urllib.request import ProxyHandler, build_opener, install_opener
 
 REPO = "Hana-ame/chat-app"
 BINARY = "chatd-windows-amd64.exe"
 CWD = os.getcwd()
+
+
+def setup_proxy(proxy):
+    if not proxy:
+        return
+    os.environ.setdefault("HTTPS_PROXY", proxy)
+    os.environ.setdefault("HTTP_PROXY", proxy)
+    handler = ProxyHandler({"http": proxy, "https": proxy})
+    install_opener(build_opener(handler))
 
 
 def latest_release():
@@ -29,12 +40,16 @@ def find_asset(release):
     sys.exit(1)
 
 
-def download(asset, dst):
+def download(asset, dst, proxy):
     url = asset["browser_download_url"]
     print(f"downloading {url}")
     if os.path.isfile(dst):
         os.remove(dst)
-    subprocess.run(["curl.exe", "-sLo", dst, url], check=True)
+    cmd = ["curl.exe", "-sLo", dst]
+    if proxy:
+        cmd += ["-x", proxy]
+    cmd += [url]
+    subprocess.run(cmd, check=True)
     print(f"saved to {dst}")
 
 
@@ -53,7 +68,14 @@ def load_env(env_file):
 
 
 def main():
-    cmd = sys.argv[1] if len(sys.argv) > 1 else "all"
+    parser = argparse.ArgumentParser()
+    parser.add_argument("cmd", nargs="?", default="all", choices=["download", "run", "all"])
+    parser.add_argument("--proxy", default="", help="proxy URL, e.g. http://localhost:10809")
+    args = parser.parse_args()
+
+    cmd = args.cmd
+    proxy = args.proxy
+    setup_proxy(proxy)
 
     dst = os.path.join(CWD, BINARY)
     env_file = os.path.join(CWD, ".env")
@@ -61,7 +83,7 @@ def main():
     if cmd in ("download", "all"):
         rel = latest_release()
         a = find_asset(rel)
-        download(a, dst)
+        download(a, dst, proxy)
         print(f"tag: {rel['tag_name']}")
 
     if cmd in ("run", "all"):
