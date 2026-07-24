@@ -147,6 +147,10 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 		w.Write(swaggerJSON)
 	})
 
+	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/icon.svg", http.StatusFound)
+	})
+
 	if s.Cfg.StaticDir != "" {
 		r.NotFound(s.serveStatic)
 	}
