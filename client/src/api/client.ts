@@ -21,13 +21,33 @@ function buildUploadUrl(data: Record<string, unknown>): string {
   return (data.url as string) || (UPLOAD_BASE + '/api/local/' + (data.path as string));
 }
 
-let _refreshing = false;
-
 interface ApiError {
   status: number;
   error?: string;
   message?: string;
   [key: string]: unknown;
+}
+
+let refreshPromise: Promise<boolean> | null = null;
+
+async function refreshToken(): Promise<boolean> {
+  try {
+    const rr = await fetch(API_BASE + '/api/auth/refresh', {
+      method: 'POST', credentials: 'include',
+    });
+    const rd = await rr.json().catch(() => ({})) as Record<string, unknown>;
+    if (rr.ok) {
+      const saved = JSON.parse(localStorage.getItem('auth') || '{}');
+      saved.accessToken = rd.access_token;
+      if (rd.user) saved.user = rd.user;
+      localStorage.setItem('auth', JSON.stringify(saved));
+      useAuthStore.setState({ accessToken: rd.access_token, user: rd.user || saved.user });
+      return true;
+    }
+  } catch (e) {
+    console.error('[API] refresh failed:', e);
+  }
+  return false;
 }
 
 async function request<T = unknown>(method: string, path: string, token: string | null, body?: unknown): Promise<T> {
@@ -43,29 +63,16 @@ async function request<T = unknown>(method: string, path: string, token: string 
   const res = await fetch(API_BASE + path, opts);
   const data: Record<string, unknown> = await res.json().catch(() => ({}));
   if (res.status === 401 && path !== '/api/auth/refresh' && path !== '/api/auth/logout') {
-    if (!_refreshing) {
-      _refreshing = true;
-      try {
-        const rr = await fetch(API_BASE + '/api/auth/refresh', {
-          method: 'POST', credentials: 'include',
-        });
-        const rd = await rr.json().catch(() => ({})) as Record<string, unknown>;
-        if (rr.ok) {
-          const saved = JSON.parse(localStorage.getItem('auth') || '{}');
-          saved.accessToken = rd.access_token;
-          if (rd.user) saved.user = rd.user;
-          localStorage.setItem('auth', JSON.stringify(saved));
-          useAuthStore.setState({ accessToken: rd.access_token, user: rd.user || saved.user });
-          const retryRes = await fetch(API_BASE + path, opts);
-          const retryData = await retryRes.json().catch(() => ({}));
-          if (!retryRes.ok) throw { status: retryRes.status, ...retryData } as ApiError;
-          return retryData as T;
-        }
-      } catch (e) {
-        console.error('[API] refresh failed:', e);
-      } finally {
-        _refreshing = false;
-      }
+    if (!refreshPromise) {
+      refreshPromise = refreshToken();
+    }
+    const ok = await refreshPromise;
+    refreshPromise = null;
+    if (ok) {
+      const retryRes = await fetch(API_BASE + path, opts);
+      const retryData = await retryRes.json().catch(() => ({}));
+      if (!retryRes.ok) throw { status: retryRes.status, ...retryData } as ApiError;
+      return retryData as T;
     }
     window.dispatchEvent(new CustomEvent('auth:unauthorized'));
   }

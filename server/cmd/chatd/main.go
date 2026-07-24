@@ -69,7 +69,9 @@ func main() {
 		hub.Shutdown()
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		_ = server.Shutdown(ctx)
+		if err := server.Shutdown(ctx); err != nil {
+			logutil.Warn("chatd: shutdown error: %v", err)
+		}
 		close(idle)
 	}()
 

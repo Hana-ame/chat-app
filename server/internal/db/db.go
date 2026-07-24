@@ -27,6 +27,40 @@ type migration struct {
 	name    string
 }
 
+type goMigration struct {
+	version int
+	fn      func(ctx context.Context, d *DB) error
+}
+
+// goMigrations are versioned schema fixups that need Go logic (e.g. ALTER
+// TABLE ADD COLUMN with existence checks that SQLite can't express portably).
+// New entries must append with an incremented version number.
+var goMigrations = []goMigration{
+	{1, migrateV1EnsureColumns},
+}
+
+func migrateV1EnsureColumns(ctx context.Context, d *DB) error {
+	if err := d.ensureLastActiveColumn(ctx); err != nil {
+		return err
+	}
+	columns := []struct {
+		table, name, definition string
+	}{
+		{"chats", "avatar_url", "avatar_url TEXT NOT NULL DEFAULT ''"},
+		{"chats", "banner_url", "banner_url TEXT NOT NULL DEFAULT ''"},
+		{"chats", "background_url", "background_url TEXT NOT NULL DEFAULT ''"},
+		{"chats", "banner_opacity", "banner_opacity REAL NOT NULL DEFAULT 0.9"},
+		{"chat_members", "notify_enabled", "notify_enabled INTEGER NOT NULL DEFAULT 1"},
+		{"users", "notify_blocked", "notify_blocked TEXT NOT NULL DEFAULT '[]'"},
+	}
+	for _, c := range columns {
+		if err := d.ensureColumn(ctx, c.table, c.name, c.definition); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func Open(path string, maxContentLength int) (*DB, error) {
 	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(ON)&_time_format=sqlite", path)
 	conn, err := sql.Open("sqlite", dsn)
@@ -102,36 +136,22 @@ func (d *DB) Migrate() error {
 		logutil.Info("applied migration: %s", m.name)
 	}
 
-	// Unversioned startup fix: rename last_visited_at → last_active_at if needed.
-	// Runs every startup regardless of schema_migrations, because ensure_db()
-	// on the VPS may have bootstrapped the DB with last_visited_at and pre-recorded
-	// version 1, causing the versioned migration 001 to be skipped.
-	if err := d.ensureLastActiveColumn(ctx); err != nil {
-		return err
-	}
-
-	if err := d.ensureColumn(ctx, "chats", "avatar_url", "avatar_url TEXT NOT NULL DEFAULT ''"); err != nil {
-		return err
-	}
-
-	if err := d.ensureColumn(ctx, "chats", "banner_url", "banner_url TEXT NOT NULL DEFAULT ''"); err != nil {
-		return err
-	}
-
-	if err := d.ensureColumn(ctx, "chats", "background_url", "background_url TEXT NOT NULL DEFAULT ''"); err != nil {
-		return err
-	}
-
-	if err := d.ensureColumn(ctx, "chats", "banner_opacity", "banner_opacity REAL NOT NULL DEFAULT 0.9"); err != nil {
-		return err
-	}
-
-	if err := d.ensureColumn(ctx, "chat_members", "notify_enabled", "notify_enabled INTEGER NOT NULL DEFAULT 1"); err != nil {
-		return err
-	}
-
-	if err := d.ensureColumn(ctx, "users", "notify_blocked", "notify_blocked TEXT NOT NULL DEFAULT '[]'"); err != nil {
-		return err
+	// ── Go-based migrations (column ensure, schema fixups) ──
+	for _, gm := range goMigrations {
+		var exists int
+		d.QueryRowContext(ctx,
+			`SELECT 1 FROM schema_migrations WHERE version = ?`, gm.version).Scan(&exists)
+		if exists == 1 {
+			continue
+		}
+		if err := gm.fn(ctx, d); err != nil {
+			return fmt.Errorf("apply migration %d: %w", gm.version, err)
+		}
+		if _, err := d.ExecContext(ctx,
+			`INSERT INTO schema_migrations (version) VALUES (?)`, gm.version); err != nil {
+			return fmt.Errorf("record migration %d: %w", gm.version, err)
+		}
+		logutil.Info("applied go migration: %d", gm.version)
 	}
 
 	return nil

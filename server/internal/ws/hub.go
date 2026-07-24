@@ -161,7 +161,11 @@ func (h *Hub) sendToUser(userID string, env Envelope) {
 	if len(clients) > 0 {
 		return
 	}
-	b, _ := json.Marshal(env)
+	b, err := json.Marshal(env)
+	if err != nil {
+		logutil.Error("ws: marshal envelope %s: %v", env.Op, err)
+		return
+	}
 	h.sseSend(userID, b)
 }
 
@@ -179,7 +183,11 @@ func (h *Hub) sendToChat(chatID string, env Envelope, exceptUser string) {
 		}
 		h.setCachedMembers(chatID, members)
 	}
-	b, _ := json.Marshal(env)
+	b, err := json.Marshal(env)
+	if err != nil {
+		logutil.Error("ws: marshal %s for chat %s: %v", env.Op, chatID[:8], err)
+		return
+	}
 	h.mu.RLock()
 	clients := make([]*Client, 0)
 	sseTargets := make([]string, 0, len(members))
@@ -223,7 +231,11 @@ func (h *Hub) setCachedMembers(chatID string, members []models.User) {
 }
 
 func envelope(op Op, payload interface{}) Envelope {
-	b, _ := json.Marshal(payload)
+	b, err := json.Marshal(payload)
+	if err != nil {
+		logutil.Error("ws: marshal envelope %s: %v", op, err)
+		return Envelope{Op: op}
+	}
 	return Envelope{Op: op, Payload: b}
 }
 
@@ -295,7 +307,11 @@ func (h *Hub) BroadcastUserUpdate(u *models.User) {
 	for _, c := range all {
 		c.queue(env)
 	}
-	b, _ := json.Marshal(env)
+	b, err := json.Marshal(env)
+	if err != nil {
+		logutil.Error("ws: marshal user_update: %v", err)
+		return
+	}
 	for _, uid := range sseUserIDs {
 		h.sseSend(uid, b)
 	}
@@ -336,7 +352,11 @@ func (h *Hub) broadcastPresence(userID, status string) {
 	for _, c := range all {
 		c.queue(env)
 	}
-	b, _ := json.Marshal(env)
+	b, err := json.Marshal(env)
+	if err != nil {
+		logutil.Error("ws: marshal presence_update: %v", err)
+		return
+	}
 	for _, uid := range sseUserIDs {
 		h.sseSend(uid, b)
 	}

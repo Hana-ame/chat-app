@@ -48,7 +48,7 @@ func (s *Server) AIChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body, err := io.ReadAll(r.Body)
-	_ = r.Body.Close()
+	r.Body.Close()
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", "cannot read body")
 		return

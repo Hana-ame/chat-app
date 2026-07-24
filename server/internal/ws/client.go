@@ -97,7 +97,12 @@ func (c *Client) readPump() {
 				continue
 			}
 			if c.hub.db != nil {
-				if ok, _ := c.hub.db.IsChatMember(context.Background(), p.ChatID, c.userID); ok {
+				ok, err := c.hub.db.IsChatMember(context.Background(), p.ChatID, c.userID)
+				if err != nil {
+					logutil.Error("ws: check member for subscribe %s: %v", p.ChatID[:8], err)
+					continue
+				}
+				if ok {
 					c.subscribe(p.ChatID)
 				}
 			}
@@ -115,7 +120,11 @@ func (c *Client) readPump() {
 			if c.hub.db != nil {
 				members, err := c.hub.db.GetChatMembers(context.Background(), p.ChatID)
 				if err == nil {
-					b, _ := json.Marshal(map[string]any{"chat_id": p.ChatID, "members": members})
+					b, err := json.Marshal(map[string]any{"chat_id": p.ChatID, "members": members})
+					if err != nil {
+						logutil.Error("ws: marshal member list: %v", err)
+						continue
+					}
 					c.queue(Envelope{Op: OpMembersList, ReqID: env.ReqID, Payload: b})
 				}
 			}
@@ -125,7 +134,12 @@ func (c *Client) readPump() {
 				continue
 			}
 			if c.hub.db != nil {
-				if ok, _ := c.hub.db.IsChatMember(context.Background(), p.ChatID, c.userID); ok {
+				ok, err := c.hub.db.IsChatMember(context.Background(), p.ChatID, c.userID)
+				if err != nil {
+					logutil.Error("ws: check member for typing %s: %v", p.ChatID[:8], err)
+					continue
+				}
+				if ok {
 					c.hub.BroadcastTyping(p.ChatID, c.userID)
 				}
 			}

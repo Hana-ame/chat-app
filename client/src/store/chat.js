@@ -42,14 +42,13 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
 import { getCoordinator } from '../realtime/coordinator';
+import { useAuthStore } from '../store/auth';
 import { requestNotifyPermission, sendBrowserNotification } from '../utils/browserNotify';
 
 const coord = getCoordinator();
 
-function getLocalAuth() {
-  try {
-    return JSON.parse(localStorage.getItem('auth') || '{}');
-  } catch { return {}; }
+function getAuth() {
+  return useAuthStore.getState();
 }
 
 function sortChats(a, b) {
@@ -242,9 +241,9 @@ export const useChatStore = create((set, get) => ({
     }
     const st = get();
     if (msg.chat_id !== st.activeChatId && msg.user_id !== 'ai') {
-      const uid = getLocalAuth().user?.id;
-      const token = getLocalAuth().accessToken;
-      const blocked = getLocalAuth().user?.notify_blocked || [];
+      const uid = getAuth().user?.id;
+      const token = getAuth().accessToken;
+      const blocked = getAuth().user?.notify_blocked || [];
       if (blocked.includes(msg.user_id)) return;
       const mentioned = uid && msg.content?.includes(`<@${uid}>`);
       const chatName = st.chats.find(c => c.id === msg.chat_id)?.name || 'Chat';
@@ -296,7 +295,7 @@ export const useChatStore = create((set, get) => ({
 
   /** @param {{ message_id: string, emoji: string, user_id: string }} payload @param {boolean} added */
   onReaction(payload, added) {
-    const myId = getLocalAuth().user?.id;
+    const myId = getAuth().user?.id;
     set(s => ({ messages: s.messages.map(m => {
       if (m.id !== payload.message_id) return m;
       const rxs = m.reactions || [];
@@ -392,7 +391,7 @@ export const useChatStore = create((set, get) => ({
 
   /** @param {string} chatId */
   async markAnnouncementRead(chatId) {
-    const { accessToken } = getLocalAuth();
+    const { accessToken } = getAuth();
     try { await api.markAnnouncementRead(accessToken, chatId); } catch (e) { console.error('markAnnouncementRead error:', e); }
     set(s => ({
       chats: s.chats.map(c => c.id === chatId ? { ...c, pinned_last_read_at: new Date().toISOString() } : c),

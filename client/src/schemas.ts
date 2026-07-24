@@ -93,7 +93,7 @@ export function validate<T>(schema: z.ZodType<T>, data: unknown, label: string):
   const result = schema.safeParse(data);
   if (!result.success) {
     console.error(`[zod] ${label} validation failed:`, result.error.issues);
-    return data as T;
+    throw new Error(`API response validation failed: ${label}`);
   }
   return result.data;
 }
