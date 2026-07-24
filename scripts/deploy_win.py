@@ -10,9 +10,12 @@ import urllib.request
 from urllib.request import ProxyHandler, build_opener, install_opener
 
 REPO = "Hana-ame/chat-app"
+REPO_BASE = f"https://raw.githubusercontent.com/{REPO}/main"
+SCRIPT_REPO_PATH = "scripts/deploy_win.py"
 BINARY = "chatd-windows-amd64.exe"
 CLIENT_ARCHIVE = "client-dist.tar.gz"
 CWD = os.getcwd()
+SCRIPT_PATH = os.path.abspath(__file__)
 
 
 def setup_proxy(proxy):
@@ -22,6 +25,97 @@ def setup_proxy(proxy):
     os.environ.setdefault("HTTP_PROXY", proxy)
     handler = ProxyHandler({"http": proxy, "https": proxy})
     install_opener(build_opener(handler))
+
+
+def fetch_raw(path):
+    url = f"{REPO_BASE}/{path}"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "deploy_win.py"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return r.read().decode("utf-8")
+    except Exception as e:
+        print(f"[deploy]  WARN: fetch {path} failed: {e}")
+        return None
+
+
+def self_update():
+    remote = fetch_raw(SCRIPT_REPO_PATH)
+    if remote is None:
+        print("[deploy]  SKIP: script self-update check failed")
+        return
+    with open(SCRIPT_PATH, encoding="utf-8") as f:
+        local = f.read()
+    if local == remote:
+        print("[deploy]  OK: script is up to date")
+        return
+    print("[deploy]  UPDATE: new version found, applying...")
+    with open(SCRIPT_PATH, "w", encoding="utf-8") as f:
+        f.write(remote)
+    print("[deploy]  UPDATE: script updated, restarting...")
+    subprocess.run([sys.executable] + sys.argv)
+    sys.exit(0)
+
+
+def sync_env():
+    example_raw = fetch_raw(".env.example")
+    if example_raw is None:
+        print("[deploy]  SKIP: cannot fetch .env.example from repo")
+        return False
+
+    example_path = os.path.join(CWD, ".env.example")
+    env_path = os.path.join(CWD, ".env")
+
+    with open(example_path, "w", encoding="utf-8") as f:
+        f.write(example_raw)
+    print("[deploy]  OK: .env.example synced from repo")
+
+    example_keys = _parse_env_file(example_path)
+    if example_keys is None:
+        print("[deploy]  WARN: cannot parse .env.example")
+        return False
+
+    env_keys = _parse_env_file(env_path)
+    if env_keys is None:
+        print("[deploy]  INFO: creating .env from latest template")
+        shutil.copy2(example_path, env_path)
+        print("[deploy]  WARN: edit .env to set secrets before running")
+        return False
+
+    modified = False
+    with open(env_path, encoding="utf-8") as f:
+        env_lines = f.readlines()
+
+    existing_keys = {}
+    for i, line in enumerate(env_lines):
+        m = re.match(r"^(\w+)=", line.strip())
+        if m:
+            existing_keys[m.group(1)] = i
+
+    for k, v in example_keys.items():
+        if k in ("CHAT_STATIC_DIR",):
+            continue
+        if k not in existing_keys:
+            env_lines.append(f"{k}={v}\n")
+            print(f"[deploy]  ADD: {k}={v}")
+            modified = True
+        else:
+            idx = existing_keys[k]
+            line = env_lines[idx].strip()
+            if not line or line.startswith("#"):
+                continue
+            _, _, existing_val = line.partition("=")
+            if existing_val.strip().strip('"').strip("'") == v and (
+                "change-me" in v.lower() or "sk-" in v.lower() or v.strip() == ""
+            ):
+                print(f"[deploy]  WARN: {k} is still a placeholder in .env")
+
+    if modified:
+        with open(env_path, "w", encoding="utf-8") as f:
+            f.writelines(env_lines)
+        print("[deploy]  OK: .env updated with missing keys")
+    else:
+        print("[deploy]  OK: .env is up to date")
+    return True
 
 
 def latest_release():
@@ -64,19 +158,10 @@ def download(asset, dst, proxy):
     print(f"[deploy] saved: {dst} ({size} bytes)")
 
 
-REPO_BASE = "https://raw.githubusercontent.com/Hana-ame/chat-app/main"
-
-EXAMPLE_FILES = [
-    (".env.example", ".env"),
-    ("server/.env.example", "server/.env"),
-    ("client/.env.example", "client/.env"),
-]
-
-
 def _parse_env_file(path):
     keys = {}
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line or line.startswith("#"):
@@ -89,80 +174,11 @@ def _parse_env_file(path):
     return keys
 
 
-def _fetch_from_repo(rel_path):
-    url = f"{REPO_BASE}/{rel_path}"
-    try:
-        with urllib.request.urlopen(url, timeout=10) as r:
-            return r.read().decode("utf-8")
-    except Exception as e:
-        print(f"[deploy]  WARN: fetch {rel_path} failed: {e}")
-        return None
-
-
-def check_env(cwd):
-    ok = True
-    for example_rel, env_rel in EXAMPLE_FILES:
-        example_path = os.path.join(cwd, example_rel)
-        env_path = os.path.join(cwd, env_rel)
-
-        example_keys = _parse_env_file(example_path)
-        if example_keys is None:
-            print(f"[deploy]  WARN: {example_rel} not found, fetching from GitHub...")
-            raw = _fetch_from_repo(example_rel)
-            if raw:
-                with open(example_path, "w") as f:
-                    f.write(raw)
-                print(f"[deploy]  OK: downloaded {example_rel}")
-                example_keys = _parse_env_file(example_path)
-            if example_keys is None:
-                print(f"[deploy]  SKIP: cannot check {env_rel} (no example)")
-                continue
-
-        env_keys = _parse_env_file(env_path)
-        if env_keys is None:
-            print(f"[deploy]  WARN: {env_rel} not found")
-            raw = _fetch_from_repo(example_rel)
-            if raw:
-                with open(env_path, "w") as f:
-                    f.write(raw)
-                print(f"[deploy]  INFO: created {env_rel} from GitHub template")
-                print(f"[deploy]  INFO: edit {env_rel} to set secrets before running")
-            else:
-                print(f"[deploy]  INFO: copy {example_rel} to {env_rel} and fill in secrets")
-            ok = False
-            continue
-
-        missing = []
-        placeholder = []
-        for k, v in example_keys.items():
-            if k not in env_keys:
-                missing.append(k)
-            elif v is not None and env_keys.get(k) == v and (
-                "change-me" in v.lower() or "sk-" in v.lower() or v.strip() == ""
-            ):
-                placeholder.append(k)
-
-        if missing:
-            print(f"[deploy]  WARN: {env_rel} missing keys: {', '.join(missing)}")
-            raw = _fetch_from_repo(example_rel)
-            if raw:
-                with open(env_path, "w") as f:
-                    f.write(raw)
-                print(f"[deploy]  INFO: replaced {env_rel} with latest template (edit secrets)")
-            ok = False
-        elif placeholder:
-            print(f"[deploy]  WARN: {env_rel} placeholder values: {', '.join(placeholder)}")
-            print(f"[deploy]  INFO: update these in {env_rel}")
-        else:
-            print(f"[deploy]  OK: {env_rel} looks good")
-    return ok
-
-
 def load_env(env_file):
     env = os.environ.copy()
     if env_file and os.path.isfile(env_file):
         print(f"[deploy] loading env from: {env_file}")
-        with open(env_file) as f:
+        with open(env_file, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line or line.startswith("#") or "=" not in line:
@@ -179,6 +195,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("cmd", nargs="?", default="all", choices=["download", "run", "all"])
     parser.add_argument("--proxy", default="http://localhost:10809", help="proxy URL")
+    parser.add_argument("--no-self-update", action="store_true", help="skip script self-update")
     args = parser.parse_args()
 
     cmd = args.cmd
@@ -188,6 +205,11 @@ def main():
     print(f"[deploy] working dir: {CWD}")
     print(f"[deploy] binary: {BINARY}")
     setup_proxy(proxy)
+
+    if cmd != "run" and not args.no_self_update:
+        self_update()
+
+    sync_env()
 
     dst = os.path.join(CWD, BINARY)
     env_file = os.path.join(CWD, ".env")
@@ -205,13 +227,12 @@ def main():
         with tarfile.open(client_dst) as tf:
             tf.extractall(client_dir)
         os.remove(client_dst)
-        # Write CHAT_STATIC_DIR as absolute path so it works regardless of working directory
-        env_file = os.path.join(CWD, ".env")
-        static_line = f"CHAT_STATIC_DIR={client_dir}"
+        abs_static = client_dir.replace("/", "\\")
+        static_line = f"CHAT_STATIC_DIR={abs_static}"
         if os.path.isfile(env_file):
-            with open(env_file) as f:
+            with open(env_file, encoding="utf-8") as f:
                 lines = f.readlines()
-            with open(env_file, "w") as f:
+            with open(env_file, "w", encoding="utf-8") as f:
                 found = False
                 for line in lines:
                     if line.strip().startswith("CHAT_STATIC_DIR="):
@@ -222,7 +243,7 @@ def main():
                 if not found:
                     f.write(static_line + "\n")
         else:
-            with open(env_file, "a") as f:
+            with open(env_file, "a", encoding="utf-8") as f:
                 f.write(static_line + "\n")
         print(f"[deploy] download complete (tag: {rel['tag_name']})")
 
@@ -251,4 +272,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

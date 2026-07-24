@@ -4677,3 +4677,54 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 - Server: `go build` / `go vet` / `go test` — all ✅
 - Client: `npm run build` — ✅
 - CI (GitHub Actions) — passed ✅
+
+---
+
+## 2026-07-25 后端架构优化（第 48 轮）
+
+### 变更
+
+#### 1. Service.WithTx 空存根 → 真实事务
+- **问题**: `WithTx` 是空存根 `return fn()`，不支持跨表事务
+- **修复**: 改为 `BeginTx/Commit/Rollback` 完整事务；`CreateAIMessage` 改用事务保证 INSERT + UPDATE 原子性
+- **文件**: `server/internal/service/service.go`、`server/internal/db/messages.go`
+
+#### 2. 消除 4 处重复的 cookie secure 判断
+- **问题**: `setAuthCookie`、`setRefreshCookie`、`clearRefreshCookie`、`clearAccessTokenCookie` 各自重复 `r.TLS != nil || r.Header.Get(...)` 判断
+- **修复**: 提取 `isSecure(r)` 辅助函数
+- **文件**: `server/internal/handlers/util.go`
+
+#### 3. PickColor 改用 FNV 哈希
+- **问题**: `PickColor` 用 `uuid.Parse(seed)` 再取 `id.ID()`，对非 UUID 字符串（如群聊 name）静默回退到第一种颜色 → 所有群聊同色
+- **修复**: 改用 `hash/fnv.New32a`，任意字符串均匀分布到色盘
+- **文件**: `server/internal/db/users.go`
+
+#### 4. 移除 UpdatePinnedChat 死代码别名
+- **问题**: `UpdatePinnedChat` 是 `PinChat` 的精确别名，路由中 POST/PATCH 各注册一次
+- **修复**: 删除别名，路由 POST + PATCH 共用 `s.PinChat`
+- **文件**: `server/internal/handlers/chat.go`、`router.go`
+
+#### 5. Password truncation 一致性
+- **问题**: `HashPassword` 拒绝 >72 字节密码，`VerifyPassword` 静默截断到 72 字节，两者行为不一致
+- **修复**: `VerifyPassword` 超 72 字节直接返回 `ErrInvalidCredentials`
+- **文件**: `server/internal/auth/auth.go`
+
+#### 6. SafeID 日志 helper + 全量替换
+- **问题**: 30+ 处 `userID[:8]` / `chatID[:8]` 重复截断模式，可读性低，且 `logutil.SafeID` 集中控制截断长度
+- **修复**: 新增 `logutil.SafeID(id)`，替换全部 `id[:8]` 模式（保留 SHA256 hash 和 UUID 文件名等非用户 ID 的 `[:8]`）
+- **文件**: `server/internal/logutil/log.go` + `handlers/` 6 文件 + `ws/` 3 文件
+
+#### 7. 修复 AIChat 中 body.Close 顺序
+- **问题**: `io.ReadAll` 失败后 `r.Body.Close()` 不会执行
+- **修复**: 先检查 `io.ReadAll` 错误，再关闭 body
+- **文件**: `server/internal/handlers/ai.go`
+
+#### 8. ensureColumn SQL 注入防护
+- **问题**: `fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s", table, definition)` 直接拼接参数
+- **修复**: 添加 `strings.ContainsAny` 校验 + 警告注释
+- **文件**: `server/internal/db/db_fixups.go`
+
+### 验证
+- Go build + vet: ✅
+- Go test ./...: ✅ (all packages pass)
+- Client build: ✅
