@@ -125,9 +125,8 @@ func bearerToken(r *http.Request) string {
 	if strings.HasPrefix(h, "Bearer ") {
 		return strings.TrimSpace(h[7:])
 	}
-	// Deprecated: URL query token leaks via server logs, browser history, and Referer headers.
-	// Frontend should use Authorization header or cookie. This path is kept for backward compatibility
-	// with existing SSE clients and will be removed in a future version.
+	// URL query token is a backward-compat fallback for SSE (EventSource API) which
+	// cannot set custom headers. Token exposure via Referer/logs is accepted for this path.
 	if t := r.URL.Query().Get("access_token"); t != "" {
 		return t
 	}
@@ -156,13 +155,14 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 			writeError(w, http.StatusUnauthorized, "token_invalid", "access token invalid")
 			return
 		}
-		u, err := s.DB.GetUserByID(r.Context(), claims.UserID)
+		u, err := s.Services.User.GetByID(r.Context(), claims.UserID)
 		if err != nil {
-			if errors.Is(err, db.ErrNotFound) {
-				writeError(w, http.StatusUnauthorized, "user_not_found", "user does not exist")
-				return
+			status, code := mapServiceError(err)
+			msg := "user does not exist"
+			if status != http.StatusNotFound {
+				msg = err.Error()
 			}
-			writeError(w, http.StatusInternalServerError, "internal", err.Error())
+			writeError(w, status, code, msg)
 			return
 		}
 		ctx := context.WithValue(r.Context(), ctxKeyUser, u)
