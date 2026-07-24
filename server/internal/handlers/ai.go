@@ -48,11 +48,12 @@ func (s *Server) AIChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body, err := io.ReadAll(r.Body)
-	r.Body.Close()
 	if err != nil {
+		r.Body.Close()
 		writeError(w, http.StatusBadRequest, "bad_request", "cannot read body")
 		return
 	}
+	r.Body.Close()
 
 	var req struct {
 		Source   string          `json:"source"`
@@ -84,7 +85,7 @@ func (s *Server) AIChat(w http.ResponseWriter, r *http.Request) {
 		Raw:      body,
 	})
 	if err != nil {
-		logutil.Error("ai: source %s failed for user %s: %v", sourceName, u.ID[:8], err)
+		logutil.Error("ai: source %s failed for user %s: %v", sourceName, logutil.SafeID(u.ID), err)
 		writeError(w, http.StatusBadGateway, "upstream_error", "AI service error")
 		return
 	}

@@ -65,7 +65,7 @@ func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
 		writeError(w, status, code, err.Error())
 		return
 	}
-	logutil.Info("user registered: %s (username=%s email=%s)", u.ID[:8], username, email)
+	logutil.Info("user registered: %s (username=%s email=%s)", logutil.SafeID(u.ID), username, email)
 	s.registerLimiter.record()
 	s.issueSession(w, r, u.ID)
 }
@@ -109,7 +109,7 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 		return
 	}
-	logutil.Info("user logged in: %s (%s)", u.ID[:8], email)
+	logutil.Info("user logged in: %s (%s)", logutil.SafeID(u.ID), email)
 	s.issueSession(w, r, u.ID)
 }
 
@@ -189,7 +189,7 @@ func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Header().Set("X-Error", err.Error())
 	}
-	logutil.Info("user logged out: %s", u.ID[:8])
+	logutil.Info("user logged out: %s", logutil.SafeID(u.ID))
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

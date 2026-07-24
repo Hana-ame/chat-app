@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"hash/fnv"
 	"strings"
 	"time"
 
@@ -27,12 +28,9 @@ func PickColor(seed string) string {
 	if seed == "" {
 		return palette[0]
 	}
-	id, err := uuid.Parse(seed)
-	if err != nil {
-		return palette[0]
-	}
-	h := int(id.ID())
-	return palette[h%len(palette)]
+	h := fnv.New32a()
+	h.Write([]byte(seed))
+	return palette[int(h.Sum32())%len(palette)]
 }
 
 func parseTime(s string) time.Time {

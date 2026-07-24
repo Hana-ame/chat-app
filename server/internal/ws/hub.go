@@ -75,15 +75,15 @@ func (h *Hub) register(c *Client) {
 	set[c] = struct{}{}
 	wasOffline := len(set) == 1
 	h.mu.Unlock()
-	logutil.Info("ws client registered: user=%s (total=%d)", c.userID[:8], h.ClientCount())
+	logutil.Info("ws client registered: user=%s (total=%d)", logutil.SafeID(c.userID), h.ClientCount())
 	if wasOffline && h.db != nil {
 		if err := h.db.UpdateUserStatus(context.Background(), c.userID, "online"); err != nil {
-			logutil.Error("presence: failed to set online for %s: %v", c.userID[:8], err)
+			logutil.Error("presence: failed to set online for %s: %v", logutil.SafeID(c.userID), err)
 		}
 		if err := h.db.UpdateUserLastSeen(context.Background(), c.userID); err != nil {
-			logutil.Error("presence: failed to update last_seen for %s: %v", c.userID[:8], err)
+			logutil.Error("presence: failed to update last_seen for %s: %v", logutil.SafeID(c.userID), err)
 		}
-		logutil.Debug("presence: %s -> online", c.userID[:8])
+		logutil.Debug("presence: %s -> online", logutil.SafeID(c.userID))
 		h.broadcastPresence(c.userID, "online")
 	}
 }
@@ -99,15 +99,15 @@ func (h *Hub) unregister(c *Client) {
 		}
 	}
 	h.mu.Unlock()
-	logutil.Info("ws client unregistered: user=%s (total=%d)", c.userID[:8], h.ClientCount())
+	logutil.Info("ws client unregistered: user=%s (total=%d)", logutil.SafeID(c.userID), h.ClientCount())
 	if wasLast && h.db != nil {
 		if err := h.db.UpdateUserStatus(context.Background(), c.userID, "offline"); err != nil {
-			logutil.Error("presence: failed to set offline for %s: %v", c.userID[:8], err)
+			logutil.Error("presence: failed to set offline for %s: %v", logutil.SafeID(c.userID), err)
 		}
 		if err := h.db.UpdateUserLastSeen(context.Background(), c.userID); err != nil {
-			logutil.Error("presence: failed to update last_seen for %s: %v", c.userID[:8], err)
+			logutil.Error("presence: failed to update last_seen for %s: %v", logutil.SafeID(c.userID), err)
 		}
-		logutil.Debug("presence: %s -> offline", c.userID[:8])
+		logutil.Debug("presence: %s -> offline", logutil.SafeID(c.userID))
 		h.broadcastPresence(c.userID, "offline")
 	}
 }
@@ -178,14 +178,14 @@ func (h *Hub) sendToChat(chatID string, env Envelope, exceptUser string) {
 		var err error
 		members, err = h.db.GetChatMembers(context.Background(), chatID)
 		if err != nil {
-			logutil.Error("ws: failed to load members for chat %s: %v", chatID[:8], err)
+			logutil.Error("ws: failed to load members for chat %s: %v", logutil.SafeID(chatID), err)
 			return
 		}
 		h.setCachedMembers(chatID, members)
 	}
 	b, err := json.Marshal(env)
 	if err != nil {
-		logutil.Error("ws: marshal %s for chat %s: %v", env.Op, chatID[:8], err)
+		logutil.Error("ws: marshal %s for chat %s: %v", env.Op, logutil.SafeID(chatID), err)
 		return
 	}
 	h.mu.RLock()

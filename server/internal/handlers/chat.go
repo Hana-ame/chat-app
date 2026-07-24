@@ -303,10 +303,6 @@ func (s *Server) PinChat(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-func (s *Server) UpdatePinnedChat(w http.ResponseWriter, r *http.Request) {
-	s.PinChat(w, r)
-}
-
 func (s *Server) DeletePinnedChat(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	if u == nil {

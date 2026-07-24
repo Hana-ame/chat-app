@@ -61,18 +61,18 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	user, err := g.db.GetUserByID(r.Context(), claims.UserID)
 	if err != nil {
-		logutil.Warn("ws connect: user gone (%s)", claims.UserID[:8])
+		logutil.Warn("ws connect: user gone (%s)", logutil.SafeID(claims.UserID))
 		http.Error(w, "user gone", http.StatusUnauthorized)
 		return
 	}
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		logutil.Error("ws upgrade failed for %s: %v", user.ID[:8], err)
+		logutil.Error("ws upgrade failed for %s: %v", logutil.SafeID(user.ID), err)
 		return
 	}
 	conn.SetReadLimit(g.maxMessageSize)
-	logutil.Info("ws connected: user=%s", user.ID[:8])
+	logutil.Info("ws connected: user=%s", logutil.SafeID(user.ID))
 
 	c := &Client{
 		hub:    g.hub,
@@ -83,7 +83,7 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	chats, err := g.db.ListUserChats(r.Context(), user.ID)
 	if err != nil {
-		logutil.Error("ws ready: list chats for %s: %v", user.ID[:8], err)
+		logutil.Error("ws ready: list chats for %s: %v", logutil.SafeID(user.ID), err)
 		chats = []models.Chat{}
 	}
 	for _, ch := range chats {

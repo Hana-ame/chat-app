@@ -71,7 +71,7 @@ func (c *Client) readPump() {
 	defer func() {
 		c.hub.unregister(c)
 		c.close()
-		logutil.Debug("ws read pump ended: user=%s", c.userID[:8])
+		logutil.Debug("ws read pump ended: user=%s", logutil.SafeID(c.userID))
 	}()
 	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error {
@@ -99,7 +99,7 @@ func (c *Client) readPump() {
 			if c.hub.db != nil {
 				ok, err := c.hub.db.IsChatMember(context.Background(), p.ChatID, c.userID)
 				if err != nil {
-					logutil.Error("ws: check member for subscribe %s: %v", p.ChatID[:8], err)
+					logutil.Error("ws: check member for subscribe %s: %v", logutil.SafeID(p.ChatID), err)
 					continue
 				}
 				if ok {
@@ -136,7 +136,7 @@ func (c *Client) readPump() {
 			if c.hub.db != nil {
 				ok, err := c.hub.db.IsChatMember(context.Background(), p.ChatID, c.userID)
 				if err != nil {
-					logutil.Error("ws: check member for typing %s: %v", p.ChatID[:8], err)
+					logutil.Error("ws: check member for typing %s: %v", logutil.SafeID(p.ChatID), err)
 					continue
 				}
 				if ok {
@@ -159,7 +159,7 @@ func (c *Client) writePump() {
 				return
 			}
 			if err := c.conn.WriteJSON(env); err != nil {
-				logutil.Error("ws write error for %s: %v", c.userID[:8], err)
+				logutil.Error("ws write error for %s: %v", logutil.SafeID(c.userID), err)
 				return
 			}
 		case <-ticker.C:

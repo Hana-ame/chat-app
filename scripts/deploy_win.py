@@ -205,6 +205,25 @@ def main():
         with tarfile.open(client_dst) as tf:
             tf.extractall(client_dir)
         os.remove(client_dst)
+        # Write CHAT_STATIC_DIR as absolute path so it works regardless of working directory
+        env_file = os.path.join(CWD, ".env")
+        static_line = f"CHAT_STATIC_DIR={client_dir}"
+        if os.path.isfile(env_file):
+            with open(env_file) as f:
+                lines = f.readlines()
+            with open(env_file, "w") as f:
+                found = False
+                for line in lines:
+                    if line.strip().startswith("CHAT_STATIC_DIR="):
+                        f.write(static_line + "\n")
+                        found = True
+                    else:
+                        f.write(line)
+                if not found:
+                    f.write(static_line + "\n")
+        else:
+            with open(env_file, "a") as f:
+                f.write(static_line + "\n")
         print(f"[deploy] download complete (tag: {rel['tag_name']})")
 
     if cmd in ("run", "all"):

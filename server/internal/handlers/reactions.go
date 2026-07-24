@@ -37,7 +37,7 @@ func (s *Server) AddReaction(w http.ResponseWriter, r *http.Request) {
 		writeError(w, status, code, "")
 		return
 	}
-	logutil.Debug("reaction added: %s on %s by %s", emoji, msgID[:8], u.ID[:8])
+	logutil.Debug("reaction added: %s on %s by %s", emoji, logutil.SafeID(msgID), logutil.SafeID(u.ID))
 	writeJSON(w, http.StatusOK, updated)
 }
 
@@ -70,7 +70,7 @@ func (s *Server) RemoveReaction(w http.ResponseWriter, r *http.Request) {
 		writeError(w, status, code, "")
 		return
 	}
-	logutil.Debug("reaction removed: %s from %s by %s", emoji, msgID[:8], u.ID[:8])
+	logutil.Debug("reaction removed: %s from %s by %s", emoji, logutil.SafeID(msgID), logutil.SafeID(u.ID))
 	writeJSON(w, http.StatusOK, updated)
 }
 

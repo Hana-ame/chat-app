@@ -73,6 +73,13 @@ func output(calldepth int, level Level, format string, args ...interface{}) {
 	)
 }
 
+func SafeID(id string) string {
+	if len(id) > 8 {
+		return id[:8]
+	}
+	return id
+}
+
 func Debug(format string, args ...interface{}) { output(2, DEBUG, format, args...) }
 func Info(format string, args ...interface{})  { output(2, INFO, format, args...) }
 func Warn(format string, args ...interface{})  { output(2, WARN, format, args...) }

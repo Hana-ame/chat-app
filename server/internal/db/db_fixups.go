@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
 )
@@ -33,6 +34,11 @@ func (d *DB) ensureLastActiveColumn(ctx context.Context) error {
 }
 
 func (d *DB) ensureColumn(ctx context.Context, table, name, definition string) error {
+	// WARNING: table and definition must be hardcoded constants (not user input)
+	// to prevent SQL injection — ALTER TABLE cannot use parameterized placeholders.
+	if strings.ContainsAny(table, "; ") || strings.ContainsAny(definition, ";") {
+		return fmt.Errorf("invalid table or definition: potential injection")
+	}
 	var cnt int
 	if err := d.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name=?`, table, name,

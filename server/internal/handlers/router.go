@@ -34,7 +34,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 			u := userFrom(r.Context())
 			uid := ""
 			if u != nil {
-				uid = u.ID[:8]
+				uid = logutil.SafeID(u.ID)
 			}
 			logutil.Info("%s %s %d %s [user=%s]", r.Method, r.URL.Path, ww.Status(), time.Since(start).Round(time.Millisecond), uid)
 		})
@@ -118,7 +118,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 					r.Get("/messages/{messageID}/reactions", s.ListReactions)
 					r.Post("/join", s.JoinChat)
 					r.Post("/announcement", s.PinChat)
-					r.Patch("/announcement", s.UpdatePinnedChat)
+					r.Patch("/announcement", s.PinChat)
 					r.Delete("/announcement", s.DeletePinnedChat)
 					r.Post("/announcement/read", s.MarkPinnedRead)
 					r.Post("/pin", s.PinChatList)
@@ -155,6 +155,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 	})
 
 	if s.Cfg.StaticDir != "" {
+		s.logStaticInfo()
 		r.NotFound(s.serveStatic)
 	}
 	return r

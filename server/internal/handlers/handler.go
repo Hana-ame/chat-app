@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -71,6 +73,21 @@ func tokenFrom(ctx context.Context) string {
 
 func (s *Server) VersionHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"version": s.Version})
+}
+
+func (s *Server) logStaticInfo() {
+	logutil.Info("static dir: %s", s.Cfg.StaticDir)
+	if info, err := os.Stat(s.Cfg.StaticDir); err != nil {
+		logutil.Warn("static dir stat error: %v", err)
+	} else {
+		logutil.Info("static dir exists: isDir=%v", info.IsDir())
+	}
+	idx := filepath.Join(s.Cfg.StaticDir, "index.html")
+	if _, err := os.Stat(idx); err != nil {
+		logutil.Warn("static index.html not found: %v", err)
+	} else {
+		logutil.Info("static index.html: OK")
+	}
 }
 
 func mapServiceError(err error) (int, string) {

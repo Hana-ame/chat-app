@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/Hana-ame/chat-app/server/internal/config"
 	"github.com/Hana-ame/chat-app/server/internal/db"
@@ -30,8 +31,16 @@ func New(database *db.DB, hub *ws.Hub, cfg *config.Config) *Service {
 	return s
 }
 
-// WithTx is reserved for future cross-table transactions.
-// DB methods (CreateChat, CreateMessage, etc.) handle their own internal txn.
-func (s *Service) WithTx(ctx context.Context, fn func() error) error {
-	return fn()
+// WithTx runs fn inside a database transaction. If DB doesn't support
+// transactions (e.g., in tests), calls fn directly.
+func (s *Service) WithTx(ctx context.Context, fn func(tx *sql.Tx) error) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := fn(tx); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

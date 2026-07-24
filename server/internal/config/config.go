@@ -136,7 +136,7 @@ func Load() *Config {
 		ReadTimeout:             getenvDuration("CHAT_READ_TIMEOUT", 10*time.Minute),
 		ReadHeaderTimeout:       getenvDuration("CHAT_READ_HEADER_TIMEOUT", 10*time.Second),
 	}
-	logutil.Debug("config loaded: addr=%s db=%s upload_dir=%s static_dir=%s base_url=%s",
+	logutil.Info("config loaded: addr=%s db=%s upload_dir=%s static_dir=%s base_url=%s",
 		cfg.Addr, cfg.DBPath, cfg.UploadDir, cfg.StaticDir, cfg.BaseURL)
 	return cfg
 }

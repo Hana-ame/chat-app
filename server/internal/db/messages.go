@@ -18,21 +18,29 @@ func (d *DB) CreateAIMessage(ctx context.Context, chatID, msgID, content string)
 	if msgID == "" {
 		msgID = NewID()
 	}
+	tx, err := d.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	_, err := d.ExecContext(ctx,
+	_, err = tx.ExecContext(ctx,
 		`INSERT INTO messages (id, chat_id, user_id, content, created_at, attachment_count, mention_count) VALUES (?,?,?,?,?,0,0)`,
 		msgID, chatID, "ai", content, now,
 	)
 	if err != nil {
 		return nil, err
 	}
-	_, err = d.ExecContext(ctx,
+	_, err = tx.ExecContext(ctx,
 		`UPDATE chats SET last_message_at = ?, last_message_id = ? WHERE id = ?`,
 		now, msgID, chatID,
 	)
 	if err != nil {
-		// non-critical
-		logutil.Warn("CreateAIMessage: update chats: %v", err)
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
 	return &models.Message{
 		ID:        msgID,

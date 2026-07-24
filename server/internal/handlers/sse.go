@@ -50,7 +50,7 @@ func (s *Server) SSE(w http.ResponseWriter, r *http.Request) {
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		logutil.Error("SSE not supported for %s", userID[:8])
+		logutil.Error("SSE not supported for %s", logutil.SafeID(userID))
 		http.Error(w, "SSE not supported", http.StatusInternalServerError)
 		return
 	}
@@ -71,7 +71,7 @@ func (s *Server) SSE(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "id: 0\nevent: ready\ndata: %s\n\n", ready)
 	flusher.Flush()
 
-	logutil.Info("SSE connected: user=%s", userID[:8])
+	logutil.Info("SSE connected: user=%s", logutil.SafeID(userID))
 
 	ch := make(chan []byte, 64)
 	s.Hub.SSERegister(userID, ch)
@@ -81,7 +81,7 @@ func (s *Server) SSE(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case <-notify:
-			logutil.Info("SSE disconnected: user=%s", userID[:8])
+			logutil.Info("SSE disconnected: user=%s", logutil.SafeID(userID))
 			return
 		case data, ok := <-ch:
 			if !ok {

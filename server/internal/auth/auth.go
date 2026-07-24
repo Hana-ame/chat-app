@@ -118,7 +118,7 @@ func HashPassword(password string) (string, error) {
 
 func VerifyPassword(hash, password string) error {
 	if len(password) > 72 {
-		password = password[:72]
+		return ErrInvalidCredentials
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
 		logutil.Debug("password verification failed")

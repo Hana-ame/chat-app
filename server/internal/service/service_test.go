@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"testing"
 
@@ -33,7 +34,7 @@ func TestService_New(t *testing.T) {
 func TestService_WithTx(t *testing.T) {
 	f := testutil.New(t)
 	called := false
-	err := f.Server.Services.WithTx(f.Ctx(), func() error {
+	err := f.Server.Services.WithTx(f.Ctx(), func(tx *sql.Tx) error {
 		called = true
 		return nil
 	})
@@ -65,7 +66,7 @@ func TestErrors(t *testing.T) {
 
 func TestService_WithTx_Error(t *testing.T) {
 	f := testutil.New(t)
-	err := f.Server.Services.WithTx(f.Ctx(), func() error {
+	err := f.Server.Services.WithTx(f.Ctx(), func(tx *sql.Tx) error {
 		return service.ErrInvalidInput
 	})
 	if err != service.ErrInvalidInput {
