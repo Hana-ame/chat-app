@@ -20,21 +20,24 @@ var upgrader = websocket.Upgrader{
 }
 
 const (
-	writeWait      = 10 * time.Second
-	pongWait       = 60 * time.Second
-	pingPeriod     = 50 * time.Second
-	maxMessageSize = 1 << 16
-	sendQueueSize  = 64
+	writeWait     = 10 * time.Second
+	pongWait      = 60 * time.Second
+	pingPeriod    = 50 * time.Second
+	sendQueueSize = 64
 )
 
 type Gateway struct {
-	hub     *Hub
-	db      *db.DB
-	authSvc *auth.Service
+	hub           *Hub
+	db            *db.DB
+	authSvc       *auth.Service
+	maxMessageSize int64
 }
 
-func NewGateway(hub *Hub, database *db.DB, authSvc *auth.Service) *Gateway {
-	return &Gateway{hub: hub, db: database, authSvc: authSvc}
+func NewGateway(hub *Hub, database *db.DB, authSvc *auth.Service, maxMessageSize int64) *Gateway {
+	if maxMessageSize <= 0 {
+		maxMessageSize = 1 << 16
+	}
+	return &Gateway{hub: hub, db: database, authSvc: authSvc, maxMessageSize: maxMessageSize}
 }
 
 func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +71,7 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		logutil.Error("ws upgrade failed for %s: %v", user.ID[:8], err)
 		return
 	}
-	conn.SetReadLimit(maxMessageSize)
+	conn.SetReadLimit(g.maxMessageSize)
 	logutil.Info("ws connected: user=%s", user.ID[:8])
 
 	c := &Client{

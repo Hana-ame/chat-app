@@ -29,25 +29,28 @@ func New(t *testing.T) *Fixture {
 	t.Helper()
 	dir := t.TempDir()
 	cfg := &config.Config{
-		Addr:            ":0",
-		DBPath:          filepath.Join(dir, "test.db"),
-		UploadDir:       filepath.Join(dir, "uploads"),
-		JWTSecret:       []byte("test-secret-very-secret-test-secret-very-secret"),
-		AccessTokenTTL:  15 * time.Minute,
-		RefreshTokenTTL: 24 * time.Hour,
-		MaxUploadBytes:  5 << 20,
-		UploadSalt:      "test-salt",
-		StaticDir:       "",
-		AllowOrigins:    []string{"*"},
+		Addr:                    ":0",
+		DBPath:                  filepath.Join(dir, "test.db"),
+		UploadDir:               filepath.Join(dir, "uploads"),
+		JWTSecret:               []byte("test-secret-very-secret-test-secret-very-secret"),
+		AccessTokenTTL:          15 * time.Minute,
+		RefreshTokenTTL:         24 * time.Hour,
+		MaxUploadBytes:          5 << 20,
+		UploadSalt:              "test-salt",
+		StaticDir:               "",
+		AllowOrigins:            []string{"*"},
+		MaxMessageContentLength: 4000,
+		APITimeout:              30 * time.Second,
+		UploadTimeout:           5 * time.Minute,
 	}
-	database, err := db.Open(cfg.DBPath)
+	database, err := db.Open(cfg.DBPath, cfg.MaxMessageContentLength)
 	if err != nil {
 		t.Fatalf("db open: %v", err)
 	}
 	t.Cleanup(func() { _ = database.Close() })
 	authSvc := auth.New(cfg.JWTSecret, cfg.AccessTokenTTL)
 	hub := ws.NewHub(database)
-	gateway := ws.NewGateway(hub, database, authSvc)
+	gateway := ws.NewGateway(hub, database, authSvc, 1<<16)
 	srv := handlers.New(cfg, database, authSvc, hub)
 
 	httpSrv := httptest.NewServer(srv.Router(gateway))

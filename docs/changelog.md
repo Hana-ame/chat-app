@@ -4644,3 +4644,23 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 ### 验证
 - Server: `go build` / `go vet` / `go test` — all ✅
 - Client: `npm run build` — ✅
+
+## 2026-07-24 v0.5.0 超时可配 + 消息长度可配（第 47 轮）
+
+### 新增环境变量
+- `CHAT_MAX_MESSAGE_LENGTH` — 单条消息最大字符数（默认 4000）
+- `CHAT_WS_MAX_MSG_SIZE` — WebSocket 单条消息最大字节（默认 65536）
+- `CHAT_API_TIMEOUT` — 普通 API 超时（默认 10s）
+- `CHAT_UPLOAD_TIMEOUT` — 上传超时（默认 5m）
+- `CHAT_READ_TIMEOUT` — 服务级读取超时（默认 10m）
+- `CHAT_READ_HEADER_TIMEOUT` — 请求头读取超时（默认 10s）
+
+### 修复
+- `db/messages.go` — 硬编码 4000 替换为 `d.maxContentLength`，新增 `db.ErrContentTooLong` sentinel
+- `service/authz.go` — `isContentTooLong` 改用 `errors.Is` 替代字符串匹配
+- `ws/gateway.go` — `maxMessageSize` 从常量改为 Gateway 字段，可配置
+- `router.go` — 上传路由单独用 `UploadTimeout`，其余用 `APITimeout`
+- `main.go` — 透传所有配置到 DB / Gateway / http.Server
+
+### 验证
+- Server: `go build` / `go vet` / `go test` — all ✅

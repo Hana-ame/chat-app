@@ -25,7 +25,7 @@ func main() {
 	cfg := config.Load()
 	logutil.Info("chatd: %s starting (db=%s addr=%s)", Version, cfg.DBPath, cfg.Addr)
 
-	database, err := db.Open(cfg.DBPath)
+	database, err := db.Open(cfg.DBPath, cfg.MaxMessageContentLength)
 	if err != nil {
 		logutil.Fatal("db open: %v", err)
 	}
@@ -33,7 +33,7 @@ func main() {
 
 	authSvc := auth.New(cfg.JWTSecret, cfg.AccessTokenTTL)
 	hub := ws.NewHub(database)
-	gateway := ws.NewGateway(hub, database, authSvc)
+	gateway := ws.NewGateway(hub, database, authSvc, cfg.WSMaxMessageSize)
 	srv := handlers.New(cfg, database, authSvc, hub)
 	srv.Version = Version
 	r := srv.Router(gateway)
@@ -45,8 +45,8 @@ func main() {
 	server := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           r,
-		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       15 * time.Second,
+		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
+		ReadTimeout:       cfg.ReadTimeout,
 		IdleTimeout:       120 * time.Second,
 	}
 

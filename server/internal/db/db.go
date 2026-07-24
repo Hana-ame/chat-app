@@ -19,6 +19,7 @@ var migrationFS embed.FS
 
 type DB struct {
 	*sql.DB
+	maxContentLength int
 }
 
 type migration struct {
@@ -26,7 +27,7 @@ type migration struct {
 	name    string
 }
 
-func Open(path string) (*DB, error) {
+func Open(path string, maxContentLength int) (*DB, error) {
 	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(ON)&_time_format=sqlite", path)
 	conn, err := sql.Open("sqlite", dsn)
 	if err != nil {
@@ -37,12 +38,15 @@ func Open(path string) (*DB, error) {
 		conn.Close()
 		return nil, err
 	}
-	d := &DB{DB: conn}
+	if maxContentLength <= 0 {
+		maxContentLength = 4000
+	}
+	d := &DB{DB: conn, maxContentLength: maxContentLength}
 	if err := d.Migrate(); err != nil {
 		conn.Close()
 		return nil, err
 	}
-	logutil.Info("database opened: %s", path)
+	logutil.Info("database opened: %s (maxMsgLen=%d)", path, maxContentLength)
 	return d, nil
 }
 

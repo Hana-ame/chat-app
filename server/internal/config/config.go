@@ -30,6 +30,13 @@ type Config struct {
 	MaxUploadBytes   int64
 	UploadSalt       string
 	UploadPublicURL  string
+
+	MaxMessageContentLength int
+	WSMaxMessageSize        int64
+	APITimeout              time.Duration
+	UploadTimeout           time.Duration
+	ReadTimeout             time.Duration
+	ReadHeaderTimeout       time.Duration
 }
 
 func getenv(key, def string) string {
@@ -121,6 +128,13 @@ func Load() *Config {
 		AllowOrigins:    []string{"*"},
 		CSPConnectSrc:   getenv("CHAT_CSP_CONNECT_SRC", "'self' wss://wsl-8080.moonchan.xyz"),
 		AISources:       aiSources,
+
+		MaxMessageContentLength: int(getenvInt64("CHAT_MAX_MESSAGE_LENGTH", 4000)),
+		WSMaxMessageSize:        getenvInt64("CHAT_WS_MAX_MSG_SIZE", 1<<16),
+		APITimeout:              getenvDuration("CHAT_API_TIMEOUT", 10*time.Second),
+		UploadTimeout:           getenvDuration("CHAT_UPLOAD_TIMEOUT", 5*time.Minute),
+		ReadTimeout:             getenvDuration("CHAT_READ_TIMEOUT", 10*time.Minute),
+		ReadHeaderTimeout:       getenvDuration("CHAT_READ_HEADER_TIMEOUT", 10*time.Second),
 	}
 	logutil.Debug("config loaded: addr=%s db=%s upload_dir=%s static_dir=%s base_url=%s",
 		cfg.Addr, cfg.DBPath, cfg.UploadDir, cfg.StaticDir, cfg.BaseURL)

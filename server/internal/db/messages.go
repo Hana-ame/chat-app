@@ -47,8 +47,8 @@ func (d *DB) CreateAIMessage(ctx context.Context, chatID, msgID, content string)
 
 func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, mentions []string, attachments []models.Attachment) (*models.Message, error) {
 	content = strings.TrimRight(content, " \n\t")
-	if len(content) > 4000 {
-		return nil, errors.New("content too long, use file upload instead")
+	if len(content) > d.maxContentLength {
+		return nil, ErrContentTooLong
 	}
 	if content == "" && len(attachments) == 0 {
 		return nil, errors.New("empty message")
@@ -303,13 +303,15 @@ func (d *DB) UnreadCount(ctx context.Context, chatID string, lastActiveAt time.T
 	return n
 }
 
+var ErrContentTooLong = errors.New("content too long")
+
 func (d *DB) UpdateMessage(ctx context.Context, id, userID, content string) (*models.Message, error) {
 	content = strings.TrimRight(content, " \n\t")
 	if content == "" {
 		return nil, errors.New("empty content")
 	}
-	if len(content) > 4000 {
-		return nil, errors.New("content too long, use file upload instead")
+	if len(content) > d.maxContentLength {
+		return nil, ErrContentTooLong
 	}
 	res, err := d.ExecContext(ctx,
 		`UPDATE messages SET content = ?, edited_at = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL`,

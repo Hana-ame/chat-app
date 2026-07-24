@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"github.com/Hana-ame/chat-app/server/internal/db"
 )
@@ -59,5 +58,5 @@ func isConflict(err error) bool {
 }
 
 func isContentTooLong(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "content too long")
+	return errors.Is(err, db.ErrContentTooLong)
 }
