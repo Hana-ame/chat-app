@@ -130,7 +130,7 @@ func (s *Server) AAPIUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body := r.Body
+	body := http.MaxBytesReader(w, r.Body, s.Cfg.MaxUploadBytes)
 	defer body.Close()
 
 	ts := strconv.Itoa(int(time.Now().Unix()))
@@ -142,6 +142,10 @@ func (s *Server) AAPIUpload(w http.ResponseWriter, r *http.Request) {
 
 	result, err := drv.Put(path, ct, body)
 	if err != nil {
+		if err.Error() == "http: request body too large" {
+			writeError(w, http.StatusRequestEntityTooLarge, "too_large", fmt.Sprintf("max %d bytes", s.Cfg.MaxUploadBytes))
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}

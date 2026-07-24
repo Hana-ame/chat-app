@@ -5,12 +5,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
-	"github.com/Hana-ame/chat-app/server/internal/orderedmap"
 	"github.com/Hana-ame/chat-app/server/internal/ws"
 	"github.com/go-chi/chi/v5"
 	chimid "github.com/go-chi/chi/v5/middleware"
@@ -64,16 +62,11 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 	}))
 
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		om := orderedmap.New()
-		om.Set("status", "ok")
-		echo := orderedmap.New()
+		echo := map[string]string{}
 		for k, v := range r.Header {
-			echo.Set(k, strings.Join(v, ", "))
+			echo[k] = strings.Join(v, ", ")
 		}
-		echo.SortKeys(func(keys []string) { sort.Strings(keys) })
-		om.Set("echo", echo)
-		om.SortKeys(func(keys []string) { sort.Strings(keys) })
-		writeJSON(w, http.StatusOK, om)
+		writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "echo": echo})
 	})
 
 	r.Route("/api", func(r chi.Router) {
@@ -133,8 +126,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 
 			})
 
-			r.Post("/uploads", s.Upload) // Deprecated: frontend uploads directly to upload.moonchan.xyz.
-		}) // end auth group
+			}) // end auth group
 
 		r.Get("/events", s.SSE)
 		r.With(s.authMiddleware).Post("/ai/chat", s.AIChat)
@@ -155,28 +147,10 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 		w.Write(swaggerJSON)
 	})
 
-	r.Get("/uploads/*", s.serveUpload) // Deprecated: frontend uploads directly to upload.moonchan.xyz.
 	if s.Cfg.StaticDir != "" {
 		r.NotFound(s.serveStatic)
 	}
 	return r
-}
-
-// Deprecated: frontend uploads directly to upload.moonchan.xyz. Remove in future version.
-func (s *Server) serveUpload(w http.ResponseWriter, r *http.Request) {
-	rel := strings.TrimPrefix(r.URL.Path, "/uploads/")
-	if rel == "" || strings.Contains(rel, "..") {
-		http.NotFound(w, r)
-		return
-	}
-	p := filepath.Join(s.Cfg.UploadDir, rel)
-	info, err := os.Stat(p)
-	if err != nil || info.IsDir() {
-		http.NotFound(w, r)
-		return
-	}
-	w.Header().Set("Cache-Control", "public, max-age=2592000")
-	http.ServeFile(w, r, p)
 }
 
 // rateLimitByUser returns an httprate middleware that keys on the authenticated

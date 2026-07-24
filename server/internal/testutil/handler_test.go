@@ -429,15 +429,6 @@ func TestListChatsWithUnreads(t *testing.T) {
 	}
 }
 
-func TestUploadNotLoggedIn(t *testing.T) {
-	f := testutil.New(t)
-	res := f.DoMultipart(t, "POST", "/api/uploads", "", nil, "file", "test.txt", []byte("hello"), "text/plain")
-	res.Body.Close()
-	if res.StatusCode != 401 {
-		t.Fatalf("want 401, got %d", res.StatusCode)
-	}
-}
-
 func TestRenameChatOnlyOwner(t *testing.T) {
 	f := testutil.New(t)
 	alice := f.Register(t, "owner@rn.t", "OwnerR", "testtest123")
@@ -610,72 +601,6 @@ func TestHealthz(t *testing.T) {
 	}
 	if len(echo) == 0 {
 		t.Fatalf("expected non-empty echo object")
-	}
-}
-
-func TestUploadFile(t *testing.T) {
-	f := testutil.New(t)
-	s := f.Register(t, "upload@test.dev", "Uploader", "testPass1!")
-
-	res := f.DoMultipart(t, "POST", "/api/uploads", s.AccessToken, nil, "file", "hello.txt", []byte("hello world"), "text/plain")
-	defer res.Body.Close()
-	if res.StatusCode != 201 {
-		b, _ := io.ReadAll(res.Body)
-		t.Fatalf("upload: want 201 got %d body=%s", res.StatusCode, string(b))
-	}
-	var uploadResp struct {
-		ID       string `json:"id"`
-		URL      string `json:"url"`
-		Filename string `json:"filename"`
-		MimeType string `json:"mime_type"`
-		Size     int64  `json:"size"`
-	}
-	if err := json.NewDecoder(res.Body).Decode(&uploadResp); err != nil {
-		t.Fatal(err)
-	}
-	if uploadResp.ID == "" || uploadResp.URL == "" {
-		t.Fatal("upload response missing id/url")
-	}
-	if uploadResp.Filename != "hello.txt" {
-		t.Fatalf("filename: want hello.txt got %s", uploadResp.Filename)
-	}
-	if uploadResp.Size != 11 {
-		t.Fatalf("size: want 11 got %d", uploadResp.Size)
-	}
-}
-
-func TestUploadExceedsSizeLimit(t *testing.T) {
-	f := testutil.New(t)
-	s := f.Register(t, "bigupload@test.dev", "BigUploader", "testPass1!")
-
-	// MaxUploadBytes is 5MB in test config
-	data := make([]byte, 6<<20)
-	res := f.DoMultipart(t, "POST", "/api/uploads", s.AccessToken, nil, "file", "big.bin", data, "application/octet-stream")
-	defer res.Body.Close()
-	if res.StatusCode != 413 {
-		b, _ := io.ReadAll(res.Body)
-		t.Fatalf("oversize upload: want 413 got %d body=%s", res.StatusCode, string(b))
-	}
-
-	var errResp struct {
-		Error string `json:"error"`
-	}
-	json.NewDecoder(res.Body).Decode(&errResp)
-	if errResp.Error != "too_large" {
-		t.Fatalf("want error='too_large' got '%s'", errResp.Error)
-	}
-}
-
-func TestUploadRejectsUnsupportedMime(t *testing.T) {
-	f := testutil.New(t)
-	s := f.Register(t, "badmime@test.dev", "BadMime", "testPass1!")
-
-	// .exe extension maps to application/x-msdownload which is not in allowedMime
-	res := f.DoMultipart(t, "POST", "/api/uploads", s.AccessToken, nil, "file", "virus.json", []byte(`{"evil":true}`), "application/json")
-	defer res.Body.Close()
-	if res.StatusCode != 415 {
-		b, _ := io.ReadAll(res.Body)
-		t.Fatalf("bad mime: want 415 got %d body=%s", res.StatusCode, string(b))
 	}
 }
 
@@ -1567,18 +1492,6 @@ func TestUpdateMe_EmptyBody(t *testing.T) {
 	defer res.Body.Close()
 	if res.StatusCode != 400 {
 		t.Fatalf("bad json: want 400 got %d", res.StatusCode)
-	}
-}
-
-func TestUpload_MissingFile(t *testing.T) {
-	f := testutil.New(t)
-	alice := f.Register(t, "nofile@t.t", "NoFile", "password123")
-
-	res := f.DoMultipart(t, "POST", "/api/uploads", alice.AccessToken, nil, "other", "ignored.txt", []byte("x"), "text/plain")
-	defer res.Body.Close()
-	if res.StatusCode != 400 {
-		b, _ := io.ReadAll(res.Body)
-		t.Fatalf("missing file field: want 400 got %d body=%s", res.StatusCode, string(b))
 	}
 }
 

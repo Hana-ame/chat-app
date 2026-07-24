@@ -32,104 +32,21 @@ func (d *DB) ensureLastActiveColumn(ctx context.Context) error {
 	return nil
 }
 
-func (d *DB) ensureChatAvatarColumn(ctx context.Context) error {
+func (d *DB) ensureColumn(ctx context.Context, table, name, definition string) error {
 	var cnt int
 	if err := d.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM pragma_table_info('chats') WHERE name='avatar_url'`).Scan(&cnt); err != nil {
-		return fmt.Errorf("check avatar_url: %w", err)
+		`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name=?`, table, name,
+	).Scan(&cnt); err != nil {
+		return fmt.Errorf("check %s.%s: %w", table, name, err)
 	}
 	if cnt > 0 {
 		return nil
 	}
-	logutil.Info("migrating chats: add avatar_url column")
-	if _, err := d.ExecContext(ctx,
-		`ALTER TABLE chats ADD COLUMN avatar_url TEXT NOT NULL DEFAULT ''`); err != nil {
-		return fmt.Errorf("add avatar_url: %w", err)
+	logutil.Info("migrating %s: add %s column", table, name)
+	q := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s", table, definition)
+	if _, err := d.ExecContext(ctx, q); err != nil {
+		return fmt.Errorf("add %s.%s: %w", table, name, err)
 	}
-	logutil.Info("chats.avatar_url column added")
-	return nil
-}
-
-func (d *DB) ensureChatBannerBackgroundColumn(ctx context.Context) error {
-	var hasBanner, hasBg int
-	if err := d.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM pragma_table_info('chats') WHERE name='banner_url'`).Scan(&hasBanner); err != nil {
-		return fmt.Errorf("check banner_url: %w", err)
-	}
-	if err := d.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM pragma_table_info('chats') WHERE name='background_url'`).Scan(&hasBg); err != nil {
-		return fmt.Errorf("check background_url: %w", err)
-	}
-	if hasBanner > 0 && hasBg > 0 {
-		return nil
-	}
-	logutil.Info("migrating chats: add banner_url, background_url columns")
-	if hasBanner == 0 {
-		if _, err := d.ExecContext(ctx,
-			`ALTER TABLE chats ADD COLUMN banner_url TEXT NOT NULL DEFAULT ''`); err != nil {
-			return fmt.Errorf("add banner_url: %w", err)
-		}
-	}
-	if hasBg == 0 {
-		if _, err := d.ExecContext(ctx,
-			`ALTER TABLE chats ADD COLUMN background_url TEXT NOT NULL DEFAULT ''`); err != nil {
-			return fmt.Errorf("add background_url: %w", err)
-		}
-	}
-	logutil.Info("chats.banner_url, background_url columns added")
-	return nil
-}
-
-func (d *DB) ensureNotifyEnabledColumn(ctx context.Context) error {
-	var cnt int
-	if err := d.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM pragma_table_info('chat_members') WHERE name='notify_enabled'`).Scan(&cnt); err != nil {
-		return fmt.Errorf("check notify_enabled: %w", err)
-	}
-	if cnt > 0 {
-		return nil
-	}
-	logutil.Info("migrating chat_members: add notify_enabled column")
-	if _, err := d.ExecContext(ctx,
-		`ALTER TABLE chat_members ADD COLUMN notify_enabled INTEGER NOT NULL DEFAULT 1`); err != nil {
-		return fmt.Errorf("add notify_enabled: %w", err)
-	}
-	logutil.Info("chat_members.notify_enabled column added")
-	return nil
-}
-
-func (d *DB) ensureNotifyBlockedColumn(ctx context.Context) error {
-	var cnt int
-	if err := d.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM pragma_table_info('users') WHERE name='notify_blocked'`).Scan(&cnt); err != nil {
-		return fmt.Errorf("check notify_blocked: %w", err)
-	}
-	if cnt > 0 {
-		return nil
-	}
-	logutil.Info("migrating users: add notify_blocked column")
-	if _, err := d.ExecContext(ctx,
-		`ALTER TABLE users ADD COLUMN notify_blocked TEXT NOT NULL DEFAULT '[]'`); err != nil {
-		return fmt.Errorf("add notify_blocked: %w", err)
-	}
-	logutil.Info("users.notify_blocked column added")
-	return nil
-}
-
-func (d *DB) ensureBannerOpacityColumn(ctx context.Context) error {
-	var cnt int
-	if err := d.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM pragma_table_info('chats') WHERE name='banner_opacity'`).Scan(&cnt); err != nil {
-		return fmt.Errorf("check banner_opacity: %w", err)
-	}
-	if cnt > 0 {
-		return nil
-	}
-	logutil.Info("migrating chats: add banner_opacity column")
-	if _, err := d.ExecContext(ctx,
-		`ALTER TABLE chats ADD COLUMN banner_opacity REAL NOT NULL DEFAULT 0.9`); err != nil {
-		return fmt.Errorf("add banner_opacity: %w", err)
-	}
-	logutil.Info("chats.banner_opacity column added")
+	logutil.Info("%s.%s column added", table, name)
 	return nil
 }

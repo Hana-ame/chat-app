@@ -106,23 +106,27 @@ func (d *DB) Migrate() error {
 		return err
 	}
 
-	if err := d.ensureChatAvatarColumn(ctx); err != nil {
+	if err := d.ensureColumn(ctx, "chats", "avatar_url", "avatar_url TEXT NOT NULL DEFAULT ''"); err != nil {
 		return err
 	}
 
-	if err := d.ensureChatBannerBackgroundColumn(ctx); err != nil {
+	if err := d.ensureColumn(ctx, "chats", "banner_url", "banner_url TEXT NOT NULL DEFAULT ''"); err != nil {
 		return err
 	}
 
-	if err := d.ensureBannerOpacityColumn(ctx); err != nil {
+	if err := d.ensureColumn(ctx, "chats", "background_url", "background_url TEXT NOT NULL DEFAULT ''"); err != nil {
 		return err
 	}
 
-	if err := d.ensureNotifyEnabledColumn(ctx); err != nil {
+	if err := d.ensureColumn(ctx, "chats", "banner_opacity", "banner_opacity REAL NOT NULL DEFAULT 0.9"); err != nil {
 		return err
 	}
 
-	if err := d.ensureNotifyBlockedColumn(ctx); err != nil {
+	if err := d.ensureColumn(ctx, "chat_members", "notify_enabled", "notify_enabled INTEGER NOT NULL DEFAULT 1"); err != nil {
+		return err
+	}
+
+	if err := d.ensureColumn(ctx, "users", "notify_blocked", "notify_blocked TEXT NOT NULL DEFAULT '[]'"); err != nil {
 		return err
 	}
 

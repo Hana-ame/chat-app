@@ -47,7 +47,6 @@ func main() {
 		Handler:           r,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      15 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
 
@@ -67,6 +66,7 @@ func main() {
 		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 		<-sigCh
 		logutil.Info("chatd: shutting down")
+		hub.Shutdown()
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		_ = server.Shutdown(ctx)

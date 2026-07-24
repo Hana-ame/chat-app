@@ -362,6 +362,24 @@ func (h *Hub) SSEUnregister(userID string) {
 	h.mu.Unlock()
 }
 
+func (h *Hub) Shutdown() {
+	h.mu.Lock()
+	for _, set := range h.clients {
+		for c := range set {
+			c.close()
+		}
+	}
+	h.clients = make(map[string]map[*Client]struct{})
+	for uid, chs := range h.sseClients {
+		for _, ch := range chs {
+			close(ch)
+		}
+		delete(h.sseClients, uid)
+	}
+	h.mu.Unlock()
+	logutil.Info("ws hub shut down")
+}
+
 func (h *Hub) sseSend(userID string, data []byte) {
 	h.mu.RLock()
 	chs := h.sseClients[userID]
