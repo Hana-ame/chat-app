@@ -40,3 +40,9 @@ Chat application with Go backend + React frontend.
 3. `git tag build-$(git rev-parse --short HEAD)` — tag with short commit hash
 4. `git push --tags`
 5. `gh run list --branch <tag> --limit 3` — confirm CI passes
+
+## Version Bump (bump version 时)
+需同步以下三处，确保版本号一致：
+- `client/package.json` — `"version": "x.y.z"`
+- `server/internal/handlers/swagger.json` — `"version": "x.y.z"`
+- git tag — `build-<sha>`（Workflow step 3 自动完成）
