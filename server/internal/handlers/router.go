@@ -43,7 +43,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Security-Policy",
 				"default-src 'self'; "+
-					"script-src 'self' 'unsafe-inline' https://esm.sh; "+
+					"script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://esm.sh https://static.cloudflareinsights.com; "+
 					"style-src 'self' 'unsafe-inline'; "+
 					"img-src 'self' data: blob:; "+
 					"connect-src "+s.Cfg.CSPConnectSrc+" https://esm.sh; "+
