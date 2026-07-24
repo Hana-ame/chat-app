@@ -4594,6 +4594,27 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 
 ## 2026-07-23 本地文件上传 /aapi/（第 45 轮）
 
+## 2026-07-24 架构清理（第 46 轮）
+
+### 目标
+删除死代码、重复逻辑、无用依赖，提升代码可维护性。
+
+### 删除
+- `server/internal/handlers/uploads.go` — 废弃上传处理器（前端直传 upload.moonchan.xyz）
+- `server/internal/orderedmap/` — 整个包，healthz 改用 `map[string]any`
+- `server/cmd/chatd/main.go` `WriteTimeout` — 移除（导致 SSE 断开）
+- 5 个失效的 upload 测试（`TestUploadFile`, `TestUploadExceedsSizeLimit`, `TestUploadRejectsUnsupportedMime`, `TestUploadNotLoggedIn`, `TestUpload_MissingFile`）
+
+### 重构
+- `db_fixups.go` — 6 个 `ensureXxxColumn` 函数合并为单个参数化 `ensureColumn(table, name, definition)`
+- `main.go` — 添加 `hub.Shutdown()` 实现 WS/SSE 优雅关闭（P1）
+- `local_upload.go` — raw body 路径添加 `http.MaxBytesReader` 大小限制 + `413` 响应
+
+### 验证
+- Server: `go build` / `go vet` / `go test` — all ✅
+- Client: `npm run build` — ✅
+- CI (GitHub Actions) — both jobs pass ✅
+
 ### 目标
 用本地存储替换 `upload.moonchan.xyz` 外部上传服务，API 格式对齐 `Hana-ame/azure-go` 的 `?dest=local` 模式。
 
