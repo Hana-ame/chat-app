@@ -4728,3 +4728,30 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 - Go build + vet: ✅
 - Go test ./...: ✅ (all packages pass)
 - Client build: ✅
+
+---
+
+## 2026-07-25 deploy_win.py 自更新 + .env 自动同步（第 49 轮）
+
+### 变更
+
+#### 1. deploy_win.py 自更新
+- **功能**: 每次运行（run 模式除外）自动从 GitHub main 分支拉取最新 `deploy_win.py`，若内容不同则覆盖自身并重启
+- **跳过**: `--no-self-update` 参数可跳过
+- **文件**: `scripts/deploy_win.py`
+
+#### 2. .env 自动同步
+- **功能**: 自动从 GitHub 获取最新 `.env.example`，对比本地 `.env`，自动添加缺失 key（保留 `CHAT_STATIC_DIR` 和已有值），提示 placeholder 警告
+- **文件**: `scripts/deploy_win.py`
+
+#### 3. CHAT_STATIC_DIR 写入绝对路径
+- **功能**: download 步骤自动将 `CHAT_STATIC_DIR` 写入 `.env` 为绝对路径，不受工作目录影响
+- **文件**: `scripts/deploy_win.py`
+
+#### 4. 配置日志从 Debug 改为 Info
+- **功能**: 服务器启动时 `static_dir=xxx` 直接打印到日志，无需设 `LOG_LEVEL=DEBUG`
+- **文件**: `server/internal/config/config.go`
+
+### 验证
+- Go build: ✅
+- Python syntax: ✅
