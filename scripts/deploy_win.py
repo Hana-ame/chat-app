@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -61,6 +62,100 @@ def download(asset, dst, proxy):
     subprocess.run(cmd, check=True)
     size = os.path.getsize(dst)
     print(f"[deploy] saved: {dst} ({size} bytes)")
+
+
+REPO_BASE = "https://raw.githubusercontent.com/Hana-ame/chat-app/main"
+
+EXAMPLE_FILES = [
+    (".env.example", ".env"),
+    ("server/.env.example", "server/.env"),
+    ("client/.env.example", "client/.env"),
+]
+
+
+def _parse_env_file(path):
+    keys = {}
+    try:
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                m = re.match(r"^(\w+)=(.+)?", line)
+                if m:
+                    keys[m.group(1)] = m.group(2) or ""
+    except FileNotFoundError:
+        return None
+    return keys
+
+
+def _fetch_from_repo(rel_path):
+    url = f"{REPO_BASE}/{rel_path}"
+    try:
+        with urllib.request.urlopen(url, timeout=10) as r:
+            return r.read().decode("utf-8")
+    except Exception as e:
+        print(f"[deploy]  WARN: fetch {rel_path} failed: {e}")
+        return None
+
+
+def check_env(cwd):
+    ok = True
+    for example_rel, env_rel in EXAMPLE_FILES:
+        example_path = os.path.join(cwd, example_rel)
+        env_path = os.path.join(cwd, env_rel)
+
+        example_keys = _parse_env_file(example_path)
+        if example_keys is None:
+            print(f"[deploy]  WARN: {example_rel} not found, fetching from GitHub...")
+            raw = _fetch_from_repo(example_rel)
+            if raw:
+                with open(example_path, "w") as f:
+                    f.write(raw)
+                print(f"[deploy]  OK: downloaded {example_rel}")
+                example_keys = _parse_env_file(example_path)
+            if example_keys is None:
+                print(f"[deploy]  SKIP: cannot check {env_rel} (no example)")
+                continue
+
+        env_keys = _parse_env_file(env_path)
+        if env_keys is None:
+            print(f"[deploy]  WARN: {env_rel} not found")
+            raw = _fetch_from_repo(example_rel)
+            if raw:
+                with open(env_path, "w") as f:
+                    f.write(raw)
+                print(f"[deploy]  INFO: created {env_rel} from GitHub template")
+                print(f"[deploy]  INFO: edit {env_rel} to set secrets before running")
+            else:
+                print(f"[deploy]  INFO: copy {example_rel} to {env_rel} and fill in secrets")
+            ok = False
+            continue
+
+        missing = []
+        placeholder = []
+        for k, v in example_keys.items():
+            if k not in env_keys:
+                missing.append(k)
+            elif v is not None and env_keys.get(k) == v and (
+                "change-me" in v.lower() or "sk-" in v.lower() or v.strip() == ""
+            ):
+                placeholder.append(k)
+
+        if missing:
+            print(f"[deploy]  WARN: {env_rel} missing keys: {', '.join(missing)}")
+            raw = _fetch_from_repo(example_rel)
+            if raw:
+                with open(env_path, "w") as f:
+                    f.write(raw)
+                print(f"[deploy]  INFO: replaced {env_rel} with latest template (edit secrets)")
+            ok = False
+        elif placeholder:
+            print(f"[deploy]  WARN: {env_rel} placeholder values: {', '.join(placeholder)}")
+            print(f"[deploy]  INFO: update these in {env_rel}")
+        else:
+            print(f"[deploy]  OK: {env_rel} looks good")
+    return ok
 
 
 def load_env(env_file):

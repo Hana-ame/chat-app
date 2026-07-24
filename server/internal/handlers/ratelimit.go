@@ -1,15 +1,10 @@
 package handlers
 
 import (
-	"fmt"
-	"io"
 	"net"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
-
-	"github.com/Hana-ame/chat-app/server/internal/logutil"
 )
 
 type loginRateLimiter struct {
@@ -102,94 +97,13 @@ func (l *registerLimiter) record() {
 	l.count++
 }
 
-var cloudflareNets []*net.IPNet
-
-func initCloudflareNets() {
-	cidrs, err := fetchCloudflareCIDRs()
-	if err != nil {
-		logutil.Warn("fetch Cloudflare IPs: %v, using hardcoded fallback", err)
-		cidrs = hardcodedCloudflareCIDRs()
-	}
-	for _, c := range cidrs {
-		_, p, err := net.ParseCIDR(c)
-		if err == nil {
-			cloudflareNets = append(cloudflareNets, p)
-		}
-	}
-	logutil.Info("loaded %d Cloudflare IP ranges", len(cloudflareNets))
-}
-
-func fetchCloudflareCIDRs() ([]string, error) {
-	var cidrs []string
-	for _, url := range []string{"https://www.cloudflare.com/ips-v4", "https://www.cloudflare.com/ips-v6"} {
-		resp, err := http.Get(url)
-		if err != nil {
-			return nil, fmt.Errorf("get %s: %w", url, err)
-		}
-		defer resp.Body.Close()
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("read %s: %w", url, err)
-		}
-		for _, line := range strings.Split(string(body), "\n") {
-			line = strings.TrimSpace(line)
-			if line != "" {
-				cidrs = append(cidrs, line)
-			}
-		}
-	}
-	return cidrs, nil
-}
-
-func hardcodedCloudflareCIDRs() []string {
-	return []string{
-		"103.21.244.0/22", "103.22.200.0/22", "103.31.4.0/22",
-		"104.16.0.0/13", "104.24.0.0/14", "108.162.192.0/18",
-		"131.0.72.0/22", "141.101.64.0/18", "162.158.0.0/15",
-		"172.64.0.0/13", "173.245.48.0/20", "188.114.96.0/20",
-		"190.93.240.0/20", "197.234.240.0/22", "198.41.128.0/17",
-		"2400:cb00::/32", "2606:4700::/32", "2803:f800::/32",
-		"2405:b500::/32", "2405:8100::/32", "2a06:98c0::/29",
-		"2c0f:f248::/32",
-	}
-}
-
-var loadCloudflareNets sync.Once
-
-func isCloudflareIP(ip net.IP) bool {
-	if ip == nil {
-		return false
-	}
-	loadCloudflareNets.Do(initCloudflareNets)
-	for _, n := range cloudflareNets {
-		if n.Contains(ip) {
-			return true
-		}
-	}
-	return false
-}
-
+// clientIP extracts the client IP from a request.
+// chimid.RealIP middleware has already set r.RemoteAddr from X-Forwarded-For / X-Real-IP,
+// so we simply strip the port.
 func clientIP(r *http.Request) string {
-	xff := r.Header.Get("X-Forwarded-For")
-	if xff == "" {
-		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-		return ip
-	}
-	parts := strings.Split(xff, ",")
-	for _, p := range parts {
-		s := strings.TrimSpace(p)
-		if strings.Contains(s, ":") {
-			if ip, _, err := net.SplitHostPort(s); err == nil {
-				if !isCloudflareIP(net.ParseIP(ip)) {
-					return ip
-				}
-			}
-		}
-		if ip := net.ParseIP(s); ip != nil && !isCloudflareIP(ip) {
-			return s
-		}
-	}
-	// all CF IPs, fallback to RemoteAddr
 	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if ip == "" {
+		ip = r.RemoteAddr
+	}
 	return ip
 }
