@@ -4655,12 +4655,25 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 - `CHAT_READ_TIMEOUT` — 服务级读取超时（默认 10m）
 - `CHAT_READ_HEADER_TIMEOUT` — 请求头读取超时（默认 10s）
 
-### 修复
+### 审计报告验证
+- 对照 `docs/reports/codebase-audit-20260715.md` 逐项核查 14 个问题：
+  - 12 个已完全修复 ✅（BroadcastUserUpdate data race、Reactions 绕过 service、Users/SSE/Chat 直调 DB、Reconnect/CONNECTED 状态、removeUser try/catch、Gateway DB 错误、双重 loadMessages、ErrContentTooLong 413、Poll cancelled、双重排序、UserAvatar 组件、Modals aria）
+  - 2 个部分修复 🔶（`auth.go` 仍有 3 处直接调 `s.DB.*`、`isContentTooLong` 字符串匹配 → 本次已改成 `errors.Is`）
+
+### 修改
+- `config.go` — 新增 6 个可配置字段（`MaxMessageContentLength`, `WSMaxMessageSize`, `APITimeout`, `UploadTimeout`, `ReadTimeout`, `ReadHeaderTimeout`）
+- `db/db.go` — `DB` 结构体加 `maxContentLength`，`Open()` 签名扩展
 - `db/messages.go` — 硬编码 4000 替换为 `d.maxContentLength`，新增 `db.ErrContentTooLong` sentinel
-- `service/authz.go` — `isContentTooLong` 改用 `errors.Is` 替代字符串匹配
-- `ws/gateway.go` — `maxMessageSize` 从常量改为 Gateway 字段，可配置
-- `router.go` — 上传路由单独用 `UploadTimeout`，其余用 `APITimeout`
-- `main.go` — 透传所有配置到 DB / Gateway / http.Server
+- `service/authz.go` — `isContentTooLong` 改用 `errors.Is(err, db.ErrContentTooLong)`
+- `ws/gateway.go` — `maxMessageSize` 从常量改为 `Gateway.maxMessageSize` 字段
+- `handlers/handler.go` — `authMiddleware` 中 `s.DB.GetUserByID` → `s.Services.User.GetByID`
+- `handlers/router.go` — `/api` 分组拆为 upload（`UploadTimeout`）和其余（`APITimeout`）
+- `cmd/chatd/main.go` — 透传新配置到 DB, Gateway, http.Server
+- `.env.example`（root + server）— 新增 Timeouts / Limits 分组
+- `scripts/deploy_win.py` — 新增 `check_env()`：运行前自动检查 root/server/client 三组 `.env` 完整性，缺失时从 GitHub 拉取模板
+- `scripts/check_env.py` — 移除（功能合并入 deploy_win.py）
 
 ### 验证
 - Server: `go build` / `go vet` / `go test` — all ✅
+- Client: `npm run build` — ✅
+- CI (GitHub Actions) — passed ✅
