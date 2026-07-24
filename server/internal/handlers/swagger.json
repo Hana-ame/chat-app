@@ -3,22 +3,22 @@
   "info": {
     "title": "Chat App API",
     "version": "0.4.0",
-    "description": "\u5b9e\u65f6\u804a\u5929\u5e94\u7528\u540e\u7aef API\u3002\n\n\u8ba4\u8bc1\u65b9\u5f0f:\n- `Authorization: Bearer <access_token>` \u8bf7\u6c42\u5934\uff08\u9996\u9009\uff09\n- `access_token` Cookie\uff08SSE \u7b49 WebSocket \u573a\u666f\u56de\u9000\uff09\n- `refresh_token` Cookie\uff08\u4ec5 `/api/auth/refresh`\uff09\n\n\u6240\u6709\u9519\u8bef\u54cd\u5e94\u7edf\u4e00\u683c\u5f0f:\n```json\n{ \"error\": \"error_code\", \"message\": \"human-readable message\" }\n```\n"
+    "description": "实时聊天应用后端 API。\n\n认证方式:\n- `Authorization: Bearer <access_token>` 请求头（首选）\n- `access_token` Cookie（SSE 等 WebSocket 场景回退）\n- `refresh_token` Cookie（仅 `/api/auth/refresh`）\n\n所有错误响应统一格式:\n```json\n{ \"error\": \"error_code\", \"message\": \"human-readable message\" }\n```\n"
   },
   "servers": [
     {
       "url": "https://wsl-8080.moonchan.xyz",
-      "description": "\u751f\u4ea7\u670d\u52a1\u5668"
+      "description": "生产服务器"
     },
     {
       "url": "http://localhost:8080",
-      "description": "\u672c\u5730\u5f00\u53d1"
+      "description": "本地开发"
     }
   ],
   "paths": {
     "/healthz": {
       "get": {
-        "summary": "\u5065\u5eb7\u68c0\u67e5",
+        "summary": "健康检查",
         "operationId": "healthz",
         "responses": {
           "200": {
@@ -34,7 +34,7 @@
                     },
                     "echo": {
                       "type": "object",
-                      "description": "\u8bf7\u6c42\u5934\u56de\u663e"
+                      "description": "请求头回显"
                     }
                   }
                 }
@@ -46,7 +46,7 @@
     },
     "/api/version": {
       "get": {
-        "summary": "\u83b7\u53d6\u7248\u672c\u4fe1\u606f",
+        "summary": "获取版本信息",
         "operationId": "getVersion",
         "responses": {
           "200": {
@@ -70,7 +70,7 @@
     },
     "/api/auth/register": {
       "post": {
-        "summary": "\u6ce8\u518c\u65b0\u7528\u6237",
+        "summary": "注册新用户",
         "operationId": "register",
         "tags": [
           "Auth"
@@ -87,7 +87,7 @@
         },
         "responses": {
           "200": {
-            "description": "\u6ce8\u518c\u6210\u529f",
+            "description": "注册成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -105,7 +105,7 @@
             "$ref": "#/components/responses/BadRequest"
           },
           "409": {
-            "description": "\u7528\u6237\u5df2\u5b58\u5728",
+            "description": "用户已存在",
             "content": {
               "application/json": {
                 "schema": {
@@ -132,7 +132,7 @@
     },
     "/api/auth/login": {
       "post": {
-        "summary": "\u767b\u5f55",
+        "summary": "登录",
         "operationId": "login",
         "tags": [
           "Auth"
@@ -149,7 +149,7 @@
         },
         "responses": {
           "200": {
-            "description": "\u767b\u5f55\u6210\u529f",
+            "description": "登录成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -167,7 +167,7 @@
             "$ref": "#/components/responses/BadRequest"
           },
           "401": {
-            "description": "\u51ed\u636e\u65e0\u6548",
+            "description": "凭据无效",
             "content": {
               "application/json": {
                 "schema": {
@@ -193,15 +193,15 @@
     },
     "/api/auth/refresh": {
       "post": {
-        "summary": "\u5237\u65b0 access token",
-        "description": "\u4ece Cookie \u4e2d\u8bfb\u53d6 refresh_token\uff0c\u8f6e\u6362\u673a\u5236\uff08\u4e00\u6b21\u6027\uff09",
+        "summary": "刷新 access token",
+        "description": "从 Cookie 中读取 refresh_token，轮换机制（一次性）",
         "operationId": "refreshToken",
         "tags": [
           "Auth"
         ],
         "responses": {
           "200": {
-            "description": "\u5237\u65b0\u6210\u529f",
+            "description": "刷新成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -219,7 +219,7 @@
             "$ref": "#/components/responses/BadRequest"
           },
           "401": {
-            "description": "refresh token \u65e0\u6548\u6216\u8fc7\u671f",
+            "description": "refresh token 无效或过期",
             "content": {
               "application/json": {
                 "schema": {
@@ -242,8 +242,8 @@
     },
     "/api/auth/logout": {
       "post": {
-        "summary": "\u767b\u51fa",
-        "description": "\u6e05\u9664\u6240\u6709 refresh token",
+        "summary": "登出",
+        "description": "清除所有 refresh token",
         "operationId": "logout",
         "tags": [
           "Auth"
@@ -255,7 +255,7 @@
         ],
         "responses": {
           "200": {
-            "description": "\u767b\u51fa\u6210\u529f",
+            "description": "登出成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -280,7 +280,7 @@
     },
     "/api/users/me": {
       "get": {
-        "summary": "\u83b7\u53d6\u5f53\u524d\u7528\u6237\u4fe1\u606f",
+        "summary": "获取当前用户信息",
         "operationId": "getMe",
         "tags": [
           "Users"
@@ -307,7 +307,7 @@
         }
       },
       "patch": {
-        "summary": "\u66f4\u65b0\u5f53\u524d\u7528\u6237\u4fe1\u606f",
+        "summary": "更新当前用户信息",
         "operationId": "updateMe",
         "tags": [
           "Users"
@@ -329,7 +329,7 @@
         },
         "responses": {
           "200": {
-            "description": "\u66f4\u65b0\u6210\u529f",
+            "description": "更新成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -348,7 +348,7 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "description": "\u7528\u6237\u540d\u5df2\u5b58\u5728",
+            "description": "用户名已存在",
             "content": {
               "application/json": {
                 "schema": {
@@ -371,7 +371,7 @@
     },
     "/api/users": {
       "get": {
-        "summary": "\u641c\u7d22\u7528\u6237",
+        "summary": "搜索用户",
         "operationId": "searchUsers",
         "tags": [
           "Users"
@@ -390,7 +390,7 @@
               "type": "string",
               "minLength": 1
             },
-            "description": "\u641c\u7d22\u5173\u952e\u8bcd"
+            "description": "搜索关键词"
           }
         ],
         "responses": {
@@ -420,7 +420,7 @@
     },
     "/api/chats/my": {
       "get": {
-        "summary": "\u83b7\u53d6\u5f53\u524d\u7528\u6237\u7684\u804a\u5929\u5217\u8868",
+        "summary": "获取当前用户的聊天列表",
         "operationId": "listChats",
         "tags": [
           "Chats"
@@ -457,7 +457,7 @@
     },
     "/api/chats/public": {
       "get": {
-        "summary": "\u83b7\u53d6\u516c\u5f00\u804a\u5929\u5217\u8868\uff08\u5206\u9875\uff09",
+        "summary": "获取公开聊天列表（分页）",
         "operationId": "listPublicChats",
         "tags": [
           "Chats"
@@ -511,7 +511,7 @@
     },
     "/api/chats": {
       "post": {
-        "summary": "\u521b\u5efa\u804a\u5929\uff08\u4ec5\u7fa4\u7ec4\uff09",
+        "summary": "创建聊天（仅群组）",
         "operationId": "createChat",
         "tags": [
           "Chats"
@@ -533,7 +533,7 @@
         },
         "responses": {
           "201": {
-            "description": "\u521b\u5efa\u6210\u529f",
+            "description": "创建成功",
             "content": {
               "application/json": {
                 "schema": {
@@ -555,7 +555,7 @@
         }
       ],
       "get": {
-        "summary": "\u83b7\u53d6\u804a\u5929\u8be6\u60c5",
+        "summary": "获取聊天详情",
         "operationId": "getChat",
         "tags": [
           "Chats"
@@ -584,7 +584,7 @@
         }
       },
       "patch": {
-        "summary": "\u91cd\u547d\u540d\u804a\u5929",
+        "summary": "重命名聊天",
         "operationId": "renameChat",
         "tags": [
           "Chats"
@@ -620,7 +620,7 @@
         }
       },
       "delete": {
-        "summary": "\u5220\u9664\u804a\u5929",
+        "summary": "删除聊天",
         "operationId": "deleteChat",
         "tags": [
           "Chats"
@@ -656,7 +656,7 @@
     },
     "/api/chats/{chatID}/join": {
       "post": {
-        "summary": "\u52a0\u5165\u516c\u5f00\u804a\u5929",
+        "summary": "加入公开聊天",
         "operationId": "joinChat",
         "tags": [
           "Chats"
@@ -694,8 +694,8 @@
     },
     "/api/chats/{chatID}/visit": {
       "post": {
-        "summary": "\u6807\u8bb0\u804a\u5929\u8bbf\u95ee\uff08\u66f4\u65b0 last_active_at\uff09",
-        "operationId": "visitChat",
+        "summary": "标记聊天访问（更新 last_active_at）",
+        "operationId": "trackVisit",
         "tags": [
           "Chats"
         ],
@@ -735,8 +735,8 @@
     },
     "/api/dms": {
       "post": {
-        "summary": "\u521b\u5efa\u6216\u83b7\u53d6\u79c1\u804a\uff08\u5df2\u5e9f\u5f03\uff09",
-        "description": "Deprecated. \u540e\u7eed\u7248\u672c\u79fb\u9664\u3002",
+        "summary": "创建或获取私聊（已废弃）",
+        "description": "Deprecated. 后续版本移除。",
         "operationId": "createOrGetDM",
         "tags": [
           "Chats"
@@ -762,7 +762,7 @@
         },
         "responses": {
           "200": {
-            "description": "\u8fd4\u56de\u5df2\u6709\u79c1\u804a",
+            "description": "返回已有私聊",
             "content": {
               "application/json": {
                 "schema": {
@@ -772,7 +772,7 @@
             }
           },
           "201": {
-            "description": "\u65b0\u5efa\u79c1\u804a",
+            "description": "新建私聊",
             "content": {
               "application/json": {
                 "schema": {
@@ -797,7 +797,7 @@
         }
       ],
       "post": {
-        "summary": "\u521b\u5efa\u516c\u544a",
+        "summary": "创建公告",
         "operationId": "setAnnouncement",
         "tags": [
           "Announcement"
@@ -844,7 +844,7 @@
         }
       },
       "patch": {
-        "summary": "\u66f4\u65b0\u516c\u544a\uff08\u59d4\u6258\u7ed9 POST\uff09",
+        "summary": "更新公告（委托给 POST）",
         "operationId": "updateAnnouncement",
         "tags": [
           "Announcement"
@@ -891,7 +891,7 @@
         }
       },
       "delete": {
-        "summary": "\u5220\u9664\u516c\u544a",
+        "summary": "删除公告",
         "operationId": "deleteAnnouncement",
         "tags": [
           "Announcement"
@@ -927,7 +927,7 @@
     },
     "/api/chats/{chatID}/announcement/read": {
       "post": {
-        "summary": "\u6807\u8bb0\u516c\u544a\u5df2\u8bfb",
+        "summary": "标记公告已读",
         "operationId": "markAnnouncementRead",
         "tags": [
           "Announcement"
@@ -968,7 +968,7 @@
     },
     "/api/chats/{chatID}/pin": {
       "post": {
-        "summary": "\u7f6e\u9876\u804a\u5929\u5230\u5217\u8868\u9876\u90e8",
+        "summary": "置顶聊天到列表顶部",
         "operationId": "pinChatList",
         "tags": [
           "Chats"
@@ -1015,7 +1015,7 @@
     },
     "/api/chats/{chatID}/unpin": {
       "post": {
-        "summary": "\u53d6\u6d88\u804a\u5929\u7f6e\u9876",
+        "summary": "取消聊天置顶",
         "operationId": "unpinChatList",
         "tags": [
           "Chats"
@@ -1067,7 +1067,7 @@
         }
       ],
       "get": {
-        "summary": "\u83b7\u53d6\u804a\u5929\u6210\u5458\u5217\u8868",
+        "summary": "获取聊天成员列表",
         "operationId": "listMembers",
         "tags": [
           "Members"
@@ -1101,7 +1101,7 @@
         }
       },
       "post": {
-        "summary": "\u6dfb\u52a0\u6210\u5458",
+        "summary": "添加成员",
         "operationId": "addMember",
         "tags": [
           "Members"
@@ -1155,7 +1155,7 @@
         }
       ],
       "delete": {
-        "summary": "\u79fb\u9664\u6210\u5458",
+        "summary": "移除成员",
         "operationId": "removeMember",
         "tags": [
           "Members"
@@ -1196,7 +1196,7 @@
         }
       ],
       "get": {
-        "summary": "\u83b7\u53d6\u6d88\u606f\u5217\u8868\uff08\u6e38\u6807\u5206\u9875\uff09",
+        "summary": "获取消息列表（游标分页）",
         "operationId": "listMessages",
         "tags": [
           "Messages"
@@ -1222,7 +1222,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "\u6e38\u6807\uff08\u6d88\u606f ID\uff09\uff0c\u83b7\u53d6\u6b64\u6d88\u606f\u4e4b\u524d\u7684\u66f4\u65e9\u6d88\u606f"
+            "description": "游标（消息 ID），获取此消息之前的更早消息"
           }
         ],
         "responses": {
@@ -1249,7 +1249,7 @@
         }
       },
       "post": {
-        "summary": "\u53d1\u9001\u6d88\u606f",
+        "summary": "发送消息",
         "operationId": "sendMessage",
         "tags": [
           "Messages"
@@ -1298,7 +1298,7 @@
         }
       ],
       "patch": {
-        "summary": "\u7f16\u8f91\u6d88\u606f",
+        "summary": "编辑消息",
         "operationId": "editMessage",
         "tags": [
           "Messages"
@@ -1347,7 +1347,7 @@
         }
       },
       "delete": {
-        "summary": "\u5220\u9664\u6d88\u606f",
+        "summary": "删除消息",
         "operationId": "deleteMessage",
         "tags": [
           "Messages"
@@ -1393,7 +1393,7 @@
     },
     "/api/chats/{chatID}/read": {
       "post": {
-        "summary": "\u6807\u8bb0\u6d88\u606f\u5df2\u8bfb",
+        "summary": "标记消息已读",
         "operationId": "markRead",
         "tags": [
           "Messages"
@@ -1447,7 +1447,7 @@
         }
       ],
       "get": {
-        "summary": "\u83b7\u53d6\u6d88\u606f\u7684\u6240\u6709 Reaction",
+        "summary": "获取消息的所有 Reaction",
         "operationId": "listReactions",
         "tags": [
           "Reactions"
@@ -1498,11 +1498,11 @@
           "schema": {
             "type": "string"
           },
-          "description": "URL \u7f16\u7801\u7684 UTF-8 emoji"
+          "description": "URL 编码的 UTF-8 emoji"
         }
       ],
       "put": {
-        "summary": "\u6dfb\u52a0 Reaction",
+        "summary": "添加 Reaction",
         "operationId": "addReaction",
         "tags": [
           "Reactions"
@@ -1528,7 +1528,7 @@
         }
       },
       "delete": {
-        "summary": "\u79fb\u9664 Reaction",
+        "summary": "移除 Reaction",
         "operationId": "removeReaction",
         "tags": [
           "Reactions"
@@ -1554,76 +1554,10 @@
         }
       }
     },
-    "/api/uploads": {
-      "post": {
-        "summary": "\u4e0a\u4f20\u6587\u4ef6\uff08\u5df2\u5e9f\u5f03\uff09",
-        "description": "Deprecated. \u524d\u7aef\u76f4\u63a5\u4e0a\u4f20\u5230 upload.moonchan.xyz\uff0c\u540e\u7eed\u7248\u672c\u79fb\u9664\u3002",
-        "operationId": "uploadFile",
-        "tags": [
-          "Uploads"
-        ],
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "\u4e0a\u4f20\u6210\u529f",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "url": {
-                      "type": "string"
-                    },
-                    "filename": {
-                      "type": "string"
-                    },
-                    "mime_type": {
-                      "type": "string"
-                    },
-                    "size": {
-                      "type": "integer"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "413": {
-            "$ref": "#/components/responses/ContentTooLong"
-          },
-          "415": {
-            "description": "\u4e0d\u652f\u6301\u7684\u5a92\u4f53\u7c7b\u578b"
-          }
-        }
-      }
-    },
     "/api/events": {
       "get": {
-        "summary": "SSE \u4e8b\u4ef6\u6d41",
-        "description": "Server-Sent Events \u7aef\u70b9\uff0c\u7528\u4e8e\u5b9e\u65f6\u63a8\u9001\u3002\n\n\u8fde\u63a5\u6d41\u7a0b:\n1. \u5ba2\u6237\u7aef\u8fde\u63a5\u540e\u7acb\u5373\u6536\u5230 `ready` \u4e8b\u4ef6\uff0c\u5305\u542b user\u3001chats\u3001online_user_ids\n2. \u540e\u7eed\u6536\u5230 message_create\u3001message_update\u3001message_delete\u3001reaction_update \u7b49\u4e8b\u4ef6\n\n\u8ba4\u8bc1\u65b9\u5f0f: \u67e5\u8be2\u53c2\u6570 `access_token`\uff08WebSocket \u4e0d\u652f\u6301\u81ea\u5b9a\u4e49 header \u7684 fallback\uff09\n",
+        "summary": "SSE 事件流",
+        "description": "Server-Sent Events 端点，用于实时推送。\n\n连接流程:\n1. 客户端连接后立即收到 `ready` 事件，包含 user、chats、online_user_ids\n2. 后续收到 message_create、message_update、message_delete、reaction_update 等事件\n\n认证方式: 查询参数 `access_token`（WebSocket 不支持自定义 header 的 fallback）\n",
         "operationId": "sseEvents",
         "tags": [
           "Realtime"
@@ -1640,7 +1574,7 @@
         ],
         "responses": {
           "200": {
-            "description": "SSE \u4e8b\u4ef6\u6d41",
+            "description": "SSE 事件流",
             "content": {
               "text/event-stream": {
                 "schema": {
@@ -1654,8 +1588,8 @@
     },
     "/ws": {
       "get": {
-        "summary": "WebSocket \u5b9e\u65f6\u8fde\u63a5",
-        "description": "WebSocket \u7aef\u70b9\uff0c\u7528\u4e8e\u5b9e\u65f6\u6d88\u606f\u63a8\u9001\u3002\n\n\u8ba4\u8bc1: URL \u67e5\u8be2\u53c2\u6570 `token` \u643a\u5e26 access_token\u3002\n\uff08WebSocket \u4e0d\u652f\u6301\u81ea\u5b9a\u4e49 header\uff0c\u56e0\u6b64\u7528 URL \u53c2\u6570\u4f20\u9012\u3002\uff09\n\n\u4e8b\u4ef6\u7c7b\u578b\u4e0e SSE \u4e00\u81f4\u3002\n",
+        "summary": "WebSocket 连接（实时消息）",
+        "description": "WebSocket 端点，用于实时消息推送。\n\n认证: URL 查询参数 `token` 携带 access_token。\n（WebSocket 不支持自定义 header，因此用 URL 参数传递。）\n\n事件类型与 SSE 一致。\n",
         "operationId": "wsConnect",
         "tags": [
           "Realtime"
@@ -1672,10 +1606,304 @@
         ],
         "responses": {
           "101": {
-            "description": "\u5207\u6362\u534f\u8bae\u6210\u529f"
+            "description": "切换协议成功"
           },
           "401": {
-            "description": "\u8ba4\u8bc1\u5931\u8d25"
+            "description": "认证失败"
+          }
+        }
+      }
+    },
+    "/api/upload": {
+      "get": {
+        "summary": "上传页面（HTML）",
+        "operationId": "uploadPage",
+        "responses": {
+          "200": {
+            "description": "上传 HTML 页面"
+          }
+        }
+      },
+      "put": {
+        "summary": "裸 body 上传文件",
+        "operationId": "uploadPut",
+        "parameters": [
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "上传成功"
+          },
+          "413": {
+            "description": "文件过大"
+          }
+        }
+      },
+      "post": {
+        "summary": "multipart/form-data 上传文件",
+        "operationId": "uploadPost",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "上传成功"
+          },
+          "413": {
+            "description": "文件过大"
+          }
+        }
+      }
+    },
+    "/api/upload/{path}": {
+      "put": {
+        "summary": "带文件名上传",
+        "operationId": "uploadPutWithPath",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "上传成功"
+          }
+        }
+      }
+    },
+    "/api/local/{path}": {
+      "get": {
+        "summary": "下载已上传文件",
+        "operationId": "downloadFile",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "delete",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "文件内容"
+          },
+          "404": {
+            "description": "文件不存在"
+          }
+        }
+      }
+    },
+    "/api/chats/{chatID}/avatar": {
+      "put": {
+        "summary": "更新聊天avatar",
+        "operationId": "updateChatAvatar",
+        "parameters": [
+          {
+            "name": "chatID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功"
+          }
+        }
+      }
+    },
+    "/api/chats/{chatID}/banner": {
+      "put": {
+        "summary": "更新聊天banner",
+        "operationId": "updateChatBanner",
+        "parameters": [
+          {
+            "name": "chatID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "banner_url": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功"
+          }
+        }
+      }
+    },
+    "/api/chats/{chatID}/background": {
+      "put": {
+        "summary": "更新聊天background",
+        "operationId": "updateChatBackground",
+        "parameters": [
+          {
+            "name": "chatID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功"
+          }
+        }
+      }
+    },
+    "/api/chats/{chatID}/notify": {
+      "put": {
+        "summary": "更新聊天notify",
+        "operationId": "updateChatNotify",
+        "parameters": [
+          {
+            "name": "chatID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功"
+          }
+        }
+      }
+    },
+    "/api/ai/chat": {
+      "post": {
+        "summary": "AI 聊天",
+        "operationId": "aiChat",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "chat_id": {
+                    "type": "string"
+                  },
+                  "msg_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SSE 流式响应"
           }
         }
       }
@@ -1687,7 +1915,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "`Authorization: Bearer <access_token>`\naccess_token \u6709\u6548\u671f 15 \u5206\u949f\uff0c\u901a\u8fc7 `/api/auth/refresh` \u7eed\u671f\u3002\n"
+        "description": "`Authorization: Bearer <access_token>`\naccess_token 有效期 15 分钟，通过 `/api/auth/refresh` 续期。\n"
       }
     },
     "headers": {
@@ -1695,7 +1923,7 @@
         "schema": {
           "type": "string"
         },
-        "description": "\u8bbe\u7f6e `access_token` \u548c `refresh_token` Cookie\u3002\nrefresh_token \u4e3a httpOnly\uff0c\u7528\u4e8e `/api/auth/refresh`\u3002\n"
+        "description": "设置 `access_token` 和 `refresh_token` Cookie。\nrefresh_token 为 httpOnly，用于 `/api/auth/refresh`。\n"
       }
     },
     "parameters": {
@@ -1706,12 +1934,12 @@
         "schema": {
           "type": "string"
         },
-        "description": "\u804a\u5929 ID"
+        "description": "聊天 ID"
       }
     },
     "responses": {
       "BadRequest": {
-        "description": "\u8bf7\u6c42\u53c2\u6570\u9519\u8bef",
+        "description": "请求参数错误",
         "content": {
           "application/json": {
             "schema": {
@@ -1731,7 +1959,7 @@
         }
       },
       "Unauthorized": {
-        "description": "\u672a\u8ba4\u8bc1",
+        "description": "未认证",
         "content": {
           "application/json": {
             "schema": {
@@ -1751,7 +1979,7 @@
         }
       },
       "Forbidden": {
-        "description": "\u65e0\u6743\u9650",
+        "description": "无权限",
         "content": {
           "application/json": {
             "schema": {
@@ -1771,7 +1999,7 @@
         }
       },
       "NotFound": {
-        "description": "\u8d44\u6e90\u4e0d\u5b58\u5728",
+        "description": "资源不存在",
         "content": {
           "application/json": {
             "schema": {
@@ -1791,7 +2019,7 @@
         }
       },
       "RateLimited": {
-        "description": "\u8bf7\u6c42\u9891\u7387\u8d85\u9650",
+        "description": "请求频率超限",
         "content": {
           "application/json": {
             "schema": {
@@ -1811,7 +2039,7 @@
         }
       },
       "Internal": {
-        "description": "\u670d\u52a1\u5668\u5185\u90e8\u9519\u8bef",
+        "description": "服务器内部错误",
         "content": {
           "application/json": {
             "schema": {
@@ -1831,7 +2059,7 @@
         }
       },
       "ContentTooLong": {
-        "description": "\u5185\u5bb9\u8d85\u957f",
+        "description": "内容超长",
         "content": {
           "application/json": {
             "schema": {
@@ -1860,12 +2088,12 @@
         "properties": {
           "error": {
             "type": "string",
-            "description": "\u9519\u8bef\u7801\uff08\u7a33\u5b9a\uff0c\u53ef\u7528\u4e8e\u5ba2\u6237\u7aef\u5224\u65ad\uff09",
+            "description": "错误码（稳定，可用于客户端判断）",
             "example": "bad_request"
           },
           "message": {
             "type": "string",
-            "description": "\u4eba\u7c7b\u53ef\u8bfb\u7684\u9519\u8bef\u63cf\u8ff0",
+            "description": "人类可读的错误描述",
             "example": "invalid request body"
           }
         }
@@ -1932,7 +2160,7 @@
           },
           "expires_in": {
             "type": "integer",
-            "description": "\u8fc7\u671f\u65f6\u95f4\uff08\u79d2\uff09",
+            "description": "过期时间（秒）",
             "example": 900
           }
         }
@@ -1962,7 +2190,7 @@
           },
           "avatar_color": {
             "type": "string",
-            "description": "\u9ed8\u8ba4\u5934\u50cf\u80cc\u666f\u8272\uff08Hex\uff09",
+            "description": "默认头像背景色（Hex）",
             "example": "#5865F2"
           },
           "avatar_url": {
@@ -2062,7 +2290,7 @@
           },
           "unread_count": {
             "type": "integer",
-            "description": "Deprecated. \u5df2\u5f03\u7528\uff0c\u4fdd\u7559\u517c\u5bb9\u3002"
+            "description": "Deprecated. 已弃用，保留兼容。"
           },
           "pinned_message": {
             "$ref": "#/components/schemas/PinnedContent"
@@ -2087,7 +2315,7 @@
           },
           "last_message": {
             "$ref": "#/components/schemas/Message",
-            "description": "Deprecated. \u5df2\u5f03\u7528\uff0c\u4fdd\u7559\u517c\u5bb9\u3002"
+            "description": "Deprecated. 已弃用，保留兼容。"
           }
         }
       },
@@ -2115,7 +2343,7 @@
             "enum": [
               "group"
             ],
-            "description": "\u76ee\u524d\u4ec5\u652f\u6301\u521b\u5efa\u7fa4\u7ec4"
+            "description": "目前仅支持创建群组"
           },
           "name": {
             "type": "string",
@@ -2135,7 +2363,7 @@
             "items": {
               "type": "string"
             },
-            "description": "\u521d\u59cb\u6210\u5458 ID \u5217\u8868"
+            "description": "初始成员 ID 列表"
           }
         }
       },
@@ -2198,7 +2426,7 @@
           },
           "last_read_message_id": {
             "type": "string",
-            "description": "Deprecated. \u5df2\u5f03\u7528\uff0c\u4fdd\u7559\u517c\u5bb9\u3002"
+            "description": "Deprecated. 已弃用，保留兼容。"
           },
           "pinned": {
             "type": "boolean"
@@ -2244,7 +2472,7 @@
           },
           "author": {
             "$ref": "#/components/schemas/User",
-            "description": "Deprecated. \u5df2\u5f03\u7528\uff0c\u4fdd\u7559\u517c\u5bb9\u3002"
+            "description": "Deprecated. 已弃用，保留兼容。"
           },
           "content": {
             "type": "string"
@@ -2366,7 +2594,7 @@
         "properties": {
           "emoji": {
             "type": "string",
-            "example": "\ud83d\udc4d"
+            "example": "👍"
           },
           "count": {
             "type": "integer"
@@ -2376,11 +2604,11 @@
             "items": {
               "type": "string"
             },
-            "description": "\u9009\u62e9\u8be5 reaction \u7684\u7528\u6237 ID \u5217\u8868\uff08ListReactions \u65f6\u8fd4\u56de\uff09"
+            "description": "选择该 reaction 的用户 ID 列表（ListReactions 时返回）"
           },
           "me": {
             "type": "boolean",
-            "description": "\u5f53\u524d\u7528\u6237\u662f\u5426\u9009\u4e2d\u8be5 reaction"
+            "description": "当前用户是否选中该 reaction"
           }
         }
       }
