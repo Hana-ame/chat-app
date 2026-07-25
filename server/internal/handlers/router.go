@@ -80,9 +80,10 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 			r.Get("/local/*", s.AAPILocalFile)
 		})
 
-		// All other API endpoints — 10s timeout
+		// All other API endpoints — 10s timeout, 120 req/min per IP
 		r.Group(func(r chi.Router) {
 			r.Use(chimid.Timeout(s.Cfg.APITimeout))
+			r.Use(httprate.LimitByIP(120, 1*time.Minute))
 
 			r.Get("/version", s.VersionHandler)
 			r.With(httprate.LimitByIP(10, 1*time.Minute)).Post("/auth/login", s.Login)
