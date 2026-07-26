@@ -19,6 +19,7 @@ type Service struct {
 	Message  *MessageService
 	Member   *MemberService
 	Reaction *ReactionService
+	Stream   *StreamService
 }
 
 func New(database *db.DB, hub *ws.Hub, cfg *config.Config) *Service {
@@ -28,6 +29,12 @@ func New(database *db.DB, hub *ws.Hub, cfg *config.Config) *Service {
 	s.Message = &MessageService{Service: s}
 	s.Member = &MemberService{Service: s}
 	s.Reaction = &ReactionService{Service: s}
+	s.Stream = &StreamService{
+		Service:    s,
+		liveChunks: map[string][]string{},
+		liveSubs:   map[string][]chan struct{}{},
+		liveDone:   map[string]bool{},
+	}
 	return s
 }
 

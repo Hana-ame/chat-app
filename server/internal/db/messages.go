@@ -14,7 +14,7 @@ import (
 	"github.com/Hana-ame/chat-app/server/internal/models"
 )
 
-func (d *DB) CreateAIMessage(ctx context.Context, chatID, msgID, content string) (*models.Message, error) {
+func (d *DB) CreateAIMessage(ctx context.Context, chatID, userID, msgID, content string) (*models.Message, error) {
 	if msgID == "" {
 		msgID = NewID()
 	}
@@ -26,8 +26,8 @@ func (d *DB) CreateAIMessage(ctx context.Context, chatID, msgID, content string)
 
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO messages (id, chat_id, user_id, content, created_at, attachment_count, mention_count) VALUES (?,?,?,?,?,0,0)`,
-		msgID, chatID, "ai", content, now,
+		`INSERT INTO messages (id, chat_id, user_id, type, content, created_at, attachment_count, mention_count) VALUES (?,?,?,?,?,?,0,0)`,
+		msgID, chatID, userID, "stream", content, now,
 	)
 	if err != nil {
 		return nil, err
@@ -45,7 +45,8 @@ func (d *DB) CreateAIMessage(ctx context.Context, chatID, msgID, content string)
 	return &models.Message{
 		ID:        msgID,
 		ChatID:    chatID,
-		UserID:    "ai",
+		UserID:    userID,
+		Type:      "stream",
 		Content:   content,
 		CreatedAt: time.Now().UTC(),
 	}, nil
@@ -138,7 +139,7 @@ func dedupe(in []string) []string {
 
 func (d *DB) GetMessage(ctx context.Context, id string) (*models.Message, error) {
 	m, err := d.fetchMessageRow(ctx,
-		`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted_at,
+		`SELECT m.id, m.chat_id, m.user_id, m.type, m.content, m.created_at, m.edited_at, m.deleted_at,
 		        m.attachment_count, m.mention_count, m.reaction_count, m.reactions, m.attachments, m.mentions,
 		        u.id, u.username, u.avatar_color, u.avatar_url, u.status, u.last_seen, COALESCE(cm.role,'')
 		 FROM messages m JOIN users u ON u.id = m.user_id
@@ -171,7 +172,7 @@ func scanMessage(s scanner) (*models.Message, error) {
 	var role string
 	var lastSeen sql.NullString
 	err := s.Scan(
-		&m.ID, &m.ChatID, &m.UserID, &m.Content, &created, &edited, &deletedAt,
+		&m.ID, &m.ChatID, &m.UserID, &m.Type, &m.Content, &created, &edited, &deletedAt,
 		&attCnt, &mentCnt, &rxnCnt, &rxnJSON, &attJSON, &mentJSON,
 		&author.ID, &author.Username, &author.AvatarColor, &author.AvatarURL, &author.Status, &lastSeen, &role,
 	)
@@ -233,7 +234,7 @@ func (d *DB) GetMessages(ctx context.Context, chatID, before string, limit int) 
 	)
 	if before == "" {
 		rows, err = d.QueryContext(ctx,
-			`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted_at,
+			`SELECT m.id, m.chat_id, m.user_id, m.type, m.content, m.created_at, m.edited_at, m.deleted_at,
 			        m.attachment_count, m.mention_count, m.reaction_count, m.reactions, m.attachments, m.mentions,
 			        u.id, u.username, u.avatar_color, u.avatar_url, u.status, u.last_seen, COALESCE(cm.role,'')
 			 FROM messages m JOIN users u ON u.id = m.user_id
@@ -244,7 +245,7 @@ func (d *DB) GetMessages(ctx context.Context, chatID, before string, limit int) 
 		)
 	} else {
 		rows, err = d.QueryContext(ctx,
-			`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted_at,
+			`SELECT m.id, m.chat_id, m.user_id, m.type, m.content, m.created_at, m.edited_at, m.deleted_at,
 			        m.attachment_count, m.mention_count, m.reaction_count, m.reactions, m.attachments, m.mentions,
 			        u.id, u.username, u.avatar_color, u.avatar_url, u.status, u.last_seen, COALESCE(cm.role,'')
 			 FROM messages m JOIN users u ON u.id = m.user_id
@@ -281,7 +282,7 @@ func (d *DB) GetMessages(ctx context.Context, chatID, before string, limit int) 
 
 func (d *DB) LastMessage(ctx context.Context, chatID string) (*models.Message, error) {
 	m, err := d.fetchMessageRow(ctx,
-		`SELECT m.id, m.chat_id, m.user_id, m.content, m.created_at, m.edited_at, m.deleted_at,
+		`SELECT m.id, m.chat_id, m.user_id, m.type, m.content, m.created_at, m.edited_at, m.deleted_at,
 		        m.attachment_count, m.mention_count, m.reaction_count, m.reactions, m.attachments, m.mentions,
 		        u.id, u.username, u.avatar_color, u.avatar_url, u.status, u.last_seen, COALESCE(cm.role,'')
 		 FROM messages m JOIN users u ON u.id = m.user_id

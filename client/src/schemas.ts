@@ -9,6 +9,7 @@ export const UserSchema = z.object({
   status: z.string().optional(),
   last_seen: z.string().optional(),
   role: z.string().optional(),
+  notify_blocked: z.array(z.string()).optional(),
 });
 
 export const ReactionSchema = z.object({
@@ -37,13 +38,18 @@ export const MessageSchema = z.object({
   chat_id: z.string(),
   content: z.string(),
   user_id: z.string(),
+  type: z.string().optional(),
   author: UserSchema.optional(),
   created_at: z.string(),
   edited_at: z.string().nullable().optional(),
+  deleted_at: z.string().nullable().optional(),
   deleted: z.boolean().optional(),
+  attachment_count: z.number().optional(),
+  mention_count: z.number().optional(),
+  reaction_count: z.number().optional(),
   attachments: z.array(AttachmentSchema).optional(),
   reactions: z.array(ReactionSchema).optional(),
-  reaction_count: z.number().optional(),
+  mentions: z.array(z.string()).optional(),
   streaming: z.boolean().optional(),
   source: z.function().optional(),
 });
@@ -53,6 +59,10 @@ export const ChatSchema = z.object({
   type: z.string(),
   name: z.string().optional(),
   icon_color: z.string().optional(),
+  avatar_url: z.string().optional(),
+  banner_url: z.string().optional(),
+  banner_opacity: z.number().optional(),
+  background_url: z.string().optional(),
   owner_id: z.string().optional(),
   visibility: z.string().optional(),
   pinned: z.boolean().optional(),
@@ -64,6 +74,9 @@ export const ChatSchema = z.object({
   pinned_message: PinnedContentSchema.nullable().optional(),
   pinned_updated_at: z.string().nullable().optional(),
   pinned_last_read_at: z.string().nullable().optional(),
+  notify_enabled: z.boolean().optional(),
+  last_active_at: z.string().nullable().optional(),
+  last_message_id: z.string().optional(),
   unread_count: z.number().optional(),
 });
 

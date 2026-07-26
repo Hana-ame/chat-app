@@ -41,7 +41,6 @@ type Server struct {
 	refreshMu        sync.Mutex
 	loginLimiter     *loginRateLimiter
 	registerLimiter  *registerLimiter
-	aiHandler        *AIHandler
 }
 
 // New creates a new Server.
@@ -54,9 +53,6 @@ func New(cfg *config.Config, database *db.DB, authSvc *auth.Service, hub *ws.Hub
 		Services:     service.New(database, hub, cfg),
 		loginLimiter:    newLoginRateLimiter(5, 1*time.Hour),
 		registerLimiter: newRegisterLimiter(100, 24*time.Hour),
-	}
-	if len(cfg.AISources) > 0 {
-		s.aiHandler = NewAIHandler(cfg.AISources)
 	}
 	return s
 }

@@ -28,8 +28,6 @@
  * @property {(token: string) => Promise<void>} loadChats
  * @property {(token: string, chatId: string, before?: string) => Promise<void>} loadMessages
  * @property {(token: string, chatId: string, content: string, attachments?: import('../schemas').Attachment[]) => Promise<void>} sendMessage
- * @property {(msgId: string) => void} finishStreaming
- * @property {(msg: Message) => void} startConsumingStream
  * @property {(chatId: string) => void} sendTyping
  * @property {(chatId: string) => void} subscribe
  * @property {(op: string, payload?: any) => Promise<any>} wsRequest
@@ -57,6 +55,42 @@ function sortChats(a, b) {
   const da = a.last_message_at || a.created_at;
   const db = b.last_message_at || b.created_at;
   return new Date(db) - new Date(da);
+}
+
+async function fetchStream(url, msgId) {
+  const token = useAuthStore.getState().accessToken;
+  try {
+    const res = await fetch(url, { headers: token ? { Authorization: 'Bearer ' + token } : {} });
+    if (!res.ok) { console.error('fetchStream: HTTP', res.status); return; }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let streamDone = false;
+    while (!streamDone) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t.startsWith('data: ')) continue;
+        const p = t.slice(6);
+        if (p === '[DONE]') { streamDone = true; break; }
+        try {
+          const json = JSON.parse(p);
+          if (json.content) {
+            useChatStore.setState(s => ({ messages: s.messages.map(m =>
+              m.id === msgId ? { ...m, content: m.content + json.content } : m
+            ) }));
+          }
+        } catch {}
+      }
+    }
+    useChatStore.setState(s => ({ messages: s.messages.map(m =>
+      m.id === msgId ? { ...m, streaming: false } : m
+    ) }));
+  } catch (e) { console.error('fetchStream error:', e); }
 }
 
 coord.setHandlers({
@@ -219,12 +253,15 @@ export const useChatStore = create((set, get) => ({
 
   /** @param {import('../schemas').Message} msg */
   onMessageCreate(msg) {
+    let wasNew = false;
     set(s => {
       const exists = s.messages.find(m => m.id === msg.id);
+      wasNew = !exists;
       if (exists) {
+        const keepContent = msg.type === 'stream' && exists.streaming && msg.content?.startsWith('/api/chats/');
         return {
           messages: s.activeChatId === msg.chat_id
-            ? s.messages.map(m => m.id === msg.id ? { ...m, ...msg, streaming: m.streaming || msg.streaming } : m)
+            ? s.messages.map(m => m.id === msg.id ? { ...m, ...msg, content: keepContent ? m.content : msg.content, streaming: m.streaming || msg.streaming } : m)
             : s.messages,
           chats: s.chats.map(c => c.id === msg.chat_id ? { ...c, last_message: msg, last_message_at: msg.created_at, unread_count: s.activeChatId === msg.chat_id ? 0 : (c.unread_count || 0) + 1 } : c).sort(sortChats),
         };
@@ -236,11 +273,14 @@ export const useChatStore = create((set, get) => ({
         chats: s.chats.map(c => c.id === msg.chat_id ? { ...c, last_message: msg, last_message_at: msg.created_at, unread_count: s.activeChatId === msg.chat_id ? 0 : (c.unread_count || 0) + 1 } : c).sort(sortChats),
       };
     });
-    if (msg.streaming && msg.source) {
-      get().startConsumingStream(msg);
+    if (wasNew && msg.type === 'stream' && typeof msg.content === 'string' && msg.content.startsWith('/api/chats/')) {
+      const uid = getAuth().user?.id;
+      if (msg.user_id !== uid) {
+        fetchStream(msg.content, msg.id);
+      }
     }
     const st = get();
-    if (msg.chat_id !== st.activeChatId && msg.user_id !== 'ai') {
+    if (msg.chat_id !== st.activeChatId && msg.type !== 'stream') {
       const uid = getAuth().user?.id;
       const token = getAuth().accessToken;
       const blocked = getAuth().user?.notify_blocked || [];
@@ -266,21 +306,6 @@ export const useChatStore = create((set, get) => ({
         });
       }
     }
-  },
-
-  /** @param {import('../schemas').Message} msg */
-  startConsumingStream(msg) {
-    api.startStreaming(msg.source)
-      .onChunk(chunk => {
-        set(s => ({
-          messages: s.messages.map(m =>
-            m.id === msg.id ? { ...m, content: m.content + chunk } : m
-          ),
-        }));
-      })
-      .done.then(() => {
-        get().finishStreaming(msg.id);
-      });
   },
 
   /** @param {Partial<import('../schemas').Message>} msg */
@@ -354,13 +379,6 @@ export const useChatStore = create((set, get) => ({
   /** @param {string} token @param {string} chatId @param {string} content @param {import('../schemas').Attachment[]} [attachments] */
   async sendMessage(token, chatId, content, attachments) {
     await api.sendMessage(token, chatId, content, attachments);
-  },
-
-  /** @param {string} msgId */
-  finishStreaming(msgId) {
-    set(s => ({
-      messages: s.messages.map(m => m.id === msgId ? { ...m, streaming: false } : m),
-    }));
   },
 
   /** @param {string} chatId */

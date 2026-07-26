@@ -114,6 +114,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 					r.With(rateLimitByUser(30, 1*time.Minute)).Post("/messages", s.SendMessage)
 					r.Patch("/messages/{messageID}", s.EditMessage)
 					r.Delete("/messages/{messageID}", s.DeleteMessage)
+					r.Get("/messages/{messageID}/stream", s.StreamMessageContent)
 					r.Put("/messages/{messageID}/reactions/{emoji}", s.AddReaction)
 					r.Delete("/messages/{messageID}/reactions/{emoji}", s.RemoveReaction)
 					r.Get("/messages/{messageID}/reactions", s.ListReactions)
@@ -132,7 +133,6 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 			}) // end auth group
 
 			r.Get("/events", s.SSE)
-			r.With(s.authMiddleware).Post("/ai/chat", s.AIChat)
 		})
 	}) // end /api route
 

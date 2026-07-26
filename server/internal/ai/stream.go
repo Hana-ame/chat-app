@@ -14,56 +14,69 @@ import (
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
 )
 
-type OpenAIProvider struct {
-	cfg SourceConfig
+type Source struct {
+	Endpoint string          `json:"endpoint"`
+	AuthKey  string          `json:"auth_key"`
+	Body     json.RawMessage `json:"body"`
 }
 
-func NewOpenAI(cfg SourceConfig) *OpenAIProvider {
-	return &OpenAIProvider{cfg: cfg}
+type Chunk struct {
+	Content string
+	Done    bool
 }
 
-func (p *OpenAIProvider) ChatStream(ctx context.Context, req ChatRequest) (<-chan Chunk, error) {
-	body := p.buildBody(req)
-	upstreamReq, err := http.NewRequestWithContext(ctx, "POST",
-		strings.TrimRight(p.cfg.BaseURL, "/")+"/chat/completions",
-		bytes.NewReader(body))
+func StreamFromSource(ctx context.Context, src Source) (<-chan Chunk, error) {
+	body, err := ensureStreamEnabled(src.Body)
+	if err != nil {
+		return nil, fmt.Errorf("invalid body: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", src.Endpoint, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
-	upstreamReq.Header.Set("Content-Type", "application/json")
-	upstreamReq.Header.Set("Authorization", "Bearer "+p.cfg.Key)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+src.AuthKey)
 
 	client := &http.Client{Timeout: 5 * time.Minute}
-	resp, err := client.Do(upstreamReq)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("upstream: %w", err)
 	}
 
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		return nil, fmt.Errorf("upstream returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
 	ch := make(chan Chunk, 64)
 
+	go func() {
+		<-ctx.Done()
+		resp.Body.Close()
+	}()
+
 	if isStreaming(resp.Header) {
-		go p.readStream(resp, ch)
+		go readStream(resp, ch)
 	} else {
-		go p.readOnce(resp, ch)
+		go readOnce(resp, ch)
 	}
 
 	return ch, nil
 }
 
-func (p *OpenAIProvider) buildBody(req ChatRequest) []byte {
+func ensureStreamEnabled(body json.RawMessage) (json.RawMessage, error) {
 	var raw map[string]json.RawMessage
-	json.Unmarshal(req.Raw, &raw)
-	if _, ok := raw["model"]; !ok {
-		raw["model"] = mustJSON(p.cfg.Model)
+	if err := json.Unmarshal(body, &raw); err != nil || raw == nil {
+		return body, nil
 	}
-	if raw["stream"] == nil {
-		raw["stream"] = mustJSON(true)
-	}
+	raw["stream"] = mustJSON(true)
 	b, _ := json.Marshal(raw)
-	return b
+	return b, nil
 }
 
-func (p *OpenAIProvider) readStream(resp *http.Response, ch chan<- Chunk) {
+func readStream(resp *http.Response, ch chan<- Chunk) {
 	defer resp.Body.Close()
 	defer close(ch)
 
@@ -99,17 +112,17 @@ func (p *OpenAIProvider) readStream(resp *http.Response, ch chan<- Chunk) {
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		logutil.Error("ai openai stream read: %v", err)
+		logutil.Error("ai stream read: %v", err)
 	}
 	ch <- Chunk{Done: true}
 }
 
-func (p *OpenAIProvider) readOnce(resp *http.Response, ch chan<- Chunk) {
+func readOnce(resp *http.Response, ch chan<- Chunk) {
 	defer resp.Body.Close()
 	defer close(ch)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		logutil.Error("ai openai read: %v", err)
+		logutil.Error("ai read: %v", err)
 		ch <- Chunk{Done: true}
 		return
 	}

@@ -22,7 +22,7 @@ function timeFormat(t) {
 const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId }) {
   const { user, accessToken } = useAuthStore();
   const { pinnedMessage, chats } = useChatStore();
-  const isMe = msg.user_id === user.id;
+  const isMe = msg.type === 'stream' ? false : msg.user_id === user.id;
   const [showEmoji, setShowEmoji] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(msg.content);
@@ -31,9 +31,10 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId }) {
 
   const chat = useMemo(() => chats.find(c => c.id === chatId), [chats, chatId]);
   const author = useMemo(() => {
+    if (msg.type === 'stream' && msg.author) return msg.author;
     if (msg.user_id === user.id) return user;
     return chat?.members?.find(m => m.id === msg.user_id) || msg.author || { username: 'Unknown', avatar_color: '#5865F2', id: msg.user_id };
-  }, [chat, msg.user_id, msg.author, user]);
+  }, [chat, msg.user_id, msg.author, user, msg.type]);
   const pickerRef = useRef(null);
   const emojiBtnRef = useRef(null);
   const [pickerPos, setPickerPos] = useState(null);

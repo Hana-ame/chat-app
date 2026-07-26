@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -300,7 +301,13 @@ func (s *Server) PinChat(w http.ResponseWriter, r *http.Request) {
 		writeError(w, status, code, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	chat, err := s.Services.Chat.GetByID(r.Context(), id, u.ID)
+	if err != nil {
+		logutil.Error("pin chat: GetByID failed after SetAnnouncement: %v", err)
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"pinned_message": chat.PinnedMessage, "pinned_updated_at": chat.PinnedUpdatedAt})
 }
 
 func (s *Server) DeletePinnedChat(w http.ResponseWriter, r *http.Request) {

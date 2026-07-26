@@ -3,7 +3,7 @@ import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 import { notify } from '../store/notification';
-import { streamAI } from '../utils/ai';
+import AIPanel from './AIPanel';
 
 function compressImage(file) {
   return new Promise((resolve) => {
@@ -23,19 +23,15 @@ function compressImage(file) {
   });
 }
 
-const CONTEXT_LIMIT = 40;
-
 export default function Composer({ chatId }) {
   const { user, accessToken } = useAuthStore();
   const { sendMessage, sendTyping } = useChatStore();
   const [text, setText] = useState('');
   const [uploading, setUploading] = useState(false);
   const [attachments, setAttachments] = useState([]);
-  const [aiMode, setAiMode] = useState(false);
+  const [aiActive, setAiActive] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiSource, setAiSource] = useState('default');
-  const [aiModel, setAiModel] = useState('');
-  const aiAbort = useRef(null);
+  const aiPanelRef = useRef(null);
   const fileInput = useRef(null);
   const typingTimer = useRef(null);
   const textRef = useRef(null);
@@ -103,114 +99,6 @@ export default function Composer({ chatId }) {
     setMentionQuery(null);
   };
 
-  const cancelAI = () => {
-    if (aiAbort.current) {
-      aiAbort.current.abort();
-      aiAbort.current = null;
-    }
-  };
-
-  const buildContext = (msgs) => {
-    const context = [];
-    for (const m of msgs) {
-      if (context.length >= CONTEXT_LIMIT) break;
-      if (m.user_id === 'ai') {
-        context.push({ role: 'assistant', content: m.content });
-      } else if (m.user_id && m.content) {
-        context.push({ role: 'user', content: m.content });
-      }
-    }
-    return context;
-  };
-
-  const handleAISend = async (content) => {
-    const msgId = crypto.randomUUID();
-    const botMsg = {
-      id: msgId,
-      chat_id: chatId,
-      user_id: 'ai',
-      content: '',
-      created_at: new Date().toISOString(),
-      streaming: true,
-      author: { id: 'ai', username: 'AI', avatar_color: '#10a37f' },
-    };
-    useChatStore.getState().onMessageCreate(botMsg);
-    setAiLoading(true);
-
-    const store = useChatStore.getState();
-    const messages = store.messages;
-    const context = content ? [...buildContext(messages), { role: 'user', content }] : [];
-
-    const controller = new AbortController();
-    aiAbort.current = controller;
-
-    const body = {
-      source: aiSource,
-      chat_id: chatId,
-      msg_id: msgId,
-      messages: context,
-      stream: true,
-      temperature: 0.7,
-      max_tokens: 32768,
-      top_p: 1,
-    };
-    if (aiModel.trim()) body.model = aiModel.trim();
-
-    try {
-      const res = await api.aiChat(accessToken, body);
-      const { cancel } = streamAI(res,
-        (chunk) => {
-          if (chunk.type === 'content') {
-            useChatStore.setState(s => ({
-              messages: s.messages.map(m =>
-                m.id === msgId ? { ...m, content: m.content + chunk.content } : m
-              ),
-            }));
-          }
-        },
-        () => {
-          useChatStore.setState(s => ({
-            messages: s.messages.map(m =>
-              m.id === msgId ? { ...m, streaming: false } : m
-            ),
-          }));
-          setAiLoading(false);
-          aiAbort.current = null;
-        },
-        () => {
-          notify('AI response failed', 'error');
-          useChatStore.setState(s => ({
-            messages: s.messages.map(m =>
-              m.id === msgId ? { ...m, streaming: false } : m
-            ),
-          }));
-          setAiLoading(false);
-          aiAbort.current = null;
-        },
-      );
-      controller.signal.addEventListener('abort', () => {
-        cancel();
-        useChatStore.setState(s => ({
-          messages: s.messages.map(m =>
-            m.id === msgId ? { ...m, streaming: false } : m
-          ),
-        }));
-        setAiLoading(false);
-        aiAbort.current = null;
-      });
-    } catch (e) {
-      if (e.name === 'AbortError') return;
-      notify('AI request failed', 'error');
-      useChatStore.setState(s => ({
-        messages: s.messages.map(m =>
-          m.id === msgId ? { ...m, streaming: false } : m
-        ),
-      }));
-      setAiLoading(false);
-      aiAbort.current = null;
-    }
-  };
-
   const handleSend = async () => {
     const content = text.trim();
     if (!content && attachments.length === 0) return;
@@ -218,8 +106,8 @@ export default function Composer({ chatId }) {
       await sendMessage(accessToken, chatId, content, attachments);
       setText('');
       setAttachments([]);
-      if (aiMode && content) {
-        await handleAISend(content);
+      if (aiActive && content) {
+        await aiPanelRef.current.sendAI(content);
       }
     } catch (e) { notify('Failed to send message', 'error'); }
   };
@@ -312,7 +200,7 @@ export default function Composer({ chatId }) {
               ))}
             </div>
           )}
-          <textarea rows={1} placeholder={aiMode ? 'Ask AI...' : 'Message #chat'} value={text}
+          <textarea rows={1} placeholder={aiActive ? 'Ask AI...' : 'Message #chat'} value={text}
             ref={textRef}
             onChange={handleTextChange}
             onKeyDown={handleKey}
@@ -320,34 +208,16 @@ export default function Composer({ chatId }) {
             style={{flex:1,resize:'none',minHeight:36}} />
           <input type="file" ref={fileInput} onChange={handleFile} style={{display:'none'}} multiple />
           <button className="btn-ghost" style={{fontSize:18,padding:'4px 6px',lineHeight:0}} onClick={() => fileInput.current?.click()} title="Attach file">📎</button>
-          <div style={{position:'relative'}}>
-            <button className={'btn-ghost' + (aiMode ? ' active' : '')} style={{fontSize:13,padding:'4px 6px',lineHeight:0,fontWeight:aiMode?600:400,color:aiMode?'var(--accent)':'var(--text-muted)'}}
-              onClick={() => setAiMode(!aiMode)} title="Toggle AI mode"
-              disabled={aiLoading}>
-              AI{aiMode ? ' ▼' : ''}
-            </button>
-            {aiMode && (
-              <div style={{position:'absolute',bottom:'100%',left:0,marginBottom:4,display:'flex',flexDirection:'column',gap:4,background:'var(--bg-tertiary)',padding:6,borderRadius:6,border:'1px solid var(--border)',fontSize:12,whiteSpace:'nowrap'}}>
-                <label>source:
-                  <input value={aiSource} onChange={e => setAiSource(e.target.value)}
-                    style={{marginLeft:6,width:120,fontSize:12,padding:'1px 4px'}} />
-                </label>
-                <label>model:
-                  <input value={aiModel} onChange={e => setAiModel(e.target.value)}
-                    placeholder="(default)" style={{marginLeft:6,width:200,fontSize:12,padding:'1px 4px'}} />
-                </label>
-              </div>
-            )}
-          </div>
+          <AIPanel ref={aiPanelRef} chatId={chatId} onActiveChange={setAiActive} onLoadingChange={setAiLoading} />
           {aiLoading ? (
             <button className="btn-ghost" style={{padding:'4px 10px',lineHeight:0,color:'var(--danger)'}}
-              onClick={cancelAI} title="Cancel">
+              onClick={() => aiPanelRef.current?.cancelAI()} title="Cancel">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           ) : (
             <button className="btn-ghost" style={{padding:'4px 10px',lineHeight:0}}
               disabled={(!text.trim() && attachments.length === 0) || uploading}
-              onClick={handleSend} title={aiMode ? 'Send + AI reply' : 'Send'}>
+              onClick={handleSend} title={aiActive ? 'Send + AI reply' : 'Send'}>
               {uploading ? <span style={{fontSize:14}}>...</span> : (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="5" y1="12" x2="19" y2="12"/>

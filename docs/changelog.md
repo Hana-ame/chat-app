@@ -4755,3 +4755,119 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 ### 验证
 - Go build: ✅
 - Python syntax: ✅
+
+---
+
+## 2026-07-25 v0.6.0: 全局速率限制 + 版本 bump（第 50 轮）
+
+### 变更
+
+#### 1. 全局速率限制 120 req/min/IP
+- **背景**: 之前仅在 login/register/search/send 上有细粒度限流，缺少全局兜底
+- **修复**: `/api` 非上传路由组添加 `r.Use(httprate.LimitByIP(120, 1*time.Minute))`
+- **文件**: `server/internal/handlers/router.go`
+
+#### 2. 版本 bump 0.5.0 → 0.6.0
+- `client/package.json`、`server/internal/handlers/swagger.json` 同步更新
+
+### 验证
+- Go build + vet: ✅
+- CI (2 workflows): 运行中
+
+---
+
+## 2026-07-26 DB 迁移重构：JSON manifest + GitHub 远程读取（第 51 轮）
+
+### 变更
+
+#### 1. 新增 migrations.json manifest
+- `server/internal/db/migrations/migrations.json` — 列出所有 SQL 迁移文件及版本号
+- 替代原先从文件名前 3 字符解析版本的方式
+
+#### 2. GitHub 远程读取（替代 embed）
+- 主路径：从 `CHAT_MIGRATION_URL` 环境变量指定的 URL 获取 `migrations.json` 和各 SQL 文件
+- 回退路径：若网络不可用或 URL 为空，fallback 到 `//go:embed` 本地文件
+- 默认 URL: `https://raw.githubusercontent.com/Hana-ame/chat-app/main/server/internal/db/migrations/`
+
+#### 3. 配置
+- `config.go`: 新增 `MigrationURL` 字段 + `CHAT_MIGRATION_URL` 环境变量
+
+#### 4. 代码变更
+| 文件 | 操作 |
+|------|------|
+| `server/internal/db/migrations/migrations.json` | 新增 — 迁移 manifest |
+| `server/internal/db/db.go` | 重写 `Migrate()` — HTTP 获取 + JSON 解析 + embed 回退 |
+| `server/internal/config/config.go` | 新增 `MigrationURL` 字段 |
+| `server/cmd/chatd/main.go` | `db.Open()` 传入 `cfg.MigrationURL` |
+| `server/internal/testutil/testutil.go` | `db.Open()` 传入 `""`（使用 embed 回退） |
+
+### 验证
+- Go build: ✅
+- Go vet: ✅
+- Go test ./...: ✅
+
+---
+
+## 2026-07-26 DB 迁移系统重新设计—fs.Glob 文件查找 + Go 迁移 1000+（第 52 轮）
+
+### 设计变更
+按照标准迁移系统方案重新设计：
+
+- 文件命名 `NNN_xxx.sql`（000~999），版本号从文件名前缀解析
+- `schema_migrations` 只存 `(version INTEGER PRIMARY KEY, applied_at TEXT)`
+- 每次启动查 `MAX(version)`，循环 `fs.Glob("{next:03d}_*.sql")` 找下一个文件
+- 找不到 → 已最新，跳出循环
+- Go 迁移版本用 1000+，与 SQL 隔离
+
+### 移除
+| 文件 | 原因 |
+|------|------|
+| `migrations/migrations.json` | 不再需要 manifest |
+| `MigrationEntry` + `loadManifest` + `loadSQL` + `fetch*` | 用 `fs.Glob` 替代 |
+| `config.MigrationURL` + `db.Open` 参数 | 远程读取不再需要 |
+| `schema_migrations.type` 列 | 版本空间通过 0-999 / 1000+ 自然隔离 |
+
+### 修复
+- `AIPanel.jsx` `buildContext`：`m.type === 'stream'` 替代 `m.user_id === 'ai'`
+
+### 文档
+- `server/internal/db/migration.md` — 迁移系统设计文档
+
+### 验证
+- Go build + vet: ✅
+- Go test ./...: ✅
+- Client build: ✅
+
+---
+
+## 2026-07-26 Stream 消息重构：通用 SSE 客户端 + 内存在线缓冲（第 53 轮）
+
+### 新增
+- `ai/stream.go` — 通用 SSE streaming 客户端，支持 OpenAI 兼容的 streaming/non-streaming 响应、`reasoning_content`、多 choices
+- `ai/stream_test.go` — 20+ 测试用例覆盖各种边缘情况
+- `service/stream.go` — `StreamService`：内存 chunk 缓冲 + 订阅/通知模式 + 生命周期管理
+- `db/migrations/001__add_type_column.sql` — messages 表增加 `type` 列
+- `GET /api/chats/{chatID}/messages/{messageID}/stream` — SSE 端点，实时推送 stream 内容（先读内存缓冲，结束后 fallback DB）
+- `AIPanel.jsx` — 新的 AI 面板组件
+- `client/tests/ai-panel.spec.mjs` — AI 面板 E2E 测试
+
+### 变更
+- `messages.go` `SendMessage`：新增 `type=stream` 支持，返回 SSE 而非 JSON；`sendMsgReq` 增加 `type`/`source`/`msg_id`
+- `Composer.jsx` — 大幅精简，移除旧的 AI 面板逻辑
+- `chat.js` store — 支持 stream 消息类型
+- `models.Message` — 新增 `Type` 字段
+- `CreateAIMessage` — 接受 `userID` 参数，写入 `type=stream`
+- `router.go` — `/api/ai/chat` 移除，`/stream` 端点接入
+
+### 移除
+- `handlers/ai.go` — 旧 AI handler
+- `ai/openai.go` + `ai/provider.go` — 旧的 Provider 抽象
+- `config.AISources` + `.env.example` 中的 AI 配置
+
+### 修复
+- `PinChat` — `GetByID` 失败时记录 error log
+
+### 验证
+- Go build + vet: ✅
+- Go test ./...: ✅
+- Client build: ✅

@@ -146,8 +146,8 @@ CREATE INDEX IF NOT EXISTS idx_mentions_user ON mentions(user_id);
 -- Design notes
 -- ═══════════════════════════════════════════════════════════════════════════════
 --
--- All columns are defined inline in CREATE TABLE (no ALTER TABLE ADD COLUMN) so
--- the file is idempotent on existing DBs where tables already exist.
+-- Core columns are defined inline in CREATE TABLE for idempotency. Columns
+-- added later via incremental migrations (NNN_*.sql) use ALTER TABLE.
 --
 -- Why a reactions JSON cache column?
 --   Reading reactions requires GROUP BY + aggregation across the reactions

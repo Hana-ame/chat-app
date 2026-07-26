@@ -10,11 +10,10 @@ import {
   mockPinChat, mockUnpinChat, mockMarkAnnouncementRead, mockUpdateChatAvatar, mockUpdateChatBanner, mockUpdateChatBackground,
   resetMockData,
 } from './mock';
-import { createStreamSource } from '../dev/stream-source';
 import { useAuthStore } from '../store/auth';
 import { API_BASE, UPLOAD_BASE, validateEnv } from '../config';
 import { AuthResponseSchema, validate } from '../schemas';
-import type { User, Chat, Message, Attachment, StreamSource } from '../schemas';
+import type { User, Chat, Message, Attachment } from '../schemas';
 validateEnv();
 
 function buildUploadUrl(data: Record<string, unknown>): string {
@@ -101,7 +100,7 @@ const _apiMethods = {
   logout: (token: string) =>
     request<ApiError>('POST', '/api/auth/logout', token),
   updateProfile: (token: string, data: { username?: string; avatar_color?: string; avatar_url?: string }) =>
-    request<{ user: User }>('PATCH', '/api/users/me', token, data),
+    request<User>('PATCH', '/api/users/me', token, data),
   searchUsers: (token: string, q: string) =>
     request<{ users: User[] }>('GET', '/api/users?q=' + encodeURIComponent(q), token),
 
@@ -129,17 +128,17 @@ const _apiMethods = {
   clearAnnouncement: (token: string, chatId: string) =>
     request<ApiError>('DELETE', '/api/chats/' + chatId + '/announcement', token),
   updateChatAvatar: (token: string, chatId: string, avatarUrl: string) =>
-    request<ApiError>('PUT', '/api/chats/' + chatId + '/avatar', token, { avatar_url: avatarUrl }),
+    request<Chat>('PUT', '/api/chats/' + chatId + '/avatar', token, { avatar_url: avatarUrl }),
   updateChatBanner: (token: string, chatId: string, bannerUrl: string, bannerOpacity?: number) =>
-    request<ApiError>('PUT', '/api/chats/' + chatId + '/banner', token, { banner_url: bannerUrl, banner_opacity: bannerOpacity }),
+    request<Chat>('PUT', '/api/chats/' + chatId + '/banner', token, { banner_url: bannerUrl, banner_opacity: bannerOpacity }),
   updateChatBackground: (token: string, chatId: string, backgroundUrl: string) =>
-    request<ApiError>('PUT', '/api/chats/' + chatId + '/background', token, { background_url: backgroundUrl }),
+    request<Chat>('PUT', '/api/chats/' + chatId + '/background', token, { background_url: backgroundUrl }),
 
   // ── Members ──
   listMembers: (token: string, chatId: string) =>
     request<{ members: User[] }>('GET', '/api/chats/' + chatId + '/members', token),
   addMember: (token: string, chatId: string, userId: string) =>
-    request<ApiError>('POST', '/api/chats/' + chatId + '/members', token, { user_id: userId }),
+    request<Chat>('POST', '/api/chats/' + chatId + '/members', token, { user_id: userId }),
   removeMember: (token: string, chatId: string, userId: string) =>
     request<ApiError>('DELETE', '/api/chats/' + chatId + '/members/' + userId, token),
 
@@ -152,7 +151,7 @@ const _apiMethods = {
   sendMessage: (token: string, chatId: string, content: string, attachments?: Attachment[]) =>
     request<Message>('POST', '/api/chats/' + chatId + '/messages', token, { content, attachments: (attachments || []).map(({ ...a }) => a) }),
   editMessage: (token: string, chatId: string, msgId: string, content: string) =>
-    request<ApiError>('PATCH', '/api/chats/' + chatId + '/messages/' + msgId, token, { content }),
+    request<Message>('PATCH', '/api/chats/' + chatId + '/messages/' + msgId, token, { content }),
   deleteMessage: (token: string, chatId: string, msgId: string) =>
     request<ApiError>('DELETE', '/api/chats/' + chatId + '/messages/' + msgId, token),
   markRead: (token: string, chatId: string) =>
@@ -160,9 +159,9 @@ const _apiMethods = {
 
   // ── Reactions ──
   addReaction: (token: string, chatId: string, msgId: string, emoji: string) =>
-    request<ApiError>('PUT', '/api/chats/' + chatId + '/messages/' + msgId + '/reactions/' + encodeURIComponent(emoji), token),
+    request<Message>('PUT', '/api/chats/' + chatId + '/messages/' + msgId + '/reactions/' + encodeURIComponent(emoji), token),
   removeReaction: (token: string, chatId: string, msgId: string, emoji: string) =>
-    request<ApiError>('DELETE', '/api/chats/' + chatId + '/messages/' + msgId + '/reactions/' + encodeURIComponent(emoji), token),
+    request<Message>('DELETE', '/api/chats/' + chatId + '/messages/' + msgId + '/reactions/' + encodeURIComponent(emoji), token),
   pinChat: (_token: string, chatId: string) =>
     request<{ pinned: boolean }>('POST', '/api/chats/' + chatId + '/pin', _token),
   unpinChat: (_token: string, chatId: string) =>
@@ -188,36 +187,16 @@ const _apiMethods = {
     };
   },
 
-  // ── AI Chat ──
-  aiChat: (token: string, body: { source?: string; messages: { role: string; content: string }[]; stream?: boolean; [key: string]: unknown }) =>
-    fetch(API_BASE + '/api/ai/chat', {
+  // ── Stream (AI) Messages ──
+  sendStreamMessage: (token: string, chatId: string, content: string, source: Record<string, unknown>, msgId: string) =>
+    fetch(API_BASE + '/api/chats/' + chatId + '/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ content, type: 'stream', source, msg_id: msgId }),
     }).then(r => { if (!r.ok) throw r; return r; }),
 
   // ── Misc ──
   sseUrl: (token: string) => API_BASE + '/api/events?access_token=' + encodeURIComponent(token),
-
-  startStreaming: (source: StreamSource | (() => void)) => {
-    if (typeof source === 'function') return createStreamSource(source);
-    if (source.type === 'mock') return createStreamSource(source.fn!);
-    if (source.type === 'sse') {
-      return createStreamSource(async (emit: (data: string) => void) => {
-        const res = await fetch(source.url!);
-        const reader = res.body!.getReader();
-        const decoder = new TextDecoder();
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          for (const line of decoder.decode(value).split('\n')) {
-            if (line.startsWith('data: ')) emit(line.slice(6));
-          }
-        }
-      });
-    }
-    return createStreamSource(source);
-  },
 };
 
 export type ApiType = typeof _apiMethods & {

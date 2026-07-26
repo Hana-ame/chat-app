@@ -66,6 +66,7 @@ type Message struct {
 	ID              string       `json:"id"`
 	ChatID          string       `json:"chat_id"`
 	UserID          string       `json:"user_id"`
+	Type            string       `json:"type,omitempty"`
 	// Deprecated.
 	Author          *User        `json:"author,omitempty"`
 	Content         string       `json:"content"`

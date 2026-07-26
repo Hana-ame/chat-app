@@ -3,13 +3,11 @@ package config
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strconv"
 	"time"
 
-	"github.com/Hana-ame/chat-app/server/internal/ai"
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/joho/godotenv"
 )
@@ -24,8 +22,6 @@ type Config struct {
 	StaticDir       string
 	AllowOrigins    []string
 	CSPConnectSrc   string
-	AISources       []ai.SourceConfig
-
 	UploadDir        string
 	MaxUploadBytes   int64
 	UploadSalt       string
@@ -91,23 +87,6 @@ func Load() *Config {
 		uploadDir = abs
 	}
 
-	var aiSources []ai.SourceConfig
-	if s := os.Getenv("CHAT_AI_SOURCES"); s != "" {
-		if err := json.Unmarshal([]byte(s), &aiSources); err != nil {
-			logutil.Warn("CHAT_AI_SOURCES invalid JSON: %v", err)
-		}
-	}
-	if len(aiSources) == 0 {
-		if key := os.Getenv("CHAT_AI_KEY"); key != "" {
-			aiSources = []ai.SourceConfig{{
-				Name:    "default",
-				Key:     key,
-				BaseURL: getenv("CHAT_AI_BASE_URL", "https://api.siliconflow.cn/v1"),
-				Model:   getenv("CHAT_AI_MODEL", "deepseek-ai/Deepseek-V4-Flash"),
-			}}
-		}
-	}
-
 	uploadSalt := getenv("CHAT_UPLOAD_SALT", "")
 	if uploadSalt == "" {
 		uploadSalt = randomHex(16)
@@ -127,7 +106,6 @@ func Load() *Config {
 		StaticDir:       getenv("CHAT_STATIC_DIR", "../client/dist"),
 		AllowOrigins:    []string{"*"},
 		CSPConnectSrc:   getenv("CHAT_CSP_CONNECT_SRC", "'self' wss://wsl-8080.moonchan.xyz"),
-		AISources:       aiSources,
 
 		MaxMessageContentLength: int(getenvInt64("CHAT_MAX_MESSAGE_LENGTH", 4000)),
 		WSMaxMessageSize:        getenvInt64("CHAT_WS_MAX_MSG_SIZE", 1<<16),

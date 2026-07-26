@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io/fs"
 	"sort"
-	"strconv"
-	"strings"
 
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	_ "modernc.org/sqlite"
@@ -22,19 +20,11 @@ type DB struct {
 	maxContentLength int
 }
 
-type migration struct {
-	version int
-	name    string
-}
-
 type goMigration struct {
 	version int
 	fn      func(ctx context.Context, d *DB) error
 }
 
-// goMigrations are versioned schema fixups that need Go logic (e.g. ALTER
-// TABLE ADD COLUMN with existence checks that SQLite can't express portably).
-// New entries must append with an incremented version number.
 var goMigrations = []goMigration{
 	{1, migrateV1EnsureColumns},
 }
@@ -51,6 +41,7 @@ func migrateV1EnsureColumns(ctx context.Context, d *DB) error {
 		{"chats", "background_url", "background_url TEXT NOT NULL DEFAULT ''"},
 		{"chats", "banner_opacity", "banner_opacity REAL NOT NULL DEFAULT 0.9"},
 		{"chat_members", "notify_enabled", "notify_enabled INTEGER NOT NULL DEFAULT 1"},
+		{"messages", "type", "type TEXT NOT NULL DEFAULT ''"},
 		{"users", "notify_blocked", "notify_blocked TEXT NOT NULL DEFAULT '[]'"},
 	}
 	for _, c := range columns {
@@ -94,66 +85,57 @@ func (d *DB) Migrate() error {
 		return fmt.Errorf("create schema_migrations: %w", err)
 	}
 
-	entries, err := fs.ReadDir(migrationFS, "migrations")
-	if err != nil {
-		return err
+	// Read current version (latest applied SQL migration)
+	var current int
+	if err := d.QueryRowContext(ctx,
+		`SELECT COALESCE(MAX(version), -1) FROM schema_migrations`,
+	).Scan(&current); err != nil {
+		return fmt.Errorf("read version: %w", err)
 	}
 
-	var migrations []migration
-	for _, e := range entries {
-		if !strings.HasSuffix(e.Name(), ".sql") {
-			continue
+	// SQL migrations: find NNN_*.sql, apply, record, repeat
+	for {
+		next := current + 1
+		pattern := fmt.Sprintf("migrations/%03d_*.sql", next)
+		matches, err := fs.Glob(migrationFS, pattern)
+		if err != nil || len(matches) == 0 {
+			break
 		}
-		v, err := strconv.Atoi(e.Name()[:3])
-		if err != nil {
-			continue
-		}
-		migrations = append(migrations, migration{v, e.Name()})
-	}
-	sort.Slice(migrations, func(i, j int) bool {
-		return migrations[i].version < migrations[j].version
-	})
+		sort.Strings(matches)
+		file := matches[0]
 
-	for _, m := range migrations {
-		var exists int
-		d.QueryRowContext(ctx,
-			`SELECT 1 FROM schema_migrations WHERE version = ?`, m.version).Scan(&exists)
-		if exists == 1 {
-			continue
-		}
-
-		b, err := migrationFS.ReadFile("migrations/" + m.name)
+		data, err := migrationFS.ReadFile(file)
 		if err != nil {
-			return fmt.Errorf("read %s: %w", m.name, err)
+			return fmt.Errorf("read %s: %w", file, err)
 		}
-		if _, err := d.ExecContext(ctx, string(b)); err != nil {
-			return fmt.Errorf("apply %s: %w", m.name, err)
+		if _, err := d.ExecContext(ctx, string(data)); err != nil {
+			return fmt.Errorf("apply %s (v%d): %w", file, next, err)
 		}
 		if _, err := d.ExecContext(ctx,
-			`INSERT INTO schema_migrations (version) VALUES (?)`, m.version); err != nil {
-			return fmt.Errorf("record %s: %w", m.name, err)
+			`INSERT INTO schema_migrations (version) VALUES (?)`, next); err != nil {
+			return fmt.Errorf("record v%d: %w", next, err)
 		}
-		logutil.Info("applied migration: %s", m.name)
+		logutil.Info("applied migration: %s (v%d)", file, next)
+		current = next
 	}
 
-	// ── Go-based migrations (column ensure, schema fixups) ──
+	// Go migrations (version 1000+)
 	for _, gm := range goMigrations {
 		var exists int
 		d.QueryRowContext(ctx,
-			`SELECT 1 FROM schema_migrations WHERE version = ?`, gm.version).Scan(&exists)
+			`SELECT 1 FROM schema_migrations WHERE version = ?`, 1000+gm.version).Scan(&exists)
 		if exists == 1 {
 			continue
 		}
 		if err := gm.fn(ctx, d); err != nil {
-			return fmt.Errorf("apply migration %d: %w", gm.version, err)
+			return fmt.Errorf("go migration %d: %w", gm.version, err)
 		}
 		if _, err := d.ExecContext(ctx,
-			`INSERT INTO schema_migrations (version) VALUES (?)`, gm.version); err != nil {
-			return fmt.Errorf("record migration %d: %w", gm.version, err)
+			`INSERT INTO schema_migrations (version) VALUES (?)`, 1000+gm.version); err != nil {
+			return fmt.Errorf("record go migration %d: %w", gm.version, err)
 		}
 		logutil.Info("applied go migration: %d", gm.version)
 	}
 
 	return nil
 }
-

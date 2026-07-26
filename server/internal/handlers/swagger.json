@@ -1875,35 +1875,45 @@
         }
       }
     },
-    "/api/ai/chat": {
-      "post": {
-        "summary": "AI 聊天",
-        "operationId": "aiChat",
+    "/api/chats/{chatID}/messages/{messageID}/stream": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ChatID"
+        },
+        {
+          "name": "messageID",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "summary": "获取 Stream 消息的实时内容（SSE）",
+        "description": "用于 type=stream 的消息，返回 SSE 事件流。先读取内存中的 chunks，结束后 fallback 到 DB。",
+        "operationId": "streamMessageContent",
+        "tags": [
+          "Messages"
+        ],
         "security": [
           {
-            "bearerAuth": []
+            "BearerAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "chat_id": {
-                    "type": "string"
-                  },
-                  "msg_id": {
-                    "type": "string"
-                  }
+        "responses": {
+          "200": {
+            "description": "SSE 事件流",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "SSE 流式响应"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         }
       }
@@ -2448,6 +2458,29 @@
           }
         }
       },
+      "AISource": {
+        "type": "object",
+        "required": [
+          "endpoint",
+          "auth_key",
+          "body"
+        ],
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "format": "uri",
+            "description": "AI 上游 API URL，如 https://api.siliconflow.cn/v1/chat/completions"
+          },
+          "auth_key": {
+            "type": "string",
+            "description": "Authorization Bearer token"
+          },
+          "body": {
+            "type": "object",
+            "description": "请求体 JSON，stream:true 会被自动注入"
+          }
+        }
+      },
       "Message": {
         "type": "object",
         "required": [
@@ -2469,6 +2502,10 @@
           },
           "user_id": {
             "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "消息类型。空字符串为普通消息，\"stream\" 为 AI 流式消息。"
           },
           "author": {
             "$ref": "#/components/schemas/User",
@@ -2536,6 +2573,18 @@
             "items": {
               "$ref": "#/components/schemas/Attachment"
             }
+          },
+          "type": {
+            "type": "string",
+            "description": "消息类型。\"stream\" 表示 AI 流式消息，将返回 SSE 而非 JSON。"
+          },
+          "source": {
+            "$ref": "#/components/schemas/AISource",
+            "description": "type=stream 时必须提供：AI 上游的 endpoint、auth_key 和 body"
+          },
+          "msg_id": {
+            "type": "string",
+            "description": "type=stream 时可选的消息 ID，不传则服务端生成"
           }
         }
       },

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
 )
@@ -36,8 +37,13 @@ func (d *DB) ensureLastActiveColumn(ctx context.Context) error {
 func (d *DB) ensureColumn(ctx context.Context, table, name, definition string) error {
 	// WARNING: table and definition must be hardcoded constants (not user input)
 	// to prevent SQL injection — ALTER TABLE cannot use parameterized placeholders.
-	if strings.ContainsAny(table, "; ") || strings.ContainsAny(definition, ";") {
-		return fmt.Errorf("invalid table or definition: potential injection")
+	for _, r := range table {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' {
+			return fmt.Errorf("invalid table name %q: must be a simple identifier", table)
+		}
+	}
+	if strings.ContainsAny(definition, ";") || strings.Contains(definition, "--") || strings.Contains(definition, "/*") {
+		return fmt.Errorf("invalid column definition %q: potential injection", definition)
 	}
 	var cnt int
 	if err := d.QueryRowContext(ctx,
