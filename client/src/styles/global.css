@@ -242,6 +242,137 @@ button { cursor: pointer; border: none; }
   overflow-y: auto;
   box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
+
+.ai-panel {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 6px;
+  z-index: 50;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  display: flex;
+  flex-direction: column;
+  min-width: 400px;
+  max-width: 420px;
+  max-height: 80vh;
+  overflow: hidden;
+}
+.ai-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 0;
+  flex-shrink: 0;
+}
+.ai-panel-tabs {
+  display: flex;
+  gap: 2px;
+}
+.ai-panel-tab {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 0;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.ai-panel-tab:hover {
+  color: var(--text-secondary);
+}
+.ai-panel-tab.active {
+  color: var(--accent);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+.ai-panel-body {
+  padding: 10px 12px 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ai-panel-footer {
+  border-top: 1px solid var(--border);
+  padding: 10px 12px;
+}
+.ai-panel-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0 0 4px;
+}
+.ai-panel-input {
+  width: 100%;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  font-size: 12px;
+  outline: none;
+}
+.ai-panel-input:focus {
+  border-color: var(--accent);
+}
+.ai-panel-input-mono {
+  font-family: monospace;
+  font-size: 12px;
+}
+.ai-panel-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 4px 0;
+}
+.ai-panel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+}
+.ai-panel-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px 0;
+}
+.ai-panel-checkbox input {
+  accent-color: var(--accent);
+}
+.ai-panel-textarea {
+  width: 100%;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  font-size: 13px;
+  resize: none;
+  outline: none;
+  font-family: inherit;
+}
+.ai-panel-textarea:focus {
+  border-color: var(--accent);
+}
+.ai-panel-btn {
+  width: 100%;
+  padding: 8px 0;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.ai-panel-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .mention-item {
   padding: 6px 12px;
   font-size: 13px;

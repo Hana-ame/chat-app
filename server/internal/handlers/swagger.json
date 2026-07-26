@@ -2507,6 +2507,10 @@
             "type": "string",
             "description": "消息类型。空字符串为普通消息，\"stream\" 为 AI 流式消息。"
           },
+          "stream_url": {
+            "type": "string",
+            "description": "type=stream 时存在，SSE 端点 URL。客户端应用此 URL 接收实时内容。"
+          },
           "author": {
             "$ref": "#/components/schemas/User",
             "description": "Deprecated. 已弃用，保留兼容。"

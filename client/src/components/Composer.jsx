@@ -200,6 +200,9 @@ export default function Composer({ chatId }) {
               ))}
             </div>
           )}
+          <div style={{position:'relative'}}>
+            <AIPanel ref={aiPanelRef} chatId={chatId} onActiveChange={setAiActive} onLoadingChange={setAiLoading} />
+          </div>
           <textarea rows={1} placeholder={aiActive ? 'Ask AI...' : 'Message #chat'} value={text}
             ref={textRef}
             onChange={handleTextChange}
@@ -208,24 +211,22 @@ export default function Composer({ chatId }) {
             style={{flex:1,resize:'none',minHeight:36}} />
           <input type="file" ref={fileInput} onChange={handleFile} style={{display:'none'}} multiple />
           <button className="btn-ghost" style={{fontSize:18,padding:'4px 6px',lineHeight:0}} onClick={() => fileInput.current?.click()} title="Attach file">📎</button>
-          <AIPanel ref={aiPanelRef} chatId={chatId} onActiveChange={setAiActive} onLoadingChange={setAiLoading} />
-          {aiLoading ? (
+          {aiLoading && (
             <button className="btn-ghost" style={{padding:'4px 10px',lineHeight:0,color:'var(--danger)'}}
               onClick={() => aiPanelRef.current?.cancelAI()} title="Cancel">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
-          ) : (
-            <button className="btn-ghost" style={{padding:'4px 10px',lineHeight:0}}
-              disabled={(!text.trim() && attachments.length === 0) || uploading}
-              onClick={handleSend} title={aiActive ? 'Send + AI reply' : 'Send'}>
-              {uploading ? <span style={{fontSize:14}}>...</span> : (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="5" y1="12" x2="19" y2="12"/>
-                  <polyline points="12 5 19 12 12 19"/>
-                </svg>
-              )}
-            </button>
           )}
+          <button className="btn-ghost" style={{padding:'4px 10px',lineHeight:0}}
+            disabled={(!text.trim() && attachments.length === 0) || uploading}
+            onClick={handleSend} title={aiActive ? 'Send + AI reply' : 'Send'}>
+            {uploading ? <span style={{fontSize:14}}>...</span> : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"/>
+                <polyline points="12 5 19 12 12 19"/>
+              </svg>
+            )}
+          </button>
         </div>
       </div>
     </div>

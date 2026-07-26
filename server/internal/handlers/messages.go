@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -100,10 +101,17 @@ func (s *Server) handleStreamMessage(w http.ResponseWriter, r *http.Request, u *
 		msgID = db.NewID()
 	}
 
-	ch, err := s.Services.Stream.StartStream(r.Context(), chatID, u.ID, msgID, *src)
+	aiCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	go func() {
+		<-r.Context().Done()
+		cancel()
+	}()
+
+	ch, err := s.Services.Stream.StartStream(aiCtx, chatID, u.ID, msgID, *src)
 	if err != nil {
 		logutil.Error("ai: stream failed for user %s: %v", logutil.SafeID(u.ID), err)
-		writeError(w, http.StatusBadGateway, "upstream_error", "AI service error")
+		writeError(w, http.StatusBadGateway, "upstream_error", "AI upstream request failed")
 		return
 	}
 

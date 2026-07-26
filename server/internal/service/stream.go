@@ -29,13 +29,14 @@ func (s *StreamService) StartStream(ctx context.Context, chatID, userID, msgID s
 	s.liveDone[msgID] = false
 	s.liveMu.Unlock()
 
-	streamPath := "/api/chats/" + chatID + "/messages/" + msgID + "/stream"
+	streamURL := "/api/chats/" + chatID + "/messages/" + msgID + "/stream"
 	placeholder := &models.Message{
 		ID:        msgID,
 		ChatID:    chatID,
 		UserID:    userID,
 		Type:      "stream",
-		Content:   streamPath,
+		Content:   "",
+		StreamURL: streamURL,
 		CreatedAt: time.Now().UTC(),
 		Author:    &models.User{ID: "ai", Username: "AI", AvatarColor: "#10a37f"},
 	}

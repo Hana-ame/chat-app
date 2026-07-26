@@ -258,7 +258,8 @@ export const useChatStore = create((set, get) => ({
       const exists = s.messages.find(m => m.id === msg.id);
       wasNew = !exists;
       if (exists) {
-        const keepContent = msg.type === 'stream' && exists.streaming && msg.content?.startsWith('/api/chats/');
+        const hasStreamUrl = msg.stream_url || (typeof msg.content === 'string' && msg.content.startsWith('/api/chats/'));
+        const keepContent = msg.type === 'stream' && exists.streaming && !!hasStreamUrl;
         return {
           messages: s.activeChatId === msg.chat_id
             ? s.messages.map(m => m.id === msg.id ? { ...m, ...msg, content: keepContent ? m.content : msg.content, streaming: m.streaming || msg.streaming } : m)
@@ -266,17 +267,23 @@ export const useChatStore = create((set, get) => ({
           chats: s.chats.map(c => c.id === msg.chat_id ? { ...c, last_message: msg, last_message_at: msg.created_at, unread_count: s.activeChatId === msg.chat_id ? 0 : (c.unread_count || 0) + 1 } : c).sort(sortChats),
         };
       }
+      const sanitized = msg.type === 'stream' && (msg.stream_url || (typeof msg.content === 'string' && msg.content.startsWith('/api/chats/')))
+        ? { ...msg, content: '' }
+        : msg;
       const chat = s.chats.find(c => c.id === msg.chat_id);
-      if (!chat) return { messages: s.activeChatId === msg.chat_id ? [...s.messages, msg] : s.messages };
+      if (!chat) return { messages: s.activeChatId === msg.chat_id ? [...s.messages, sanitized] : s.messages };
       return {
-        messages: s.activeChatId === msg.chat_id ? [...s.messages, msg] : s.messages,
+        messages: s.activeChatId === msg.chat_id ? [...s.messages, sanitized] : s.messages,
         chats: s.chats.map(c => c.id === msg.chat_id ? { ...c, last_message: msg, last_message_at: msg.created_at, unread_count: s.activeChatId === msg.chat_id ? 0 : (c.unread_count || 0) + 1 } : c).sort(sortChats),
       };
     });
-    if (wasNew && msg.type === 'stream' && typeof msg.content === 'string' && msg.content.startsWith('/api/chats/')) {
-      const uid = getAuth().user?.id;
-      if (msg.user_id !== uid) {
-        fetchStream(msg.content, msg.id);
+    if (wasNew && msg.type === 'stream') {
+      const streamUrl = msg.stream_url || (typeof msg.content === 'string' && msg.content.startsWith('/api/chats/') ? msg.content : null);
+      if (streamUrl) {
+        const uid = getAuth().user?.id;
+        if (msg.user_id !== uid) {
+          fetchStream(streamUrl, msg.id);
+        }
       }
     }
     const st = get();
