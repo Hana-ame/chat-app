@@ -4840,7 +4840,7 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 
 ---
 
-## 2026-07-26 Stream 消息重构：通用 SSE 客户端 + 内存在线缓冲（第 53 轮）
+## 2026-07-26 v0.6.0 -> v0.7.0: Stream 消息重构（第 53 轮）
 
 ### 新增
 - `ai/stream.go` — 通用 SSE streaming 客户端，支持 OpenAI 兼容的 streaming/non-streaming 响应、`reasoning_content`、多 choices
