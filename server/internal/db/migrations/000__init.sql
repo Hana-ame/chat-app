@@ -50,7 +50,7 @@ CREATE INDEX IF NOT EXISTS idx_refresh_user ON refresh_tokens(user_id);
 
 CREATE TABLE IF NOT EXISTS chats (
     id              TEXT PRIMARY KEY,
-    type            TEXT NOT NULL CHECK (type IN ('dm','group')),
+    type            TEXT NOT NULL,
     name            TEXT,
     icon_color      TEXT NOT NULL DEFAULT '#5865F2',
     owner_id        TEXT REFERENCES users(id) ON DELETE SET NULL,

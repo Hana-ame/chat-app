@@ -8,7 +8,9 @@ import MessageList from './MessageList';
 import Composer from './Composer';
 import { renderContent } from './renderContent';
 
-function getDMName(chat) {
+function getChatDisplayName(chat) {
+  if (!chat) return 'Loading...';
+  if (chat.type === 'notify') return 'Notifications';
   if (chat.type !== 'dm') return chat.name;
   return chat.name || 'DM';
 }
@@ -81,7 +83,7 @@ export default function ChatView({ chatId, onBack }) {
     setLoading(false);
   }, [loading, hasMore, chatId, accessToken, messages]);
 
-  const name = chat ? getDMName(chat) : 'Loading...';
+  const name = getChatDisplayName(chat);
 
   const handleSaveNotice = async () => {
     if (!noticeInput.trim()) return;
@@ -195,7 +197,11 @@ export default function ChatView({ chatId, onBack }) {
         <input ref={bannerInputRef} type="file" accept="image/*" style={{display:'none'}} onChange={handleBannerUpload}/>
         <input ref={bgInputRef} type="file" accept="image/*" style={{display:'none'}} onChange={handleBgUpload}/>
         {onBack && <button className="btn-ghost" onClick={onBack} style={{fontSize:18}}>←</button>}
-        {chat.type !== 'dm' && chat.owner_id === user.id ? (
+        {chat.type === 'notify' ? (
+          <div className="chat-header-avatar">
+            <div className="chat-header-avatar-letter" style={{background:chat.icon_color||'#E8590C'}}>🔔</div>
+          </div>
+        ) : chat.type !== 'dm' && chat.owner_id === user.id ? (
           <div className="chat-header-avatar" style={{position:'relative',cursor:'pointer'}} onClick={handleAvatarClick}>
             {chat.avatar_url
               ? <img src={chat.avatar_url} alt="" className="chat-header-avatar-img" />
@@ -215,30 +221,32 @@ export default function ChatView({ chatId, onBack }) {
               {memberCount} member{memberCount !== 1 ? 's' : ''}
             </div>
           </div>
-          <button className="btn-ghost" style={{
-            position: 'relative',
-            padding: '6px 8px',
-            background: (showNotice && pinnedMessage[chatId]) ? 'var(--bg-tertiary)' : 'transparent',
-            borderRadius: 4,
-            lineHeight: 0,
-            opacity: pinnedMessage[chatId] ? 1 : 0.4,
-          }} onClick={() => {
-            if (!pinnedMessage[chatId]) return;
-            setShowNotice(!showNotice);
-          }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11 5L6 9H2v6h4l5 4V5z"/>
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
-            </svg>
-            {pinnedMessage[chatId] && chat?.pinned_updated_at && (!chat?.pinned_last_read_at || new Date(chat.pinned_updated_at) > new Date(chat.pinned_last_read_at)) && (
-              <span style={{
-                position: 'absolute', top: 2, right: 2,
-                width: 8, height: 8, borderRadius: '50%',
-                background: 'var(--danger)',
-              }}/>
-            )}
-          </button>
-          {chat?.owner_id === user.id && (
+          {chat.type === 'notify' ? null : (
+            <button className="btn-ghost" style={{
+              position: 'relative',
+              padding: '6px 8px',
+              background: (showNotice && pinnedMessage[chatId]) ? 'var(--bg-tertiary)' : 'transparent',
+              borderRadius: 4,
+              lineHeight: 0,
+              opacity: pinnedMessage[chatId] ? 1 : 0.4,
+            }} onClick={() => {
+              if (!pinnedMessage[chatId]) return;
+              setShowNotice(!showNotice);
+            }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+              </svg>
+              {pinnedMessage[chatId] && chat?.pinned_updated_at && (!chat?.pinned_last_read_at || new Date(chat.pinned_updated_at) > new Date(chat.pinned_last_read_at)) && (
+                <span style={{
+                  position: 'absolute', top: 2, right: 2,
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: 'var(--danger)',
+                }}/>
+              )}
+            </button>
+          )}
+          {chat.type === 'notify' || chat?.owner_id !== user.id ? null : (
             <button className="btn-ghost" style={{padding:'6px 8px',lineHeight:0,borderRadius:4}} title="Set announcement"
               onClick={() => {
                 setNoticeInput(pinnedMessage[chatId]?.content || '');
@@ -250,15 +258,17 @@ export default function ChatView({ chatId, onBack }) {
               </svg>
             </button>
           )}
-          <button className="btn-ghost" style={{
-            padding:'6px 8px',lineHeight:0,borderRadius:4,
-            color: useChatStore.getState().notifyEnabled[chatId] ? 'var(--accent)' : undefined,
-          }} title={useChatStore.getState().notifyEnabled[chatId] ? 'Notifications on' : 'Notifications off'}
-            onClick={handleNotifyToggle}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-            </svg>
-          </button>
+          {chat.type === 'notify' ? null : (
+            <button className="btn-ghost" style={{
+              padding:'6px 8px',lineHeight:0,borderRadius:4,
+              color: useChatStore.getState().notifyEnabled[chatId] ? 'var(--accent)' : undefined,
+            }} title={useChatStore.getState().notifyEnabled[chatId] ? 'Notifications on' : 'Notifications off'}
+              onClick={handleNotifyToggle}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              </svg>
+            </button>
+          )}
           <div ref={headerMenuRef} style={{position:'relative'}}>
             <button className="btn-ghost" style={{padding:'6px 8px',lineHeight:0,borderRadius:4,fontSize:18,fontWeight:700,letterSpacing:0}}
               onClick={() => setShowHeaderMenu(v => !v)} title="More">⋮</button>
@@ -267,7 +277,7 @@ export default function ChatView({ chatId, onBack }) {
                 <button className="context-menu-item" onClick={handlePinToggle}>
                   {chat?.pinned ? 'Unpin' : 'Pin'}
                 </button>
-                {chat?.owner_id === user.id && (
+                {chat?.type !== 'notify' && chat?.owner_id === user.id && (
                   <>
                     <button className="context-menu-item" onClick={() => { bannerInputRef.current?.click(); setShowHeaderMenu(false); }} disabled={uploadingBanner}>
                       Upload banner

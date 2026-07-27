@@ -62,3 +62,70 @@ func (d *DB) ensureColumn(ctx context.Context, table, name, definition string) e
 	logutil.Info("%s.%s column added", table, name)
 	return nil
 }
+
+func migrateV2DropChatTypeCheck(ctx context.Context, d *DB) error {
+	rows, err := d.QueryContext(ctx, `SELECT name FROM pragma_table_info('chats') ORDER BY cid`)
+	if err != nil {
+		return fmt.Errorf("read chats columns: %w", err)
+	}
+	defer rows.Close()
+
+	var oldCols []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return err
+		}
+		oldCols = append(oldCols, name)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	colList := strings.Join(oldCols, ", ")
+
+	defs := []string{
+		"id TEXT PRIMARY KEY",
+		"type TEXT NOT NULL",
+		"name TEXT",
+		"icon_color TEXT NOT NULL DEFAULT '#5865F2'",
+		"owner_id TEXT REFERENCES users(id) ON DELETE SET NULL",
+		"created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
+		"last_message_at TEXT",
+		"last_message_id TEXT",
+		"member_count INTEGER NOT NULL DEFAULT 0",
+		"visibility TEXT NOT NULL DEFAULT 'private'",
+		"pinned_message TEXT NOT NULL DEFAULT ''",
+		"pinned_updated_at TEXT",
+		"avatar_url TEXT NOT NULL DEFAULT ''",
+		"banner_url TEXT NOT NULL DEFAULT ''",
+		"background_url TEXT NOT NULL DEFAULT ''",
+		"banner_opacity REAL NOT NULL DEFAULT 0.9",
+	}
+
+	schema := strings.Join(defs, ", ")
+
+	createSQL := fmt.Sprintf(`CREATE TABLE chats_new (%s)`, schema)
+	if _, err := d.ExecContext(ctx, `PRAGMA foreign_keys=OFF`); err != nil {
+		return err
+	}
+	if _, err := d.ExecContext(ctx, createSQL); err != nil {
+		return fmt.Errorf("create chats_new: %w", err)
+	}
+	if _, err := d.ExecContext(ctx,
+		fmt.Sprintf(`INSERT INTO chats_new (%s) SELECT %s FROM chats`, colList, colList),
+	); err != nil {
+		return fmt.Errorf("copy chats data: %w", err)
+	}
+	if _, err := d.ExecContext(ctx, `DROP TABLE chats`); err != nil {
+		return fmt.Errorf("drop chats: %w", err)
+	}
+	if _, err := d.ExecContext(ctx, `ALTER TABLE chats_new RENAME TO chats`); err != nil {
+		return fmt.Errorf("rename chats_new: %w", err)
+	}
+	if _, err := d.ExecContext(ctx, `PRAGMA foreign_keys=ON`); err != nil {
+		return err
+	}
+	logutil.Info("migrated chats table: removed type CHECK constraint, added notify support")
+	return nil
+}

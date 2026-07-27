@@ -7,8 +7,9 @@ import {
   mockListMessages, mockSendMessage, mockEditMessage, mockDeleteMessage,
   mockMarkRead, mockAddReaction, mockRemoveReaction,
   mockUpload, mockUploadAvatar,
-  mockPinChat, mockUnpinChat, mockMarkAnnouncementRead, mockUpdateChatAvatar, mockUpdateChatBanner, mockUpdateChatBackground,
-  resetMockData,
+	mockPinChat, mockUnpinChat, mockMarkAnnouncementRead, mockUpdateChatAvatar, mockUpdateChatBanner, mockUpdateChatBackground,
+	mockGetNotifyChat,
+	resetMockData,
 } from './mock';
 import { useAuthStore } from '../store/auth';
 import { API_BASE, UPLOAD_BASE, validateEnv } from '../config';
@@ -171,6 +172,10 @@ const _apiMethods = {
   markAnnouncementRead: (token: string, chatId: string) =>
     request<ApiError>('POST', '/api/chats/' + chatId + '/announcement/read', token, {}),
 
+  // ── Notify ──
+  getNotifyChat: (token: string) =>
+    request<Chat>('GET', '/api/chats/notify', token),
+
   // ── Uploads ──
   upload: async (file: File) => {
     const res = await fetch(UPLOAD_BASE + '/api/upload', {
@@ -221,6 +226,7 @@ function buildMockProxy(target: typeof _apiMethods): ApiType {
     markRead: mockMarkRead, addReaction: mockAddReaction, removeReaction: mockRemoveReaction,
     pinChat: mockPinChat, unpinChat: mockUnpinChat,
     markAnnouncementRead: mockMarkAnnouncementRead,
+    getNotifyChat: mockGetNotifyChat,
     upload: mockUpload, uploadAvatar: mockUploadAvatar,
   };
   let mockEnabled = false;

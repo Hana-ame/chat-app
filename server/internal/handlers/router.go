@@ -101,6 +101,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 				r.Get("/chats/public", s.ListPublicChats)
 				r.Post("/chats", s.CreateChat)
 				r.Post("/dms", s.CreateOrGetDM)
+				r.Get("/chats/notify", s.GetOrCreateNotifyChat)
 				r.Route("/chats/{chatID}", func(r chi.Router) {
 					r.Use(s.trackLastActive)
 					r.Get("/", s.GetChat)

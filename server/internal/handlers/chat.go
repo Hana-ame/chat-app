@@ -63,6 +63,17 @@ func (s *Server) CreateChat(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, chat)
 }
 
+func (s *Server) GetOrCreateNotifyChat(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r.Context())
+	chat, err := s.Services.Chat.CreateOrGetNotify(r.Context(), u.ID)
+	if err != nil {
+		status, code := mapServiceError(err)
+		writeError(w, status, code, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, chat)
+}
+
 // CreateOrGetDM creates or retrieves a direct message chat.
 // Deprecated: use POST /api/chats with type=dm and member_ids=[otherUserID].
 func (s *Server) CreateOrGetDM(w http.ResponseWriter, r *http.Request) {
