@@ -144,7 +144,7 @@ func (s *Server) handleStreamMessage(w http.ResponseWriter, r *http.Request, u *
 	if content == "" {
 		content = "（AI 响应为空，请检查 endpoint / auth_key / body 设置）"
 	}
-	s.Services.Stream.FinishStream(r.Context(), chatID, u.ID, msgID, content)
+	s.Services.Stream.FinishStream(context.Background(), chatID, u.ID, msgID, content)
 
 	_, _ = w.Write([]byte("data: [DONE]\n\n"))
 	flusher.Flush()

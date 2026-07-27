@@ -192,7 +192,7 @@ func (s *Server) trackLastActive(next http.Handler) http.Handler {
 		if chatID != "" && u != nil {
 			id := u.ID
 			go func() {
-				if err := s.DB.UpdateLastActiveAt(r.Context(), chatID, id); err != nil {
+				if err := s.DB.UpdateLastActiveAt(context.Background(), chatID, id); err != nil {
 					logutil.Error("trackLastActive error: %v", err)
 				}
 			}()
