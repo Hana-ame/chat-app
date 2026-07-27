@@ -212,13 +212,8 @@
     import { encode as avifEncode } from 'https://esm.sh/@jsquash/avif';
     import { encode as webpEncode } from 'https://esm.sh/@jsquash/webp';
 
-    const AVIF_ENCODE_OPTIONS = {
-      cqLevel: 30,
-      speed: 7,
-    };
-    const WEBP_ENCODE_OPTIONS = {
-      quality: 75,
-    };
+    const AVIF_ENCODE_OPTIONS = { cqLevel: 30, speed: 7 };
+    const WEBP_ENCODE_OPTIONS = { quality: 75 };
 
     const ENDPOINT = document.location.origin;
     const DEST = 'local';
@@ -237,14 +232,6 @@
           uploadFile(file);
         }
         fileInput.value = '';
-      };
-
-      const compressToAvif = async (imageData) => {
-        return await avifEncode(imageData, AVIF_ENCODE_OPTIONS);
-      };
-
-      const compressToWebp = async (imageData) => {
-        return await webpEncode(imageData, WEBP_ENCODE_OPTIONS);
       };
 
       const formatBytes = (bytes) => {
@@ -283,10 +270,10 @@
         } else if (shouldCompress) {
             try {
                 const formatName = selectedCompression.toUpperCase();
-                urlLink.value = `压缩中 (${formatName} WASM)...`;
+                urlLink.value = `压缩中 (${formatName})...`;
                 delLink.value = '请稍候...';
 
-                const imageBitmap = await createImageBitmap(originalFile);
+                    const imageBitmap = await createImageBitmap(originalFile);
                 const canvas = document.createElement('canvas');
                 canvas.width = imageBitmap.width;
                 canvas.height = imageBitmap.height;
@@ -294,30 +281,57 @@
                 ctx.drawImage(imageBitmap, 0, 0);
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-                let compressedBuffer;
-                let compressedMimeType;
-                let newExtension;
+                let compressedFile = null;
+                let usedFormat = '';
 
                 if (selectedCompression === 'avif') {
-                    compressedBuffer = await compressToAvif(imageData);
-                    compressedMimeType = 'image/avif';
-                    newExtension = '.avif';
-                } else {
-                    compressedBuffer = await compressToWebp(imageData);
-                    compressedMimeType = 'image/webp';
-                    newExtension = '.webp';
+                    try {
+                        urlLink.value = `压缩中 (AVIF WASM)...`;
+                        const buffer = await avifEncode(imageData, AVIF_ENCODE_OPTIONS);
+                        const nameWithoutExt = originalFile.name.replace(/\.[^/.]+$/, "");
+                        compressedFile = new File([new Blob([buffer], { type: 'image/avif' })], `${nameWithoutExt}.avif`, { type: 'image/avif' });
+                        usedFormat = 'AVIF';
+                    } catch (e) {
+                        console.warn("AVIF WASM failed", e);
+                    }
+                }
+                if (!compressedFile) {
+                    try {
+                        urlLink.value = `压缩中 (WEBP WASM)...`;
+                        const buffer = await webpEncode(imageData, WEBP_ENCODE_OPTIONS);
+                        const nameWithoutExt = originalFile.name.replace(/\.[^/.]+$/, "");
+                        compressedFile = new File([new Blob([buffer], { type: 'image/webp' })], `${nameWithoutExt}.webp`, { type: 'image/webp' });
+                        usedFormat = 'WEBP';
+                    } catch (e) {
+                        console.warn("WEBP WASM failed", e);
+                    }
+                }
+                if (!compressedFile) {
+                    const target = selectedCompression === 'avif'
+                        ? { mime: 'image/avif', ext: '.avif', q: 0.7 }
+                        : { mime: 'image/webp', ext: '.webp', q: 0.75 };
+                    const blob = await new Promise(resolve => { canvas.toBlob(resolve, target.mime, target.q); });
+                    if (blob && blob.size > 0) {
+                        const nameWithoutExt = originalFile.name.replace(/\.[^/.]+$/, "");
+                        compressedFile = new File([blob], `${nameWithoutExt}${target.ext}`, { type: target.mime });
+                        usedFormat = target.mime.split('/')[1].toUpperCase();
+                    }
+                }
+                if (!compressedFile) {
+                    const blob = await new Promise(resolve => { canvas.toBlob(resolve, 'image/jpeg', 0.85); });
+                    if (blob && blob.size > 0) {
+                        const nameWithoutExt = originalFile.name.replace(/\.[^/.]+$/, "");
+                        compressedFile = new File([blob], `${nameWithoutExt}.jpg`, { type: 'image/jpeg' });
+                        usedFormat = 'JPEG';
+                    }
                 }
 
-                const nameWithoutExt = originalFile.name.replace(/\.[^/.]+$/, "");
-                const newName = `${nameWithoutExt}${newExtension}`;
-                const compressedFile = new File([new Blob([compressedBuffer], { type: compressedMimeType })], newName, { type: compressedMimeType });
-
-                if (compressedFile.size < originalFile.size) {
+                if (compressedFile && compressedFile.size < originalFile.size) {
                     fileToUpload = compressedFile;
                     URL.revokeObjectURL(initialPreviewUrl);
                     imgElement.src = URL.createObjectURL(fileToUpload);
                     const savedPercent = ((1 - fileToUpload.size / originalFile.size) * 100).toFixed(0);
-                    statusInfoSpan.textContent = `${formatName} 压缩成功! 体积减小 ${savedPercent}% (${formatBytes(fileToUpload.size)})`;
+                    statusInfoSpan.textContent = `${usedFormat} 压缩成功! 体积减小 ${savedPercent}% (${formatBytes(fileToUpload.size)})`;
                 } else {
                     statusInfoSpan.textContent = `原图更优，无需压缩 (${formatBytes(originalFile.size)})`;
                     statusInfoSpan.classList.add('warning');
