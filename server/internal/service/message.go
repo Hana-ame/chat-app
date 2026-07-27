@@ -19,7 +19,7 @@ func (s *MessageService) List(ctx context.Context, chatID, userID string, before
 	return s.DB.GetMessages(ctx, chatID, before, limit)
 }
 
-func (s *MessageService) SendAI(ctx context.Context, chatID, userID, content, msgID string) (*models.Message, error) {
+func (s *MessageService) SendAI(ctx context.Context, chatID, userID, content, msgID string, author *models.User) (*models.Message, error) {
 	if strings.TrimSpace(content) == "" {
 		return nil, ErrInvalidInput
 	}
@@ -27,7 +27,7 @@ func (s *MessageService) SendAI(ctx context.Context, chatID, userID, content, ms
 	if err != nil {
 		return nil, err
 	}
-	msg.Author = &models.User{ID: "ai", Username: "AI", AvatarColor: "#10a37f"}
+	msg.Author = author
 	if s.Hub != nil {
 		s.Hub.BroadcastMessageCreate(msg)
 	}

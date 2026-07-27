@@ -108,7 +108,7 @@ func (s *Server) handleStreamMessage(w http.ResponseWriter, r *http.Request, u *
 		cancel()
 	}()
 
-	ch, err := s.Services.Stream.StartStream(aiCtx, chatID, u.ID, msgID, *src)
+	ch, err := s.Services.Stream.StartStream(aiCtx, chatID, u.ID, msgID, *src, u)
 	if err != nil {
 		logutil.Error("ai: stream failed for user %s: %v", logutil.SafeID(u.ID), err)
 		writeError(w, http.StatusBadGateway, "upstream_error", "AI upstream request failed")

@@ -1830,7 +1830,7 @@ func TestStreamService_Lifecycle(t *testing.T) {
 		Body:     json.RawMessage(`{"model":"test"}`),
 	}
 
-	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src)
+	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1907,7 +1907,7 @@ func TestStreamService_StreamStatus_WithIdx(t *testing.T) {
 		Body:     json.RawMessage(`{"model":"test"}`),
 	}
 
-	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src)
+	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1962,7 +1962,7 @@ func TestStreamService_Subscribe_Notification(t *testing.T) {
 		Body:     json.RawMessage(`{"model":"test"}`),
 	}
 
-	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src)
+	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2015,7 +2015,7 @@ func TestStreamService_Finish_NotifiesSubscribers(t *testing.T) {
 		Body:     json.RawMessage(`{"model":"test"}`),
 	}
 
-	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src)
+	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2068,7 +2068,7 @@ func TestStreamService_Unsubscribe(t *testing.T) {
 		Body:     json.RawMessage(`{"model":"test"}`),
 	}
 
-	_, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src)
+	_, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2119,7 +2119,7 @@ func TestStreamService_EmptyContent(t *testing.T) {
 		Body:     json.RawMessage(`{"model":"test"}`),
 	}
 
-	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src)
+	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2170,7 +2170,7 @@ func TestStreamService_NonStreamingUpstream(t *testing.T) {
 		Body:     json.RawMessage(`{"model":"test","messages":[{"role":"user","content":"hi"}]}`),
 	}
 
-	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src)
+	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2212,7 +2212,7 @@ func TestStreamService_MultipleSubscribers(t *testing.T) {
 		Body:     json.RawMessage(`{"model":"test"}`),
 	}
 
-	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src)
+	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2261,7 +2261,7 @@ func TestStreamService_UpstreamError(t *testing.T) {
 		Body:     json.RawMessage(`{"model":"test"}`),
 	}
 
-	_, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, "err-msg", src)
+	_, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, "err-msg", src, nil)
 	if err == nil {
 		t.Fatal("expected error for HTTP 500")
 	}
@@ -2295,7 +2295,7 @@ func TestStreamService_ContextCancelPropagation(t *testing.T) {
 		Body:     json.RawMessage(`{"model":"test"}`),
 	}
 
-	ch, err := f.Server.Services.Stream.StartStream(ctx, chat.ID, a, "cancel-msg", src)
+	ch, err := f.Server.Services.Stream.StartStream(ctx, chat.ID, a, "cancel-msg", src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2332,7 +2332,7 @@ func TestStreamService_ConcurrentAppendAndStatus(t *testing.T) {
 		Body:     json.RawMessage(`{"model":"test"}`),
 	}
 
-	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src)
+	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2375,7 +2375,7 @@ func TestStreamService_FinishIdempotent(t *testing.T) {
 		Body:     json.RawMessage(`{"model":"test"}`),
 	}
 
-	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src)
+	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2414,7 +2414,7 @@ func TestStreamService_SubscribeAfterFinish(t *testing.T) {
 		Body:     json.RawMessage(`{"model":"test"}`),
 	}
 
-	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src)
+	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2464,7 +2464,7 @@ func TestStreamService_DoneBeforeChunks(t *testing.T) {
 		Body:     json.RawMessage(`{"model":"test"}`),
 	}
 
-	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src)
+	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2501,7 +2501,7 @@ func TestStreamService_StreamStatusIndexBounds(t *testing.T) {
 		Body:     json.RawMessage(`{"model":"test"}`),
 	}
 
-	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src)
+	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2575,7 +2575,7 @@ func TestStreamService_ConcurrentSubscribeUnsubscribe(t *testing.T) {
 		Body:     json.RawMessage(`{"model":"test"}`),
 	}
 
-	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src)
+	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2624,7 +2624,7 @@ func TestStreamService_SubscribeThenAppend(t *testing.T) {
 		Body:     json.RawMessage(`{"model":"test"}`),
 	}
 
-	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src)
+	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2666,7 +2666,7 @@ func TestStreamService_AppendChunk_NonexistentMessage(t *testing.T) {
 		Body:     json.RawMessage(`{"model":"test"}`),
 	}
 
-	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src)
+	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2705,7 +2705,7 @@ func TestStreamService_Unsubscribe_NonexistentChannel(t *testing.T) {
 		Body:     json.RawMessage(`{"model":"test"}`),
 	}
 
-	_, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src)
+	_, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2736,7 +2736,7 @@ func TestStreamService_StartStream_HubNil(t *testing.T) {
 		Body:     json.RawMessage(`{"model":"test"}`),
 	}
 
-	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src)
+	ch, err := f.Server.Services.Stream.StartStream(context.Background(), chat.ID, a, msgID, src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

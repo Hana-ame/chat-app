@@ -6,6 +6,7 @@ import (
 
 	"github.com/Hana-ame/chat-app/server/internal/config"
 	"github.com/Hana-ame/chat-app/server/internal/db"
+	"github.com/Hana-ame/chat-app/server/internal/models"
 	"github.com/Hana-ame/chat-app/server/internal/ws"
 )
 
@@ -34,6 +35,7 @@ func New(database *db.DB, hub *ws.Hub, cfg *config.Config) *Service {
 		liveChunks: map[string][]string{},
 		liveSubs:   map[string][]chan struct{}{},
 		liveDone:   map[string]bool{},
+		liveAuthor: map[string]*models.User{},
 	}
 	return s
 }

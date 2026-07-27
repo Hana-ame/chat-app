@@ -105,7 +105,7 @@ const AIPanel = forwardRef(function AIPanel({ chatId, active, onActiveChange, on
       content: '',
       created_at: new Date().toISOString(),
       streaming: true,
-      author: { id: 'ai', username: 'AI', avatar_color: '#10a37f' },
+      author: { id: user.id, username: user.username, avatar_color: user.avatar_color },
     };
     useChatStore.getState().onMessageCreate(botMsg);
     setLoading(true);
@@ -213,7 +213,7 @@ const AIPanel = forwardRef(function AIPanel({ chatId, active, onActiveChange, on
         style={{ fontSize: 13, padding: '4px 8px', lineHeight: 0, fontWeight: active ? 600 : 400, color: active ? 'var(--accent)' : 'var(--text-muted)' }}
         onClick={() => onActiveChange(!active)} title={active ? 'Disable AI' : 'Enable AI'}
         disabled={loading}>
-        🤖 {active ? 'AI' : 'AI'}
+        🤖 AI
       </button>
       {active && (
         <button className="btn-ghost"

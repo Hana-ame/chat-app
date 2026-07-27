@@ -209,7 +209,7 @@ export default function Composer({ chatId }) {
           <input type="file" ref={fileInput} onChange={handleFile} style={{display:'none'}} multiple />
           <button className="btn-ghost" style={{fontSize:18,padding:'4px 6px',lineHeight:0}} onClick={() => fileInput.current?.click()} title="Attach file">📎</button>
           <div style={{position:'relative'}}>
-            <AIPanel ref={aiPanelRef} chatId={chatId} onActiveChange={setAiActive} onLoadingChange={setAiLoading} />
+            <AIPanel ref={aiPanelRef} chatId={chatId} active={aiActive} onActiveChange={setAiActive} onLoadingChange={setAiLoading} />
           </div>
           {aiLoading && (
             <button className="btn-ghost" style={{padding:'4px 10px',lineHeight:0,color:'var(--danger)'}}

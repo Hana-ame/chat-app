@@ -16,9 +16,10 @@ type StreamService struct {
 	liveChunks map[string][]string
 	liveSubs   map[string][]chan struct{}
 	liveDone   map[string]bool
+	liveAuthor map[string]*models.User
 }
 
-func (s *StreamService) StartStream(ctx context.Context, chatID, userID, msgID string, src ai.Source) (<-chan ai.Chunk, error) {
+func (s *StreamService) StartStream(ctx context.Context, chatID, userID, msgID string, src ai.Source, author *models.User) (<-chan ai.Chunk, error) {
 	ch, err := ai.StreamFromSource(ctx, src)
 	if err != nil {
 		return nil, err
@@ -27,6 +28,7 @@ func (s *StreamService) StartStream(ctx context.Context, chatID, userID, msgID s
 	s.liveMu.Lock()
 	s.liveChunks[msgID] = []string{}
 	s.liveDone[msgID] = false
+	s.liveAuthor[msgID] = author
 	s.liveMu.Unlock()
 
 	streamURL := "/api/chats/" + chatID + "/messages/" + msgID + "/stream"
@@ -38,7 +40,7 @@ func (s *StreamService) StartStream(ctx context.Context, chatID, userID, msgID s
 		Content:   "",
 		StreamURL: streamURL,
 		CreatedAt: time.Now().UTC(),
-		Author:    &models.User{ID: "ai", Username: "AI", AvatarColor: "#10a37f"},
+		Author:    author,
 	}
 	if s.Hub != nil {
 		s.Hub.BroadcastMessageCreate(placeholder)
@@ -63,13 +65,14 @@ func (s *StreamService) AppendChunk(msgID, content string) {
 func (s *StreamService) FinishStream(ctx context.Context, chatID, userID, msgID, content string) {
 	s.liveMu.Lock()
 	s.liveDone[msgID] = true
+	author := s.liveAuthor[msgID]
 	for _, ch := range s.liveSubs[msgID] {
 		close(ch)
 	}
 	s.liveSubs[msgID] = nil
 	s.liveMu.Unlock()
 
-	if _, err := s.Message.SendAI(ctx, chatID, userID, content, msgID); err != nil {
+	if _, err := s.Message.SendAI(ctx, chatID, userID, content, msgID, author); err != nil {
 		logutil.Error("ai: save message failed: %v", err)
 	}
 
@@ -77,6 +80,7 @@ func (s *StreamService) FinishStream(ctx context.Context, chatID, userID, msgID,
 		s.liveMu.Lock()
 		delete(s.liveChunks, msgID)
 		delete(s.liveSubs, msgID)
+		delete(s.liveAuthor, msgID)
 		// liveDone 保留 true，让后续 StreamStatus 能识别「流已结束」
 		s.liveMu.Unlock()
 	})
