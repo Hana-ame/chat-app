@@ -52,32 +52,31 @@ const defaults = {
   }, null, 2),
 };
 
-const AIPanel = forwardRef(function AIPanel({ chatId, onActiveChange, onLoadingChange }, ref) {
+const AIPanel = forwardRef(function AIPanel({ chatId, active, onActiveChange, onLoadingChange }, ref) {
   const { user, accessToken } = useAuthStore();
-  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [prompt, setPrompt] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
   const [tab, setTab] = useState('basic');
   const tabRef = useRef(tab);
   tabRef.current = tab;
   const saved = useRef(loadSettings() || defaults);
   const [fields, setFields] = useState({ ...saved.current });
   const aiAbort = useRef(null);
-  const panelRef = useRef(null);
+  const settingsRef = useRef(null);
 
   useEffect(() => {
     const handler = (e) => {
-      if (panelRef.current && !panelRef.current.contains(e.target)) {
-        setOpen(false);
+      if (settingsRef.current && !settingsRef.current.contains(e.target)) {
+        setShowSettings(false);
       }
     };
-    if (open) document.addEventListener('mousedown', handler);
+    if (showSettings) document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
+  }, [showSettings]);
 
   useEffect(() => {
-    onActiveChange(open);
-  }, [open, onActiveChange]);
+    onActiveChange(active);
+  }, [active, onActiveChange]);
 
   useEffect(() => {
     onLoadingChange(loading);
@@ -167,7 +166,6 @@ const AIPanel = forwardRef(function AIPanel({ chatId, onActiveChange, onLoadingC
             ),
           }));
           setLoading(false);
-          setPrompt('');
           aiAbort.current = null;
         },
         () => {
@@ -204,139 +202,80 @@ const AIPanel = forwardRef(function AIPanel({ chatId, onActiveChange, onLoadingC
     }
   }, [chatId, user, accessToken]);
 
-  const handleSend = useCallback(async () => {
-    const content = prompt.trim();
-    if (!content) return;
-    await doSend(content);
-  }, [prompt, doSend]);
-
-  const handleKey = useCallback((e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  }, [handleSend]);
-
   useImperativeHandle(ref, () => ({
     sendAI: doSend,
     cancelAI,
   }), [doSend, cancelAI]);
 
   return (
-    <div ref={panelRef} style={{ position: 'relative', display: 'inline-flex' }}>
-      <button className={'btn-ghost' + (open ? ' active' : '')}
-        style={{ fontSize: 13, padding: '4px 8px', lineHeight: 0, fontWeight: open ? 600 : 400, color: open ? 'var(--accent)' : 'var(--text-muted)' }}
-        onClick={() => setOpen(!open)} title="AI settings"
+    <div style={{ position: 'relative', display: 'inline-flex' }}>
+      <button className={'btn-ghost' + (active ? ' active' : '')}
+        style={{ fontSize: 13, padding: '4px 8px', lineHeight: 0, fontWeight: active ? 600 : 400, color: active ? 'var(--accent)' : 'var(--text-muted)' }}
+        onClick={() => onActiveChange(!active)} title={active ? 'Disable AI' : 'Enable AI'}
         disabled={loading}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 3, verticalAlign: 'middle' }}>
-          <path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1-4 4 4 4 0 0 1-4-4V6a4 4 0 0 1 4-4z"/>
-          <path d="M16 14H8a4 4 0 0 0-4 4v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2a4 4 0 0 0-4-4z"/>
-          <path d="M12 14v6"/>
-        </svg>
-        AI
+        🤖 {active ? 'AI' : 'AI'}
       </button>
-
-      {open && (
-        <div className="ai-panel">
-          <div className="ai-panel-header">
-            <div className="ai-panel-tabs">
-              <button className={'ai-panel-tab' + (tab === 'basic' ? ' active' : '')}
-                onClick={() => setTab('basic')}>Basic</button>
-              <button className={'ai-panel-tab' + (tab === 'json' ? ' active' : '')}
-                onClick={() => setTab('json')}>JSON</button>
-            </div>
+      {active && (
+        <button className="btn-ghost"
+          style={{ fontSize: 11, padding: '2px 4px', lineHeight: 0, marginLeft: 2 }}
+          onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); }}
+          title="AI settings">
+          ⚙
+        </button>
+      )}
+      {showSettings && (
+        <div ref={settingsRef} style={{
+          position: 'absolute', bottom: '100%', right: 0, marginBottom: 6, zIndex: 50,
+          background: 'var(--bg-primary)', border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)', boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+          padding: 10, minWidth: 360, maxWidth: 400,
+        }}>
+          <div style={{ display: 'flex', gap: 2, marginBottom: 8 }}>
+            <button style={{ fontSize: 12, padding: '4px 10px', background: 'none', cursor: 'pointer', color: tab === 'basic' ? 'var(--accent)' : 'var(--text-muted)', borderBottom: tab === 'basic' ? '2px solid var(--accent)' : '2px solid transparent', fontWeight: tab === 'basic' ? 600 : 400 }}
+              onClick={() => setTab('basic')}>Basic</button>
+            <button style={{ fontSize: 12, padding: '4px 10px', background: 'none', cursor: 'pointer', color: tab === 'json' ? 'var(--accent)' : 'var(--text-muted)', borderBottom: tab === 'json' ? '2px solid var(--accent)' : '2px solid transparent', fontWeight: tab === 'json' ? 600 : 400 }}
+              onClick={() => setTab('json')}>JSON</button>
           </div>
-
-          <div className="ai-panel-body">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {tab === 'basic' ? (
-                <>
-                  <label className="ai-panel-label">Endpoint</label>
-                  <input className="ai-panel-input ai-panel-input-mono" value={fields.endpoint}
-                    onChange={e => setField('endpoint', e.target.value)}
-                    spellCheck={false} />
-
-                  <label className="ai-panel-label">Auth Key</label>
-                  <input className="ai-panel-input ai-panel-input-mono" value={fields.authKey}
-                    onChange={e => setField('authKey', e.target.value)}
-                    type="password" spellCheck={false} />
-
-                  <hr className="ai-panel-divider" />
-
-                  <label className="ai-panel-label">Model</label>
-                  <input className="ai-panel-input ai-panel-input-mono" value={fields.model}
-                    onChange={e => setField('model', e.target.value)}
-                    spellCheck={false} />
-
-                  <div className="ai-panel-grid">
-                    <label className="ai-panel-label">
-                      Temperature
-                      <input className="ai-panel-input" value={fields.temperature}
-                        onChange={e => setField('temperature', e.target.value)}
-                        type="number" step="0.1" min="0" max="2"
-                        style={{ marginTop: 2 }} />
-                    </label>
-                    <label className="ai-panel-label">
-                      Max Tokens
-                      <input className="ai-panel-input" value={fields.maxTokens}
-                        onChange={e => setField('maxTokens', e.target.value)}
-                        type="number" step="1" min="1"
-                        style={{ marginTop: 2 }} />
-                    </label>
-                    <label className="ai-panel-label">
-                      Top P
-                      <input className="ai-panel-input" value={fields.topP}
-                        onChange={e => setField('topP', e.target.value)}
-                        type="number" step="0.05" min="0" max="1"
-                        style={{ marginTop: 2 }} />
-                    </label>
-                  </div>
-
-                  <label className="ai-panel-checkbox">
-                    <input type="checkbox" checked={fields.sendContext}
-                      onChange={e => setField('sendContext', e.target.checked)} />
-                    Send {CONTEXT_LIMIT} context messages
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {tab === 'basic' ? (
+              <>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Endpoint</label>
+                <input style={{ width: '100%', padding: '6px 8px', fontSize: 12, fontFamily: 'monospace', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)' }} value={fields.endpoint}
+                  onChange={e => setField('endpoint', e.target.value)} spellCheck={false} />
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Auth Key</label>
+                <input style={{ width: '100%', padding: '6px 8px', fontSize: 12, fontFamily: 'monospace', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)' }} value={fields.authKey}
+                  onChange={e => setField('authKey', e.target.value)} type="password" spellCheck={false} />
+                <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '4px 0' }} />
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Model</label>
+                <input style={{ width: '100%', padding: '6px 8px', fontSize: 12, fontFamily: 'monospace', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)' }} value={fields.model}
+                  onChange={e => setField('model', e.target.value)} spellCheck={false} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                  <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Temperature
+                    <input style={{ width: '100%', padding: '6px 8px', fontSize: 12, background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', marginTop: 2 }} value={fields.temperature}
+                      onChange={e => setField('temperature', e.target.value)} type="number" step="0.1" min="0" max="2" />
                   </label>
-                </>
-              ) : (
-                <>
-                  <label className="ai-panel-label">Request Body (JSON)</label>
-                  <textarea className="ai-panel-input" value={fields.jsonBody}
-                    onChange={e => setField('jsonBody', e.target.value)}
-                    rows={8} spellCheck={false}
-                    style={{ fontFamily: 'monospace', fontSize: 11, resize: 'vertical' }} />
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="ai-panel-footer">
-            <textarea className="ai-panel-textarea"
-              placeholder="Ask AI something..."
-              value={prompt}
-              onChange={e => setPrompt(e.target.value)}
-              onKeyDown={handleKey}
-              rows={2}
-            />
-            <button className="btn-primary ai-panel-btn"
-              disabled={!prompt.trim() || loading}
-              onClick={handleSend}
-              style={{ marginTop: 8 }}>
-              {loading ? (
-                <>
-                  <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2, display: 'inline-block', flexShrink: 0 }} />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="5" y1="12" x2="19" y2="12"/>
-                    <polyline points="12 5 19 12 12 19"/>
-                  </svg>
-                  Send to AI
-                </>
-              )}
-            </button>
+                  <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Max Tokens
+                    <input style={{ width: '100%', padding: '6px 8px', fontSize: 12, background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', marginTop: 2 }} value={fields.maxTokens}
+                      onChange={e => setField('maxTokens', e.target.value)} type="number" step="1" min="1" />
+                  </label>
+                  <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Top P
+                    <input style={{ width: '100%', padding: '6px 8px', fontSize: 12, background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', marginTop: 2 }} value={fields.topP}
+                      onChange={e => setField('topP', e.target.value)} type="number" step="0.05" min="0" max="1" />
+                  </label>
+                </div>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <input type="checkbox" checked={fields.sendContext}
+                    onChange={e => setField('sendContext', e.target.checked)} />
+                  Send {CONTEXT_LIMIT} context messages
+                </label>
+              </>
+            ) : (
+              <>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Request Body (JSON)</label>
+                <textarea style={{ width: '100%', padding: '6px 8px', fontSize: 11, fontFamily: 'monospace', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', resize: 'vertical' }} value={fields.jsonBody}
+                  onChange={e => setField('jsonBody', e.target.value)} rows={8} spellCheck={false} />
+              </>
+            )}
           </div>
         </div>
       )}

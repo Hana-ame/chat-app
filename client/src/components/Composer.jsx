@@ -200,9 +200,6 @@ export default function Composer({ chatId }) {
               ))}
             </div>
           )}
-          <div style={{position:'relative'}}>
-            <AIPanel ref={aiPanelRef} chatId={chatId} onActiveChange={setAiActive} onLoadingChange={setAiLoading} />
-          </div>
           <textarea rows={1} placeholder={aiActive ? 'Ask AI...' : 'Message #chat'} value={text}
             ref={textRef}
             onChange={handleTextChange}
@@ -211,6 +208,9 @@ export default function Composer({ chatId }) {
             style={{flex:1,resize:'none',minHeight:36}} />
           <input type="file" ref={fileInput} onChange={handleFile} style={{display:'none'}} multiple />
           <button className="btn-ghost" style={{fontSize:18,padding:'4px 6px',lineHeight:0}} onClick={() => fileInput.current?.click()} title="Attach file">📎</button>
+          <div style={{position:'relative'}}>
+            <AIPanel ref={aiPanelRef} chatId={chatId} onActiveChange={setAiActive} onLoadingChange={setAiLoading} />
+          </div>
           {aiLoading && (
             <button className="btn-ghost" style={{padding:'4px 10px',lineHeight:0,color:'var(--danger)'}}
               onClick={() => aiPanelRef.current?.cancelAI()} title="Cancel">
