@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
@@ -21,9 +21,10 @@ const MODES = [
   { key: 'poll', label: 'Poll' },
 ];
 
-export default function ChatList({ onSelectChat, activeId, onLogout, notifyChatId }) {
+export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const { user, accessToken } = useAuthStore();
   const { chats, mode, setMode } = useChatStore();
+  const notifyChatId = useMemo(() => chats.find(c => c.type === 'notify')?.id, [chats]);
   const [showCreate, setShowCreate] = useState(false);
   const [newChatName, setNewChatName] = useState('');
   const [newChatVisibility, setNewChatVisibility] = useState('public');

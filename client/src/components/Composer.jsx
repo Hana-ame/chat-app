@@ -75,7 +75,7 @@ function compressImage(file) {
   });
 }
 
-export default function Composer({ chatId }) {
+export default function Composer({ chatId, isNotification }) {
   const { user, accessToken } = useAuthStore();
   const { sendMessage, sendTyping } = useChatStore();
   const [text, setText] = useState('');
@@ -203,7 +203,7 @@ export default function Composer({ chatId }) {
   }, []);
 
   const doSendAI = useCallback(async (content) => {
-    if (!content) return;
+    if (!content || isNotification) return;
     const msgId = crypto.randomUUID();
     const botMsg = {
       id: msgId,
@@ -301,7 +301,11 @@ export default function Composer({ chatId }) {
     const content = text.trim();
     if (!content && attachments.length === 0) return;
     try {
-      await sendMessage(accessToken, chatId, content, attachments);
+      if (isNotification) {
+        await api.notifications.sendMessage(accessToken, content, attachments);
+      } else {
+        await sendMessage(accessToken, chatId, content, attachments);
+      }
       setText('');
       setAttachments([]);
       if (aiActive && content) {

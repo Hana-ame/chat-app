@@ -15,7 +15,7 @@ function getChatDisplayName(chat) {
   return chat.name || 'DM';
 }
 
-export default function ChatView({ chatId, onBack }) {
+export default function ChatView({ chatId, isNotification, onBack }) {
   const { user, accessToken } = useAuthStore();
   const { chats, messages, loadMessages, subscribe, markRead, pinnedMessage, setAnnouncement, clearAnnouncement, markAnnouncementRead, onChatUpdate } = useChatStore();
   const [loading, setLoading] = useState(false);
@@ -36,38 +36,51 @@ export default function ChatView({ chatId, onBack }) {
   const chat = useMemo(() => chats.find(c => c.id === chatId), [chats, chatId]);
 
   useEffect(() => {
-    if (!chatId || !accessToken) return;
+    if (!chatId || !accessToken || isNotification) return;
     api.listMembers(accessToken, chatId).then(d => setMemberCount(d.members?.length || 0)).catch(() => notify('Failed to load members', 'error'));
-  }, [chatId, accessToken]);
+  }, [chatId, accessToken, isNotification]);
 
   useEffect(() => {
     if (chatId && accessToken) {
       subscribe(chatId);
-      loadMessages(accessToken, chatId);
+      if (isNotification) {
+        api.notifications.listMessages(accessToken).then(data => {
+          useChatStore.setState(s => ({ messages: (data.messages || []).map(m => ({
+            ...m,
+            deleted_at: m.deleted_at || (m.deleted ? '' : undefined),
+            deleted: !!m.deleted,
+            content: m.deleted ? '' : m.content,
+          })) }));
+        }).catch(() => {});
+      } else {
+        loadMessages(accessToken, chatId);
+      }
       setHasMore(true);
     }
-  }, [chatId, accessToken]);
+  }, [chatId, accessToken, isNotification]);
 
   useEffect(() => {
-    if (showNotice && pinnedMessage[chatId]) {
+    if (!isNotification && showNotice && pinnedMessage[chatId]) {
       markAnnouncementRead(chatId);
     }
-  }, [showNotice, chatId, pinnedMessage[chatId]]);
+  }, [showNotice, chatId, pinnedMessage[chatId], isNotification]);
 
   // Re-fetch chat if deleted from store by onChatDelete (e.g. after leave)
   useEffect(() => {
-    if (!chat && chatId && accessToken) {
+    if (!isNotification && !chat && chatId && accessToken) {
       api.getChat(accessToken, chatId).then(data => {
         if (data && data.id) useChatStore.getState().onChatUpdate(data);
       }).catch(() => notify('Failed to load chat', 'error'));
     }
-  }, [chatId, accessToken, chat]);
+  }, [chatId, accessToken, chat, isNotification]);
 
   const loadMore = useCallback(async () => {
     if (loading || !hasMore) return;
     setLoading(true);
     try {
-      const msgs = await api.listMessages(accessToken, chatId, messages[0]?.id, 100);
+      const msgs = isNotification
+        ? await api.notifications.listMessages(accessToken, messages[0]?.id, 100)
+        : await api.listMessages(accessToken, chatId, messages[0]?.id, 100);
       const list = (msgs.messages || []);
       if (list.length) {
         useChatStore.setState(s => ({ messages: [...list, ...s.messages] }));
@@ -81,7 +94,7 @@ export default function ChatView({ chatId, onBack }) {
       }
     }
     setLoading(false);
-  }, [loading, hasMore, chatId, accessToken, messages]);
+  }, [loading, hasMore, isNotification, chatId, accessToken, messages]);
 
   const name = getChatDisplayName(chat);
 
@@ -345,7 +358,7 @@ export default function ChatView({ chatId, onBack }) {
           } : undefined}
           hasBackground={!!chat?.background_url}
         />
-      <Composer chatId={chatId} />
+      <Composer chatId={chatId} isNotification={isNotification} />
     </div>
   );
 }

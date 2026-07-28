@@ -351,15 +351,8 @@ export const useChatStore = create((set, get) => ({
   /** @param {string} token */
   async loadChats(token) {
     try {
-      const [data, notify] = await Promise.all([
-        api.listChats(token),
-        api.getNotifyChat(token).catch(() => null),
-      ]);
-      const list = data.chats || [];
-      if (notify && !list.find(c => c.id === notify.id)) {
-        list.push(notify);
-      }
-      get().setChats(list);
+      const data = await api.listChats(token);
+      get().setChats(data.chats || []);
     } catch (e) { console.error('loadChats error:', e); }
   },
 
