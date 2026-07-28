@@ -42,6 +42,7 @@ func New(t *testing.T) *Fixture {
 		MaxMessageContentLength: 4000,
 		APITimeout:              30 * time.Second,
 		UploadTimeout:           5 * time.Minute,
+		ReadTimeout:             10 * time.Minute,
 	}
 	database, err := db.Open(cfg.DBPath, cfg.MaxMessageContentLength)
 	if err != nil {
