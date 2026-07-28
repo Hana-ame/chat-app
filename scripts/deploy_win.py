@@ -17,12 +17,12 @@ VERSION = "0.8.1"
 REPO = "Hana-ame/chat-app"
 REPO_BRANCH = os.environ.get("DEPLOY_BRANCH", "dev")
 REPO_BASE = f"https://raw.githubusercontent.com/{REPO}/{REPO_BRANCH}"
-SCRIPT_REPO_PATH = "scripts/deploy_win.py"
 BINARY = "chatd-windows-amd64.exe"
 CLIENT_ARCHIVE = "client-dist.tar.gz"
 CWD = os.getcwd()
-SCRIPT_PATH = os.path.abspath(__file__)
 KNOWN_TAG_FILE = os.path.join(CWD, ".deployed_tag")
+
+GH_PROXY = "https://gh-proxy.com/"
 
 
 def setup_proxy(proxy):
@@ -43,24 +43,6 @@ def fetch_raw(path):
     except Exception as e:
         print(f"[deploy]  WARN: fetch {path} failed: {e}")
         return None
-
-
-def self_update():
-    remote = fetch_raw(SCRIPT_REPO_PATH)
-    if remote is None:
-        print("[deploy]  SKIP: script self-update check failed")
-        return
-    with open(SCRIPT_PATH, encoding="utf-8") as f:
-        local = f.read()
-    if local == remote:
-        print("[deploy]  OK: script is up to date")
-        return
-    print("[deploy]  UPDATE: new version found, applying...")
-    with open(SCRIPT_PATH, "w", encoding="utf-8") as f:
-        f.write(remote)
-    print("[deploy]  UPDATE: script updated, restarting...")
-    subprocess.run([sys.executable] + sys.argv)
-    sys.exit(0)
 
 
 def sync_env():
@@ -151,8 +133,6 @@ def find_asset(release, name):
     print(f"[deploy] available assets: {[a['name'] for a in release.get('assets', [])]}")
     sys.exit(1)
 
-
-GH_PROXY = "https://gh-proxy.com/"
 
 def download(asset, dst):
     url = GH_PROXY + asset["browser_download_url"]
@@ -292,7 +272,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("cmd", nargs="?", default="all", choices=["download", "run", "all", "watch"])
     parser.add_argument("--proxy", default="", help="proxy URL for GitHub API (download uses gh-proxy.com)")
-    parser.add_argument("--no-self-update", action="store_true", help="skip script self-update")
     parser.add_argument("--interval", type=int, default=120, help="poll interval in seconds (watch mode)")
     args = parser.parse_args()
 
@@ -304,9 +283,6 @@ def main():
     print(f"[deploy] working dir: {CWD}")
     print(f"[deploy] binary: {BINARY}")
     setup_proxy(proxy)
-
-    if cmd != "run" and not args.no_self_update:
-        self_update()
 
     sync_env()
 
