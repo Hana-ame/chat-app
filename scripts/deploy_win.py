@@ -276,6 +276,7 @@ def main():
     env_file = os.path.join(CWD, ".env")
 
     if cmd in ("download", "all"):
+        kill_chatd()
         rel = latest_release()
         deploy_once(rel, dst, env_file)
         tag = rel["tag_name"]

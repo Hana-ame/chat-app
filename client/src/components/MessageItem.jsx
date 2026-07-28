@@ -22,7 +22,7 @@ function timeFormat(t) {
 const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId }) {
   const { user, accessToken } = useAuthStore();
   const { pinnedMessage, chats } = useChatStore();
-  const isMe = msg.type === 'stream' ? false : msg.user_id === user.id;
+  const isMe = msg.user_id === user.id;
   const [showEmoji, setShowEmoji] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(msg.content);
@@ -132,14 +132,23 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId }) {
                  </button>
                 <button className="btn-ghost" style={{fontSize:12}} onClick={()=>setEditing(false)}>Cancel</button>
               </div>
+            ) : msg.type === 'thinking' ? (
+              <details>
+                <summary style={{fontSize:12,color:'var(--text-muted)',cursor:'pointer',userSelect:'none',opacity:0.7}}>
+                  💭 {msg.streaming && !msg.content ? <span className="stream-cursor" /> : 'Thought'}
+                </summary>
+                <div className="msg-content" style={{whiteSpace:'pre-wrap',wordBreak:'break-word',fontSize:12,color:'var(--text-muted)',padding:'4px 8px',background:'var(--bg-tertiary)',borderRadius:4,marginTop:4}}>
+                  {msg.content}
+                </div>
+              </details>
             ) : (
               <>
                 {msg.thinking && (
-                  <details style={{marginBottom:4}} open={msg.streaming && !msg.content}>
+                  <details style={{marginBottom:4}}>
                     <summary style={{fontSize:12,color:'var(--text-muted)',cursor:'pointer',userSelect:'none',opacity:0.7}}>
                       💭 {msg.streaming && !msg.content ? <span className="stream-cursor" /> : 'Thought'}
                     </summary>
-                    <div style={{fontSize:12,color:'var(--text-muted)',padding:'4px 8px',background:'var(--bg-tertiary)',borderRadius:4,whiteSpace:'pre-wrap',wordBreak:'break-word',marginTop:4}}>
+                    <div className="msg-content" style={{whiteSpace:'pre-wrap',wordBreak:'break-word',fontSize:12,color:'var(--text-muted)',padding:'4px 8px',background:'var(--bg-tertiary)',borderRadius:4,marginTop:4}}>
                       {msg.thinking}
                     </div>
                   </details>
@@ -149,7 +158,7 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId }) {
                     {msg.content}<span className="stream-cursor" />
                   </div>
                 ) : (
-                  <div className="msg-content">
+                  <div className="msg-content" style={{whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
                     {renderContent(msg.content, userMap)}
                   </div>
                 )}
