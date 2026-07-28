@@ -10,6 +10,9 @@ export function streamAI(response, onChunk, onDone, onError) {
     if (payload === '[DONE]') return;
     try {
       const json = JSON.parse(payload);
+      if (json.reasoning_content) {
+        onChunk?.({ type: 'thinking', content: json.reasoning_content });
+      }
       if (json.content) {
         onChunk?.({ type: 'content', content: json.content });
       }

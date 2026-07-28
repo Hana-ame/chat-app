@@ -132,14 +132,28 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId }) {
                  </button>
                 <button className="btn-ghost" style={{fontSize:12}} onClick={()=>setEditing(false)}>Cancel</button>
               </div>
-            ) : msg.streaming ? (
-              <div className="msg-content" style={{whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
-                {msg.content}<span className="stream-cursor" />
-              </div>
             ) : (
-              <div className="msg-content">
-                {renderContent(msg.content, userMap)}
-              </div>
+              <>
+                {msg.thinking && (
+                  <details style={{marginBottom:4}} open={msg.streaming && !msg.content}>
+                    <summary style={{fontSize:12,color:'var(--text-muted)',cursor:'pointer',userSelect:'none',opacity:0.7}}>
+                      💭 {msg.streaming && !msg.content ? <span className="stream-cursor" /> : 'Thought'}
+                    </summary>
+                    <div style={{fontSize:12,color:'var(--text-muted)',padding:'4px 8px',background:'var(--bg-tertiary)',borderRadius:4,whiteSpace:'pre-wrap',wordBreak:'break-word',marginTop:4}}>
+                      {msg.thinking}
+                    </div>
+                  </details>
+                )}
+                {msg.streaming ? (
+                  <div className="msg-content" style={{whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
+                    {msg.content}<span className="stream-cursor" />
+                  </div>
+                ) : (
+                  <div className="msg-content">
+                    {renderContent(msg.content, userMap)}
+                  </div>
+                )}
+              </>
             )}
             {!msg.deleted && (
               <div className="msg-actions">

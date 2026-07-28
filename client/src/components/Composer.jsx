@@ -77,7 +77,6 @@ export default function Composer({ chatId }) {
   const [attachments, setAttachments] = useState([]);
   const [aiActive, setAiActive] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const aiAbort = useRef(null);
   const fileInput = useRef(null);
   const typingTimer = useRef(null);
@@ -170,6 +169,7 @@ export default function Composer({ chatId }) {
       chat_id: chatId,
       user_id: user.id,
       content: '',
+      thinking: '',
       created_at: new Date().toISOString(),
       streaming: true,
       author: { id: user.id, username: user.username, avatar_color: user.avatar_color },
@@ -195,6 +195,10 @@ export default function Composer({ chatId }) {
         setAiLoading(false);
         return;
       }
+      body.model = (f.model || '').trim() || body.model;
+      body.temperature = parseFloat(f.temperature) || body.temperature || 0.7;
+      body.max_tokens = parseInt(f.maxTokens) || body.max_tokens || 32768;
+      body.top_p = parseFloat(f.topP) || body.top_p || 1;
     } else {
       body = {
         model: (f.model || '').trim() || undefined,
@@ -214,6 +218,10 @@ export default function Composer({ chatId }) {
           if (chunk.type === 'content') {
             useChatStore.setState(s => ({
               messages: s.messages.map(m => m.id === msgId ? { ...m, content: m.content + chunk.content } : m),
+            }));
+          } else if (chunk.type === 'thinking') {
+            useChatStore.setState(s => ({
+              messages: s.messages.map(m => m.id === msgId ? { ...m, thinking: (m.thinking || '') + chunk.content } : m),
             }));
           }
         },
@@ -327,12 +335,12 @@ export default function Composer({ chatId }) {
   };
 
   const inputStyle = {
-    width: '100%', padding: '4px 6px', fontSize: 12, fontFamily: 'monospace',
+    width: '100%', padding: '4px 6px', fontSize: 13, fontFamily: 'monospace',
     background: 'var(--bg-secondary)', border: '1px solid var(--border)',
     borderRadius: 4, color: 'var(--text-primary)',
     outline: 'none', boxSizing: 'border-box',
   };
-  const labelStyle = { fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' };
+  const labelStyle = { fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap' };
   const rowStyle = { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' };
 
   return (
@@ -360,48 +368,44 @@ export default function Composer({ chatId }) {
               <div style={rowStyle}>
                 <span style={labelStyle}>Model</span>
                 <input style={{...inputStyle,flex:1}} value={settings.model} onChange={e => setField('model', e.target.value)} spellCheck={false} />
-                <span style={labelStyle}>Key</span>
-                <input style={{...inputStyle,maxWidth:100}} value={settings.authKey} onChange={e => setField('authKey', e.target.value)} type="password" spellCheck={false} />
-                <button className="btn-ghost" style={{fontSize:11,padding:'3px 6px',whiteSpace:'nowrap',color:'var(--text-muted)'}}
-                  onClick={() => setShowAdvanced(!showAdvanced)}>
-                  {showAdvanced ? '▲ adv' : '▼ adv'}
-                </button>
               </div>
-              {showAdvanced && (
-                <div style={{display:'flex',flexDirection:'column',gap:4}}>
-                  <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                    <label style={{...labelStyle,display:'flex',alignItems:'center',gap:3}}>
-                      Temperature
-                      <input style={{width:60,padding:'3px 5px',fontSize:11,background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)'}}
-                        value={settings.temperature} onChange={e => setField('temperature',e.target.value)} type="number" step="0.1" min="0" max="2" />
-                    </label>
-                    <label style={{...labelStyle,display:'flex',alignItems:'center',gap:3}}>
-                      Top P
-                      <input style={{width:60,padding:'3px 5px',fontSize:11,background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)'}}
-                        value={settings.topP} onChange={e => setField('topP',e.target.value)} type="number" step="0.05" min="0" max="1" />
-                    </label>
-                    <label style={{...labelStyle,display:'flex',alignItems:'center',gap:3}}>
-                      Max Tokens
-                      <input style={{width:70,padding:'3px 5px',fontSize:11,background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)'}}
-                        value={settings.maxTokens} onChange={e => setField('maxTokens',e.target.value)} type="number" step="1" min="1" />
-                    </label>
-                    <label style={{...labelStyle,display:'flex',alignItems:'center',gap:3}}>
-                      <input type="checkbox" checked={settings.sendContext} onChange={e => setField('sendContext',e.target.checked)} />
-                      Context
-                    </label>
-                  </div>
-                  <div style={rowStyle}>
-                    <button className="btn-ghost" style={{fontSize:11,padding:'2px 6px',fontWeight:settings.mode==='basic'?600:400,color:settings.mode==='basic'?'var(--accent)':'var(--text-muted)'}}
-                      onClick={() => setField('mode','basic')}>Basic</button>
-                    <button className="btn-ghost" style={{fontSize:11,padding:'2px 6px',fontWeight:settings.mode==='json'?600:400,color:settings.mode==='json'?'var(--accent)':'var(--text-muted)'}}
-                      onClick={() => setField('mode','json')}>JSON Body</button>
-                  </div>
-                  {settings.mode==='json' && (
-                    <textarea style={{width:'100%',padding:'4px 6px',fontSize:11,fontFamily:'monospace',background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)',resize:'vertical',boxSizing:'border-box'}}
-                      value={settings.jsonBody} onChange={e => setField('jsonBody',e.target.value)} rows={3} spellCheck={false} />
-                  )}
+              <div style={rowStyle}>
+                <span style={labelStyle}>Key</span>
+                <input style={{...inputStyle,flex:1}} value={settings.authKey} onChange={e => setField('authKey', e.target.value)} type="password" spellCheck={false} />
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                  <label style={{...labelStyle,display:'flex',alignItems:'center',gap:3}}>
+                    Temperature
+                    <input style={{width:60,padding:'3px 5px',fontSize:13,background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)'}}
+                      value={settings.temperature} onChange={e => setField('temperature',e.target.value)} type="number" step="0.1" min="0" max="2" />
+                  </label>
+                  <label style={{...labelStyle,display:'flex',alignItems:'center',gap:3}}>
+                    Top P
+                    <input style={{width:60,padding:'3px 5px',fontSize:13,background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)'}}
+                      value={settings.topP} onChange={e => setField('topP',e.target.value)} type="number" step="0.05" min="0" max="1" />
+                  </label>
+                  <label style={{...labelStyle,display:'flex',alignItems:'center',gap:3}}>
+                    Max Tokens
+                    <input style={{width:70,padding:'3px 5px',fontSize:13,background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)'}}
+                      value={settings.maxTokens} onChange={e => setField('maxTokens',e.target.value)} type="number" step="1" min="1" />
+                  </label>
+                  <label style={{...labelStyle,display:'flex',alignItems:'center',gap:3}}>
+                    <input type="checkbox" checked={settings.sendContext} onChange={e => setField('sendContext',e.target.checked)} />
+                    最近50条聊天记录
+                  </label>
                 </div>
-              )}
+                <div style={rowStyle}>
+                  <button className="btn-ghost" style={{fontSize:13,padding:'2px 6px',fontWeight:settings.mode==='basic'?600:400,color:settings.mode==='basic'?'var(--accent)':'var(--text-muted)'}}
+                    onClick={() => setField('mode','basic')}>Basic</button>
+                  <button className="btn-ghost" style={{fontSize:13,padding:'2px 6px',fontWeight:settings.mode==='json'?600:400,color:settings.mode==='json'?'var(--accent)':'var(--text-muted)'}}
+                    onClick={() => setField('mode','json')}>JSON Body</button>
+                </div>
+                {settings.mode==='json' && (
+                  <textarea style={{width:'100%',padding:'4px 6px',fontSize:13,fontFamily:'monospace',background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)',resize:'vertical',boxSizing:'border-box'}}
+                    value={settings.jsonBody} onChange={e => setField('jsonBody',e.target.value)} rows={3} spellCheck={false} />
+                )}
+              </div>
             </>
           )}
           {mentionQuery !== null && mentionMembers.length > 0 && (

@@ -199,7 +199,7 @@ export default function ChatView({ chatId, onBack }) {
         {onBack && <button className="btn-ghost" onClick={onBack} style={{fontSize:18}}>←</button>}
         {chat.type === 'notify' ? (
           <div className="chat-header-avatar">
-            <div className="chat-header-avatar-letter" style={{background:chat.icon_color||'#E8590C'}}>🔔</div>
+            <div className="chat-header-avatar-letter" style={{background:'var(--accent)'}}>🔔</div>
           </div>
         ) : chat.type !== 'dm' && chat.owner_id === user.id ? (
           <div className="chat-header-avatar" style={{position:'relative',cursor:'pointer'}} onClick={handleAvatarClick}>
