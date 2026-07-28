@@ -4726,7 +4726,22 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 
 ### 验证
 - Go build + vet: ✅
-- Go test ./...: ✅ (all packages pass)
+- Go test ./...: ✅
+- Client build: ✅
+
+---
+
+## 2026-07-28 AI 设置内嵌 Composer + 清理（第 22 轮）
+
+### 变更
+- `Composer.jsx` — AI 设置改为内嵌在 `.chat-input` 区域（endpoint/model/key 常驻，Advanced 可折叠，Basic/JSON Body 切换），移除 `lineHeight: 0` 修复按钮对齐
+- `deploy_win.py` — 新增 `watch` 模式、`ensure_jwt_secret()`、`VERSION` 常量
+- `scripts/deploy_win.py` — 同上，提交到 `dev` 分支
+
+### 移除
+- `AIPanel.jsx` — 旧浮动面板，功能已全部迁移到 Composer 内嵌
+
+### 验证
 - Client build: ✅
 
 ---

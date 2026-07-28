@@ -3,7 +3,53 @@ import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 import { notify } from '../store/notification';
-import AIPanel from './AIPanel';
+import { streamAI } from '../utils/ai';
+
+const CONTEXT_LIMIT = 50;
+const STORAGE_KEY = 'ai_settings';
+
+function buildContext(msgs) {
+  const context = [];
+  for (const m of msgs) {
+    if (context.length >= CONTEXT_LIMIT) break;
+    if (m.type === 'stream' || m.user_id === 'ai') {
+      context.push({ role: 'assistant', content: m.content });
+    } else if (m.user_id && m.content) {
+      context.push({ role: 'user', content: m.content });
+    }
+  }
+  return context;
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
+function saveSettings(s) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {}
+}
+
+const defaultSettings = {
+  endpoint: import.meta.env.VITE_AI_ENDPOINT || 'https://api.siliconflow.cn/v1/chat/completions',
+  authKey: import.meta.env.VITE_AI_AUTH_KEY || '',
+  model: import.meta.env.VITE_AI_MODEL || 'deepseek-ai/Deepseek-V4-Flash',
+  temperature: '0.7',
+  maxTokens: '32768',
+  topP: '1',
+  sendContext: true,
+  mode: 'basic',
+  jsonBody: JSON.stringify({
+    model: 'deepseek-ai/Deepseek-V4-Flash-free',
+    messages: [{ role: 'user', content: '' }],
+    temperature: 0.7,
+    max_tokens: 32768,
+    top_p: 1,
+  }, null, 2),
+};
 
 function compressImage(file) {
   return new Promise((resolve) => {
@@ -31,12 +77,22 @@ export default function Composer({ chatId }) {
   const [attachments, setAttachments] = useState([]);
   const [aiActive, setAiActive] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
-  const aiPanelRef = useRef(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const aiAbort = useRef(null);
   const fileInput = useRef(null);
   const typingTimer = useRef(null);
   const textRef = useRef(null);
   const [mentionQuery, setMentionQuery] = useState(null);
   const [mentionIdx, setMentionIdx] = useState(0);
+
+  const saved = useRef(loadSettings() || { ...defaultSettings });
+  const [settings, setSettings] = useState({ ...saved.current });
+
+  const setField = useCallback((k, v) => {
+    setSettings(prev => ({ ...prev, [k]: v }));
+    saved.current = { ...saved.current, [k]: v };
+    saveSettings(saved.current);
+  }, []);
 
   const autoResize = useCallback(() => {
     const el = textRef.current;
@@ -99,6 +155,103 @@ export default function Composer({ chatId }) {
     setMentionQuery(null);
   };
 
+  const cancelAI = useCallback(() => {
+    if (aiAbort.current) {
+      aiAbort.current.abort();
+      aiAbort.current = null;
+    }
+  }, []);
+
+  const doSendAI = useCallback(async (content) => {
+    if (!content) return;
+    const msgId = crypto.randomUUID();
+    const botMsg = {
+      id: msgId,
+      chat_id: chatId,
+      user_id: user.id,
+      content: '',
+      created_at: new Date().toISOString(),
+      streaming: true,
+      author: { id: user.id, username: user.username, avatar_color: user.avatar_color },
+    };
+    useChatStore.getState().onMessageCreate(botMsg);
+    setAiLoading(true);
+
+    const store = useChatStore.getState();
+    const messages = store.messages;
+    const context = [...buildContext(messages), { role: 'user', content }];
+
+    const controller = new AbortController();
+    aiAbort.current = controller;
+
+    const f = saved.current;
+    let body;
+    if (f.mode === 'json') {
+      try { body = JSON.parse(f.jsonBody); } catch {
+        notify('Invalid JSON body', 'error');
+        useChatStore.setState(s => ({
+          messages: s.messages.map(m => m.id === msgId ? { ...m, streaming: false } : m),
+        }));
+        setAiLoading(false);
+        return;
+      }
+    } else {
+      body = {
+        model: (f.model || '').trim() || undefined,
+        messages: f.sendContext ? context : [{ role: 'user', content }],
+        temperature: parseFloat(f.temperature) || 0.7,
+        max_tokens: parseInt(f.maxTokens) || 32768,
+        top_p: parseFloat(f.topP) || 1,
+      };
+    }
+
+    const source = { endpoint: f.endpoint, auth_key: f.authKey, body };
+
+    try {
+      const res = await api.sendStreamMessage(accessToken, chatId, '', source, msgId);
+      const { cancel } = streamAI(res,
+        (chunk) => {
+          if (chunk.type === 'content') {
+            useChatStore.setState(s => ({
+              messages: s.messages.map(m => m.id === msgId ? { ...m, content: m.content + chunk.content } : m),
+            }));
+          }
+        },
+        () => {
+          useChatStore.setState(s => ({
+            messages: s.messages.map(m => m.id === msgId ? { ...m, streaming: false } : m),
+          }));
+          setAiLoading(false);
+          aiAbort.current = null;
+        },
+        () => {
+          notify('AI response failed', 'error');
+          useChatStore.setState(s => ({
+            messages: s.messages.map(m => m.id === msgId ? { ...m, streaming: false } : m),
+          }));
+          setAiLoading(false);
+          aiAbort.current = null;
+        },
+      );
+      controller.signal.addEventListener('abort', () => {
+        cancel();
+        useChatStore.setState(s => ({
+          messages: s.messages.map(m => m.id === msgId ? { ...m, streaming: false } : m),
+        }));
+        setAiLoading(false);
+        aiAbort.current = null;
+      });
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      notify('AI request failed', 'error');
+      useChatStore.setState(s => ({
+        messages: s.messages.map(m => m.id === msgId ? { ...m, streaming: false } : m),
+      }));
+      setAiLoading(false);
+      aiAbort.current = null;
+    }
+  }, [chatId, user, accessToken]);
+
   const handleSend = async () => {
     const content = text.trim();
     if (!content && attachments.length === 0) return;
@@ -107,7 +260,7 @@ export default function Composer({ chatId }) {
       setText('');
       setAttachments([]);
       if (aiActive && content) {
-        await aiPanelRef.current.sendAI(content);
+        await doSendAI(content);
       }
     } catch (e) { notify('Failed to send message', 'error'); }
   };
@@ -173,6 +326,15 @@ export default function Composer({ chatId }) {
     }
   };
 
+  const inputStyle = {
+    width: '100%', padding: '4px 6px', fontSize: 12, fontFamily: 'monospace',
+    background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+    borderRadius: 4, color: 'var(--text-primary)',
+    outline: 'none', boxSizing: 'border-box',
+  };
+  const labelStyle = { fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' };
+  const rowStyle = { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' };
+
   return (
     <div className="chat-footer">
       {attachments.length > 0 && (
@@ -188,9 +350,62 @@ export default function Composer({ chatId }) {
         </div>
       )}
       <div className="chat-input">
-        <div style={{display:'flex',gap:6,alignItems:'stretch',position:'relative'}}>
+        <div style={{display:'flex',flexDirection:'column',gap:4,position:'relative'}}>
+          {aiActive && (
+            <>
+              <div style={rowStyle}>
+                <span style={labelStyle}>Endpoint</span>
+                <input style={{...inputStyle,flex:1}} value={settings.endpoint} onChange={e => setField('endpoint', e.target.value)} spellCheck={false} />
+              </div>
+              <div style={rowStyle}>
+                <span style={labelStyle}>Model</span>
+                <input style={{...inputStyle,flex:1}} value={settings.model} onChange={e => setField('model', e.target.value)} spellCheck={false} />
+                <span style={labelStyle}>Key</span>
+                <input style={{...inputStyle,maxWidth:100}} value={settings.authKey} onChange={e => setField('authKey', e.target.value)} type="password" spellCheck={false} />
+                <button className="btn-ghost" style={{fontSize:11,padding:'3px 6px',whiteSpace:'nowrap',color:'var(--text-muted)'}}
+                  onClick={() => setShowAdvanced(!showAdvanced)}>
+                  {showAdvanced ? '▲ adv' : '▼ adv'}
+                </button>
+              </div>
+              {showAdvanced && (
+                <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                  <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                    <label style={{...labelStyle,display:'flex',alignItems:'center',gap:3}}>
+                      Temperature
+                      <input style={{width:60,padding:'3px 5px',fontSize:11,background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)'}}
+                        value={settings.temperature} onChange={e => setField('temperature',e.target.value)} type="number" step="0.1" min="0" max="2" />
+                    </label>
+                    <label style={{...labelStyle,display:'flex',alignItems:'center',gap:3}}>
+                      Top P
+                      <input style={{width:60,padding:'3px 5px',fontSize:11,background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)'}}
+                        value={settings.topP} onChange={e => setField('topP',e.target.value)} type="number" step="0.05" min="0" max="1" />
+                    </label>
+                    <label style={{...labelStyle,display:'flex',alignItems:'center',gap:3}}>
+                      Max Tokens
+                      <input style={{width:70,padding:'3px 5px',fontSize:11,background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)'}}
+                        value={settings.maxTokens} onChange={e => setField('maxTokens',e.target.value)} type="number" step="1" min="1" />
+                    </label>
+                    <label style={{...labelStyle,display:'flex',alignItems:'center',gap:3}}>
+                      <input type="checkbox" checked={settings.sendContext} onChange={e => setField('sendContext',e.target.checked)} />
+                      Context
+                    </label>
+                  </div>
+                  <div style={rowStyle}>
+                    <button className="btn-ghost" style={{fontSize:11,padding:'2px 6px',fontWeight:settings.mode==='basic'?600:400,color:settings.mode==='basic'?'var(--accent)':'var(--text-muted)'}}
+                      onClick={() => setField('mode','basic')}>Basic</button>
+                    <button className="btn-ghost" style={{fontSize:11,padding:'2px 6px',fontWeight:settings.mode==='json'?600:400,color:settings.mode==='json'?'var(--accent)':'var(--text-muted)'}}
+                      onClick={() => setField('mode','json')}>JSON Body</button>
+                  </div>
+                  {settings.mode==='json' && (
+                    <textarea style={{width:'100%',padding:'4px 6px',fontSize:11,fontFamily:'monospace',background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)',resize:'vertical',boxSizing:'border-box'}}
+                      value={settings.jsonBody} onChange={e => setField('jsonBody',e.target.value)} rows={3} spellCheck={false} />
+                  )}
+                </div>
+              )}
+            </>
+          )}
           {mentionQuery !== null && mentionMembers.length > 0 && (
-            <div className="mention-dropdown">
+            <div className="mention-dropdown" style={{bottom:'100%',top:'auto',marginBottom:0}}>
               {mentionMembers.map((m, i) => (
                 <div key={m.id} className={'mention-item' + (i === mentionIdx ? ' active' : '')}
                   onMouseDown={e => { e.preventDefault(); handleMentionSelect(m); }}
@@ -200,33 +415,37 @@ export default function Composer({ chatId }) {
               ))}
             </div>
           )}
-          <textarea rows={1} placeholder={aiActive ? 'Ask AI...' : 'Message #chat'} value={text}
-            ref={textRef}
-            onChange={handleTextChange}
-            onKeyDown={handleKey}
-            onPaste={handlePaste}
-            style={{flex:1,resize:'none',minHeight:36}} />
-          <input type="file" ref={fileInput} onChange={handleFile} style={{display:'none'}} multiple />
-          <button className="btn-ghost" style={{fontSize:18,padding:'4px 6px',lineHeight:0}} onClick={() => fileInput.current?.click()} title="Attach file">📎</button>
-          <div style={{position:'relative'}}>
-            <AIPanel ref={aiPanelRef} chatId={chatId} active={aiActive} onActiveChange={setAiActive} onLoadingChange={setAiLoading} />
-          </div>
-          {aiLoading && (
-            <button className="btn-ghost" style={{padding:'4px 10px',lineHeight:0,color:'var(--danger)'}}
-              onClick={() => aiPanelRef.current?.cancelAI()} title="Cancel">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <div style={{display:'flex',gap:6,alignItems:'stretch'}}>
+            <textarea rows={1} placeholder={aiActive ? 'Ask AI...' : 'Message #chat'} value={text}
+              ref={textRef}
+              onChange={handleTextChange}
+              onKeyDown={handleKey}
+              onPaste={handlePaste}
+              style={{flex:1,resize:'none',minHeight:36}} />
+            <input type="file" ref={fileInput} onChange={handleFile} style={{display:'none'}} multiple />
+            <button className="btn-ghost" style={{fontSize:18,padding:'4px 6px'}} onClick={() => fileInput.current?.click()} title="Attach file">📎</button>
+            <button className={'btn-ghost' + (aiActive ? ' active' : '')}
+              style={{fontSize:13,padding:'4px 8px',fontWeight:aiActive?600:400,color:aiActive?'var(--accent)':'var(--text-muted)'}}
+              onClick={() => setAiActive(!aiActive)} disabled={aiLoading} title={aiActive?'Disable AI':'Enable AI'}>
+              🤖 AI
             </button>
-          )}
-          <button className="btn-ghost" style={{padding:'4px 10px',lineHeight:0}}
-            disabled={(!text.trim() && attachments.length === 0) || uploading}
-            onClick={handleSend} title={aiActive ? 'Send + AI reply' : 'Send'}>
-            {uploading ? <span style={{fontSize:14}}>...</span> : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12"/>
-                <polyline points="12 5 19 12 12 19"/>
-              </svg>
+            {aiLoading && (
+              <button className="btn-ghost" style={{padding:'4px 10px',color:'var(--danger)'}}
+                onClick={cancelAI} title="Cancel">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
             )}
-          </button>
+            <button className="btn-ghost" style={{padding:'4px 10px'}}
+              disabled={(!text.trim() && attachments.length === 0) || uploading}
+              onClick={handleSend} title={aiActive ? 'Send + AI reply' : 'Send'}>
+              {uploading ? <span style={{fontSize:14}}>...</span> : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                  <polyline points="12 5 19 12 12 19"/>
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
