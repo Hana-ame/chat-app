@@ -12,7 +12,6 @@ import tarfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 import urllib.request
-from urllib.request import ProxyHandler, build_opener, install_opener
 
 VERSION = "0.8.1"
 REPO = "Hana-ame/chat-app"
@@ -24,13 +23,6 @@ CWD = os.getcwd()
 KNOWN_TAG_FILE = os.path.join(CWD, ".deployed_tag")
 
 GH_PROXY = "https://gh-proxy.com/"
-
-
-def setup_proxy(proxy):
-    if not proxy:
-        return
-    handler = ProxyHandler({"http": proxy, "https": proxy})
-    install_opener(build_opener(handler))
 
 
 def fetch_raw(path):
@@ -270,18 +262,13 @@ def deploy_once(rel, dst, env_file):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("cmd", nargs="?", default="all", choices=["download", "run", "all", "watch"])
-    parser.add_argument("--proxy", default="", help="proxy URL for GitHub API (download uses gh-proxy.com)")
     parser.add_argument("--interval", type=int, default=120, help="poll interval in seconds (watch mode)")
     args = parser.parse_args()
 
     cmd = args.cmd
-    proxy = args.proxy
     print(f"[deploy] command: {cmd}")
-    if proxy:
-        print(f"[deploy] proxy: {proxy}")
     print(f"[deploy] working dir: {CWD}")
     print(f"[deploy] binary: {BINARY}")
-    setup_proxy(proxy)
 
     sync_env()
 
