@@ -1,1 +1,10 @@
 __pycache__
+chat.db
+chat.db-shm
+chat.db-wal
+chatd.exe
+chatd-windows-amd64.exe
+uploads/
+client/
+.env
+.deployed_tag

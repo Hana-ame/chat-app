@@ -13,6 +13,7 @@ client/test-results/
 server/chatd
 
 chatd
+*.exe
 
 docs/*.pptx
-server/docs/swagger/swagger.jsonscripts/__pycache__/
+scripts/__pycache__/
