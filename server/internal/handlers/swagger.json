@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Chat App API",
-    "version": "0.8.12",
+    "version": "0.8.13",
     "description": "实时聊天应用后端 API。\n\n认证方式:\n- `Authorization: Bearer <access_token>` 请求头（首选）\n- `access_token` Cookie（SSE 等 WebSocket 场景回退）\n- `refresh_token` Cookie（仅 `/api/auth/refresh`）\n\n所有错误响应统一格式:\n```json\n{ \"error\": \"error_code\", \"message\": \"human-readable message\" }\n```\n"
   },
   "servers": [
