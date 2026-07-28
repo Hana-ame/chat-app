@@ -140,7 +140,7 @@ def download(asset, dst):
     if os.path.isfile(dst):
         print(f"[deploy] removing existing file: {dst}")
         os.remove(dst)
-    cmd = ["curl.exe", "-L", "--progress-bar", "-o", dst, url]
+    cmd = ["curl.exe", "-L", "--progress-bar", "--retry", "5", "--connect-timeout", "30", "-o", dst, url]
     print(f"[deploy] running: {' '.join(cmd)}")
     subprocess.run(cmd, check=True)
     size = os.path.getsize(dst)
