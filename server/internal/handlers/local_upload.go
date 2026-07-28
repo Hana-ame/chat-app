@@ -68,15 +68,10 @@ func (s *Server) aapiUploadResp(w http.ResponseWriter, r *http.Request, path str
 	h := s.aapiHash(path)
 	reqBase := s.aapiRequestBaseURL(r)
 
-	publicURL := s.Cfg.UploadPublicURL
-	if publicURL == "" {
-		publicURL = reqBase
-	}
-
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id":         h,
 		"path":       "/" + path,
-		"url":        publicURL + "/api/local/" + path,
+		"url":        "/api/local/" + path,
 		"delete_url": reqBase + "/api/local/" + path + "?delete=" + h,
 	})
 }

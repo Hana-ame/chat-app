@@ -6,6 +6,21 @@ import { renderContent } from './renderContent';
 import UserAvatar from './UserAvatar';
 import UserProfileModal from './UserProfileModal';
 
+function ThinkingContent({ content }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={'thinking-block' + (open ? ' open' : '')}>
+      <div className="thinking-block-header" onClick={() => setOpen(o => !o)}>
+        <svg className="thinking-block-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+        <span className="thinking-block-label">Reasoning</span>
+      </div>
+      {open && <div className="thinking-block-content">{content}</div>}
+    </div>
+  );
+}
+
 const COMMON_EMOJI = ['👍','❤️','😂','🎉','😢','😡','👀','🔥','✅','❌'];
 
 function timeFormat(t) {
@@ -133,26 +148,10 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId }) {
                 <button className="btn-ghost" style={{fontSize:12}} onClick={()=>setEditing(false)}>Cancel</button>
               </div>
             ) : msg.type === 'thinking' ? (
-              <details>
-                <summary style={{fontSize:12,color:'var(--text-muted)',cursor:'pointer',userSelect:'none',opacity:0.7}}>
-                  🔍 {msg.streaming && !msg.content ? <span className="stream-cursor" /> : 'Reasoning'}
-                </summary>
-                <div className="msg-content" style={{whiteSpace:'pre-wrap',wordBreak:'break-word',fontSize:12,color:'var(--text-muted)',padding:'4px 8px',background:'var(--bg-tertiary)',borderRadius:4,marginTop:4}}>
-                  {msg.content}
-                </div>
-              </details>
+              <ThinkingContent content={msg.content} />
             ) : (
               <>
-                {msg.thinking && (
-                  <details style={{marginBottom:4}}>
-                    <summary style={{fontSize:12,color:'var(--text-muted)',cursor:'pointer',userSelect:'none',opacity:0.7}}>
-                      🔍 {msg.streaming && !msg.content ? <span className="stream-cursor" /> : 'Reasoning'}
-                    </summary>
-                    <div className="msg-content" style={{whiteSpace:'pre-wrap',wordBreak:'break-word',fontSize:12,color:'var(--text-muted)',padding:'4px 8px',background:'var(--bg-tertiary)',borderRadius:4,marginTop:4}}>
-                      {msg.thinking}
-                    </div>
-                  </details>
-                )}
+                {msg.thinking && <ThinkingContent content={msg.thinking} />}
                 {msg.streaming ? (
                   <div className="msg-content" style={{whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
                     {msg.content}<span className="stream-cursor" />

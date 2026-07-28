@@ -25,7 +25,6 @@ type Config struct {
 	UploadDir        string
 	MaxUploadBytes   int64
 	UploadSalt       string
-	UploadPublicURL  string
 
 	MaxMessageContentLength int
 	WSMaxMessageSize        int64
@@ -102,7 +101,7 @@ func Load() *Config {
 		RefreshTokenTTL: getenvDuration("CHAT_REFRESH_TTL", 365*24*time.Hour),
 		MaxUploadBytes:  getenvInt64("CHAT_MAX_UPLOAD", 20<<20),
 		UploadSalt:      uploadSalt,
-		UploadPublicURL: getenv("CHAT_UPLOAD_PUBLIC_URL", ""),
+
 		StaticDir:       getenv("CHAT_STATIC_DIR", "../client/dist"),
 		AllowOrigins:    []string{"*"},
 		CSPConnectSrc:   getenv("CHAT_CSP_CONNECT_SRC", "'self' wss://wsl-8080.moonchan.xyz"),

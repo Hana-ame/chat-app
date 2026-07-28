@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -101,13 +102,8 @@ func (s *Server) handleStreamMessage(w http.ResponseWriter, r *http.Request, u *
 		msgID = db.NewID()
 	}
 
-	aiCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-	go func() {
-		<-r.Context().Done()
-		cancel()
-	}()
-
+	aiCtx, aiCancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer aiCancel()
 	ch, err := s.Services.Stream.StartStream(aiCtx, chatID, u.ID, msgID, *src, u)
 	if err != nil {
 		logutil.Error("ai: stream failed for user %s: %v", logutil.SafeID(u.ID), err)
@@ -128,21 +124,43 @@ func (s *Server) handleStreamMessage(w http.ResponseWriter, r *http.Request, u *
 	var buf bytes.Buffer
 	var thinkingBuf bytes.Buffer
 
-	for chunk := range ch {
-		if chunk.Done {
-			break
-		}
+	writeChunk := func(chunk ai.Chunk) {
 		if chunk.Type == "reasoning" {
 			thinkingBuf.WriteString(chunk.Content)
 		} else {
 			buf.WriteString(chunk.Content)
 		}
 		s.Services.Stream.AppendChunk(msgID, chunk.Type, chunk.Content)
+	}
+
+	for {
+		chunk, ok := <-ch
+		if !ok || chunk.Done {
+			break
+		}
+		writeChunk(chunk)
 		data, _ := json.Marshal(map[string]string{"type": chunk.Type, "content": chunk.Content})
-		_, _ = w.Write([]byte("data: "))
-		_, _ = w.Write(data)
-		_, _ = w.Write([]byte("\n\n"))
+		fmt.Fprintf(w, "data: %s\n\n", data)
 		flusher.Flush()
+	}
+
+	// If client disconnected mid-stream, keep consuming in background
+	if r.Context().Err() != nil {
+		go func() {
+			for chunk := range ch {
+				if chunk.Done {
+					break
+				}
+				writeChunk(chunk)
+			}
+			content := buf.String()
+			thinking := thinkingBuf.String()
+			if content == "" && thinking == "" {
+				content = "（AI 响应为空，请检查 endpoint / auth_key / body 设置）"
+			}
+			s.Services.Stream.FinishStream(context.Background(), chatID, u.ID, msgID, content, thinking)
+		}()
+		return
 	}
 
 	content := buf.String()
@@ -152,7 +170,7 @@ func (s *Server) handleStreamMessage(w http.ResponseWriter, r *http.Request, u *
 	}
 	s.Services.Stream.FinishStream(context.Background(), chatID, u.ID, msgID, content, thinking)
 
-	_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	fmt.Fprintf(w, "data: [DONE]\n\n")
 	flusher.Flush()
 }
 

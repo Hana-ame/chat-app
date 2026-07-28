@@ -4909,6 +4909,20 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 - 版本号 0.8.13 → 0.8.14
 - 禁用 `ci.spec.mjs` 和 `real-time.spec.mjs` 全部测试（`describe.skip`），mock 测试不再维护
 
+---
+
+## 2026-07-28 v0.8.15: AI 流超时修复 + 上传端点清理
+
+### 变更
+- 版本号 0.8.14 → 0.8.15
+- 移除 `CHAT_UPLOAD_PUBLIC_URL`，上传 `url` 字段直接返回相对路径 `/api/local/...`
+- 删除 `CHAT_AI_KEY` 环境变量及相关代码
+- AI stream 硬超时 5m → 15m，client 断开后服务器继续跑完
+- 将 `POST /chats/{chatID}/messages` 移出 `chimid.Timeout(10s)` 分组，避免 AI 流被错误截断
+
+### 验证
+- Go build: ✅
+
 ### 根因
 - Notify chat 在 DOM 中排首位，测试点击 `first .chat-item` 命中 notification chat
 - 嵌套 `api.notifications.*` 未经 mock proxy 拦截，发出真实 HTTP 请求导致失败

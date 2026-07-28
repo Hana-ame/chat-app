@@ -123,7 +123,6 @@ Server → Client:  {op:"pong"} / {op:"ready",payload:{user,chats,online_user_id
 | CHAT_MAX_UPLOAD | 20971520 | Max upload size (bytes) |
 | CHAT_STATIC_DIR | ../client/dist | Frontend static files |
 | CHAT_AI_SOURCES | - | JSON array of AI sources `[{"name","key","base_url","model"}]` |
-| CHAT_AI_KEY | - | Single AI API key (legacy, overridden by SOURCES) |
 | CHAT_AI_BASE_URL | https://api.siliconflow.cn/v1 | AI base URL (legacy) |
 | CHAT_AI_MODEL | deepseek-ai/Deepseek-V4-Flash | Default model (legacy) |
 

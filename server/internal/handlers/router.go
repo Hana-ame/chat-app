@@ -118,10 +118,8 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 					r.Delete("/members/{userID}", s.RemoveMember)
 					r.Post("/read", s.MarkRead)
 					r.Get("/messages", s.ListMessages)
-					r.With(rateLimitByUser(30, 1*time.Minute)).Post("/messages", s.SendMessage)
 					r.Patch("/messages/{messageID}", s.EditMessage)
 					r.Delete("/messages/{messageID}", s.DeleteMessage)
-					r.Get("/messages/{messageID}/stream", s.StreamMessageContent)
 					r.Put("/messages/{messageID}/reactions/{emoji}", s.AddReaction)
 					r.Delete("/messages/{messageID}/reactions/{emoji}", s.RemoveReaction)
 					r.Get("/messages/{messageID}/reactions", s.ListReactions)
@@ -140,6 +138,13 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 			}) // end auth group
 
 			r.Get("/events", s.SSE)
+		})
+
+		// AI stream — separate group with read timeout (can be minutes-long SSE)
+		r.Group(func(r chi.Router) {
+			r.Use(s.authMiddleware, chimid.Timeout(s.Cfg.ReadTimeout))
+			r.With(rateLimitByUser(30, 1*time.Minute)).Post("/chats/{chatID}/messages", s.SendMessage)
+			r.Get("/chats/{chatID}/messages/{messageID}/stream", s.StreamMessageContent)
 		})
 	}) // end /api route
 

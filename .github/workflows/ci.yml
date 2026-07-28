@@ -39,7 +39,7 @@ jobs:
       - run: npx playwright install chromium --with-deps
       - run: npm run build
         env:
-          APP_VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build-{0}', github.sha) }}
+          APP_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.sha) }}
       - run: npx playwright test --project=chromium || echo "E2E skipped"
       - uses: actions/upload-artifact@v4
         with:
@@ -72,7 +72,7 @@ jobs:
       - name: Build chatd (${{ matrix.goos }}/${{ matrix.goarch }})
         run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
-            -ldflags="-s -w -X main.Version=${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build-{0}', github.sha) }}" \
+            -ldflags="-s -w -X main.Version=${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.sha) }}" \
             -o ../chatd-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }} \
             ./cmd/chatd/
       - uses: actions/upload-artifact@v4
