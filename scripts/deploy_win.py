@@ -1,3 +1,5 @@
+# should always push to branch=dev
+
 import argparse
 import json
 import os
@@ -9,6 +11,7 @@ import sys
 import tarfile
 import time
 import urllib.request
+from urllib.request import ProxyHandler, build_opener, install_opener
 
 VERSION = "0.8.1"
 REPO = "Hana-ame/chat-app"
@@ -20,6 +23,15 @@ CLIENT_ARCHIVE = "client-dist.tar.gz"
 CWD = os.getcwd()
 SCRIPT_PATH = os.path.abspath(__file__)
 KNOWN_TAG_FILE = os.path.join(CWD, ".deployed_tag")
+
+
+def setup_proxy(proxy):
+    if not proxy:
+        return
+    os.environ.setdefault("HTTPS_PROXY", proxy)
+    os.environ.setdefault("HTTP_PROXY", proxy)
+    handler = ProxyHandler({"http": proxy, "https": proxy})
+    install_opener(build_opener(handler))
 
 
 def fetch_raw(path):
@@ -279,14 +291,19 @@ def deploy_once(rel, dst, env_file):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("cmd", nargs="?", default="all", choices=["download", "run", "all", "watch"])
+    parser.add_argument("--proxy", default="", help="proxy URL for GitHub API (download uses gh-proxy.com)")
     parser.add_argument("--no-self-update", action="store_true", help="skip script self-update")
     parser.add_argument("--interval", type=int, default=120, help="poll interval in seconds (watch mode)")
     args = parser.parse_args()
 
     cmd = args.cmd
+    proxy = args.proxy
     print(f"[deploy] command: {cmd}")
+    if proxy:
+        print(f"[deploy] proxy: {proxy}")
     print(f"[deploy] working dir: {CWD}")
     print(f"[deploy] binary: {BINARY}")
+    setup_proxy(proxy)
 
     if cmd != "run" and not args.no_self_update:
         self_update()
@@ -298,7 +315,7 @@ def main():
 
     if cmd in ("download", "all"):
         rel = latest_release()
-        deploy_once(rel, dst, proxy, env_file)
+        deploy_once(rel, dst, env_file)
         tag = rel["tag_name"]
         print(f"[deploy] download complete (tag: {tag})")
         write_known_tag(tag)
@@ -332,7 +349,7 @@ def main():
                 if tag != known:
                     print(f"[deploy] new release detected: {tag}")
                     kill_chatd()
-                    deploy_once(rel, dst, proxy, env_file)
+                    deploy_once(rel, dst, env_file)
                     write_known_tag(tag)
                     known = tag
                     env = load_env(env_file)
