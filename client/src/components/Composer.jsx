@@ -33,6 +33,16 @@ function saveSettings(s) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {}
 }
 
+function toJsonBody(s) {
+  return JSON.stringify({
+    model: s.model || 'deepseek-ai/Deepseek-V4-Flash-free',
+    messages: [{ role: 'user', content: '' }],
+    temperature: parseFloat(s.temperature) || 0.7,
+    max_tokens: parseInt(s.maxTokens) || 32768,
+    top_p: parseFloat(s.topP) || 1,
+  }, null, 2);
+}
+
 const defaultSettings = {
   endpoint: import.meta.env.VITE_AI_ENDPOINT || 'https://api.siliconflow.cn/v1/chat/completions',
   authKey: import.meta.env.VITE_AI_AUTH_KEY || '',
@@ -42,14 +52,10 @@ const defaultSettings = {
   topP: '1',
   sendContext: true,
   mode: 'basic',
-  jsonBody: JSON.stringify({
-    model: 'deepseek-ai/Deepseek-V4-Flash-free',
-    messages: [{ role: 'user', content: '' }],
-    temperature: 0.7,
-    max_tokens: 32768,
-    top_p: 1,
-  }, null, 2),
+  jsonBody: '',
 };
+
+defaultSettings.jsonBody = toJsonBody(defaultSettings);
 
 function compressImage(file) {
   return new Promise((resolve) => {
@@ -88,9 +94,44 @@ export default function Composer({ chatId }) {
   const [settings, setSettings] = useState({ ...saved.current });
 
   const setField = useCallback((k, v) => {
-    setSettings(prev => ({ ...prev, [k]: v }));
-    saved.current = { ...saved.current, [k]: v };
-    saveSettings(saved.current);
+    setSettings(prev => {
+      let next = { ...prev, [k]: v };
+      if (['model', 'temperature', 'maxTokens', 'topP'].includes(k)) {
+        next.jsonBody = toJsonBody(next);
+      }
+      if (k === 'jsonBody') {
+        try {
+          const obj = JSON.parse(v);
+          if (obj.model && typeof obj.model === 'string') next.model = obj.model;
+          if (obj.temperature != null) next.temperature = String(obj.temperature);
+          if (obj.max_tokens != null) next.maxTokens = String(obj.max_tokens);
+          if (obj.top_p != null) next.topP = String(obj.top_p);
+        } catch {}
+      }
+      saved.current = { ...saved.current, ...next };
+      saveSettings(saved.current);
+      return next;
+    });
+  }, []);
+
+  const setMode = useCallback((mode) => {
+    setSettings(prev => {
+      let next = { ...prev, mode };
+      if (mode === 'json') {
+        next.jsonBody = toJsonBody(next);
+      } else {
+        try {
+          const obj = JSON.parse(prev.jsonBody);
+          if (obj.model && typeof obj.model === 'string') next.model = obj.model;
+          if (obj.temperature != null) next.temperature = String(obj.temperature);
+          if (obj.max_tokens != null) next.maxTokens = String(obj.max_tokens);
+          if (obj.top_p != null) next.topP = String(obj.top_p);
+        } catch {}
+      }
+      saved.current = { ...saved.current, ...next };
+      saveSettings(saved.current);
+      return next;
+    });
   }, []);
 
   const autoResize = useCallback(() => {
@@ -362,9 +403,9 @@ export default function Composer({ chatId }) {
               <input style={inputStyle} value={settings.authKey} onChange={e => setField('authKey', e.target.value)} type="password" spellCheck={false} />
               <div style={{gridColumn:'1/-1',display:'flex',gap:6}}>
                 <button className="btn-ghost" style={{fontSize:13,padding:'2px 6px',fontWeight:settings.mode==='basic'?600:400,color:settings.mode==='basic'?'var(--accent)':'var(--text-muted)'}}
-                  onClick={() => setField('mode','basic')}>Basic</button>
+                  onClick={() => setMode('basic')}>Basic</button>
                 <button className="btn-ghost" style={{fontSize:13,padding:'2px 6px',fontWeight:settings.mode==='json'?600:400,color:settings.mode==='json'?'var(--accent)':'var(--text-muted)'}}
-                  onClick={() => setField('mode','json')}>JSON</button>
+                  onClick={() => setMode('json')}>JSON</button>
               </div>
               {settings.mode==='basic' ? (
                 <>
