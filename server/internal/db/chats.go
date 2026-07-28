@@ -15,7 +15,7 @@ import (
 // ── Chats ────────────────────────────────────────────────────────────
 
 func (d *DB) CreateChat(ctx context.Context, typ, name, visibility, ownerID string, memberIDs []string) (*models.Chat, error) {
-	if typ != "dm" && typ != "group" {
+	if typ != "dm" && typ != "group" && typ != "notify" {
 		return nil, errors.New("invalid chat type")
 	}
 	name = strings.TrimSpace(name)
@@ -27,6 +27,9 @@ func (d *DB) CreateChat(ctx context.Context, typ, name, visibility, ownerID stri
 	}
 	if typ == "dm" && len(memberIDs) != 2 {
 		return nil, errors.New("dm requires exactly 2 members")
+	}
+	if typ == "notify" && len(memberIDs) != 1 {
+		return nil, errors.New("notify chat must have exactly 1 member")
 	}
 
 	tx, err := d.BeginTx(ctx, nil)
@@ -41,6 +44,9 @@ func (d *DB) CreateChat(ctx context.Context, typ, name, visibility, ownerID stri
 	color := PickColor(id)
 	if typ == "group" {
 		color = PickColor(name)
+	}
+	if typ == "notify" {
+		color = "#E8590C"
 	}
 
 	var ownerVal interface{}
@@ -60,6 +66,9 @@ func (d *DB) CreateChat(ctx context.Context, typ, name, visibility, ownerID stri
 		visibility = "private"
 	}
 	if typ == "dm" {
+		visibility = ""
+	}
+	if typ == "notify" {
 		visibility = ""
 	}
 	_, err = tx.ExecContext(ctx,
@@ -234,6 +243,28 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 	})
 	logutil.Debug("list chats for user %s: %d chats", userID, len(out))
 	return out, nil
+}
+
+func (d *DB) FindNotifyChat(ctx context.Context, userID string) (*models.Chat, error) {
+	var id string
+	err := d.QueryRowContext(ctx,
+		`SELECT c.id FROM chats c
+		 JOIN chat_members cm ON cm.chat_id = c.id AND cm.user_id = ?
+		 WHERE c.type = 'notify'
+		 LIMIT 1`,
+		userID,
+	).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return d.GetChat(ctx, id)
+}
+
+func (d *DB) CreateNotifyChat(ctx context.Context, userID string) (*models.Chat, error) {
+	return d.CreateChat(ctx, "notify", "Notifications", "", userID, []string{userID})
 }
 
 // Deprecated.

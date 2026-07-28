@@ -745,4 +745,40 @@ export function mockUpdateChatBackground(_token, chatId, backgroundUrl) {
   return { id: chatId, background_url: backgroundUrl };
 }
 
+/**
+ * @param {string} _token
+ * @returns {Chat}
+ */
+export function mockGetNotifyChat(_token) {
+  const d = ensureData();
+  const cu = currentUser();
+  let chat = d.chats.find(c => c.type === 'notify');
+  if (!chat) {
+    const members = [{ id: cu.id, ...userById(cu.id), role: 'owner' }];
+    chat = {
+      id: randid(),
+      type: 'notify',
+      name: 'Notifications',
+      icon_color: '#E8590C',
+      owner_id: cu.id,
+      created_at: new Date().toISOString(),
+      last_message_at: new Date().toISOString(),
+      member_count: 1,
+      visibility: '',
+      pinned_message: null,
+      pinned_updated_at: null,
+      pinned_last_read_at: null,
+      pinned: false,
+      notify_enabled: true,
+      last_active_at: new Date().toISOString(),
+      last_message_id: '',
+      unread_count: 0,
+      members,
+    };
+    d.chats.push(chat);
+    if (_store) _store.getState().onChatUpdate(chat);
+  }
+  return { ...chat, members: chat.members || [] };
+}
+
 

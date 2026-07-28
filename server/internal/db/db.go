@@ -27,6 +27,7 @@ type goMigration struct {
 
 var goMigrations = []goMigration{
 	{1, migrateV1EnsureColumns},
+	{2, migrateV2DropChatTypeCheck},
 }
 
 func migrateV1EnsureColumns(ctx context.Context, d *DB) error {

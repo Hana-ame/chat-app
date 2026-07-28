@@ -54,6 +54,20 @@ func (s *ChatService) Create(ctx context.Context, userID, name, visibility strin
 	return chat, nil
 }
 
+func (s *ChatService) CreateOrGetNotify(ctx context.Context, userID string) (*models.Chat, error) {
+	if chat, err := s.DB.FindNotifyChat(ctx, userID); err == nil {
+		return chat, nil
+	}
+	chat, err := s.DB.CreateNotifyChat(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if s.Hub != nil {
+		s.Hub.BroadcastChatCreated(chat)
+	}
+	return chat, nil
+}
+
 func (s *ChatService) CreateOrGetDM(ctx context.Context, userID, otherUserID string) (*models.Chat, bool, error) {
 	if _, err := s.DB.GetUserByID(ctx, otherUserID); err != nil {
 		if isNotFound(err) {
@@ -82,7 +96,7 @@ func (s *ChatService) Rename(ctx context.Context, chatID, userID, name string) (
 		}
 		return nil, err
 	}
-	if chat.Type == "dm" {
+	if chat.Type == "dm" || chat.Type == "notify" {
 		return nil, ErrInvalidInput
 	}
 	if chat.OwnerID != userID {
@@ -109,7 +123,7 @@ func (s *ChatService) UpdateAvatar(ctx context.Context, chatID, userID, avatarUR
 		}
 		return nil, err
 	}
-	if chat.Type == "dm" {
+	if chat.Type == "dm" || chat.Type == "notify" {
 		return nil, ErrInvalidInput
 	}
 	if chat.OwnerID != userID {
@@ -136,7 +150,7 @@ func (s *ChatService) UpdateBanner(ctx context.Context, chatID, userID, bannerUR
 		}
 		return nil, err
 	}
-	if chat.Type == "dm" {
+	if chat.Type == "dm" || chat.Type == "notify" {
 		return nil, ErrInvalidInput
 	}
 	if chat.OwnerID != userID {
@@ -168,7 +182,7 @@ func (s *ChatService) UpdateBackground(ctx context.Context, chatID, userID, back
 		}
 		return nil, err
 	}
-	if chat.Type == "dm" {
+	if chat.Type == "dm" || chat.Type == "notify" {
 		return nil, ErrInvalidInput
 	}
 	if chat.OwnerID != userID {
@@ -195,7 +209,7 @@ func (s *ChatService) Delete(ctx context.Context, chatID, userID string) error {
 		}
 		return err
 	}
-	if chat.Type == "dm" {
+	if chat.Type == "dm" || chat.Type == "notify" {
 		return ErrInvalidInput
 	}
 	if chat.OwnerID != userID {

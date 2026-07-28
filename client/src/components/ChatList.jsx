@@ -180,7 +180,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(chatSearch.trim());
 
   const filteredChats = useMemo(() => chats.filter(c => {
-    if (c.type === 'dm') return false; // @deprecated DM 已下线，保留类型守卫防止旧数据冒泡
+    if (c.type === 'dm') return false;
     if (!chatSearch.trim()) return true;
     if (isUUID) return c.id === chatSearch.trim();
     const q = chatSearch.toLowerCase();
@@ -278,13 +278,17 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
             : <button className="context-menu-item" onClick={() => handlePin(contextMenu.chatId)}>Pin</button>}
           <button className="context-menu-item" onClick={() => { navigator.clipboard.writeText(contextMenu.chatId).catch(() => {}); setContextMenu(null); }}>Copy Chat ID</button>
           <button className="context-menu-item" onClick={() => { setShowChatInfo(contextMenu.chatId); setContextMenu(null); }}>View Info</button>
-          <button className="context-menu-item" onClick={() => handleNotifyToggle(contextMenu.chatId)}>
-            {useChatStore.getState().notifyEnabled[contextMenu.chatId] ? '🔔 Notifications' : '🔕 Notifications'}
-          </button>
-          {c?.type !== 'dm' && c?.owner_id === user.id && (
+          {c?.type !== 'notify' && (
+            <button className="context-menu-item" onClick={() => handleNotifyToggle(contextMenu.chatId)}>
+              {useChatStore.getState().notifyEnabled[contextMenu.chatId] ? '🔔 Notifications' : '🔕 Notifications'}
+            </button>
+          )}
+          {c?.type === 'notify' ? null : c?.type !== 'dm' && c?.owner_id === user.id && (
             <button className="context-menu-item danger" onClick={() => handleDelete(contextMenu.chatId)}>Delete</button>
           )}
-          <button className="context-menu-item danger" onClick={() => handleLeaveChat(contextMenu.chatId)}>Leave</button>
+          {c?.type === 'notify' ? null : (
+            <button className="context-menu-item danger" onClick={() => handleLeaveChat(contextMenu.chatId)}>Leave</button>
+          )}
         </div>);
       })()}
 
