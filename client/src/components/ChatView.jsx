@@ -231,7 +231,7 @@ export default function ChatView({ chatId, isNotification, onBack }) {
         <div style={{flex:1}}>
             <div style={{fontWeight:600}}>{name}</div>
             <div style={{fontSize:12,color:'var(--text-muted)'}}>
-              {memberCount} member{memberCount !== 1 ? 's' : ''}
+              {isNotification ? '' : memberCount + ' member' + (memberCount !== 1 ? 's' : '')}
             </div>
           </div>
           {chat.type === 'notify' ? null : (

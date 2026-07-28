@@ -26,15 +26,11 @@ Chat application with Go backend + React frontend.
 - Backend API: `https://chat.moonchan.xyz` (same domain, proxied)
 - API version endpoint: `GET /api/version`
 
-## Workflow (每次修改后)
-1. `git add` + `git commit`
-2. `git push` (push to remote)
-3. `git tag build-$(git rev-parse --short HEAD)` — tag with short commit hash
-4. `git push --tags`
-5. `gh run list --branch <tag> --limit 3` — confirm CI passes
-
-## Version Bump (bump version 时)
-需同步以下三处，确保版本号一致：
-- `client/package.json` — `"version": "x.y.z"`
-- `server/internal/handlers/swagger.json` — `"version": "x.y.z"`
-- git tag — `build-<sha>`（Workflow step 3 自动完成）
+## Workflow
+1. 修改代码 → `git add` + `git commit`
+2. 如需 bump version，先同步两处版本号：
+   - `client/package.json` — `"version": "x.y.z"`
+   - `server/internal/handlers/swagger.json` — `"version": "x.y.z"`
+3. `git tag v<version>` — 创建版本标签
+4. `git push && git push --tags`
+5. `gh run watch <run-id> --exit-status` — 等 CI 通过（run ID 从 push 输出获取）
