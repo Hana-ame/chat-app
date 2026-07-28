@@ -41,7 +41,7 @@ export default function ChatListItem({ chat, activeId, onSelectChat, onContextMe
     <div key={merged.id} className={'chat-item' + (merged.id === activeId ? ' active' : '') + (merged.pinned ? ' pinned' : '') + (merged.visibility === 'public' ? ' public' : '') + (merged.owner_id === user.id ? ' owner' : '')}
       onClick={() => onSelectChat(merged.id)} style={bannerStyle}>
       <div className="chat-item-avatar" style={{ background: merged.avatar_url ? 'none' : (merged.type === 'notify' ? 'var(--accent)' : bgColor) }}>
-        {merged.avatar_url ? <img src={merged.avatar_url} alt="" className="chat-item-avatar-img" /> : merged.type === 'notify' ? '🔔' : (name ? name[0].toUpperCase() : '?')}
+        {merged.avatar_url ? <img src={merged.avatar_url} alt="" className="chat-item-avatar-img" /> : merged.type === 'notify' ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> : (name ? name[0].toUpperCase() : '?')}
       </div>
       <div className="chat-item-info">
         <div style={{display:'flex',alignItems:'center',gap:4}}>

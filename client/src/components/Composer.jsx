@@ -195,10 +195,6 @@ export default function Composer({ chatId }) {
         setAiLoading(false);
         return;
       }
-      body.model = (f.model || '').trim() || body.model;
-      body.temperature = parseFloat(f.temperature) || body.temperature || 0.7;
-      body.max_tokens = parseInt(f.maxTokens) || body.max_tokens || 32768;
-      body.top_p = parseFloat(f.topP) || body.top_p || 1;
     } else {
       body = {
         model: (f.model || '').trim() || undefined,
@@ -341,7 +337,6 @@ export default function Composer({ chatId }) {
     outline: 'none', boxSizing: 'border-box',
   };
   const labelStyle = { fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap' };
-  const rowStyle = { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' };
 
   return (
     <div className="chat-footer">
@@ -360,16 +355,12 @@ export default function Composer({ chatId }) {
       <div className="chat-input">
         <div style={{display:'flex',flexDirection:'column',gap:4,position:'relative'}}>
           {aiActive && (
-            <>
-              <div style={rowStyle}>
-                <span style={labelStyle}>Endpoint</span>
-                <input style={{...inputStyle,flex:1}} value={settings.endpoint} onChange={e => setField('endpoint', e.target.value)} spellCheck={false} />
-              </div>
-              <div style={rowStyle}>
-                <span style={labelStyle}>Key</span>
-                <input style={{...inputStyle,flex:1}} value={settings.authKey} onChange={e => setField('authKey', e.target.value)} type="password" spellCheck={false} />
-              </div>
-              <div style={rowStyle}>
+            <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:'4px 8px',alignItems:'center'}}>
+              <span style={labelStyle}>Endpoint</span>
+              <input style={inputStyle} value={settings.endpoint} onChange={e => setField('endpoint', e.target.value)} spellCheck={false} />
+              <span style={labelStyle}>Key</span>
+              <input style={inputStyle} value={settings.authKey} onChange={e => setField('authKey', e.target.value)} type="password" spellCheck={false} />
+              <div style={{gridColumn:'1/-1',display:'flex',gap:6}}>
                 <button className="btn-ghost" style={{fontSize:13,padding:'2px 6px',fontWeight:settings.mode==='basic'?600:400,color:settings.mode==='basic'?'var(--accent)':'var(--text-muted)'}}
                   onClick={() => setField('mode','basic')}>Basic</button>
                 <button className="btn-ghost" style={{fontSize:13,padding:'2px 6px',fontWeight:settings.mode==='json'?600:400,color:settings.mode==='json'?'var(--accent)':'var(--text-muted)'}}
@@ -377,11 +368,9 @@ export default function Composer({ chatId }) {
               </div>
               {settings.mode==='basic' ? (
                 <>
-                  <div style={rowStyle}>
-                    <span style={labelStyle}>Model</span>
-                    <input style={{...inputStyle,flex:1}} value={settings.model} onChange={e => setField('model', e.target.value)} spellCheck={false} />
-                  </div>
-                  <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                  <span style={labelStyle}>Model</span>
+                  <input style={inputStyle} value={settings.model} onChange={e => setField('model', e.target.value)} spellCheck={false} />
+                  <div style={{gridColumn:'1/-1',display:'flex',gap:6,flexWrap:'wrap'}}>
                     <label style={{...labelStyle,display:'flex',alignItems:'center',gap:3}}>
                       Temperature
                       <input style={{width:60,padding:'3px 5px',fontSize:13,background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)'}}
@@ -404,10 +393,10 @@ export default function Composer({ chatId }) {
                   </div>
                 </>
               ) : (
-                <textarea style={{width:'100%',padding:'4px 6px',fontSize:13,fontFamily:'monospace',background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)',resize:'vertical',boxSizing:'border-box'}}
+                <textarea style={{gridColumn:'1/-1',width:'100%',padding:'4px 6px',fontSize:13,fontFamily:'monospace',background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)',resize:'vertical',boxSizing:'border-box'}}
                   value={settings.jsonBody} onChange={e => setField('jsonBody',e.target.value)} rows={3} spellCheck={false} />
               )}
-            </>
+            </div>
           )}
           {mentionQuery !== null && mentionMembers.length > 0 && (
             <div className="mention-dropdown" style={{bottom:'100%',top:'auto',marginBottom:0}}>
