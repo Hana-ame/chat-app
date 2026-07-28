@@ -102,12 +102,6 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 				r.Post("/chats", s.CreateChat)
 				r.Post("/dms", s.CreateOrGetDM)
 				r.Get("/chats/notify", s.GetNotificationsChat)
-				r.Route("/notifications", func(r chi.Router) {
-					r.Get("/messages", s.ListNotifications)
-					r.Post("/messages", s.SendNotification)
-					r.Delete("/messages/{messageID}", s.DeleteNotification)
-					r.Post("/read", s.MarkNotificationsRead)
-				})
 				r.Route("/chats/{chatID}", func(r chi.Router) {
 					r.Use(s.trackLastActive)
 					r.Get("/", s.GetChat)

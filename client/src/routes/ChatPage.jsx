@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
@@ -12,18 +12,16 @@ export default function ChatPage() {
   const loc = useLocation();
   const navigate = useNavigate();
   const { user, accessToken, logout } = useAuthStore();
-  const { wsReady, mode, connect, loadChats, chats } = useChatStore();
+  const { wsReady, mode, connect, loadChats } = useChatStore();
   const [mobileView, setMobileView] = useState('list');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [notifyChatId, setNotifyChatId] = useState(null);
 
-  const notifyChat = useMemo(() => chats.find(c => c.type === 'notify'), [chats]);
-  const notifyChatId = notifyChat?.id;
-  const isNotification = loc.pathname === '/g/notifications';
-
-  const urlChatId = isNotification
+  const urlChatId = loc.pathname === '/g/notifications'
     ? notifyChatId
     : loc.pathname.startsWith('/g/') ? loc.pathname.slice(3) : null;
 
+  // sync URL → store for internal unread/message logic
   useEffect(() => {
     useChatStore.setState({ activeChatId: urlChatId || null });
   }, [urlChatId, accessToken]);
@@ -38,6 +36,9 @@ export default function ChatPage() {
     if (accessToken) {
       connect(accessToken);
       loadChats(accessToken);
+      api.getNotificationsChat(accessToken).then(chat => {
+        setNotifyChatId(chat.id);
+      }).catch(() => {});
     }
     return () => useChatStore.getState().connect(null);
   }, [accessToken]);
@@ -45,11 +46,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (urlChatId && accessToken) {
       if (isMobile) setMobileView('chat');
-      if (isNotification) {
-        api.notifications.markRead(accessToken).catch(() => {});
-      } else {
-        api.markRead(accessToken, urlChatId).catch(() => {});
-      }
+      api.markRead(accessToken, urlChatId).catch(()=>{});
     }
   }, [urlChatId, accessToken]);
 
@@ -81,15 +78,14 @@ export default function ChatPage() {
 
   return (
     <div className={appClass}>
-      <ChatList onSelectChat={handleSelectChat} activeId={urlChatId} onLogout={logout} />
+      <ChatList onSelectChat={handleSelectChat} activeId={urlChatId} notifyChatId={notifyChatId} onLogout={logout} />
        {urlChatId ? (
          <ChatView
            chatId={urlChatId}
-           isNotification={isNotification}
            onBack={isMobile ? handleBack : null}
          />
        ) : isMobile ? null : <WelcomeView />}
-       {!isMobile && urlChatId && !isNotification && <MemberPanel chatId={urlChatId} />}
+       {!isMobile && urlChatId && <MemberPanel chatId={urlChatId} />}
     </div>
   );
 }

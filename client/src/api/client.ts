@@ -172,20 +172,9 @@ const _apiMethods = {
   markAnnouncementRead: (token: string, chatId: string) =>
     request<ApiError>('POST', '/api/chats/' + chatId + '/announcement/read', token, {}),
 
-  // ── Notifications ──
-  notifications: {
-    listMessages: (token: string, before?: string, limit?: number) => {
-      let url = '/api/notifications/messages?limit=' + (limit || 50);
-      if (before) url += '&before=' + before;
-      return request<{ messages: Message[] }>('GET', url, token);
-    },
-    sendMessage: (token: string, content: string, attachments?: Attachment[]) =>
-      request<Message>('POST', '/api/notifications/messages', token, { content, attachments: (attachments || []).map(({ ...a }) => a) }),
-    deleteMessage: (token: string, msgId: string) =>
-      request<ApiError>('DELETE', '/api/notifications/messages/' + msgId, token),
-    markRead: (token: string) =>
-      request<ApiError>('POST', '/api/notifications/read', token, {}),
-  },
+  // ── Notifications Chat ──
+  getNotificationsChat: (token: string) =>
+    request<Chat>('GET', '/api/chats/notify', token),
 
   // ── Uploads ──
   upload: async (file: File) => {
