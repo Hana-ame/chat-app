@@ -4886,3 +4886,17 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 - Go build + vet: ✅
 - Go test ./...: ✅
 - Client build: ✅
+
+---
+
+## 2026-07-28 v0.8.3: 弹版本号 + AI 按钮对齐 + 清理 AIPanel
+
+### 变更
+- 版本号 0.8.2 → 0.8.3（`client/package.json`、`swagger.json`）
+- `Composer.jsx` — 按钮行加 `display:inline-flex` + `alignItems:center` 修复 AI 按钮垂直对齐
+
+### 移除
+- `AIPanel.jsx` — 死代码删除（功能已迁移到 Composer 内嵌）
+
+### 验证
+- Client build: ✅
