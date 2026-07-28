@@ -415,7 +415,7 @@ export default function Composer({ chatId }) {
               ))}
             </div>
           )}
-          <div style={{display:'flex',gap:6,alignItems:'center'}}>
+          <div style={{display:'flex',gap:6,alignItems:'stretch'}}>
             <textarea rows={1} placeholder={aiActive ? 'Ask AI...' : 'Message #chat'} value={text}
               ref={textRef}
               onChange={handleTextChange}

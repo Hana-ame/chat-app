@@ -246,7 +246,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout, notifyChatI
       </div>
 
       {notifyChatId && !chatSearch.trim() && (
-        <div className={'chat-item' + (activeId === notifyChatId ? ' active' : '')} style={{cursor:'pointer'}} onClick={() => onSelectChat(notifyChatId)}>
+        <div className={'sidebar-notify-entry' + (activeId === notifyChatId ? ' active' : '')} style={{cursor:'pointer'}} onClick={() => onSelectChat(notifyChatId)}>
           <div className="chat-item-avatar" style={{background:'var(--accent)'}}>🔔</div>
           <div className="chat-item-info">
             <div className="chat-item-name">Notifications</div>

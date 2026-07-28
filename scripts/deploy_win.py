@@ -9,7 +9,6 @@ import sys
 import tarfile
 import time
 import urllib.request
-from urllib.request import ProxyHandler, build_opener, install_opener
 
 VERSION = "0.8.1"
 REPO = "Hana-ame/chat-app"
@@ -21,15 +20,6 @@ CLIENT_ARCHIVE = "client-dist.tar.gz"
 CWD = os.getcwd()
 SCRIPT_PATH = os.path.abspath(__file__)
 KNOWN_TAG_FILE = os.path.join(CWD, ".deployed_tag")
-
-
-def setup_proxy(proxy):
-    if not proxy:
-        return
-    os.environ.setdefault("HTTPS_PROXY", proxy)
-    os.environ.setdefault("HTTP_PROXY", proxy)
-    handler = ProxyHandler({"http": proxy, "https": proxy})
-    install_opener(build_opener(handler))
 
 
 def fetch_raw(path):
@@ -150,16 +140,15 @@ def find_asset(release, name):
     sys.exit(1)
 
 
-def download(asset, dst, proxy):
-    url = asset["browser_download_url"]
+GH_PROXY = "https://gh-proxy.com/"
+
+def download(asset, dst):
+    url = GH_PROXY + asset["browser_download_url"]
     print(f"[deploy] download url: {url}")
     if os.path.isfile(dst):
         print(f"[deploy] removing existing file: {dst}")
         os.remove(dst)
-    cmd = ["curl.exe", "-L", "--progress-bar", "-o", dst]
-    if proxy:
-        cmd += ["-x", proxy]
-    cmd += [url]
+    cmd = ["curl.exe", "-L", "--progress-bar", "-o", dst, url]
     print(f"[deploy] running: {' '.join(cmd)}")
     subprocess.run(cmd, check=True)
     size = os.path.getsize(dst)
@@ -255,12 +244,12 @@ def load_env(env_file):
     return env
 
 
-def deploy_once(rel, dst, proxy, env_file):
+def deploy_once(rel, dst, env_file):
     binary_asset = find_asset(rel, BINARY)
-    download(binary_asset, dst, proxy)
+    download(binary_asset, dst)
     client_asset = find_asset(rel, CLIENT_ARCHIVE)
     client_dst = os.path.join(CWD, CLIENT_ARCHIVE)
-    download(client_asset, client_dst, proxy)
+    download(client_asset, client_dst)
     client_dir = os.path.join(CWD, "client", "dist")
     os.makedirs(client_dir, exist_ok=True)
     print(f"[deploy] extracting {CLIENT_ARCHIVE} -> {client_dir}")
@@ -290,18 +279,14 @@ def deploy_once(rel, dst, proxy, env_file):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("cmd", nargs="?", default="all", choices=["download", "run", "all", "watch"])
-    parser.add_argument("--proxy", default="http://localhost:10809", help="proxy URL")
     parser.add_argument("--no-self-update", action="store_true", help="skip script self-update")
     parser.add_argument("--interval", type=int, default=120, help="poll interval in seconds (watch mode)")
     args = parser.parse_args()
 
     cmd = args.cmd
-    proxy = args.proxy
     print(f"[deploy] command: {cmd}")
-    print(f"[deploy] proxy: {proxy if proxy else '(none)'}")
     print(f"[deploy] working dir: {CWD}")
     print(f"[deploy] binary: {BINARY}")
-    setup_proxy(proxy)
 
     if cmd != "run" and not args.no_self_update:
         self_update()
