@@ -2,20 +2,25 @@ import argparse
 import json
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import sys
 import tarfile
+import time
 import urllib.request
 from urllib.request import ProxyHandler, build_opener, install_opener
 
+VERSION = "0.8.1"
 REPO = "Hana-ame/chat-app"
-REPO_BASE = f"https://raw.githubusercontent.com/{REPO}/main"
+REPO_BRANCH = os.environ.get("DEPLOY_BRANCH", "dev")
+REPO_BASE = f"https://raw.githubusercontent.com/{REPO}/{REPO_BRANCH}"
 SCRIPT_REPO_PATH = "scripts/deploy_win.py"
 BINARY = "chatd-windows-amd64.exe"
 CLIENT_ARCHIVE = "client-dist.tar.gz"
 CWD = os.getcwd()
 SCRIPT_PATH = os.path.abspath(__file__)
+KNOWN_TAG_FILE = os.path.join(CWD, ".deployed_tag")
 
 
 def setup_proxy(proxy):
@@ -78,7 +83,8 @@ def sync_env():
     if env_keys is None:
         print("[deploy]  INFO: creating .env from latest template")
         shutil.copy2(example_path, env_path)
-        print("[deploy]  WARN: edit .env to set secrets before running")
+        ensure_jwt_secret(env_path)
+        print("[deploy]  OK: .env created with persistent secrets")
         return False
 
     modified = False
@@ -115,6 +121,8 @@ def sync_env():
         print("[deploy]  OK: .env updated with missing keys")
     else:
         print("[deploy]  OK: .env is up to date")
+
+    ensure_jwt_secret(env_path)
     return True
 
 
@@ -158,6 +166,62 @@ def download(asset, dst, proxy):
     print(f"[deploy] saved: {dst} ({size} bytes)")
 
 
+def kill_chatd():
+    subprocess.run(["taskkill", "/f", "/im", BINARY], capture_output=True)
+    time.sleep(1)
+
+
+def start_detached(dst, env):
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    proc = subprocess.Popen(
+        ["cmd", "/c", "start", "/min", "", dst],
+        env=env, startupinfo=startupinfo
+    )
+    print(f"[deploy] started detached: {dst} (PID: {proc.pid})")
+    return proc
+
+
+def read_known_tag():
+    try:
+        with open(KNOWN_TAG_FILE) as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return None
+
+
+def write_known_tag(tag):
+    with open(KNOWN_TAG_FILE, "w") as f:
+        f.write(tag)
+
+
+def ensure_jwt_secret(env_path):
+    if not os.path.isfile(env_path):
+        return
+    lines = []
+    found = False
+    with open(env_path, encoding="utf-8") as f:
+        for line in f:
+            m = re.match(r"^CHAT_JWT_SECRET=(.+)?", line.strip())
+            if m:
+                val = (m.group(1) or "").strip().strip('"').strip("'")
+                if not val or "change-me" in val.lower() or "sk-" in val.lower() or val == "your-secret-key":
+                    new_val = secrets.token_hex(32)
+                    lines.append(f"CHAT_JWT_SECRET={new_val}\n")
+                    print(f"[deploy]  FIX: CHAT_JWT_SECRET was placeholder, generated persistent secret")
+                else:
+                    lines.append(line)
+                found = True
+            else:
+                lines.append(line)
+    if not found:
+        new_val = secrets.token_hex(32)
+        lines.append(f"CHAT_JWT_SECRET={new_val}\n")
+        print(f"[deploy]  ADD: CHAT_JWT_SECRET (generated persistent secret)")
+    with open(env_path, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+
+
 def _parse_env_file(path):
     keys = {}
     try:
@@ -191,11 +255,44 @@ def load_env(env_file):
     return env
 
 
+def deploy_once(rel, dst, proxy, env_file):
+    binary_asset = find_asset(rel, BINARY)
+    download(binary_asset, dst, proxy)
+    client_asset = find_asset(rel, CLIENT_ARCHIVE)
+    client_dst = os.path.join(CWD, CLIENT_ARCHIVE)
+    download(client_asset, client_dst, proxy)
+    client_dir = os.path.join(CWD, "client", "dist")
+    os.makedirs(client_dir, exist_ok=True)
+    print(f"[deploy] extracting {CLIENT_ARCHIVE} -> {client_dir}")
+    with tarfile.open(client_dst) as tf:
+        tf.extractall(client_dir)
+    os.remove(client_dst)
+    abs_static = client_dir.replace("/", "\\")
+    static_line = f"CHAT_STATIC_DIR={abs_static}"
+    if os.path.isfile(env_file):
+        with open(env_file, encoding="utf-8") as f:
+            lines = f.readlines()
+        with open(env_file, "w", encoding="utf-8") as f:
+            found = False
+            for line in lines:
+                if line.strip().startswith("CHAT_STATIC_DIR="):
+                    f.write(static_line + "\n")
+                    found = True
+                else:
+                    f.write(line)
+            if not found:
+                f.write(static_line + "\n")
+    else:
+        with open(env_file, "a", encoding="utf-8") as f:
+            f.write(static_line + "\n")
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("cmd", nargs="?", default="all", choices=["download", "run", "all"])
+    parser.add_argument("cmd", nargs="?", default="all", choices=["download", "run", "all", "watch"])
     parser.add_argument("--proxy", default="http://localhost:10809", help="proxy URL")
     parser.add_argument("--no-self-update", action="store_true", help="skip script self-update")
+    parser.add_argument("--interval", type=int, default=120, help="poll interval in seconds (watch mode)")
     args = parser.parse_args()
 
     cmd = args.cmd
@@ -216,36 +313,10 @@ def main():
 
     if cmd in ("download", "all"):
         rel = latest_release()
-        binary_asset = find_asset(rel, BINARY)
-        download(binary_asset, dst, proxy)
-        client_asset = find_asset(rel, CLIENT_ARCHIVE)
-        client_dst = os.path.join(CWD, CLIENT_ARCHIVE)
-        download(client_asset, client_dst, proxy)
-        client_dir = os.path.join(CWD, "client", "dist")
-        os.makedirs(client_dir, exist_ok=True)
-        print(f"[deploy] extracting {CLIENT_ARCHIVE} -> {client_dir}")
-        with tarfile.open(client_dst) as tf:
-            tf.extractall(client_dir)
-        os.remove(client_dst)
-        abs_static = client_dir.replace("/", "\\")
-        static_line = f"CHAT_STATIC_DIR={abs_static}"
-        if os.path.isfile(env_file):
-            with open(env_file, encoding="utf-8") as f:
-                lines = f.readlines()
-            with open(env_file, "w", encoding="utf-8") as f:
-                found = False
-                for line in lines:
-                    if line.strip().startswith("CHAT_STATIC_DIR="):
-                        f.write(static_line + "\n")
-                        found = True
-                    else:
-                        f.write(line)
-                if not found:
-                    f.write(static_line + "\n")
-        else:
-            with open(env_file, "a", encoding="utf-8") as f:
-                f.write(static_line + "\n")
-        print(f"[deploy] download complete (tag: {rel['tag_name']})")
+        deploy_once(rel, dst, proxy, env_file)
+        tag = rel["tag_name"]
+        print(f"[deploy] download complete (tag: {tag})")
+        write_known_tag(tag)
 
     if cmd in ("run", "all"):
         if not os.path.isfile(dst):
@@ -257,6 +328,7 @@ def main():
             if os.path.isfile(example):
                 shutil.copy2(example, env_file)
                 print(f"[deploy] created {env_file} from .env.example")
+                ensure_jwt_secret(env_file)
             else:
                 print(f"[deploy] no .env.example at {example}, skipping")
         env = load_env(env_file)
@@ -265,8 +337,34 @@ def main():
         print(f"[deploy] --- server output below ---")
         subprocess.run([dst], env=env)
 
-    if cmd not in ("download", "run", "all"):
-        print(f"usage: python {sys.argv[0]} [download|run|all]")
+    if cmd == "watch":
+        known = read_known_tag()
+        print(f"[deploy] watch mode started (interval: {args.interval}s, known tag: {known})")
+        while True:
+            try:
+                rel = latest_release()
+                tag = rel["tag_name"]
+                if tag != known:
+                    print(f"[deploy] new release detected: {tag}")
+                    kill_chatd()
+                    deploy_once(rel, dst, proxy, env_file)
+                    write_known_tag(tag)
+                    known = tag
+                    env = load_env(env_file)
+                    start_detached(dst, env)
+                    print(f"[deploy] deployed {tag}, sleeping {args.interval}s...")
+                else:
+                    print(f"[deploy] no new release (current: {tag})")
+                time.sleep(args.interval)
+            except KeyboardInterrupt:
+                print("[deploy] watch mode stopped")
+                break
+            except Exception as e:
+                print(f"[deploy] ERROR in watch loop: {e}")
+                time.sleep(args.interval)
+
+    if cmd not in ("download", "run", "all", "watch"):
+        print(f"usage: python {sys.argv[0]} [download|run|all|watch]")
         sys.exit(1)
 
 
