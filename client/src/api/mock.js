@@ -762,7 +762,7 @@ export function mockGetNotifyChat(_token) {
       icon_color: '#E8590C',
       owner_id: cu.id,
       created_at: new Date().toISOString(),
-      last_message_at: new Date().toISOString(),
+      last_message_at: new Date(0).toISOString(),
       member_count: 1,
       visibility: '',
       pinned_message: null,
