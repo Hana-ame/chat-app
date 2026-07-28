@@ -29,8 +29,6 @@ GH_PROXY = "https://gh-proxy.com/"
 def setup_proxy(proxy):
     if not proxy:
         return
-    os.environ.setdefault("HTTPS_PROXY", proxy)
-    os.environ.setdefault("HTTP_PROXY", proxy)
     handler = ProxyHandler({"http": proxy, "https": proxy})
     install_opener(build_opener(handler))
 
