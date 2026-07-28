@@ -10,12 +10,16 @@ import WelcomeView from '../components/WelcomeView';
 
 export default function ChatPage() {
   const loc = useLocation();
-  const urlChatId = loc.pathname.startsWith('/g/') ? loc.pathname.slice(3) : null;
   const navigate = useNavigate();
   const { user, accessToken, logout } = useAuthStore();
   const { wsReady, mode, connect, loadChats } = useChatStore();
   const [mobileView, setMobileView] = useState('list');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [notifyChatId, setNotifyChatId] = useState(null);
+
+  const urlChatId = loc.pathname === '/g/notifications'
+    ? notifyChatId
+    : loc.pathname.startsWith('/g/') ? loc.pathname.slice(3) : null;
 
   // sync URL → store for internal unread/message logic
   useEffect(() => {
@@ -32,6 +36,9 @@ export default function ChatPage() {
     if (accessToken) {
       connect(accessToken);
       loadChats(accessToken);
+      api.getNotificationsChat(accessToken).then(chat => {
+        setNotifyChatId(chat.id);
+      }).catch(() => {});
     }
     return () => useChatStore.getState().connect(null);
   }, [accessToken]);
@@ -43,12 +50,22 @@ export default function ChatPage() {
     }
   }, [urlChatId, accessToken]);
 
+  useEffect(() => {
+    if (!urlChatId && notifyChatId && accessToken) {
+      navigate('/g/notifications', { replace: true });
+    }
+  }, [urlChatId, notifyChatId, accessToken, navigate]);
+
   const handleSelectChat = (id) => {
     useChatStore.setState(s => ({
       activeChatId: id,
       chats: s.chats.map(c => c.id === id ? { ...c, unread_count: 0 } : c),
     }));
-    navigate('/g/' + id, { replace: true });
+    if (id === notifyChatId) {
+      navigate('/g/notifications', { replace: true });
+    } else {
+      navigate('/g/' + id, { replace: true });
+    }
     if (isMobile) setMobileView('chat');
   };
 
@@ -61,7 +78,7 @@ export default function ChatPage() {
 
   return (
     <div className={appClass}>
-      <ChatList onSelectChat={handleSelectChat} activeId={urlChatId} onLogout={logout} />
+      <ChatList onSelectChat={handleSelectChat} activeId={urlChatId} notifyChatId={notifyChatId} onLogout={logout} />
        {urlChatId ? (
          <ChatView
            chatId={urlChatId}

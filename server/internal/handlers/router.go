@@ -101,7 +101,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 				r.Get("/chats/public", s.ListPublicChats)
 				r.Post("/chats", s.CreateChat)
 				r.Post("/dms", s.CreateOrGetDM)
-				r.Get("/chats/notify", s.GetOrCreateNotifyChat)
+				r.Get("/chats/notify", s.GetNotificationsChat)
 				r.Route("/chats/{chatID}", func(r chi.Router) {
 					r.Use(s.trackLastActive)
 					r.Get("/", s.GetChat)
@@ -129,7 +129,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 					r.Put("/avatar", s.UpdateChatAvatar)
 					r.Put("/banner", s.UpdateChatBanner)
 					r.Put("/background", s.UpdateChatBackground)
-					r.Put("/notify", s.UpdateNotify)
+					r.Put("/notify", s.UpdateChatNotify)
 				})
 			}) // end auth group
 

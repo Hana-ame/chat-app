@@ -54,11 +54,11 @@ func (s *ChatService) Create(ctx context.Context, userID, name, visibility strin
 	return chat, nil
 }
 
-func (s *ChatService) CreateOrGetNotify(ctx context.Context, userID string) (*models.Chat, error) {
-	if chat, err := s.DB.FindNotifyChat(ctx, userID); err == nil {
+func (s *ChatService) CreateOrGetNotificationsChat(ctx context.Context, userID string) (*models.Chat, error) {
+	if chat, err := s.DB.FindNotificationsChat(ctx, userID); err == nil {
 		return chat, nil
 	}
-	chat, err := s.DB.CreateNotifyChat(ctx, userID)
+	chat, err := s.DB.CreateNotificationsChat(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -292,11 +292,11 @@ func (s *ChatService) SetPinned(ctx context.Context, chatID, userID string, pinn
 	return nil
 }
 
-func (s *ChatService) SetNotifyEnabled(ctx context.Context, chatID, userID string, enabled bool) error {
+func (s *ChatService) SetChatNotifyEnabled(ctx context.Context, chatID, userID string, enabled bool) error {
 	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return err
 	}
-	return s.DB.SetNotifyEnabled(ctx, chatID, userID, enabled)
+	return s.DB.SetChatNotifyEnabled(ctx, chatID, userID, enabled)
 }
 
 func (s *ChatService) Visit(ctx context.Context, chatID, userID string) error {

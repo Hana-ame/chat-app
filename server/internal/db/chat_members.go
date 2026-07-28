@@ -141,7 +141,7 @@ func (d *DB) SetPinned(ctx context.Context, chatID, userID string, pinned bool) 
 	return err
 }
 
-func (d *DB) SetNotifyEnabled(ctx context.Context, chatID, userID string, enabled bool) error {
+func (d *DB) SetChatNotifyEnabled(ctx context.Context, chatID, userID string, enabled bool) error {
 	v := 0
 	if enabled {
 		v = 1

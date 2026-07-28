@@ -245,7 +245,7 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 	return out, nil
 }
 
-func (d *DB) FindNotifyChat(ctx context.Context, userID string) (*models.Chat, error) {
+func (d *DB) FindNotificationsChat(ctx context.Context, userID string) (*models.Chat, error) {
 	var id string
 	err := d.QueryRowContext(ctx,
 		`SELECT c.id FROM chats c
@@ -263,7 +263,7 @@ func (d *DB) FindNotifyChat(ctx context.Context, userID string) (*models.Chat, e
 	return d.GetChat(ctx, id)
 }
 
-func (d *DB) CreateNotifyChat(ctx context.Context, userID string) (*models.Chat, error) {
+func (d *DB) CreateNotificationsChat(ctx context.Context, userID string) (*models.Chat, error) {
 	return d.CreateChat(ctx, "notify", "Notifications", "", userID, []string{userID})
 }
 

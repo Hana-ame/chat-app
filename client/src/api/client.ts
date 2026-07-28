@@ -172,8 +172,8 @@ const _apiMethods = {
   markAnnouncementRead: (token: string, chatId: string) =>
     request<ApiError>('POST', '/api/chats/' + chatId + '/announcement/read', token, {}),
 
-  // ── Notify ──
-  getNotifyChat: (token: string) =>
+  // ── Notifications Chat ──
+  getNotificationsChat: (token: string) =>
     request<Chat>('GET', '/api/chats/notify', token),
 
   // ── Uploads ──
@@ -226,7 +226,7 @@ function buildMockProxy(target: typeof _apiMethods): ApiType {
     markRead: mockMarkRead, addReaction: mockAddReaction, removeReaction: mockRemoveReaction,
     pinChat: mockPinChat, unpinChat: mockUnpinChat,
     markAnnouncementRead: mockMarkAnnouncementRead,
-    getNotifyChat: mockGetNotifyChat,
+    getNotificationsChat: mockGetNotifyChat,
     upload: mockUpload, uploadAvatar: mockUploadAvatar,
   };
   let mockEnabled = false;

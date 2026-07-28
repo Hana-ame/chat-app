@@ -21,7 +21,7 @@ const MODES = [
   { key: 'poll', label: 'Poll' },
 ];
 
-export default function ChatList({ onSelectChat, activeId, onLogout }) {
+export default function ChatList({ onSelectChat, activeId, onLogout, notifyChatId }) {
   const { user, accessToken } = useAuthStore();
   const { chats, mode, setMode } = useChatStore();
   const [showCreate, setShowCreate] = useState(false);
@@ -180,7 +180,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(chatSearch.trim());
 
   const filteredChats = useMemo(() => chats.filter(c => {
-    if (c.type === 'dm') return false;
+    if (c.type === 'dm' || c.type === 'notify') return false;
     if (!chatSearch.trim()) return true;
     if (isUUID) return c.id === chatSearch.trim();
     const q = chatSearch.toLowerCase();
@@ -245,6 +245,14 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
         )}
       </div>
 
+      {notifyChatId && !chatSearch.trim() && (
+        <div className={'chat-item' + (activeId === notifyChatId ? ' active' : '')} style={{cursor:'pointer'}} onClick={() => onSelectChat(notifyChatId)}>
+          <div className="chat-item-avatar" style={{background:'var(--accent)'}}>🔔</div>
+          <div className="chat-item-info">
+            <div className="chat-item-name">Notifications</div>
+          </div>
+        </div>
+      )}
       <ScrollArea className="sidebar-body">
         {uuidChat ? (
           <ChatListItem key={uuidChat.id} chat={uuidChat} activeId={activeId}

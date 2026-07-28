@@ -63,9 +63,9 @@ func (s *Server) CreateChat(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, chat)
 }
 
-func (s *Server) GetOrCreateNotifyChat(w http.ResponseWriter, r *http.Request) {
+func (s *Server) GetNotificationsChat(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
-	chat, err := s.Services.Chat.CreateOrGetNotify(r.Context(), u.ID)
+	chat, err := s.Services.Chat.CreateOrGetNotificationsChat(r.Context(), u.ID)
 	if err != nil {
 		status, code := mapServiceError(err)
 		writeError(w, status, code, err.Error())
@@ -370,7 +370,7 @@ type updateNotifyReq struct {
 	Enabled bool `json:"enabled"`
 }
 
-func (s *Server) UpdateNotify(w http.ResponseWriter, r *http.Request) {
+func (s *Server) UpdateChatNotify(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	if u == nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "")
@@ -382,7 +382,7 @@ func (s *Server) UpdateNotify(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
-	if err := s.Services.Chat.SetNotifyEnabled(r.Context(), id, u.ID, req.Enabled); err != nil {
+	if err := s.Services.Chat.SetChatNotifyEnabled(r.Context(), id, u.ID, req.Enabled); err != nil {
 		status, code := mapServiceError(err)
 		writeError(w, status, code, err.Error())
 		return

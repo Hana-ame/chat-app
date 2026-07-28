@@ -19,6 +19,7 @@ Chat application with Go backend + React frontend.
 
 ## Notes
 - This file is for initialization context only. Session logs and changelogs go in `docs/changelog.md`.
+- **Never run `npm run build` or any build command.** CI handles builds on push.
 
 ## Changelog Rules
 - Always append new entries to the **end** of `docs/changelog.md`.
