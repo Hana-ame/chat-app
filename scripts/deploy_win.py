@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tarfile
 import time
+from concurrent.futures import ThreadPoolExecutor
 import urllib.request
 from urllib.request import ProxyHandler, build_opener, install_opener
 
@@ -137,10 +138,7 @@ def find_asset(release, name):
 def download(asset, dst):
     url = GH_PROXY + asset["browser_download_url"]
     print(f"[deploy] download url: {url}")
-    if os.path.isfile(dst):
-        print(f"[deploy] removing existing file: {dst}")
-        os.remove(dst)
-    cmd = ["curl.exe", "-L", "--progress-bar", "--retry", "5", "--connect-timeout", "30", "-o", dst, url]
+    cmd = ["curl.exe", "-L", "-C", "-", "--retry", "5", "--connect-timeout", "30", "--progress-bar", "-o", dst, url]
     print(f"[deploy] running: {' '.join(cmd)}")
     subprocess.run(cmd, check=True)
     size = os.path.getsize(dst)
@@ -238,10 +236,13 @@ def load_env(env_file):
 
 def deploy_once(rel, dst, env_file):
     binary_asset = find_asset(rel, BINARY)
-    download(binary_asset, dst)
     client_asset = find_asset(rel, CLIENT_ARCHIVE)
     client_dst = os.path.join(CWD, CLIENT_ARCHIVE)
-    download(client_asset, client_dst)
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        f1 = ex.submit(download, binary_asset, dst)
+        f2 = ex.submit(download, client_asset, client_dst)
+        f1.result()
+        f2.result()
     client_dir = os.path.join(CWD, "client", "dist")
     os.makedirs(client_dir, exist_ok=True)
     print(f"[deploy] extracting {CLIENT_ARCHIVE} -> {client_dir}")
