@@ -8,7 +8,7 @@ test.describe('Mock API Mode (CI)', () => {
     await page.goto('/login');
     await page.waitForSelector('.form-box');
     await page.evaluate(() => window.__mockLogin());
-    await page.waitForURL('/');
+    await page.waitForURL(/\/g\/notifications|\/$/);
     await page.waitForSelector('.sidebar');
   }
 
