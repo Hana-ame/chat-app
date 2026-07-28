@@ -7,10 +7,6 @@ Chat application with Go backend + React frontend.
 - `server/` — Go backend (chi router, SQLite, WebSocket)
 - `client/` — React frontend (Vite, Zustand)
 
-## Commands
-- Server: `cd server && go build ./... && go test ./... && go vet ./...`
-- Client: `cd client && npm run build`
-
 ## Architecture
 - Handlers in `server/internal/handlers/` — HTTP layer only
 - Service in `server/internal/service/` — business logic, permissions, broadcasts
@@ -29,11 +25,6 @@ Chat application with Go backend + React frontend.
 - Frontend (Cloudflare Pages): `https://chat.moonchan.xyz`
 - Backend API: `https://chat.moonchan.xyz` (same domain, proxied)
 - API version endpoint: `GET /api/version`
-
-## Release (Tag & Build)
-- `git tag build-$(git rev-parse --short HEAD)` — tag with short commit hash
-- `git push --tags` — triggers CI (go-build + release job only runs on `main` or tags)
-- After push, run `gh run list --branch <tag> --limit 3` to confirm CI passes
 
 ## Workflow (每次修改后)
 1. `git add` + `git commit`
