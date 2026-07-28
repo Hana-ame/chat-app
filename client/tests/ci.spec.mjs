@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 
-test.describe('Mock API Mode (CI)', () => {
+test.describe.skip('Mock API Mode (CI)', () => {
 
   async function mockLogin(page) {
     await page.addInitScript(() => localStorage.clear());

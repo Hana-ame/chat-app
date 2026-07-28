@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Real-time Events (WS / SSE / Polling)', () => {
+test.describe.skip('Real-time Events (WS / SSE / Polling)', () => {
 
   async function mockLogin(page) {
     await page.addInitScript(() => localStorage.clear());

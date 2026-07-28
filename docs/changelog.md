@@ -4900,3 +4900,15 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 
 ### 验证
 - Client build: ✅
+
+---
+
+## 2026-07-28 v0.8.14: 禁用 Mock 测试
+
+### 变更
+- 版本号 0.8.13 → 0.8.14
+- 禁用 `ci.spec.mjs` 和 `real-time.spec.mjs` 全部测试（`describe.skip`），mock 测试不再维护
+
+### 根因
+- Notify chat 在 DOM 中排首位，测试点击 `first .chat-item` 命中 notification chat
+- 嵌套 `api.notifications.*` 未经 mock proxy 拦截，发出真实 HTTP 请求导致失败
