@@ -79,7 +79,11 @@ async function fetchStream(url, msgId) {
         if (p === '[DONE]') { streamDone = true; break; }
         try {
           const json = JSON.parse(p);
-          if (json.content) {
+          if (json.type === 'reasoning' && json.content) {
+            useChatStore.setState(s => ({ messages: s.messages.map(m =>
+              m.id === msgId ? { ...m, thinking: (m.thinking || '') + json.content } : m
+            ) }));
+          } else if (json.content) {
             useChatStore.setState(s => ({ messages: s.messages.map(m =>
               m.id === msgId ? { ...m, content: m.content + json.content } : m
             ) }));

@@ -32,7 +32,7 @@ func New(database *db.DB, hub *ws.Hub, cfg *config.Config) *Service {
 	s.Reaction = &ReactionService{Service: s}
 	s.Stream = &StreamService{
 		Service:    s,
-		liveChunks: map[string][]string{},
+		liveChunks: map[string][]ChunkInfo{},
 		liveSubs:   map[string][]chan struct{}{},
 		liveDone:   map[string]bool{},
 		liveAuthor: map[string]*models.User{},

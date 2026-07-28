@@ -10,10 +10,13 @@ export function streamAI(response, onChunk, onDone, onError) {
     if (payload === '[DONE]') return;
     try {
       const json = JSON.parse(payload);
-      if (json.reasoning_content) {
+      if (json.type === 'reasoning') {
+        onChunk?.({ type: 'thinking', content: json.content || '' });
+      } else if (json.type === 'content') {
+        onChunk?.({ type: 'content', content: json.content || '' });
+      } else if (json.reasoning_content) {
         onChunk?.({ type: 'thinking', content: json.reasoning_content });
-      }
-      if (json.content) {
+      } else if (json.content) {
         onChunk?.({ type: 'content', content: json.content });
       }
     } catch {}

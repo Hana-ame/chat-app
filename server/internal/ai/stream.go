@@ -21,6 +21,7 @@ type Source struct {
 }
 
 type Chunk struct {
+	Type    string // "content" or "reasoning"
 	Content string
 	Done    bool
 }
@@ -105,9 +106,9 @@ func readStream(resp *http.Response, ch chan<- Chunk) {
 		}
 		for _, c := range event.Choices {
 			if c.Delta.ReasoningContent != "" {
-				ch <- Chunk{Content: c.Delta.ReasoningContent}
+				ch <- Chunk{Type: "reasoning", Content: c.Delta.ReasoningContent}
 			} else if c.Delta.Content != "" {
-				ch <- Chunk{Content: c.Delta.Content}
+				ch <- Chunk{Type: "content", Content: c.Delta.Content}
 			}
 		}
 	}

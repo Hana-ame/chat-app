@@ -46,9 +46,9 @@ export default function ChatListItem({ chat, activeId, onSelectChat, onContextMe
       <div className="chat-item-info">
         <div style={{display:'flex',alignItems:'center',gap:4}}>
           <div className="chat-item-name">{name}</div>
-          <span style={{fontSize:10,padding:'0 5px',borderRadius:3,fontWeight:500,background: merged.visibility === 'public' ? 'var(--success-bg)' : merged.visibility === 'unlisted' ? 'var(--accent-bg)' : 'rgba(128,132,142,0.15)', color: merged.visibility === 'public' ? 'var(--success)' : merged.visibility === 'unlisted' ? 'var(--accent)' : 'var(--text-muted)'}}>
+          {merged.type !== 'notify' && <span style={{fontSize:10,padding:'0 5px',borderRadius:3,fontWeight:500,background: merged.visibility === 'public' ? 'var(--success-bg)' : merged.visibility === 'unlisted' ? 'var(--accent-bg)' : 'rgba(128,132,142,0.15)', color: merged.visibility === 'public' ? 'var(--success)' : merged.visibility === 'unlisted' ? 'var(--accent)' : 'var(--text-muted)'}}>
             {merged.visibility || 'private'}
-          </span>
+          </span>}
         </div>
         <div className="chat-item-preview">
           {merged.last_message ? (merged.last_message.deleted ? '(message deleted)' : merged.last_message.author?.username + ': ' + merged.last_message.content) : ''}

@@ -135,7 +135,7 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId }) {
             ) : msg.type === 'thinking' ? (
               <details>
                 <summary style={{fontSize:12,color:'var(--text-muted)',cursor:'pointer',userSelect:'none',opacity:0.7}}>
-                  💭 {msg.streaming && !msg.content ? <span className="stream-cursor" /> : 'Thought'}
+                  🔍 {msg.streaming && !msg.content ? <span className="stream-cursor" /> : 'Reasoning'}
                 </summary>
                 <div className="msg-content" style={{whiteSpace:'pre-wrap',wordBreak:'break-word',fontSize:12,color:'var(--text-muted)',padding:'4px 8px',background:'var(--bg-tertiary)',borderRadius:4,marginTop:4}}>
                   {msg.content}
@@ -146,7 +146,7 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId }) {
                 {msg.thinking && (
                   <details style={{marginBottom:4}}>
                     <summary style={{fontSize:12,color:'var(--text-muted)',cursor:'pointer',userSelect:'none',opacity:0.7}}>
-                      💭 {msg.streaming && !msg.content ? <span className="stream-cursor" /> : 'Thought'}
+                      🔍 {msg.streaming && !msg.content ? <span className="stream-cursor" /> : 'Reasoning'}
                     </summary>
                     <div className="msg-content" style={{whiteSpace:'pre-wrap',wordBreak:'break-word',fontSize:12,color:'var(--text-muted)',padding:'4px 8px',background:'var(--bg-tertiary)',borderRadius:4,marginTop:4}}>
                       {msg.thinking}

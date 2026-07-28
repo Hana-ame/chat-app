@@ -24,7 +24,8 @@ const MODES = [
 export default function ChatList({ onSelectChat, activeId, onLogout }) {
   const { user, accessToken } = useAuthStore();
   const { chats, mode, setMode } = useChatStore();
-  const notifyChatId = useMemo(() => chats.find(c => c.type === 'notify')?.id, [chats]);
+  const notifyChat = useMemo(() => chats.find(c => c.type === 'notify'), [chats]);
+  const notifyChatId = notifyChat?.id;
   const [showCreate, setShowCreate] = useState(false);
   const [newChatName, setNewChatName] = useState('');
   const [newChatVisibility, setNewChatVisibility] = useState('public');
@@ -246,15 +247,11 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
         )}
       </div>
 
-      {notifyChatId && !chatSearch.trim() && (
-        <div className={'chat-item' + (activeId === notifyChatId ? ' active' : '')} style={{cursor:'pointer'}} onClick={() => onSelectChat(notifyChatId)}>
-          <div className="chat-item-avatar" style={{background:'var(--accent)'}}><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
-          <div className="chat-item-info">
-            <div className="chat-item-name">Notifications</div>
-          </div>
-        </div>
-      )}
       <ScrollArea className="sidebar-body">
+        {!chatSearch.trim() && notifyChat && (
+          <ChatListItem key={notifyChat.id} chat={notifyChat} activeId={activeId}
+            onSelectChat={onSelectChat} onContextMenu={setContextMenu} />
+        )}
         {uuidChat ? (
           <ChatListItem key={uuidChat.id} chat={uuidChat} activeId={activeId}
             onSelectChat={chats.find(c => c.id === uuidChat.id) ? onSelectChat : () => handleJoinPublic(uuidChat.id)}

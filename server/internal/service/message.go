@@ -19,11 +19,11 @@ func (s *MessageService) List(ctx context.Context, chatID, userID string, before
 	return s.DB.GetMessages(ctx, chatID, before, limit)
 }
 
-func (s *MessageService) SendAI(ctx context.Context, chatID, userID, content, msgID string, author *models.User) (*models.Message, error) {
-	if strings.TrimSpace(content) == "" {
+func (s *MessageService) SendAI(ctx context.Context, chatID, userID, content, thinking, msgID string, author *models.User) (*models.Message, error) {
+	if strings.TrimSpace(content) == "" && strings.TrimSpace(thinking) == "" {
 		return nil, ErrInvalidInput
 	}
-	msg, err := s.DB.CreateAIMessage(ctx, chatID, userID, msgID, content)
+	msg, err := s.DB.CreateAIMessage(ctx, chatID, userID, msgID, content, thinking)
 	if err != nil {
 		return nil, err
 	}

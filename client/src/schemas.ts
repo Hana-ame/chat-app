@@ -50,6 +50,7 @@ export const MessageSchema = z.object({
   attachments: z.array(AttachmentSchema).optional(),
   reactions: z.array(ReactionSchema).optional(),
   mentions: z.array(z.string()).optional(),
+  thinking: z.string().optional(),
   stream_url: z.string().optional(),
   streaming: z.boolean().optional(),
   source: z.function().optional(),

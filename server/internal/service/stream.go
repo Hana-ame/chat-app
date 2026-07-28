@@ -10,10 +10,15 @@ import (
 	"github.com/Hana-ame/chat-app/server/internal/models"
 )
 
+type ChunkInfo struct {
+	Type    string `json:"type"`
+	Content string `json:"content"`
+}
+
 type StreamService struct {
 	*Service
 	liveMu     sync.Mutex
-	liveChunks map[string][]string
+	liveChunks map[string][]ChunkInfo
 	liveSubs   map[string][]chan struct{}
 	liveDone   map[string]bool
 	liveAuthor map[string]*models.User
@@ -26,7 +31,7 @@ func (s *StreamService) StartStream(ctx context.Context, chatID, userID, msgID s
 	}
 
 	s.liveMu.Lock()
-	s.liveChunks[msgID] = []string{}
+	s.liveChunks[msgID] = []ChunkInfo{}
 	s.liveDone[msgID] = false
 	s.liveAuthor[msgID] = author
 	s.liveMu.Unlock()
@@ -49,9 +54,9 @@ func (s *StreamService) StartStream(ctx context.Context, chatID, userID, msgID s
 	return ch, nil
 }
 
-func (s *StreamService) AppendChunk(msgID, content string) {
+func (s *StreamService) AppendChunk(msgID, chunkType, content string) {
 	s.liveMu.Lock()
-	s.liveChunks[msgID] = append(s.liveChunks[msgID], content)
+	s.liveChunks[msgID] = append(s.liveChunks[msgID], ChunkInfo{Type: chunkType, Content: content})
 	subs := s.liveSubs[msgID]
 	s.liveMu.Unlock()
 	for _, sub := range subs {
@@ -62,7 +67,7 @@ func (s *StreamService) AppendChunk(msgID, content string) {
 	}
 }
 
-func (s *StreamService) FinishStream(ctx context.Context, chatID, userID, msgID, content string) {
+func (s *StreamService) FinishStream(ctx context.Context, chatID, userID, msgID, content, thinking string) {
 	s.liveMu.Lock()
 	s.liveDone[msgID] = true
 	author := s.liveAuthor[msgID]
@@ -72,7 +77,7 @@ func (s *StreamService) FinishStream(ctx context.Context, chatID, userID, msgID,
 	s.liveSubs[msgID] = nil
 	s.liveMu.Unlock()
 
-	if _, err := s.Message.SendAI(ctx, chatID, userID, content, msgID, author); err != nil {
+	if _, err := s.Message.SendAI(ctx, chatID, userID, content, thinking, msgID, author); err != nil {
 		logutil.Error("ai: save message failed: %v", err)
 	}
 
@@ -81,12 +86,11 @@ func (s *StreamService) FinishStream(ctx context.Context, chatID, userID, msgID,
 		delete(s.liveChunks, msgID)
 		delete(s.liveSubs, msgID)
 		delete(s.liveAuthor, msgID)
-		// liveDone 保留 true，让后续 StreamStatus 能识别「流已结束」
 		s.liveMu.Unlock()
 	})
 }
 
-func (s *StreamService) StreamStatus(msgID string, idx int) (chunks []string, done bool, ok bool) {
+func (s *StreamService) StreamStatus(msgID string, idx int) (chunks []ChunkInfo, done bool, ok bool) {
 	s.liveMu.Lock()
 	defer s.liveMu.Unlock()
 
@@ -116,9 +120,7 @@ func (s *StreamService) Subscribe(msgID string) chan struct{} {
 	return ch
 }
 
-// SubscribeFrom atomically reads chunks from fromIdx and subscribes for
-// future notifications — no chunk can be lost between the read and subscribe.
-func (s *StreamService) SubscribeFrom(msgID string, fromIdx int) (chunks []string, done bool, ok bool, notify chan struct{}) {
+func (s *StreamService) SubscribeFrom(msgID string, fromIdx int) (chunks []ChunkInfo, done bool, ok bool, notify chan struct{}) {
 	s.liveMu.Lock()
 	defer s.liveMu.Unlock()
 

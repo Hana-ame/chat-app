@@ -1843,7 +1843,7 @@ func TestStreamService_Lifecycle(t *testing.T) {
 		}
 		got.WriteString(c.Content)
 		chunkCount++
-		f.Server.Services.Stream.AppendChunk(msgID, c.Content)
+		f.Server.Services.Stream.AppendChunk(msgID, "content", c.Content)
 	}
 	if got.String() != "Hello World" {
 		t.Fatalf("want 'Hello World', got '%s'", got.String())
@@ -1863,12 +1863,16 @@ func TestStreamService_Lifecycle(t *testing.T) {
 	if len(chunks) != 2 {
 		t.Fatalf("want 2 chunks, got %d", len(chunks))
 	}
-	if strings.Join(chunks, "") != "Hello World" {
-		t.Fatalf("want 'Hello World', got '%s'", strings.Join(chunks, ""))
+	var joined string
+	for _, ci := range chunks {
+		joined += ci.Content
+	}
+	if joined != "Hello World" {
+		t.Fatalf("want 'Hello World', got '%s'", joined)
 	}
 
 	// FinishStream
-	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, got.String())
+	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, got.String(), "")
 
 	// done should be true
 	_, done, ok = f.Server.Services.Stream.StreamStatus(msgID, 0)
@@ -1917,7 +1921,7 @@ func TestStreamService_StreamStatus_WithIdx(t *testing.T) {
 		if c.Done {
 			break
 		}
-		f.Server.Services.Stream.AppendChunk(msgID, c.Content)
+		f.Server.Services.Stream.AppendChunk(msgID, "content", c.Content)
 	}
 
 	// read with idx
@@ -1937,7 +1941,7 @@ func TestStreamService_StreamStatus_WithIdx(t *testing.T) {
 	}
 
 	// after finish, StreamStatus should still be ok
-	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "ABC")
+	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "ABC", "")
 	_, done, ok = f.Server.Services.Stream.StreamStatus(msgID, 0)
 	if !ok {
 		t.Fatal("stream should still exist after finish (before cleanup)")
@@ -1978,7 +1982,7 @@ func TestStreamService_Subscribe_Notification(t *testing.T) {
 			if c.Done {
 				break
 			}
-			f.Server.Services.Stream.AppendChunk(msgID, c.Content)
+			f.Server.Services.Stream.AppendChunk(msgID, "content", c.Content)
 		}
 		close(done)
 	}()
@@ -1992,12 +1996,12 @@ func TestStreamService_Subscribe_Notification(t *testing.T) {
 
 	// verify chunk is there
 	chunks, _, _ := f.Server.Services.Stream.StreamStatus(msgID, 0)
-	if len(chunks) != 1 || chunks[0] != "X" {
+	if len(chunks) != 1 || chunks[0].Content != "X" {
 		t.Fatalf("want [X], got %v", chunks)
 	}
 
 	<-done
-	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "X")
+	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "X", "")
 }
 
 func TestStreamService_Finish_NotifiesSubscribers(t *testing.T) {
@@ -2023,13 +2027,13 @@ func TestStreamService_Finish_NotifiesSubscribers(t *testing.T) {
 		if c.Done {
 			break
 		}
-		f.Server.Services.Stream.AppendChunk(msgID, c.Content)
+		f.Server.Services.Stream.AppendChunk(msgID, "content", c.Content)
 	}
 
 	notify := f.Server.Services.Stream.Subscribe(msgID)
 	defer f.Server.Services.Stream.Unsubscribe(msgID, notify)
 
-	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "hello")
+	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "hello", "")
 
 	// subscriber channel should be closed (nil after finish)
 	select {
@@ -2080,7 +2084,7 @@ func TestStreamService_Unsubscribe(t *testing.T) {
 	f.Server.Services.Stream.Unsubscribe(msgID, ch1)
 
 	// append
-	f.Server.Services.Stream.AppendChunk(msgID, "data")
+	f.Server.Services.Stream.AppendChunk(msgID, "content", "data")
 
 	// ch1 should not receive notification
 	select {
@@ -2127,11 +2131,11 @@ func TestStreamService_EmptyContent(t *testing.T) {
 		if c.Done {
 			break
 		}
-		f.Server.Services.Stream.AppendChunk(msgID, c.Content)
+		f.Server.Services.Stream.AppendChunk(msgID, "content", c.Content)
 	}
 
 	// FinishStream with empty content
-	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "")
+	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "", "")
 
 	// done should be true
 	_, done, ok := f.Server.Services.Stream.StreamStatus(msgID, 0)
@@ -2180,13 +2184,13 @@ func TestStreamService_NonStreamingUpstream(t *testing.T) {
 			break
 		}
 		got.WriteString(c.Content)
-		f.Server.Services.Stream.AppendChunk(msgID, c.Content)
+		f.Server.Services.Stream.AppendChunk(msgID, "content", c.Content)
 	}
 	if got.String() != "non-stream response" {
 		t.Fatalf("want 'non-stream response', got '%s'", got.String())
 	}
 
-	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, got.String())
+	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, got.String(), "")
 
 	msg, err := f.DB.GetMessage(context.Background(), msgID)
 	if err != nil {
@@ -2228,7 +2232,7 @@ func TestStreamService_MultipleSubscribers(t *testing.T) {
 			if c.Done {
 				break
 			}
-			f.Server.Services.Stream.AppendChunk(msgID, c.Content)
+			f.Server.Services.Stream.AppendChunk(msgID, "content", c.Content)
 		}
 	}()
 
@@ -2344,7 +2348,7 @@ func TestStreamService_ConcurrentAppendAndStatus(t *testing.T) {
 			if c.Done {
 				break
 			}
-			f.Server.Services.Stream.AppendChunk(msgID, c.Content)
+			f.Server.Services.Stream.AppendChunk(msgID, "content", c.Content)
 		}
 		close(done)
 	}()
@@ -2383,12 +2387,12 @@ func TestStreamService_FinishIdempotent(t *testing.T) {
 		if c.Done {
 			break
 		}
-		f.Server.Services.Stream.AppendChunk(msgID, c.Content)
+		f.Server.Services.Stream.AppendChunk(msgID, "content", c.Content)
 	}
 
 	// calling FinishStream twice should not panic
-	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "x")
-	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "x")
+	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "x", "")
+	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "x", "")
 
 	_, done, ok := f.Server.Services.Stream.StreamStatus(msgID, 0)
 	if !ok {
@@ -2422,10 +2426,10 @@ func TestStreamService_SubscribeAfterFinish(t *testing.T) {
 		if c.Done {
 			break
 		}
-		f.Server.Services.Stream.AppendChunk(msgID, c.Content)
+		f.Server.Services.Stream.AppendChunk(msgID, "content", c.Content)
 	}
 
-	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "d")
+	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "d", "")
 
 	// subscribe after finish — channel should close immediately
 	notify := f.Server.Services.Stream.Subscribe(msgID)
@@ -2475,7 +2479,7 @@ func TestStreamService_DoneBeforeChunks(t *testing.T) {
 	}
 
 	// no AppendChunk called, but FinishStream sets done
-	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "")
+	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "", "")
 
 	_, done, ok := f.Server.Services.Stream.StreamStatus(msgID, 0)
 	if !ok {
@@ -2509,7 +2513,7 @@ func TestStreamService_StreamStatusIndexBounds(t *testing.T) {
 		if c.Done {
 			break
 		}
-		f.Server.Services.Stream.AppendChunk(msgID, c.Content)
+		f.Server.Services.Stream.AppendChunk(msgID, "content", c.Content)
 	}
 
 	// negative index should not panic (cast to uint)
@@ -2601,11 +2605,11 @@ func TestStreamService_ConcurrentSubscribeUnsubscribe(t *testing.T) {
 		if c.Done {
 			break
 		}
-		f.Server.Services.Stream.AppendChunk(msgID, c.Content)
+		f.Server.Services.Stream.AppendChunk(msgID, "content", c.Content)
 	}
 
 	wg.Wait()
-	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "abcde")
+	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "abcde", "")
 }
 
 func TestStreamService_SubscribeThenAppend(t *testing.T) {
@@ -2639,7 +2643,7 @@ func TestStreamService_SubscribeThenAppend(t *testing.T) {
 			if c.Done {
 				break
 			}
-			f.Server.Services.Stream.AppendChunk(msgID, c.Content)
+			f.Server.Services.Stream.AppendChunk(msgID, "content", c.Content)
 		}
 	}()
 
@@ -2672,15 +2676,15 @@ func TestStreamService_AppendChunk_NonexistentMessage(t *testing.T) {
 	}
 
 	// append for a different msgID that doesn't exist
-	f.Server.Services.Stream.AppendChunk("nonexistent-msg", "should-not-panic")
+	f.Server.Services.Stream.AppendChunk("nonexistent-msg", "content", "should-not-panic")
 
 	for c := range ch {
 		if c.Done {
 			break
 		}
-		f.Server.Services.Stream.AppendChunk(msgID, c.Content)
+		f.Server.Services.Stream.AppendChunk(msgID, "content", c.Content)
 	}
-	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "x")
+	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "x", "")
 }
 
 func TestStreamService_Unsubscribe_NonexistentMessage(t *testing.T) {
@@ -2746,10 +2750,10 @@ func TestStreamService_StartStream_HubNil(t *testing.T) {
 			break
 		}
 		got.WriteString(c.Content)
-		f.Server.Services.Stream.AppendChunk(msgID, c.Content)
+		f.Server.Services.Stream.AppendChunk(msgID, "content", c.Content)
 	}
 	if got.String() != "data" {
 		t.Fatalf("want 'data', got '%s'", got.String())
 	}
-	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "data")
+	f.Server.Services.Stream.FinishStream(context.Background(), chat.ID, a, msgID, "data", "")
 }

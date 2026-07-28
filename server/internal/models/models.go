@@ -70,6 +70,7 @@ type Message struct {
 	// Deprecated.
 	Author          *User        `json:"author,omitempty"`
 	Content         string       `json:"content"`
+	Thinking        string       `json:"thinking,omitempty"`
 	StreamURL       string       `json:"stream_url,omitempty"`
 	CreatedAt       time.Time    `json:"created_at"`
 	EditedAt        *time.Time   `json:"edited_at,omitempty"`

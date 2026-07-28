@@ -43,6 +43,15 @@ export default function ChatPage() {
   }, [accessToken]);
 
   useEffect(() => {
+    if (!accessToken) return;
+    if (!notifyChat) {
+      api.notifications.getNotifyChat(accessToken).then(chat => {
+        if (chat && chat.id) useChatStore.getState().onChatUpdate(chat);
+      }).catch(() => {});
+    }
+  }, [accessToken, notifyChat]);
+
+  useEffect(() => {
     if (urlChatId && accessToken) {
       if (isMobile) setMobileView('chat');
       if (isNotification) {

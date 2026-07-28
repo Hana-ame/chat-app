@@ -45,12 +45,13 @@ export default function ChatView({ chatId, isNotification, onBack }) {
       subscribe(chatId);
       if (isNotification) {
         api.notifications.listMessages(accessToken).then(data => {
-          useChatStore.setState(s => ({ messages: (data.messages || []).map(m => ({
-            ...m,
-            deleted_at: m.deleted_at || (m.deleted ? '' : undefined),
-            deleted: !!m.deleted,
-            content: m.deleted ? '' : m.content,
-          })) }));
+          useChatStore.setState(s => ({
+            messages: (data.messages || []).map(m => {
+              if (m.deleted_at) return { ...m, deleted: true, content: '' };
+              if (m.deleted) return { ...m, content: '' };
+              return m;
+            }),
+          }));
         }).catch(() => {});
       } else {
         loadMessages(accessToken, chatId);

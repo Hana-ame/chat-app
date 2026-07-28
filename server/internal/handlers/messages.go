@@ -126,14 +126,19 @@ func (s *Server) handleStreamMessage(w http.ResponseWriter, r *http.Request, u *
 	}
 
 	var buf bytes.Buffer
+	var thinkingBuf bytes.Buffer
 
 	for chunk := range ch {
 		if chunk.Done {
 			break
 		}
-		buf.WriteString(chunk.Content)
-		s.Services.Stream.AppendChunk(msgID, chunk.Content)
-		data, _ := json.Marshal(map[string]string{"content": chunk.Content})
+		if chunk.Type == "reasoning" {
+			thinkingBuf.WriteString(chunk.Content)
+		} else {
+			buf.WriteString(chunk.Content)
+		}
+		s.Services.Stream.AppendChunk(msgID, chunk.Type, chunk.Content)
+		data, _ := json.Marshal(map[string]string{"type": chunk.Type, "content": chunk.Content})
 		_, _ = w.Write([]byte("data: "))
 		_, _ = w.Write(data)
 		_, _ = w.Write([]byte("\n\n"))
@@ -141,10 +146,11 @@ func (s *Server) handleStreamMessage(w http.ResponseWriter, r *http.Request, u *
 	}
 
 	content := buf.String()
-	if content == "" {
+	thinking := thinkingBuf.String()
+	if content == "" && thinking == "" {
 		content = "（AI 响应为空，请检查 endpoint / auth_key / body 设置）"
 	}
-	s.Services.Stream.FinishStream(context.Background(), chatID, u.ID, msgID, content)
+	s.Services.Stream.FinishStream(context.Background(), chatID, u.ID, msgID, content, thinking)
 
 	_, _ = w.Write([]byte("data: [DONE]\n\n"))
 	flusher.Flush()
@@ -172,8 +178,8 @@ func (s *Server) StreamMessageContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeSSE := func(content string) {
-		data, _ := json.Marshal(map[string]string{"content": content})
+	writeSSE := func(chunkType, content string) {
+		data, _ := json.Marshal(map[string]string{"type": chunkType, "content": content})
 		_, _ = w.Write([]byte("data: "))
 		_, _ = w.Write(data)
 		_, _ = w.Write([]byte("\n\n"))
@@ -190,8 +196,13 @@ func (s *Server) StreamMessageContent(w http.ResponseWriter, r *http.Request) {
 	// buffer 不存在 → 从 DB 读
 	if !ok {
 		msg, err := s.Services.Stream.GetMessage(r.Context(), msgID)
-		if err == nil && msg.Content != "" {
-			writeSSE(msg.Content)
+		if err == nil {
+			if msg.Thinking != "" {
+				writeSSE("reasoning", msg.Thinking)
+			}
+			if msg.Content != "" {
+				writeSSE("content", msg.Content)
+			}
 		}
 		sendDone()
 		return
@@ -200,7 +211,7 @@ func (s *Server) StreamMessageContent(w http.ResponseWriter, r *http.Request) {
 
 	// 写已有 chunks
 	for _, c := range chunks {
-		writeSSE(c)
+		writeSSE(c.Type, c.Content)
 	}
 
 	// 流已结束 → 直接 DONE
@@ -221,7 +232,7 @@ loop:
 				break loop
 			}
 			for _, c := range chunks {
-				writeSSE(c)
+				writeSSE(c.Type, c.Content)
 			}
 			idx += len(chunks)
 			if done {
