@@ -45,7 +45,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (!accessToken) return;
     if (!notifyChat) {
-      api.notifications.getNotifyChat(accessToken).then(chat => {
+      api.getNotificationsChat(accessToken).then(chat => {
         if (chat && chat.id) useChatStore.getState().onChatUpdate(chat);
       }).catch(() => {});
     }

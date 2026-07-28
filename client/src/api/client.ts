@@ -173,6 +173,8 @@ const _apiMethods = {
     request<ApiError>('POST', '/api/chats/' + chatId + '/announcement/read', token, {}),
 
   // ── Notifications ──
+  getNotificationsChat: (token: string) =>
+    request<Chat>('GET', '/api/chats/notify', token),
   notifications: {
     listMessages: (token: string, before?: string, limit?: number) => {
       let url = '/api/notifications/messages?limit=' + (limit || 50);
