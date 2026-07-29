@@ -4962,24 +4962,65 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 
 ---
 
-## 2026-07-23 v0.3.2: 上传服务 + AI Provider 抽象 + 通知偏好
+## 2026-07-23 v0.3.2: AI 多源接入 + 本地文件上传 + 通知偏好
 
-### 新增
-- `server-side notification prefs` — `notify_enabled` / `notify_blocked` 字段
-- 本地文件上传 `POST /api/upload` 及 `deploy_win.py` 部署脚本
-- 多源 AI Provider 抽象 + 源选择器（Composer）
-- 浏览器通知支持
+### 提交历史
+```
+6d72b2c feat: server-side notification prefs + browser notify
+c8dd0b4 feat: local upload via /api/upload + deploy_win.py
+8380a84 docs: update README with AI Chat architecture, API, config
+e37156b fix: respect model field from request body, add model input in Composer
+b6da818 feat: multi-source AI provider abstraction + source picker
+81d2d28 refactor: extract Authz, fix SSE/WS dupe, add reconnect backoff, clean up ensure* methods
+```
+
+### 文件变更（50 个文件，+1835 −307）
+
+### 新增：AI 多源 Provider 抽象
+- `server/internal/ai/provider.go`（新）— `Provider` 接口（`ChatStream`）、`SourceConfig` 结构体、`ChatRequest`/`Chunk` 类型
+- `server/internal/ai/openai.go`（新）— OpenAI 兼容流式/非流式 provider（SSE 解析、`reasoning_content` 支持、5min 超时）
+- `server/internal/handlers/ai.go`（新）— `POST /api/ai/chat` SSE 端点：鉴权、多 source 路由、流式转发、AI 回复自动入库
+- `server/internal/handlers/handler.go` — `Server` 新增 `AIHandler`，`New()` 中按 `cfg.AISources` 初始化
+- `server/internal/handlers/router.go` — 注册 `POST /api/ai/chat`
+- `server/internal/config/config.go` — 新增 `AISources`（环境变量 `CHAT_AI_*` 兼容）
+- `server/internal/service/message.go` — 新增 `SendAI()`（创建 AI 消息 + Hub 广播）
+- `client/src/utils/ai.js`（新）— `streamAI()` SSE reader，支持 AbortController
+- `client/src/api/client.ts` — 新增 `aiChat()` 方法
+- `client/src/components/Composer.jsx` — AI 模式开关、source/model 配置、40 条上下文、streaming 逐字渲染、`@mention` 成员下拉
+
+### 新增：服务端通知偏好 + 浏览器通知
+- `server/internal/db/chat_members.go` — `SetNotifyEnabled()`
+- `server/internal/db/users.go` — `notify_blocked` 字段、`GetUserNotifyBlocked()` / `SetUserNotifyBlocked()`
+- `server/internal/handlers/chat.go` — `UpdateNotify` 处理器
+- `server/internal/handlers/users.go` — `UpdateMe` 支持 `notify_blocked`
+- `server/internal/models/models.go` — `User.NotifyBlocked []string`、`Chat.NotifyEnabled bool`
+- `server/internal/service/chat.go` — `SetNotifyEnabled()`
+- `server/internal/service/user.go` — `UpdateNotifyBlocked()`
+- `client/src/utils/browserNotify.js`（新）— `requestNotifyPermission()` / `sendBrowserNotification()`
+- `client/src/store/chat.js` — `notifyEnabled` state + action，`onMessageCreate` 触发浏览器通知
+
+### 新增：本地文件上传
+- `server/internal/storage/driver.go`（新）— `StorageDriver` 接口
+- `server/internal/storage/local/local.go`（新）— 本地文件系统驱动（MD5 ETag）
+- `server/internal/handlers/aapi.go`（新）— `AAPIUpload`（PUT/POST multipart/raw）、`AAPILocalFile`（GET + 安全删除）
+- `client/src/api/client.ts` — `buildUploadUrl()` 重写，`VITE_UPLOAD_BASE` 默认空（同源）
+
+### 新增：部署脚本
+- `scripts/deploy_win.py`（新）— GitHub Releases 下载、`.env` 创建、守护进程启动
 
 ### 重构
-- 提取 `authz` 包，修复 SSE/WS 连接重复
-- 添加 reconnect backoff
-- 清理 `ensure*` 方法
+- **Authz 独立** — `server/internal/service/authz.go`：从 ChatService 提取独立 `Authz` 结构体（`MustBeMember` / `RequireOwnerOrAdmin`）
+- **SSE/WS 去重** — `server/internal/ws/hub.go`：`sendToUser` 有 WS 时跳过 SSE
+- **Reconnect 退避** — `client/src/realtime/coordinator.js`：指数增长 1s→30s，generation-gated
+- **DB 迁移函数外置** — `server/internal/db/db_fixups.go`（新）：从 db.go 提取所有 `ensure*Column`
 
-### 修改
-- 消息体 `model` 字段优先使用请求体传入
-- Composer 新增 model 输入框
+### 文档
+- `README.md`（+54 行）— AI Chat 架构、API、配置说明
+- `.env.example`（新）、`server/.env.example`（新）
+- `client/.env.example` — `VITE_UPLOAD_BASE` 默认空
 
 ### 验证
+- 6 commits, 50 文件, +1835 −307
 - Go build + vet + test: ✅
 - Client build: ✅
 
@@ -4987,8 +5028,16 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 
 ## 2026-07-23 v0.3.3: 上传页面 HTML
 
-### 新增
-- `GET /api/upload` 提供上传 HTML 页面（`dest=local`）
+### 提交历史
+```
+d02604c feat: serve upload HTML page at GET /api/upload (dest=local)
+```
+
+### 文件变更（3 文件，+420）
+
+- `server/internal/handlers/upload.html`（新，+408 行）— 完整中文上传页面：拖拽/Ctrl+V/多文件选择、AVIF/WEBP WASM 压缩、实时缩略图预览、"复制所有链接"
+- `server/internal/handlers/aapi.go`（+11 行）— `//go:embed upload.html`，GET 分支返回 HTML
+- `server/internal/handlers/router.go`（+1 行）— `r.Get("/api/upload")`
 
 ### 验证
 - Go build: ✅
@@ -4997,28 +5046,52 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 
 ## 2026-07-23 v0.3.4: deploy_win 完善 + CSP 修复
 
-### 修复
-- CSP 允许 `esm.sh` 域名用于上传页面的 AVIF/WebP 压缩
-- `__pycache__` 加入 gitignore
+### 提交历史
+```
+5bd9ad7 chore: ignore __pycache__
+1601dee fix: allow esm.sh in CSP for upload page AVIF/WEBP compression
+702535f feat: add verbose logging throughout deploy_win.py
+d739e32 fix: set default proxy to http://localhost:10809
+1dc749a feat: add --proxy flag for explicit proxy support
+6e44db3 fix: use curl.exe instead of urllib for download
+78b32d8 fix: remove existing file before download to avoid permission error
+cc7283f fix: run chatd in foreground so console stays open
+```
 
-### 改进
-- `deploy_win.py` 添加 verbose 日志
-- `--proxy` 参数显式代理支持
-- `curl.exe` 替代 `urllib` 下载
-- 下载前删除旧文件避免权限错误
+### 文件变更（3 文件，+61/−22）
+
+**deploy_win.py（+79/−22）— 重大重写：**
+- argparse 子命令（download/run/all）+ `--proxy` 参数
+- `setup_proxy()` 同时设置 `os.environ` 和 `ProxyHandler`
 - 默认代理 `http://localhost:10809`
-- `chatd` 前台运行窗口保持
+- `curl.exe` 替代 `urllib` 下载
+- 下载前 `os.remove(dst)` 避免权限冲突
+- 删除 `CREATE_NEW_PROCESS_GROUP`，控制台前台运行
+- `[deploy]` 前缀 verbose 日志
+
+**其他：**
+- `server/internal/handlers/router.go` — CSP `script-src` 加入 `https://esm.sh`
+- `.gitignore` — 新增 `scripts/__pycache__/`
 
 ### 验证
 - Server: `go build` ✅
 
 ---
 
-## 2026-07-23 v0.3.5: CSP 路由级修复
+## 2026-07-23 v0.3.5: 路由级 CSP
 
-### 修复
-- 路由级 CSP 允许 `esm.sh` 作为 `connect-src`
-- `curl` 显示下载进度条
+### 提交历史
+```
+441a11c fix: per-route CSP for /api/upload allowing esm.sh connect-src
+448cdd6 chore: show curl progress bar
+```
+
+### 文件变更（4 文件，+10/−2）
+
+- `server/internal/handlers/aapi.go` — `AAPIUpload` GET 分支新增**独立 CSP**（`script-src 'self' 'unsafe-inline' https://esm.sh`、`connect-src 'self' https://esm.sh`、`font-src 'self' data:`）
+- `server/internal/handlers/router.go` — 回退全局 CSP，移除 `https://esm.sh`
+- `scripts/deploy_win.py` — `curl` 添加 `--progress-bar`
+- `scripts/.gitignore`（新）— 忽略 `__pycache__`
 
 ### 验证
 - Server: `go build` ✅
@@ -5027,9 +5100,16 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 
 ## 2026-07-23 v0.3.6: 全局 CSP + 文件重命名
 
-### 修复
-- 全局 CSP 允许 `esm.sh` script+connect
-- `aapi.go` 重命名为 `local_upload.go`
+### 提交历史
+```
+0c89c59 fix: global CSP allows esm.sh script+connect, rename aapi.go -> local_upload.go
+```
+
+### 文件变更（2 文件，+2/−9）
+
+- `server/internal/handlers/aapi.go` → `local_upload.go`（重命名）
+- `local_upload.go` — 删除路由级 CSP（-7 行）
+- `router.go` — 全局 CSP `script-src` + `connect-src` 加入 `https://esm.sh`
 
 ### 验证
 - Server: `go build` ✅
@@ -5038,20 +5118,164 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 
 ## 2026-07-23 v0.3.7: Chi 路由分组修复
 
-### 修复
-- upload/SSE/AI 路由移入 `/api` 分组，修复 Chi 路由解析
+### 提交历史
+```
+70fd15d fix: move upload/SSE/AI routes inside /api group to fix Chi routing
+```
+
+### 文件变更（1 文件，+12/−10）
+
+`server/internal/handlers/router.go` — upload/SSE/AI 路由从外挂式（`r.Get("/api/upload")`）改为 Chi 分组内嵌式（`r.Get("/upload")`），统一享有 `/api` 组的全局中间件
+
+| 路由 | 改前 | 改后 |
+|------|------|------|
+| 上传 | `/api/upload` | `/upload` |
+| 本地文件 | `/api/local/*` | `/local/*` |
+| SSE | `/api/events` | `/events` |
+| AI Chat | `/api/ai/chat` | `/ai/chat` |
 
 ### 验证
 - Server: `go build` ✅
 
 ---
 
-## 2026-07-27 v0.7.1: 上传压缩优化 + goroutine 修复
+## 2026-07-25 ~ 2026-07-26 v0.3.7 → v0.7.0: Stream 消息重构 + 架构清理 + 配置系统（第 45~53 轮）
 
-### 修复
-- 上传图片：WASM-only 压缩 → WASM→toBlob→JPEG 回退链
-- goroutine 错误泄漏清理
-- `doSend` 依赖优化
+### 提交历史（关键）
+```
+918f94a service_test.go +975 lines
+caedc2d feat: download and extract client-dist.tar.gz
+4c67e83 bump v0.3.1 -> v0.4.0
+3242246 update swagger.json
+8050624 add /favicon.ico -> /icon.svg redirect
+6d20b04 docs: add version bump sync notes to AGENTS.md
+8e100f8 bump v0.4.0 -> v0.5.0: 超时可配
+e5f42b0 merge check_env into deploy_win.py
+08725c4 update changelog: v0.5.0 full report
+bb977e6 fix: config log to Info level
+1f1702f deploy_win: auto self-update + .env sync
+f9ef6f8 changelog: 第 49 轮
+f8c1c9d bump v0.5.0 -> v0.6.0; global 120 req/min rate limit
+4bb479f refactor: stream messages (第 53 轮)
+ac107a8 bump v0.6.0 -> v0.7.0
+```
+
+### 新增文件
+
+| 文件 | 行数 | 说明 |
+|------|------|------|
+| `server/internal/ai/stream.go` | +154 | AI 流式请求（替代 openai.go+provider.go） |
+| `server/internal/ai/stream_test.go` | +846 | AI 流式单元测试 |
+| `server/internal/service/stream.go` | +158 | StreamService（chunk 缓冲 + 订阅者模式） |
+| `server/internal/testutil/ai_stream_test.go` | +973 | Stream 集成测试 |
+| `server/internal/db/migrations/001__add_type_column.sql` | +1 | messages.type 列迁移 |
+| `server/internal/db/migration.md` | +64 | 迁移方案文档 |
+| `client/src/components/AIPanel.jsx` | +235 | AI 配置面板 |
+| `client/tests/ai-panel.spec.mjs` | +234 | AI 面板 E2E 测试 |
+
+### 删除文件
+
+| 文件 | 行数 | 说明 |
+|------|------|------|
+| `server/internal/ai/provider.go` | -29 | 旧 Provider 接口 |
+| `server/internal/handlers/ai.go` | -126 | 旧 AIChat 处理器 |
+| `server/internal/handlers/uploads.go` | -120 | 废弃上传处理器 |
+| `server/internal/orderedmap/orderedmap.go` | -318 | 废弃 orderedmap |
+| `server/internal/orderedmap/orderedmap_test.go` | -411 | orderedmap 测试 |
+| `client/src/types.js` | -81 | JSDoc 类型（被 schemas.ts 替代） |
+
+### 1. Stream 消息重构（第 53 轮）
+- `server/internal/ai/stream.go` — `Source` 结构体 + `StreamFromSource()`（自动 `stream: true`）+ `readStream()`（SSE 行解析, 支持 `reasoning_content`）+ `readOnce()` fallback
+- `server/internal/service/stream.go` — `liveChunks`/`liveSubs`/`liveDone` 内存管理；`StartStream()`（广播 type=stream 占位消息）+ `AppendChunk()`（通知所有订阅者）+ `FinishStream()`（DB 持久化, 30s 后清理）+ `SubscribeFrom()`（原子读取+注册, 零丢失）
+- `server/internal/handlers/messages.go` — `handleStreamMessage()`（SSE 逐 chunk 写回）+ `StreamMessageContent()`（`GET .../messageID/stream`，其他客户端 SSE 拉取）
+- `server/internal/models/models.go` — `Message.Type string`
+- `server/internal/db/messages.go` — `CreateAIMessage` 新增 `userID` 参数；写入 `type=stream`；查询新增 `m.type` 列
+- `server/internal/db/migrations/001__add_type_column.sql` — `ALTER TABLE messages ADD COLUMN type TEXT DEFAULT ''`
+- **前端**：`AIPanel.jsx`（新，235 行）+ `Composer.jsx`（AI 逻辑提取）+ `client.ts`（新增 `sendStreamMessage()`）+ `chat.js`（新增 `fetchStream()`，自动识别 type=stream 并触发）
+
+### 2. 配置系统（第 47/50 轮）
+- **新增环境变量**：`CHAT_MAX_MESSAGE_LENGTH`（默认 4000）、`CHAT_WS_MAX_MSG_SIZE`（默认 65536）、`CHAT_API_TIMEOUT`（默认 10s）、`CHAT_UPLOAD_TIMEOUT`（默认 5m）、`CHAT_READ_TIMEOUT`（默认 10m）、`CHAT_READ_HEADER_TIMEOUT`（默认 10s）
+- `server/internal/config/config.go` — 新增 6 个配置字段；移除 `AISources` 解析
+- `server/cmd/chatd/main.go` — `db.Open()` 传 `MaxMessageContentLength`；`ws.NewGateway()` 传 `WSMaxMessageSize`；`http.Server` 使用可配超时
+- `server/internal/db/db.go` — `Open()` 接收 `maxContentLength`，硬编码 4000 替换
+- `server/internal/ws/gateway.go` — `maxMessageSize` 可配置
+- `server/internal/handlers/router.go` — `/api` 分组拆为 upload（UploadTimeout）和其余（APITimeout）
+- `server/internal/handlers/ratelimit.go` — 全局 120 req/min per-IP
+
+### 3. DB 迁移系统重构（第 51/52 轮）
+- `server/internal/db/db.go` — 从一次性 SQL 升级 → `fs.Glob("migrations/{NNN}_*.sql")` 增量引擎；Go 迁移版本 1000+
+- `server/internal/db/db_fixups.go` — 6 个独立 ensure 函数 → 通用 `ensureColumn(table, name, definition)`
+- `server/internal/db/migration.md`（新）— 迁移方案文档
+- 移除 `migrations.json` manifest 方案
+
+### 4. 架构清理 + 死代码删除（第 46 轮）
+- 删除 `server/internal/orderedmap/` 整个包（healthz 改用 `map[string]any`）
+- 删除 `server/internal/handlers/uploads.go`（废弃上传 POST /api/uploads）
+- `server/internal/testutil/handler_test.go` — 移除 4 个上传测试（−87 行）
+- `server/internal/handlers/ratelimit.go` — 移除 Cloudflare IP 检测
+- `client/src/types.js` — 被 `schemas.ts` Zod 类型替代
+
+### 5. 后端 Stream 测试覆盖
+- `server/internal/service/service_test.go`（+973 行）— 事务、消息发送、权限、stream 服务测试
+- `server/internal/ai/stream_test.go`（+846 行）— AI 流式读取全面测试
+- `server/internal/testutil/ai_stream_test.go`（+973 行）— 集成测试：完整 stream 生命周期
+
+### 6. 前端变更
+- `client/src/api/client.ts` — token 刷新改为 singleton（`refreshPromise`）；所有 API 方法返回类型正确化
+- `client/src/schemas.ts` — 新增多个字段（type, deleted_at, reaction_count 等）；`validate()` 失败 throw
+- `client/src/store/chat.js` — `fetchStream()` 接入；`onMessageCreate` 自动识别 type=stream
+- `client/src/components/MessageItem.jsx` — 微小调整
+
+### 7. 部署脚本
+- `scripts/deploy_win.py`（+152 行）— 脚本自更新、.env 同步、前端构建包部署、`ensure_jwt_secret`
+
+### 版本演进
+- `0.3.1` → `0.4.0`（第 46 轮：架构清理）
+- `0.4.0` → `0.5.0`（第 49 轮：超时可配）
+- `0.5.0` → `0.6.0`（第 52 轮：全局速率限制）
+- `0.6.0` → `0.7.0`（第 53 轮：Stream 消息重构）
+
+### 验证
+- `go build ./...` — ✅
+- `go vet ./...` — ✅
+- `go test ./...` — ✅
+- Client build — ✅
+- CI pipeline — ✅
+
+---
+
+## 2026-07-27 v0.7.1: AI 面板重构 + Stream 通道 + 上传压缩回退
+
+### 提交历史
+```
+4007f72 bump version to 0.7.1
+bbf6742 upload: replace WASM-only compression with WASM→toBlob→JPEG fallback
+a717817 fix: error leak, goroutine simplify, doSend deps perf
+```
+
+### 文件变更（11 文件，+433 −153）
+
+#### AIPanel 完整重写（+300 行）
+- `client/src/components/AIPanel.jsx` — 从简单 inline 下拉弹出改为独立全功能面板：
+  - 状态统一：8 个独立 `useState` → `fields` 对象 + `setField(k, v)`
+  - `saved.current` ref 消除 stale closure
+  - `loadSettings()`/`saveSettings()` localStorage 持久化（key: `ai_panel_settings`）
+  - 新增 Basic/JSON Tab 切换，JSON 编辑区（monospace 8 行）
+  - 底部 prompt 输入区 + "Send to AI" 按钮（loading spinner + SVG 箭头）
+  - 点击外部关闭（`mousedown` 监听）、Enter 发送（Shift+Enter 换行）
+  - `useImperativeHandle` 导出 `sendAI`/`cancelAI`
+- `client/src/styles/global.css`（+131 行）— 完整 `.ai-panel` CSS 类体系（面板/标签/输入/网格/文本域/按钮）
+- `client/src/components/Composer.jsx`（−27 行）— AIPanel 从按钮后移到附件预览前，`position:relative` 包裹
+
+#### 上传压缩回退链
+- `server/internal/handlers/upload.html` — AVIF WASM → WebP WASM → canvas.toBlob(target) → canvas.toBlob(JPEG) 四重回退
+
+#### Stream URL 通道
+- `client/src/store/chat.js`（+21 行）— `stream_url` 独立字段检测 + content 清洗 + 向后兼容
+- `client/src/schemas.ts` — `MessageSchema` 新增 `stream_url: z.string().optional()`
+- `server/internal/service/stream.go` — `Content: ""` + `StreamURL: streamURL`
+- `server/internal/models/models.go` — `Message.StreamURL`
+- `server/internal/handlers/messages.go` — Stream 上下文改为 `context.WithTimeout(context.Background(), 5*time.Minute)`，client 断连后继续生成
 
 ### 验证
 - Go build + test: ✅
@@ -5059,36 +5283,103 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 
 ---
 
-## 2026-07-27 v0.7.2: 版本号修复
+## 2026-07-27 v0.7.2: 版本号修正
 
-### 修复
-- 版本号同步修正 `v0.7.1` → `v0.7.2`
+### 提交历史
+```
+d100ed3 fix version: 0.7.1 -> 0.7.2
+```
 
-### 验证
-- Go build: ✅
+### 文件变更（2 文件，+2 −2）
+- `client/package.json` — `"version": "0.7.1"` → `"0.7.2"`
+- `server/internal/handlers/swagger.json` — `"0.7.1"` → `"0.7.2"`
 
----
-
-## 2026-07-27 v0.8.0: 版本分支
-
-### 变更
-- 版本号 `0.7.2` → `0.8.0`
+纯版本号同步，无功能变更。
 
 ### 验证
 - Go build: ✅
 
 ---
 
-## 2026-07-28 v0.8.1: AI UX 简化 + 请求生命周期修复
+## 2026-07-27 ~ 2026-07-28 v0.7.2 → v0.8.2: 通知系统 + AI 面板重构 + 部署脚本
 
-### 修复
-- Stream/track 请求使用 `context.Background()`，client disconnect 后服务器继续处理
-- AI 消息 author 使用请求用户而非硬编码 AI bot
-- `ai author`: 使用请求用户替代硬编码 AI 机器人
-- `defer` 简化 goroutine 管理
+### 分支说明
+v0.8.0（dev 分支）、v0.8.1（main 分支，合并 dev）、v0.8.2（dev 分支继续演进）代表两条并行开发路径。
 
-### 改进
-- AI UX 简化：移除弹出面板，使用主输入框，🤖 emoji 触发
+### v0.8.0 — 通知系统（dev 分支）
+
+#### 提交历史
+```
+25c1362 bump version to 0.8.0
+```
+
+#### 文件变更（14 文件，+244/−56）
+
+**后端 — 数据库**
+- `server/internal/db/migrations/000__init.sql` — 移除 `chats.type` 的 `CHECK (type IN ('dm','group'))` 约束
+- `server/internal/db/chats.go`（+33 行）— `CreateChat` 允许 `type=notify`；新增 `FindNotifyChat()` / `CreateNotifyChat()`
+- `server/internal/db/db_fixups.go`（+67 行）— `migrateV2DropChatTypeCheck` 迁移
+
+**后端 — 业务**
+- `server/internal/service/chat.go`（+24 行）— `CreateOrGetNotify()`（查找或创建）；对 notify 类型禁止 Rename/Delete 等操作
+
+**后端 — HTTP**
+- `server/internal/handlers/chat.go` — `GetOrCreateNotifyChat` 处理器
+- `server/internal/handlers/router.go` — `GET /api/chats/notify`
+
+**前端**
+- `client/src/api/client.ts` — 新增 `getNotifyChat()`
+- `client/src/api/mock.js`（+36 行）— `mockGetNotifyChat`
+- `client/src/store/chat.js` — `loadChats` 并行获取 notify 聊天
+- `client/src/components/ChatList.jsx` — 过滤系统聊天，隐藏 notify 菜单项
+- `client/src/components/ChatView.jsx`（+84 行）— `getChatDisplayName()`，notify 显示 🔔 图标（`#E8590C`），隐藏通知开关/公告/编辑
+
+### v0.8.1 — AI 面板重构 + goroutine 修复（main 分支，合并 dev）
+
+#### 提交历史
+```
+173a747 merge dev into main, bump to v0.8.0
+1755033 use context.Background for FinishStream and trackLastActive
+54524fd use context.Background() for post-request goroutines
+ab3b809 ai author: use requesting user instead of hardcoded AI bot
+a4e2249 ai: simplify UX - remove popup panel, use main input, robot emoji
+```
+
+#### 文件变更（8 文件，+111/−166）
+
+**AIPanel 重构**
+- `client/src/components/AIPanel.jsx`（−55 行净减）— 移除弹出面板，改为 `active` prop 控制；AI 激活时显示齿轮按钮 → 浮动设置（Basic/JSON 标签页）；用内联 style 替代 CSS 类名；按钮文字改为 `🤖 AI`
+- `client/src/components/Composer.jsx`（+6/−3 行）— AIPanel 从输入框上方移到右侧按钮组
+
+**AI 作者修复**
+- `server/internal/service/stream.go` — `StartStream` 新增 `author *models.User` 参数
+- `server/internal/service/message.go` — `SendAI` 接受 `author` 参数
+- `server/internal/handlers/messages.go` — 传递当前用户给 `StartStream`；`FinishStream` 改用 `context.Background()`
+- `server/internal/handlers/handler.go` — `trackLastActive` goroutine 改用 `context.Background()`
+
+### v0.8.2 — 部署脚本增强（dev 分支）
+
+#### 提交历史
+```
+593b27c bump version to 0.8.2
+2e9d13b gitignore: reorganize scripts/ ignores into scripts/.gitignore
+87f7fae deploy_win: add watch mode, ensure_jwt_secret, VERSION constant
+```
+
+#### 文件变更（5 文件，+147/−39）
+
+**deploy_win.py（+168 行）**
+- `VERSION` 常量、`REPO_BRANCH` 环境变量控制
+- `ensure_jwt_secret()` — 自动检测替换 `.env` 中的 `change-me`/`your-secret-key`，`secrets.token_hex(32)` 生成
+- `kill_chatd()` — `taskkill` 停止 chatd
+- `start_detached()` — 后台最小窗口启动
+- `read_known_tag()`/`write_known_tag()` — `.deployed_tag` 持久化
+- `deploy_once()` — 单次部署逻辑
+- `watch` 命令 — 周期性轮询 GitHub Release，自动替换+重启
+
+**gitignore 整理**
+- `.gitignore` — 新增 `*.exe`
+- `scripts/.gitignore` — 新增 `chat.db`、`chatd.exe`、`uploads/`、`.env`、`.deployed_tag` 等
 
 ### 验证
 - Go build + test: ✅
@@ -5096,120 +5387,212 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 
 ---
 
-## 2026-07-28 v0.8.2: deploy_win 改进 + 配置整理
+## 2026-07-28 v0.8.2 → v0.8.4: AI 设置内嵌 Composer + 通知 API 重命名
 
-### 新增
-- `deploy_win.py` 新增 `--watch` 模式、`ensure_jwt_secret`、`VERSION` 常量
+### 提交历史
+```
+0d07479 composer: embed AI settings inline, remove old AIPanel
+df517d9 bump v0.8.3, fix AI btn alignment, remove AIPanel
+01368f9 bump v0.8.3 -> v0.8.4
+999bc3c fix tests: handle /g/notifications redirect in mockLogin
+56dcede fix tests: remove waitForURL, use sidebar-notify-entry class
+```
 
-### 整理
-- `scripts/` 忽略规则移入 `scripts/.gitignore`
+### 文件变更（20 文件，+366/−370）
+
+**AI 设置内嵌 Composer**
+- `client/src/components/AIPanel.jsx`（删除，−286 行）— 整个 AIPanel 移除
+- `client/src/components/Composer.jsx`（+279 行重写）— AI 设置从弹出面板改为内嵌 textarea 上方：
+  - `buildContext()`/`loadSettings()`/`saveSettings()`/`defaultSettings`
+  - `showAdvanced` 折叠、`settings` localStorage 持久化（key: `ai_settings`）、`aiAbort` ref
+  - `doSendAI()` 替代 `aiPanelRef.current.sendAI()`
+  - UI：Endpoint/Model/Key 三行 + "▼ adv" 展开 Temperature/Top P/Max Tokens/JSON 模式切换
+
+**通知 API 重命名**
+- `server/internal/db/chat_members.go` — `SetNotifyEnabled` → `SetChatNotifyEnabled`
+- `server/internal/db/chats.go` — `FindNotifyChat` → `FindNotificationsChat`
+- `server/internal/service/chat.go` — `CreateOrGetNotify` → `CreateOrGetNotificationsChat`
+- `server/internal/handlers/chat.go` — `GetOrCreateNotifyChat` → `GetNotificationsChat`
+- `client/src/api/client.ts` — `getNotifyChat()` → `getNotificationsChat()`
+- `client/src/routes/ChatPage.jsx` — 通知聊天路由 `/g/notifications` 映射
+
+**部署脚本简化**
+- `scripts/deploy_win.py`（−31 行）— 删除 `--proxy`/`setup_proxy()`，所有下载通过 `GH_PROXY`
+
+**新文件**
+- `scripts/.env.example`（+25 行）— 部署环境变量模板
+- `AGENTS.md`（+1 行）— 项目上下文说明
 
 ### 验证
 - Client build: ✅
-
----
-
-## 2026-07-28 v0.8.4: 测试修复 + 版本号对齐
-
-### 修复
-- Playwright 测试选择器：移除 `waitForURL`，使用 `sidebar-notify-entry` class
-- 处理 `/g/notifications` 重定向
-
-### 变更
-- 版本号 `v0.8.3` → `v0.8.4`（v0.8.3 无 tag）
-
-### 验证
 - Frontend CI: ✅
 
 ---
 
-## 2026-07-28 v0.8.5: AI 设置 UI 改进 + deploy_win 下载优化
+## 2026-07-28 v0.8.4 → v0.8.5: AI 推理支持 + 部署脚本并行下载
 
-### AI 设置
-- key 独立一行，更大字号，中文 context label
-- JSON 模式始终显示参数 + merge model
-- 修复 notify 图标颜色
-- 添加 `thinking`/`reasoning_content` 支持
+### 提交历史
+```
+cb13de7 AI settings: key own line, bigger font, context label in Chinese; JSON mode always shows params + merges model; fix notify icon color; add thinking/reasoning_content support
+7b0ace5 deploy_win: download via gh-proxy.com
+7ee898a deploy_win: remove broken self_update
+f228497 deploy_win: add curl retry 5 and 30s timeout
+bae45d2 deploy_win: parallel download + resume (-C -)
+7296b74 deploy_win: proxy only for urllib
+c0508dc deploy_win: remove all proxy code
+c5b4eab bump v0.8.4 -> v0.8.5
+```
 
-### deploy_win 下载优化
-- 移除所有 proxy 代码，`curl` 直连 via `gh-proxy`
-- 并行下载 + 断点续传（`-C -`）
-- `curl` retry 5 次 + 30s 超时
-- 移除损坏的自更新逻辑
+### 文件变更（7 文件，+86/−86）
 
-### 验证
-- Client build: ✅
+**AI reasoning/thinking 支持**
+- `client/src/utils/ai.js`（+3 行）— `streamAI()` 新增 `reasoning_content` 检测，发出 `{ type: 'thinking' }` chunk
+- `client/src/components/Composer.jsx`（+88 行变更）— thinking 字段累积；JSON 模式 body.model/temperature/max_tokens/top_p 双向同步；移除 `showAdvanced` 折叠，所有参数始终可见；Model/Key 拆分独立行；字号 11→13；Context 标签改为中文"最近50条聊天记录"
+- `client/src/components/MessageItem.jsx`（+28 行）— `msg.thinking` 渲染：`<details>` 可折叠，💭 图标，streaming 状态自动展开+闪烁光标，`var(--text-muted)` 颜色 + `var(--bg-tertiary)` 背景
+- `client/src/components/ChatView.jsx` — notify 头像颜色从 `#E8590C` 改为 `var(--accent)`
 
----
-
-## 2026-07-28 v0.8.6: 版本号 bump
-
-### 变更
-- `v0.8.5` → `v0.8.6`
-
-### 验证
-- Client build: ✅
-
----
-
-## 2026-07-28 v0.8.7: thinking 类型渲染 + deploy_win 修复
-
-### 新增
-- `MessageItem` 添加 `thinking` 类型消息渲染
-
-### 修复
-- `deploy_win.py`: kill `chatd` 再下载，避免 curl 写入冲突
+**deploy_win.py（−47 行重写）**
+- 删除 `self_update()`、所有 proxy 代码、`setup_proxy()`、`--proxy` 参数
+- `ThreadPoolExecutor(max_workers=2)` 并行下载 binary + client archive
+- `curl -C -` 断点续传、`--retry 5`、`--connect-timeout 30`
 
 ### 验证
 - Client build: ✅
 
 ---
 
-## 2026-07-28 v0.8.10: 通知聊天统一重构
+## 2026-07-28 v0.8.5 → v0.8.6: 版本号 bump
 
-### 变更
-- 通知聊天重构为 `type=notify` 存储，新增专用 API/backend
-- Notify chat 头像改用 bell SVG 图标
-- ChatList 通知入口改用 `chat-item` class 渲染
-- Composer AI 设置布局重排
-- 移除 AGENTS.md 中的过时指令
-
-### 版本历史
-- v0.8.8 → v0.8.9（含 revert）→ v0.8.10
+纯版本号更新：`client/package.json` + `swagger.json` 0.8.5 → 0.8.6。无功能变更。
 
 ### 验证
 - Client build: ✅
 
 ---
 
-## 2026-07-28 v0.8.11: AI thinking/reasoning 管线
+## 2026-07-28 v0.8.6 → v0.8.7: thinking 消息类型 + 部署进程管理
 
-### 新增
-- AI thinking/reasoning 完整管线（后端 stream → 前端渲染）
-- 通知聊天 UI 修复
+### 提交历史
+```
+2ae7776 deploy_win: kill chatd before download; MessageItem: add thinking type rendering
+21d7015 bump v0.8.6 -> v0.8.7
+```
 
-### 修复
-- 通知聊天隐藏 member count
+### 文件变更（4 文件，+16/−6）
 
-### 验证
-- Client build: ✅
+**thinking 消息类型**
+- `client/src/components/MessageItem.jsx`（+17 行）— 新增 `msg.type === 'thinking'` 独立渲染分支（`<details>` + 💭 + `msg.content`）；修复 `isMe` 判定（移除 `msg.type==='stream'` 排除条件）；thinking 详情默认折叠（移除 `open` 属性）
 
----
-
-## 2026-07-28 v0.8.12: 通知 API 修复
-
-### 修复
-- 新增 `getNotificationsChat` API 方法，修复 TypeError 崩溃
+**部署修复**
+- `scripts/deploy_win.py`（+1 行）— `download`/`all` 命令执行前先调用 `kill_chatd()` 杀进程，避免 curl 写入运行中 exe 失败
 
 ### 验证
 - Client build: ✅
 
 ---
 
-## 2026-07-28 v0.8.13: 排序修复
+## 2026-07-28 v0.8.7 → v0.8.10: 通知中心重构 + AI 设置布局重排
 
-### 修复
-- 通知聊天移至排序末尾（mock 数据）
+> v0.8.8 和 v0.8.9 标签曾被创建又回退（`Revert "bump v0.8.8 → v0.8.9"`），最终跳至 v0.8.10。
+
+### 提交历史
+```
+2fb901a bump v0.8.7 -> v0.8.8
+5fe315f Composer: reorder AI settings layout
+129ecde AGENTS: remove contradictory commands
+d894fa9 fix: replace bell emoji with SVG icon in chat list notify
+653ff2e fix: use bell SVG and chat-item class for notify entry
+c970819 bump v0.8.8 -> v0.8.9
+1c9b8f1 Revert "bump v0.8.8 -> v0.8.9"
+c86b6c9 bump v0.8.8 -> v0.8.9
+a58ff6d refactor: unify notifications chat as type=notify, add dedicated API/backend
+bf05da7 bump v0.8.9 -> v0.8.10
+```
+
+### 文件变更（13 文件，+284/−115）
+
+**后端 — notifications API（新）**
+- `server/internal/handlers/notifications.go`（新，114 行）— 4 个 handler：`ListNotifications`（GET 分页）、`SendNotification`（POST）、`DeleteNotification`（DELETE）、`MarkNotificationsRead`（POST）
+- `server/internal/handlers/router.go` — 注册 `/api/notifications/*` 路由组
+
+**前端 — 通知统一**
+- `client/src/api/client.ts` — 新增 `notifications` 命名空间（listMessages/sendMessage/deleteMessage/markRead）；移除旧 `getNotificationsChat`
+- `client/src/store/chat.js` — `loadChats` 简化，移除单独 fetch notify
+- `client/src/routes/ChatPage.jsx` — `notifyChatId` 从 store chats 推导；`isNotification` 通过 URL 路径判断
+- `client/src/components/ChatList.jsx` — notify 铃铛 emoji → SVG；类名 `sidebar-notify-entry` → `chat-item`
+- `client/src/components/ChatListItem.jsx` — notify 头像 SVG 铃铛图标
+- `client/src/components/ChatView.jsx` — `isNotification` prop：不加载成员列表、使用 `notifications.listMessages`
+- `client/src/components/Composer.jsx` — Basic/JSON 模式重构；`toJsonBody()` 生成；notify 聊天禁用 AI 按钮
+
+### 验证
+- Client build: ✅
+
+---
+
+## 2026-07-28 v0.8.10 → v0.8.11: AI thinking/reasoning 完整管线
+
+### 提交历史
+```
+3b3351a fix: hide member count for notifications chat
+6a75df6 feat: AI thinking/reasoning pipeline + notifications chat UI fix
+be23ec4 bump v0.8.10 -> v0.8.11
+```
+
+### 文件变更（20 文件，+143/−106）
+
+**后端 — thinking 字段**
+- `server/internal/ai/stream.go` — `Chunk` 新增 `Type` 字段（`"content"/"reasoning"`）
+- `server/internal/db/messages.go` — `CreateAIMessage` 新增 `thinking` 参数；所有查询 SELECT `m.thinking`；`scanMessage` 读取 thinking 列
+- `server/internal/db/migrations/002__add_thinking_column.sql`（新）— `ALTER TABLE messages ADD COLUMN thinking TEXT DEFAULT ''`
+- `server/internal/handlers/messages.go` — `handleStreamMessage` 分别缓冲 content/thinking；SSE 载荷加入 `type` 标识；`FinishStream` 传入 thinking
+- `server/internal/models/models.go` — `Message.Thinking string`
+- `server/internal/service/message.go` — `SendAI` 新增 `thinking` 参数
+- `server/internal/service/stream.go` — 新增 `ChunkInfo`（`Type`+`Content`）；`liveChunks` 改为 `[]ChunkInfo`；`AppendChunk` 增加 `chunkType` 参数；`FinishStream` 增加 `thinking` 参数
+
+**前端 — thinking 渲染**
+- `client/src/utils/ai.js` — 解析 `type: reasoning` 和 `type: content` 两种 SSE 格式；保留旧 `reasoning_content` 兼容
+- `client/src/store/chat.js` — `fetchStream` 处理 `type=reasoning` chunk，累加到 `msg.thinking`
+- `client/src/schemas.ts` — `MessageSchema.thinking: z.string().optional()`
+- `client/src/components/MessageItem.jsx` — thinking 图标 💭 → 🔍，标签 "Thought" → "Reasoning"
+- `client/src/components/ChatList.jsx` — 通知聊天通过 `ChatListItem` 渲染在 `ScrollArea` 内
+- `client/src/components/ChatListItem.jsx` — `type=notify` 隐藏 visibility badge
+- `client/src/components/ChatView.jsx` — 通知聊天隐藏 member count
+- `client/src/routes/ChatPage.jsx` — store 中不存在 notifyChat 时调用 `notifications.getNotifyChat`
+
+### 验证
+- Client build: ✅
+
+---
+
+## 2026-07-28 v0.8.11 → v0.8.12: 通知 API 修复
+
+### 提交历史
+```
+e5ab792 fix: add getNotificationsChat API method to prevent TypeError crash
+e6d44c3 bump v0.8.11 -> v0.8.12
+```
+
+### 文件变更（4 文件，+5/−3）
+
+- `client/src/api/client.ts` — 恢复 `getNotificationsChat` 方法（v0.8.10 中被移除），调用 `GET /api/chats/notify`
+- `client/src/routes/ChatPage.jsx` — `api.notifications.getNotifyChat()` → `api.getNotificationsChat()`（修复 `TypeError: api.notifications.getNotifyChat is not a function`）
+
+### 验证
+- Client build: ✅
+
+---
+
+## 2026-07-28 v0.8.12 → v0.8.13: 排序修复
+
+### 提交历史
+```
+e5c9e8a fix: move notify chat to end of sort order in mock data
+f73e3b3 bump v0.8.12 -> v0.8.13
+```
+
+### 文件变更（3 文件，+3/−3）
+
+- `client/src/api/mock.js` — `mockGetNotifyChat` 的 `last_message_at` 从 `new Date()` 改为 `new Date(0).toISOString()`（1970-01-01），通知聊天按排序排到末尾
 
 ### 验证
 - Client build: ✅
