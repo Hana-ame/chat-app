@@ -131,6 +131,14 @@ func (s *Server) handleStreamMessage(w http.ResponseWriter, r *http.Request, u *
 			buf.WriteString(chunk.Content)
 		}
 		s.Services.Stream.AppendChunk(msgID, chunk.Type, chunk.Content)
+		if s.Hub != nil {
+			s.Hub.BroadcastMessageUpdate(&models.Message{
+				ID:       msgID,
+				ChatID:   chatID,
+				Content:  buf.String(),
+				Thinking: thinkingBuf.String(),
+			})
+		}
 	}
 
 	for {

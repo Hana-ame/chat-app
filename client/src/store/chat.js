@@ -321,7 +321,10 @@ export const useChatStore = create((set, get) => ({
 
   /** @param {Partial<import('../schemas').Message>} msg */
   onMessageUpdate(msg) {
-    set(s => ({ messages: s.messages.map(m => m.id === msg.id ? { ...m, ...msg } : m) }));
+    set(s => {
+      if (s._localStreaming[msg.id]) return {};
+      return { messages: s.messages.map(m => m.id === msg.id ? { ...m, ...msg } : m) };
+    });
   },
 
   /** @param {{ message_id: string }} payload */

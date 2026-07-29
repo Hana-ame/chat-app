@@ -63,10 +63,10 @@ export default function ChatPage() {
   }, [urlChatId, accessToken]);
 
   useEffect(() => {
-    if (!urlChatId && notifyChatId && accessToken) {
+    if (!urlChatId && notifyChatId && accessToken && !isMobile) {
       navigate('/g/notifications', { replace: true });
     }
-  }, [urlChatId, notifyChatId, accessToken, navigate]);
+  }, [urlChatId, notifyChatId, accessToken, isMobile, navigate]);
 
   const handleSelectChat = (id) => {
     useChatStore.setState(s => ({
