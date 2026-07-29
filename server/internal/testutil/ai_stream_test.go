@@ -3,12 +3,14 @@ package testutil_test
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Hana-ame/chat-app/server/internal/testutil"
 )
@@ -970,4 +972,168 @@ func TestSendStreamMessage_ReplayWithEmptyLiveBuffer(t *testing.T) {
 	if !foundDone {
 		t.Fatal("expected [DONE] for empty stream replay")
 	}
+}
+
+// TestSendStreamMessage_SlowAI 用慢速 mock AI（每 500ms 发一个 chunk，持续 15s）
+// 验证 v0.8.15 的 ReadTimeout 分组下 SSE 能存活超过 10s（不会被 APITimeout 杀死）。
+func TestSendStreamMessage_SlowAI(t *testing.T) {
+	f := testutil.New(t)
+	alice := f.Register(t, "slowai@test.dev", "SlowAI", "password123")
+
+	// 慢速 mock AI：每 500ms 一个 chunk，持续 15s（共 30 个 chunk）
+	mux := http.NewServeMux()
+	mux.HandleFunc("/slow", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		flusher, _ := w.(http.Flusher)
+		for i := 0; i < 30; i++ {
+			fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"chunk%d\"}}]}\n\n", i)
+			flusher.Flush()
+			time.Sleep(500 * time.Millisecond)
+		}
+		w.Write([]byte("data: [DONE]\n\n"))
+		flusher.Flush()
+	})
+	slowAI := httptest.NewServer(mux)
+	defer slowAI.Close()
+
+	// 创建群聊
+	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+		"type": "group", "name": "SlowAITest", "member_ids": []string{},
+	})
+	var chat struct{ ID string `json:"id"` }
+	json.NewDecoder(res.Body).Decode(&chat)
+	res.Body.Close()
+
+	start := time.Now()
+	sendRes := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", alice.AccessToken, map[string]any{
+		"type": "stream",
+		"source": map[string]any{
+			"endpoint": slowAI.URL + "/slow",
+			"auth_key": "public",
+			"body":     map[string]any{"model": "test", "messages": []map[string]string{{"role": "user", "content": "hi"}}},
+		},
+	})
+	defer sendRes.Body.Close()
+	if sendRes.StatusCode != 200 {
+		b, _ := io.ReadAll(sendRes.Body)
+		t.Fatalf("slow AI: want 200 got %d body=%s", sendRes.StatusCode, string(b))
+	}
+
+	// 读 SSE，记录持续时间和 chunk 数
+	scanner := bufio.NewScanner(sendRes.Body)
+	chunkCount := 0
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		payload := line[6:]
+		if payload == "[DONE]" {
+			elapsed := time.Since(start)
+			if elapsed < 14*time.Second {
+				t.Fatalf("SSE completed too fast: %v (expected ~15s for 30 slow chunks)", elapsed)
+			}
+			t.Logf("SSE survived %v with %d chunks — ReadTimeout fix works!", elapsed, chunkCount)
+			return
+		}
+		chunkCount++
+	}
+
+	elapsed := time.Since(start)
+	t.Fatalf("SSE INTERRUPTED at %v after %d chunks (err=%v) — route still under APITimeout!", elapsed, chunkCount, scanner.Err())
+}
+
+// TestRealAIEndpoint 用真实 AI endpoint 验证生产场景的 SSE 完整性。
+// 运行: go test -run TestRealAIEndpoint -v -timeout 3m ./internal/testutil/
+// 需要网络连接。
+func TestRealAIEndpoint(t *testing.T) {
+	endpoint := "https://bwh.moonchan.xyz:8443/zen/v1/chat/completions"
+	authKey := "public"
+	model := "deepseek-v4-flash-free"
+
+	f := testutil.New(t)
+	alice := f.Register(t, "realai@test.dev", "RealAI", "password123")
+
+	// 创建群聊
+	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
+		"type": "group", "name": "RealAITest", "member_ids": []string{},
+	})
+	var chat struct{ ID string `json:"id"` }
+	json.NewDecoder(res.Body).Decode(&chat)
+	res.Body.Close()
+
+	t.Logf("chat created: %s", chat.ID)
+
+	// 发送 stream 消息到真实 endpoint
+	start := time.Now()
+	sendRes := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", alice.AccessToken, map[string]any{
+		"type":    "stream",
+		"content": "",
+		"source": map[string]any{
+			"endpoint": endpoint,
+			"auth_key": authKey,
+			"body": map[string]any{
+				"model": model,
+				"messages": []map[string]string{
+					{"role": "system", "content": "请用中文回答，回复一篇约500字的短文，主题是大语言模型的发展历史。"},
+					{"role": "user", "content": "开始"},
+				},
+			},
+		},
+	})
+	if sendRes.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(sendRes.Body)
+		sendRes.Body.Close()
+		t.Fatalf("stream message: want 200 got %d body=%s", sendRes.StatusCode, string(body))
+	}
+
+	// 读取 SSE，记录时间和数据量
+	defer sendRes.Body.Close()
+
+	scanner := bufio.NewScanner(sendRes.Body)
+	scanner.Buffer(make([]byte, 0, 64*1024), 256*1024)
+
+	var totalContent int
+	chunkCount := 0
+	lastChunkAt := time.Now()
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		payload := line[6:]
+		if payload == "[DONE]" {
+			elapsed := time.Since(start)
+			t.Logf("SSE complete: elapsed=%v chunks=%d totalBytes=%d", elapsed, chunkCount, totalContent)
+			return
+		}
+
+		lastChunkAt = time.Now()
+		chunkCount++
+		totalContent += len(payload)
+
+		if chunkCount <= 3 || chunkCount%50 == 0 {
+			t.Logf("chunk #%d at %v: len=%d", chunkCount, time.Since(start), len(payload))
+		}
+	}
+
+	elapsed := time.Since(start)
+	t.Logf("INTERRUPTED after %v: chunks=%d totalBytes=%d lastChunkAge=%v",
+		elapsed, chunkCount, totalContent, time.Since(lastChunkAt))
+
+	if err := scanner.Err(); err != nil {
+		if errors.Is(err, io.EOF) || strings.Contains(err.Error(), "unexpected EOF") {
+			t.Logf("scanner EOF (connection closed by server): %v", err)
+		} else {
+			t.Logf("scanner error: %v", err)
+		}
+	}
+
+	// 如果没有收到 [DONE] 而是被中断，标记失败
+	t.Errorf("SSE interrupted before [DONE]: only %d chunks in %v", chunkCount, elapsed)
 }

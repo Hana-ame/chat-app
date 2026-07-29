@@ -63,7 +63,9 @@ export default function MessageList({ messages, hasMore, loading, onLoadMore, ch
         {messages.map((msg, i) => {
           const prev = i > 0 ? messages[i - 1] : null;
           const sameAuthor = prev && prev.user_id === msg.user_id && !prev.deleted && !msg.deleted;
-          return <MessageItem key={msg.id || `msg-${i}`} msg={msg} sameAuthor={sameAuthor} chatId={chatId} />;
+          const next = i < messages.length - 1 ? messages[i + 1] : null;
+          const isPrompt = !msg.deleted && next?.type === 'stream' && next.user_id === msg.user_id;
+          return <MessageItem key={msg.id || `msg-${i}`} msg={msg} sameAuthor={sameAuthor} chatId={chatId} isPrompt={isPrompt} />;
         })}
       </div>
     </div>

@@ -97,6 +97,19 @@ jobs:
         with:
           name: client-dist
           path: client-dist
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.23' }
+      - name: Verify embedded version
+        run: |
+          EMBEDDED=$(go version -m chatd-linux-amd64 2>/dev/null | grep "main.Version=" | sed 's/.*main.Version=//')
+          echo "Embedded version: $EMBEDDED"
+          EXPECTED="${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build-{0}', github.sha) }}"
+          echo "Expected version: $EXPECTED"
+          if [ "$EMBEDDED" != "$EXPECTED" ]; then
+            echo "::error::Embedded version '$EMBEDDED' does not match expected '$EXPECTED'"
+            exit 1
+          fi
+          echo "Version OK!"
       - name: Assemble release
         run: |
           mkdir -p release/client-dist
@@ -111,18 +124,28 @@ jobs:
       - name: Package client dist
         run: |
           tar -czf release/client-dist.tar.gz -C client-dist .
-      - name: Create GitHub Release
+      - name: Create or Update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build-{0}', github.sha) }}"
           TITLE="${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('Build {0}', github.sha) }}"
-          gh release create "$TAG" \
-            --title "$TITLE" \
-            --notes "Auto-built from commit ${GITHUB_SHA}" \
-            --target "$GITHUB_SHA" \
-            release/chatd-linux-amd64 \
-            release/chatd-linux-arm64 \
-            release/chatd-windows-amd64.exe \
-            release/client-dist.tar.gz \
-            || echo "::warning::Release creation skipped (may already exist)"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Release $TAG already exists — uploading assets (clobber)..."
+            gh release upload "$TAG" \
+              release/chatd-linux-amd64 \
+              release/chatd-linux-arm64 \
+              release/chatd-windows-amd64.exe \
+              release/client-dist.tar.gz \
+              --clobber
+          else
+            echo "Creating release $TAG..."
+            gh release create "$TAG" \
+              --title "$TITLE" \
+              --notes "Auto-built from commit ${GITHUB_SHA}" \
+              --target "$GITHUB_SHA" \
+              release/chatd-linux-amd64 \
+              release/chatd-linux-arm64 \
+              release/chatd-windows-amd64.exe \
+              release/client-dist.tar.gz
+          fi

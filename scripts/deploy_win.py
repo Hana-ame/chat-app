@@ -125,14 +125,53 @@ def find_asset(release, name):
     sys.exit(1)
 
 
-def download(asset, dst):
-    url = GH_PROXY + asset["browser_download_url"]
-    print(f"[deploy] download url: {url}")
-    cmd = ["curl.exe", "-L", "-C", "-", "--retry", "5", "--connect-timeout", "30", "--progress-bar", "-o", dst, url]
-    print(f"[deploy] running: {' '.join(cmd)}")
-    subprocess.run(cmd, check=True)
-    size = os.path.getsize(dst)
-    print(f"[deploy] saved: {dst} ({size} bytes)")
+def download(asset, dst, tag, verify_version=False):
+    expected_size = asset["size"]
+    urls = [
+        ("proxy", GH_PROXY + asset["browser_download_url"]),
+        ("direct", asset["browser_download_url"]),
+    ]
+    for source, url in urls:
+        print(f"[deploy] downloading from {source}: {url}")
+        try:
+            subprocess.run(
+                ["curl.exe", "-L", "--retry", "3", "--connect-timeout", "30", "--max-time", "300", "--progress-bar", "-o", dst, url],
+                check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError as e:
+            print(f"[deploy] WARN: {source} download failed: {e.stderr.strip() or e}")
+            continue
+
+        actual_size = os.path.getsize(dst)
+        if actual_size != expected_size:
+            print(f"[deploy] WARN: size mismatch (expected {expected_size}, got {actual_size})")
+            os.remove(dst)
+            continue
+
+        if verify_version:
+            go_ok = subprocess.run(["go", "version"], capture_output=True, text=True).returncode == 0
+            embedded = ""
+            if go_ok:
+                r = subprocess.run(["go", "version", "-m", dst], capture_output=True, text=True)
+                if r.returncode == 0:
+                    for line in r.stdout.splitlines():
+                        if "main.Version=" in line:
+                            embedded = line.split("main.Version=")[-1].strip()
+                            break
+            if not go_ok:
+                print(f"[deploy] SKIP: 'go' not found, version check disabled")
+                return
+            print(f"[deploy] embedded version: {embedded or '(unknown)'}")
+            if embedded == tag:
+                print(f"[deploy] version verification passed!")
+                return
+            print(f"[deploy] WARN: version mismatch (expected {tag}, got {embedded or '?'}), trying next source...")
+            os.remove(dst)
+        else:
+            print(f"[deploy] download OK (size {actual_size}, skipping version check)")
+            return
+
+    print(f"[deploy] ERROR: all download sources failed for {asset['name']}")
+    sys.exit(1)
 
 
 def kill_chatd():
@@ -225,12 +264,13 @@ def load_env(env_file):
 
 
 def deploy_once(rel, dst, env_file):
+    tag = rel["tag_name"]
     binary_asset = find_asset(rel, BINARY)
     client_asset = find_asset(rel, CLIENT_ARCHIVE)
     client_dst = os.path.join(CWD, CLIENT_ARCHIVE)
     with ThreadPoolExecutor(max_workers=2) as ex:
-        f1 = ex.submit(download, binary_asset, dst)
-        f2 = ex.submit(download, client_asset, client_dst)
+        f1 = ex.submit(download, binary_asset, dst, tag, verify_version=True)
+        f2 = ex.submit(download, client_asset, client_dst, tag, verify_version=False)
         f1.result()
         f2.result()
     client_dir = os.path.join(CWD, "client", "dist")

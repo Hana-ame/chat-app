@@ -4926,3 +4926,36 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 ### 根因
 - Notify chat 在 DOM 中排首位，测试点击 `first .chat-item` 命中 notification chat
 - 嵌套 `api.notifications.*` 未经 mock proxy 拦截，发出真实 HTTP 请求导致失败
+
+---
+
+## 2026-07-29 CI: 版本校验 + release 更新逻辑 + deploy 脚本下载校验
+
+### 原因
+- 生产 `/api/version` 返回 `v0.8.4`，但代码是 v0.8.15
+- `gh-proxy.com` 返回了错误的缓存文件，`gh release create` 在 release 已存在时静默失败
+- 旧版 `deploy_win.py` 无版本校验，下载了错误二进制也不知道
+
+### 变更
+
+#### 1. CI — release 步骤（`.github/workflows/ci.yml`）
+- 新增 `Verify embedded version` 步骤：用 `go version -m` 检查 `main.Version` 是否与 tag 一致，不一致则 fail
+- 将 `Create GitHub Release` 改为 `Create or Update GitHub Release`：若 release 已存在，用 `gh release upload --clobber` 更新 asset，而非静默跳过
+- **文件**: `.github/workflows/ci.yml`
+
+#### 2. deploy_win.py — 下载校验 + 直连 fallback
+- 移除 `-C -`（断点续传）防止代理返回残缺文件
+- 添加 size 校验：对比 `asset["size"]` 与实际下载大小
+- 添加版本校验：`go version -m binary` 检查 `main.Version` 是否匹配 tag
+- 直连 fallback：代理下载失败/校验不通过时尝试直接从 GitHub 下载
+- 无 `go` 环境时跳过版本校验
+- **文件**: `scripts/deploy_win.py`
+
+### 验证
+- `go version -m` 确认 ldflags `-X main.Version=v0.8.15` 生效
+- `TestSendStreamMessage_SlowAI`: SSE 存活 15s+（ReadTimeout 分组生效）
+- `TestRealAIEndpoint`: 真实 endpoint 63s 完整运行
+
+### 后续
+- 重新 tag v0.8.15，触发 CI 重建正确二进制
+- 用 `deploy_win.py` 重新部署

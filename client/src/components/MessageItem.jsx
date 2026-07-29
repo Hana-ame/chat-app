@@ -6,17 +6,37 @@ import { renderContent } from './renderContent';
 import UserAvatar from './UserAvatar';
 import UserProfileModal from './UserProfileModal';
 
-function ThinkingContent({ content }) {
+function ThinkingContent({ content, streaming }) {
   const [open, setOpen] = useState(false);
+  const contentRef = useRef(null);
+  const [height, setHeight] = useState(0);
+
+  useEffect(() => {
+    if (open && contentRef.current) {
+      setHeight(contentRef.current.scrollHeight);
+    }
+  }, [open, content]);
+
   return (
     <div className={'thinking-block' + (open ? ' open' : '')}>
-      <div className="thinking-block-header" onClick={() => setOpen(o => !o)}>
-        <svg className="thinking-block-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <div className="thinking-block-header" onClick={() => setOpen(o => !o)} role="button" tabIndex={0}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}>
+        <svg className="thinking-block-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="9 18 15 12 9 6" />
         </svg>
+        <svg className="thinking-block-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 2a4 4 0 0 0-4 4c0 2 2 3 2 5h4c0-2 2-3 2-5a4 4 0 0 0-4-4Z"/>
+          <path d="M9 18h6"/>
+          <path d="M10 22h4"/>
+          <path d="M12 11v2"/>
+          <path d="M8 13a4 4 0 0 0 8 0"/>
+        </svg>
         <span className="thinking-block-label">Reasoning</span>
+        {streaming && <span className="thinking-block-streaming" />}
       </div>
-      {open && <div className="thinking-block-content">{content}</div>}
+      <div className="thinking-block-collapse" style={{ maxHeight: open ? height : 0 }}>
+        <div ref={contentRef} className="thinking-block-content">{content}</div>
+      </div>
     </div>
   );
 }
@@ -34,7 +54,7 @@ function timeFormat(t) {
   return d.toLocaleDateString();
 }
 
-const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId }) {
+const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId, isPrompt }) {
   const { user, accessToken } = useAuthStore();
   const { pinnedMessage, chats } = useChatStore();
   const isMe = msg.user_id === user.id;
@@ -128,6 +148,7 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId }) {
           {!sameAuthor && (
             <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
               <span className="msg-author" onClick={() => setProfileUser(author)} style={{cursor:'pointer'}}>{author.username}</span>
+              {isPrompt && <span className="prompt-badge">Prompt</span>}
               {(author.role === 'admin' || author.role === 'owner' || author.id === chat?.owner_id) && (
                 <span style={{fontSize:10,padding:'0 5px',borderRadius:3,fontWeight:500,background:'rgba(88,101,242,0.15)',color:'#5865F2',lineHeight:'18px'}}>ADMIN</span>
               )}
@@ -148,10 +169,10 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId }) {
                 <button className="btn-ghost" style={{fontSize:12}} onClick={()=>setEditing(false)}>Cancel</button>
               </div>
             ) : msg.type === 'thinking' ? (
-              <ThinkingContent content={msg.content} />
+              <ThinkingContent content={msg.content} streaming={msg.streaming} />
             ) : (
               <>
-                {msg.thinking && <ThinkingContent content={msg.thinking} />}
+                {msg.thinking && <ThinkingContent content={msg.thinking} streaming={msg.streaming} />}
                 {msg.streaming ? (
                   <div className="msg-content" style={{whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
                     {msg.content}<span className="stream-cursor" />
