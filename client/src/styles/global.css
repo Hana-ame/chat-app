@@ -463,18 +463,6 @@ button { cursor: pointer; border: none; }
   font-style: italic;
 }
 
-.prompt-badge {
-  font-size: 9px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  background: rgba(240,178,50,0.15);
-  color: var(--warning);
-  line-height: 16px;
-}
-
 .spinner {
   width: 32px; height: 32px; border: 3px solid var(--bg-tertiary);
   border-top: 3px solid var(--accent); border-radius: 50%;

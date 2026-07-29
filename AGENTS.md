@@ -15,7 +15,11 @@ Chat application with Go backend + React frontend.
 
 ## Notes
 - This file is for initialization context only. Session logs and changelogs go in `docs/changelog.md`.
-- **Never run `npm run build` or any build command.** CI handles builds on push.
+
+## Local Build & Debug
+- 前端: `cd client && npm ci && npm run build`，产物在 `client/dist/`
+- 后端: `cd server && go build -ldflags="-s -w -X main.Version=dev" -o ../chatd.exe ./cmd/chatd/`
+- 直接运行 `./chatd.exe` 启动（需先配置 `.env`，参考 `LOCAL_DEPLOYMENT.md`）
 
 ## Changelog Rules
 - Always append new entries to the **end** of `docs/changelog.md`.
@@ -26,7 +30,7 @@ Chat application with Go backend + React frontend.
 - Backend API: `https://chat.moonchan.xyz` (same domain, proxied)
 - API version endpoint: `GET /api/version`
 
-## Workflow
+## CI/CD Workflow (production release)
 1. 修改代码 → `git add` + `git commit`
 2. 如需 bump version，先同步两处版本号：
    - `client/package.json` — `"version": "x.y.z"`

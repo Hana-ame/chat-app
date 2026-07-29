@@ -262,8 +262,7 @@ export const useChatStore = create((set, get) => ({
       const exists = s.messages.find(m => m.id === msg.id);
       wasNew = !exists;
       if (exists) {
-        const hasStreamUrl = msg.stream_url || (typeof msg.content === 'string' && msg.content.startsWith('/api/chats/'));
-        const keepContent = msg.type === 'stream' && exists.streaming && !!hasStreamUrl;
+        const keepContent = msg.type === 'stream' && exists.streaming;
         return {
           messages: s.activeChatId === msg.chat_id
             ? s.messages.map(m => m.id === msg.id ? { ...m, ...msg, content: keepContent ? m.content : msg.content, streaming: m.streaming || msg.streaming } : m)

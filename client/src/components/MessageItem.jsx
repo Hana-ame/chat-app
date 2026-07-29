@@ -54,7 +54,7 @@ function timeFormat(t) {
   return d.toLocaleDateString();
 }
 
-const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId, isPrompt }) {
+const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId }) {
   const { user, accessToken } = useAuthStore();
   const { pinnedMessage, chats } = useChatStore();
   const isMe = msg.user_id === user.id;
@@ -148,7 +148,7 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId, isPromp
           {!sameAuthor && (
             <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
               <span className="msg-author" onClick={() => setProfileUser(author)} style={{cursor:'pointer'}}>{author.username}</span>
-              {isPrompt && <span className="prompt-badge">Prompt</span>}
+              
               {(author.role === 'admin' || author.role === 'owner' || author.id === chat?.owner_id) && (
                 <span style={{fontSize:10,padding:'0 5px',borderRadius:3,fontWeight:500,background:'rgba(88,101,242,0.15)',color:'#5865F2',lineHeight:'18px'}}>ADMIN</span>
               )}
