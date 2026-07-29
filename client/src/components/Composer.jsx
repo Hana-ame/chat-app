@@ -247,6 +247,23 @@ export default function Composer({ chatId, isNotification }) {
     }
 
     const source = { endpoint: f.endpoint, auth_key: f.authKey, body };
+    useChatStore.setState(s => ({ _localStreaming: { ...s._localStreaming, [msgId]: true } }));
+
+    const clearLocalStreaming = () => {
+      useChatStore.setState(s => {
+        const next = { ...s._localStreaming };
+        delete next[msgId];
+        return { _localStreaming: next };
+      });
+    };
+    const done = () => {
+      useChatStore.setState(s => ({
+        messages: s.messages.map(m => m.id === msgId ? { ...m, streaming: false } : m),
+      }));
+      clearLocalStreaming();
+      setAiLoading(false);
+      aiAbort.current = null;
+    };
 
     try {
       const res = await api.sendStreamMessage(accessToken, chatId, '', source, msgId);
@@ -262,38 +279,20 @@ export default function Composer({ chatId, isNotification }) {
             }));
           }
         },
-        () => {
-          useChatStore.setState(s => ({
-            messages: s.messages.map(m => m.id === msgId ? { ...m, streaming: false } : m),
-          }));
-          setAiLoading(false);
-          aiAbort.current = null;
-        },
+        done,
         () => {
           notify('AI response failed', 'error');
-          useChatStore.setState(s => ({
-            messages: s.messages.map(m => m.id === msgId ? { ...m, streaming: false } : m),
-          }));
-          setAiLoading(false);
-          aiAbort.current = null;
+          done();
         },
       );
       controller.signal.addEventListener('abort', () => {
         cancel();
-        useChatStore.setState(s => ({
-          messages: s.messages.map(m => m.id === msgId ? { ...m, streaming: false } : m),
-        }));
-        setAiLoading(false);
-        aiAbort.current = null;
+        done();
       });
     } catch (e) {
       if (e.name === 'AbortError') return;
       notify('AI request failed', 'error');
-      useChatStore.setState(s => ({
-        messages: s.messages.map(m => m.id === msgId ? { ...m, streaming: false } : m),
-      }));
-      setAiLoading(false);
-      aiAbort.current = null;
+      done();
     }
   }, [chatId, user, accessToken]);
 

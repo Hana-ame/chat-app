@@ -2,34 +2,26 @@
 
 ## Agent: ren
 
-AI coding assistant specialized in software engineering. Maintains session continuity across conversations.
-
-### Responsibilities
-- Implement features and fix bugs across Go backend and React frontend
-- Maintain and debug CI/CD pipeline (GitHub Actions, deploy scripts)
-- Manage releases: tag, build, deploy
-- Write and update documentation (changelog, deployment guides, session state)
-- Refactor code, improve architecture, ensure security best practices
-- Test via Go unit tests, Playwright E2E, and manual verification
-- Keep AGENTS.md and colab.md updated for agent handover
+Agent coordinator. Communicates task instructions to rin via this file.
 
 ## Agent: rin
-AI coding assistant specialized in software engineering. Maintains session continuity across conversations.
+
+AI coding assistant. Executes development tasks.
 
 ### Responsibilities
-- Implement features and fix bugs across Go backend and React frontend
-- Maintain and debug CI/CD pipeline (GitHub Actions, deploy scripts)
-- Manage releases: tag, build, deploy
-- Write and update documentation (changelog, deployment guides, session state)
-- Refactor code, improve architecture, ensure security best practices
-- Test via Go unit tests, Playwright E2E, and manual verification
-- Keep AGENTS.md and colab.md updated for agent handover
+- Go backend + React frontend feature implementation and bug fixing
+- CI/CD pipeline maintenance (GitHub Actions, deploy scripts)
+- Release management: tag, build, deploy
+- Documentation: changelog, deployment guides, session state handover
+- Code refactoring, architecture improvement, security best practices
 
 ## Current State
-- Local dev server running (PID 14948, `chatd-windows-amd64.exe`, started 14:54)
-- Version: v0.8.15 (`/api/version` returns `{"version":"v0.8.15"}`)
+- Local dev server running (PID 14760, `chatd.exe`, started 16:33)
+- Version: dev (`/api/version` returns `{"version":"dev"}`)
 - Frontend built at `client/dist/`
-- Built from source, not downloaded from release (GitHub download too slow on this network)
+- Server log: `server.log`
+- Built from source (GitHub download too slow on this network)
+- Deploy script: `python scripts/deploy_local.py [all|build|start|kill|restart]`
 
 ## How to Build & Run
 ```powershell

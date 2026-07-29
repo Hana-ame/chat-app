@@ -35,6 +35,11 @@ export default function ChatView({ chatId, isNotification, onBack }) {
 
   const chat = useMemo(() => chats.find(c => c.id === chatId), [chats, chatId]);
 
+  const sortedMessages = useMemo(() =>
+    messages.filter(m => m.chat_id === chatId).sort((a, b) => new Date(a.created_at) - new Date(b.created_at)),
+    [messages, chatId],
+  );
+
   useEffect(() => {
     if (!chatId || !accessToken || isNotification) return;
     api.listMembers(accessToken, chatId).then(d => setMemberCount(d.members?.length || 0)).catch(() => notify('Failed to load members', 'error'));
@@ -346,7 +351,7 @@ export default function ChatView({ chatId, isNotification, onBack }) {
         )}
 
         <MessageList
-          messages={messages.filter(m => m.chat_id === chatId)}
+          messages={sortedMessages}
           hasMore={hasMore}
           loading={loading}
           onLoadMore={loadMore}

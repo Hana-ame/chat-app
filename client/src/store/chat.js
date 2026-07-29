@@ -160,6 +160,7 @@ export const useChatStore = create((set, get) => ({
   pinnedMessage: {},
   onlineUserIds: [],
   notifyEnabled: {},
+  _localStreaming: {}, // msgId → true: Composer 正在本地处理 AI 流, fetchStream 应跳过
 
   mode: 'ws',
   wsReady: false,
@@ -284,7 +285,7 @@ export const useChatStore = create((set, get) => ({
       const streamUrl = msg.stream_url || (typeof msg.content === 'string' && msg.content.startsWith('/api/chats/') ? msg.content : null);
       if (streamUrl) {
         const uid = getAuth().user?.id;
-        if (msg.user_id !== uid) {
+        if (msg.user_id !== uid && !get()._localStreaming[msg.id]) {
           fetchStream(streamUrl, msg.id);
         }
       }
