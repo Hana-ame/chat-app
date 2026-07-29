@@ -4959,3 +4959,257 @@ SettingsModal 合并到 UserProfileModal 后，Playwright 测试仍引用旧的 
 ### 后续
 - 重新 tag v0.8.15，触发 CI 重建正确二进制
 - 用 `deploy_win.py` 重新部署
+
+---
+
+## 2026-07-23 v0.3.2: 上传服务 + AI Provider 抽象 + 通知偏好
+
+### 新增
+- `server-side notification prefs` — `notify_enabled` / `notify_blocked` 字段
+- 本地文件上传 `POST /api/upload` 及 `deploy_win.py` 部署脚本
+- 多源 AI Provider 抽象 + 源选择器（Composer）
+- 浏览器通知支持
+
+### 重构
+- 提取 `authz` 包，修复 SSE/WS 连接重复
+- 添加 reconnect backoff
+- 清理 `ensure*` 方法
+
+### 修改
+- 消息体 `model` 字段优先使用请求体传入
+- Composer 新增 model 输入框
+
+### 验证
+- Go build + vet + test: ✅
+- Client build: ✅
+
+---
+
+## 2026-07-23 v0.3.3: 上传页面 HTML
+
+### 新增
+- `GET /api/upload` 提供上传 HTML 页面（`dest=local`）
+
+### 验证
+- Go build: ✅
+
+---
+
+## 2026-07-23 v0.3.4: deploy_win 完善 + CSP 修复
+
+### 修复
+- CSP 允许 `esm.sh` 域名用于上传页面的 AVIF/WebP 压缩
+- `__pycache__` 加入 gitignore
+
+### 改进
+- `deploy_win.py` 添加 verbose 日志
+- `--proxy` 参数显式代理支持
+- `curl.exe` 替代 `urllib` 下载
+- 下载前删除旧文件避免权限错误
+- 默认代理 `http://localhost:10809`
+- `chatd` 前台运行窗口保持
+
+### 验证
+- Server: `go build` ✅
+
+---
+
+## 2026-07-23 v0.3.5: CSP 路由级修复
+
+### 修复
+- 路由级 CSP 允许 `esm.sh` 作为 `connect-src`
+- `curl` 显示下载进度条
+
+### 验证
+- Server: `go build` ✅
+
+---
+
+## 2026-07-23 v0.3.6: 全局 CSP + 文件重命名
+
+### 修复
+- 全局 CSP 允许 `esm.sh` script+connect
+- `aapi.go` 重命名为 `local_upload.go`
+
+### 验证
+- Server: `go build` ✅
+
+---
+
+## 2026-07-23 v0.3.7: Chi 路由分组修复
+
+### 修复
+- upload/SSE/AI 路由移入 `/api` 分组，修复 Chi 路由解析
+
+### 验证
+- Server: `go build` ✅
+
+---
+
+## 2026-07-27 v0.7.1: 上传压缩优化 + goroutine 修复
+
+### 修复
+- 上传图片：WASM-only 压缩 → WASM→toBlob→JPEG 回退链
+- goroutine 错误泄漏清理
+- `doSend` 依赖优化
+
+### 验证
+- Go build + test: ✅
+- Client build: ✅
+
+---
+
+## 2026-07-27 v0.7.2: 版本号修复
+
+### 修复
+- 版本号同步修正 `v0.7.1` → `v0.7.2`
+
+### 验证
+- Go build: ✅
+
+---
+
+## 2026-07-27 v0.8.0: 版本分支
+
+### 变更
+- 版本号 `0.7.2` → `0.8.0`
+
+### 验证
+- Go build: ✅
+
+---
+
+## 2026-07-28 v0.8.1: AI UX 简化 + 请求生命周期修复
+
+### 修复
+- Stream/track 请求使用 `context.Background()`，client disconnect 后服务器继续处理
+- AI 消息 author 使用请求用户而非硬编码 AI bot
+- `ai author`: 使用请求用户替代硬编码 AI 机器人
+- `defer` 简化 goroutine 管理
+
+### 改进
+- AI UX 简化：移除弹出面板，使用主输入框，🤖 emoji 触发
+
+### 验证
+- Go build + test: ✅
+- Client build: ✅
+
+---
+
+## 2026-07-28 v0.8.2: deploy_win 改进 + 配置整理
+
+### 新增
+- `deploy_win.py` 新增 `--watch` 模式、`ensure_jwt_secret`、`VERSION` 常量
+
+### 整理
+- `scripts/` 忽略规则移入 `scripts/.gitignore`
+
+### 验证
+- Client build: ✅
+
+---
+
+## 2026-07-28 v0.8.4: 测试修复 + 版本号对齐
+
+### 修复
+- Playwright 测试选择器：移除 `waitForURL`，使用 `sidebar-notify-entry` class
+- 处理 `/g/notifications` 重定向
+
+### 变更
+- 版本号 `v0.8.3` → `v0.8.4`（v0.8.3 无 tag）
+
+### 验证
+- Frontend CI: ✅
+
+---
+
+## 2026-07-28 v0.8.5: AI 设置 UI 改进 + deploy_win 下载优化
+
+### AI 设置
+- key 独立一行，更大字号，中文 context label
+- JSON 模式始终显示参数 + merge model
+- 修复 notify 图标颜色
+- 添加 `thinking`/`reasoning_content` 支持
+
+### deploy_win 下载优化
+- 移除所有 proxy 代码，`curl` 直连 via `gh-proxy`
+- 并行下载 + 断点续传（`-C -`）
+- `curl` retry 5 次 + 30s 超时
+- 移除损坏的自更新逻辑
+
+### 验证
+- Client build: ✅
+
+---
+
+## 2026-07-28 v0.8.6: 版本号 bump
+
+### 变更
+- `v0.8.5` → `v0.8.6`
+
+### 验证
+- Client build: ✅
+
+---
+
+## 2026-07-28 v0.8.7: thinking 类型渲染 + deploy_win 修复
+
+### 新增
+- `MessageItem` 添加 `thinking` 类型消息渲染
+
+### 修复
+- `deploy_win.py`: kill `chatd` 再下载，避免 curl 写入冲突
+
+### 验证
+- Client build: ✅
+
+---
+
+## 2026-07-28 v0.8.10: 通知聊天统一重构
+
+### 变更
+- 通知聊天重构为 `type=notify` 存储，新增专用 API/backend
+- Notify chat 头像改用 bell SVG 图标
+- ChatList 通知入口改用 `chat-item` class 渲染
+- Composer AI 设置布局重排
+- 移除 AGENTS.md 中的过时指令
+
+### 版本历史
+- v0.8.8 → v0.8.9（含 revert）→ v0.8.10
+
+### 验证
+- Client build: ✅
+
+---
+
+## 2026-07-28 v0.8.11: AI thinking/reasoning 管线
+
+### 新增
+- AI thinking/reasoning 完整管线（后端 stream → 前端渲染）
+- 通知聊天 UI 修复
+
+### 修复
+- 通知聊天隐藏 member count
+
+### 验证
+- Client build: ✅
+
+---
+
+## 2026-07-28 v0.8.12: 通知 API 修复
+
+### 修复
+- 新增 `getNotificationsChat` API 方法，修复 TypeError 崩溃
+
+### 验证
+- Client build: ✅
+
+---
+
+## 2026-07-28 v0.8.13: 排序修复
+
+### 修复
+- 通知聊天移至排序末尾（mock 数据）
+
+### 验证
+- Client build: ✅
