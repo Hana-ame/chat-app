@@ -17,9 +17,15 @@ Chat application with Go backend + React frontend.
 - This file is for initialization context only. Session logs and changelogs go in `docs/changelog.md`.
 
 ## Local Build & Debug
-- 前端: `cd client && npm ci && npm run build`，产物在 `client/dist/`
-- 后端: `cd server && go build -ldflags="-s -w -X main.Version=dev" -o ../chatd.exe ./cmd/chatd/`
-- 直接运行 `./chatd.exe` 启动（需先配置 `.env`，参考 `LOCAL_DEPLOYMENT.md`）
+- 一键全流程: `python scripts/deploy_local.py all`
+- 单独编译: `python scripts/deploy_local.py build`
+- 单独启动（捕获日志到 server.log）: `python scripts/deploy_local.py start`
+- 单独杀掉进程: `python scripts/deploy_local.py kill`
+- kill + start（不编译）: `python scripts/deploy_local.py restart`
+- 手动编译前端: `cd client && npm ci && npm run build`
+- 手动编译后端: `cd server && go build -ldflags="-s -w -X main.Version=dev" -o ../chatd.exe ./cmd/chatd/`
+- 手动启动: `./chatd.exe`（需先配置 `.env`，参考 `LOCAL_DEPLOYMENT.md`）
+- 日志: `server.log`（启动后自动写入）
 
 ## Changelog Rules
 - Always append new entries to the **end** of `docs/changelog.md`.

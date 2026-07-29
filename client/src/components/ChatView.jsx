@@ -42,7 +42,7 @@ export default function ChatView({ chatId, isNotification, onBack }) {
 
   useEffect(() => {
     if (!chatId || !accessToken || isNotification) return;
-    api.listMembers(accessToken, chatId).then(d => setMemberCount(d.members?.length || 0)).catch(() => notify('Failed to load members', 'error'));
+    api.listMembers(accessToken, chatId).then(d => setMemberCount(d.members?.length || 0)).catch(e => notify('Failed to load members: ' + (e.message || e.statusText || 'Unknown error'), 'error'));
   }, [chatId, accessToken, isNotification]);
 
   useEffect(() => {
@@ -76,7 +76,7 @@ export default function ChatView({ chatId, isNotification, onBack }) {
     if (!isNotification && !chat && chatId && accessToken) {
       api.getChat(accessToken, chatId).then(data => {
         if (data && data.id) useChatStore.getState().onChatUpdate(data);
-      }).catch(() => notify('Failed to load chat', 'error'));
+      }).catch(e => notify('Failed to load chat: ' + (e.message || e.statusText || 'Unknown error'), 'error'));
     }
   }, [chatId, accessToken, chat, isNotification]);
 
@@ -96,7 +96,7 @@ export default function ChatView({ chatId, isNotification, onBack }) {
       if (e.status === 429) {
         alert(e.message || 'Too many requests, please try again later');
       } else {
-        console.error('Load more error:', e);
+        notify('Failed to load messages: ' + (e.message || e.statusText || 'Unknown error'));
       }
     }
     setLoading(false);
@@ -139,7 +139,7 @@ export default function ChatView({ chatId, isNotification, onBack }) {
       await api.updateChatAvatar(accessToken, chatId, url + '?v=' + Date.now());
       useChatStore.getState().onChatUpdate({ id: chatId, avatar_url: url + '?v=' + Date.now() });
     } catch (e) {
-      notify('Failed to update avatar');
+      notify('Failed to update avatar: ' + (e.message || e.statusText || 'Unknown error'));
     } finally {
       setUploadingAvatar(false);
       if (avatarInputRef.current) avatarInputRef.current.value = '';
@@ -155,7 +155,7 @@ export default function ChatView({ chatId, isNotification, onBack }) {
       await api.updateChatBanner(accessToken, chatId, url + '?v=' + Date.now());
       useChatStore.getState().onChatUpdate({ id: chatId, banner_url: url + '?v=' + Date.now() });
     } catch (e) {
-      notify('Failed to update banner');
+      notify('Failed to update banner: ' + (e.message || e.statusText || 'Unknown error'));
     } finally {
       setUploadingBanner(false);
       if (bannerInputRef.current) bannerInputRef.current.value = '';
@@ -171,7 +171,7 @@ export default function ChatView({ chatId, isNotification, onBack }) {
       await api.updateChatBackground(accessToken, chatId, url + '?v=' + Date.now());
       useChatStore.getState().onChatUpdate({ id: chatId, background_url: url + '?v=' + Date.now() });
     } catch (e) {
-      notify('Failed to update background');
+      notify('Failed to update background: ' + (e.message || e.statusText || 'Unknown error'));
     } finally {
       setUploadingBg(false);
       if (bgInputRef.current) bgInputRef.current.value = '';

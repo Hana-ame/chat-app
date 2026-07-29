@@ -5596,3 +5596,78 @@ f73e3b3 bump v0.8.12 -> v0.8.13
 
 ### 验证
 - Client build: ✅
+
+---
+
+## 2026-07-29 全端错误消息具体化（第 22 轮）
+
+### 背景
+用户反馈 "AI request failed" 无具体原因，要求代码中所有错误通知返回具体原因。
+
+### 变更
+
+**后端 — `server/internal/handlers/messages.go`**
+- `handleStreamMessage`：`writeError` 的 "AI upstream request failed" 改为 `err.Error()`，包含上游实际错误原因
+
+**前端 — `client/src/components/Composer.jsx`**
+- `doSendAI` 的 `onError` 回调：`"AI response failed"` → `"AI response failed: " + err.message`
+- `doSendAI` 的 `catch`：`"AI request failed"` → `"AI request failed: " + e.message / e.statusText / e.error`
+- `handleSend` 的 `catch`：`"Failed to send message"` → `"Failed to send message: " + e.message / e.statusText / e.error`
+- `uploadPastedImages` / `handleFile` 的 `catch`：`"Upload failed"` → `"Upload failed: " + err.message`
+- JSON parse 错误：`"Invalid JSON body"` → `"Invalid JSON body: " + e.message`
+
+**前端 — `client/src/components/ChatView.jsx`**
+- 所有 `catch` 块（listMembers / getChat / upload avatar/banner/background / loadMore）：包含具体错误原因
+
+**前端 — `client/src/hooks/useMembers.js`**
+- 两个 `catch` 块：`"Failed to load members"` → 包含具体原因
+
+**前端 — `client/src/components/MemberPanel.jsx`**
+- `handleRemoveMember` 的 `catch`：`"Failed to remove member"` → 包含具体原因
+
+### 验证
+- Client build: ✅
+- Backend build: ✅
+
+---
+
+## 2026-07-29 修复 prompt 双发（第 23 轮）
+
+### 背景
+用户反馈每次 prompt 都会被视为发送两次（"就是最后的这条prompt"）。
+
+### 根因
+前端 `handleSend` 无并发保护。快速按两次 Enter 时，由于 JavaScript async 的 yield 特性，两次调用都能读到相同的 `text` 值，导致 `sendMessage` 被调用两次，消息重复发送。
+
+### 修复
+- `client/src/components/Composer.jsx`：新增 `sending` state guard，`handleSend` 入口处 `if (sending) return`，`finally` 中重置；发送按钮同时监听 `sending` 状态 disabled
+
+### 验证
+- Client build: ✅
+
+---
+
+## 2026-07-29 第 24 轮 — 发送失败恢复修复 + AI stream 对其他客户端可见
+
+### 24-1: 发送失败文本翻倍
+
+**反馈**: 发送失败后输入框内容变成 "hellohello"（翻倍），而非恢复原内容。
+
+**根因**: `handleSend` 的 catch 块使用 `setText(text ? savedText + text : savedText)`，其中 `text` 取自闭包（在 async yield 期间不会更新，与 `savedText` 相同），导致 `"hello" + "hello" = "hellohello"`。
+
+**修复**: `Composer.jsx:314` — 改用 functional updater `setText(prev => prev || savedText)`，读取最新 React state。附件同理。
+
+### 24-2: 其他客户端看不到 AI stream
+
+**反馈**: 发送 AI 消息后，其他客户端只看到一条完整回复，没有逐字出现的流式效果。
+
+**根因**: 两条路径同时更新同一消息的 content：
+1. WS `BroadcastMessageUpdate` → `onMessageUpdate` — **全量替换** `content`
+2. SSE `fetchStream` — **增量追加** `m.content + json.content`
+
+当 SSE 的增量 chunk 在 WS 已替换为完整内容后到达时，结果 `"Hello world" + " world" = "Hello world world"`，内容翻倍错乱。用户感知为"只看到一条完整回复"。
+
+**修复**: `chat.js:60-101` — `fetchStream` 改为本地积累 `contentAcc`/`thinkingAcc`，用全量替换（非追加）写入 store，与 WS 行为一致，消除竞态。同时保留 `streaming: false` 清理功能。
+
+### 验证
+- Client build: ✅

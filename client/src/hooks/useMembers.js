@@ -24,8 +24,8 @@ export function useMembers(chatId) {
         useChatStore.setState(s => ({
           chats: s.chats.map(c => c.id === chatId ? { ...c, members: data } : c),
         }));
-      } catch {
-        notify('Failed to load members');
+      } catch (e) {
+        notify('Failed to load members: ' + (e.message || e.statusText || 'Unknown error'));
       }
     })();
     return () => { cancelled = true; };
@@ -41,8 +41,8 @@ export function useMembers(chatId) {
       useChatStore.setState(s => ({
         chats: s.chats.map(c => c.id === chatId ? { ...c, members: data } : c),
       }));
-    } catch {
-      notify('Failed to load members');
+    } catch (e) {
+      notify('Failed to load members: ' + (e.message || e.statusText || 'Unknown error'));
     }
   }, [chatId, accessToken]);
 

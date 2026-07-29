@@ -59,6 +59,8 @@ function sortChats(a, b) {
 
 async function fetchStream(url, msgId) {
   const token = useAuthStore.getState().accessToken;
+  let contentAcc = '';
+  let thinkingAcc = '';
   try {
     const res = await fetch(url, { headers: token ? { Authorization: 'Bearer ' + token } : {} });
     if (!res.ok) { console.error('fetchStream: HTTP', res.status); return; }
@@ -80,12 +82,14 @@ async function fetchStream(url, msgId) {
         try {
           const json = JSON.parse(p);
           if (json.type === 'reasoning' && json.content) {
+            thinkingAcc += json.content;
             useChatStore.setState(s => ({ messages: s.messages.map(m =>
-              m.id === msgId ? { ...m, thinking: (m.thinking || '') + json.content } : m
+              m.id === msgId ? { ...m, thinking: thinkingAcc } : m
             ) }));
           } else if (json.content) {
+            contentAcc += json.content;
             useChatStore.setState(s => ({ messages: s.messages.map(m =>
-              m.id === msgId ? { ...m, content: m.content + json.content } : m
+              m.id === msgId ? { ...m, content: contentAcc } : m
             ) }));
           }
         } catch {}
@@ -272,7 +276,7 @@ export const useChatStore = create((set, get) => ({
         };
       }
       const sanitized = msg.type === 'stream' && (msg.stream_url || (typeof msg.content === 'string' && msg.content.startsWith('/api/chats/')))
-        ? { ...msg, content: '' }
+        ? { ...msg, content: '', streaming: true }
         : msg;
       const chat = s.chats.find(c => c.id === msg.chat_id);
       if (!chat) return { messages: s.activeChatId === msg.chat_id ? [...s.messages, sanitized] : s.messages };
@@ -323,7 +327,8 @@ export const useChatStore = create((set, get) => ({
   onMessageUpdate(msg) {
     set(s => {
       if (s._localStreaming[msg.id]) return {};
-      return { messages: s.messages.map(m => m.id === msg.id ? { ...m, ...msg } : m) };
+      const { type, user_id, author, created_at, stream_url, ...rest } = msg;
+      return { messages: s.messages.map(m => m.id === msg.id ? { ...m, ...rest, streaming: m.streaming || msg.streaming } : m) };
     });
   },
 

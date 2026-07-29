@@ -8,10 +8,10 @@ import { streamAI } from '../utils/ai';
 const CONTEXT_LIMIT = 50;
 const STORAGE_KEY = 'ai_settings';
 
-function buildContext(msgs) {
+function buildContext(msgs, limit) {
   const context = [];
   for (const m of msgs) {
-    if (context.length >= CONTEXT_LIMIT) break;
+    if (context.length >= limit) break;
     if (m.type === 'stream' || m.user_id === 'ai') {
       context.push({ role: 'assistant', content: m.content });
     } else if (m.user_id && m.content) {
@@ -50,7 +50,7 @@ const defaultSettings = {
   temperature: '0.7',
   maxTokens: '32768',
   topP: '1',
-  sendContext: true,
+  contextLimit: 50,
   mode: 'basic',
   jsonBody: '',
 };
@@ -83,6 +83,7 @@ export default function Composer({ chatId, isNotification }) {
   const [attachments, setAttachments] = useState([]);
   const [aiActive, setAiActive] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
+  const [sending, setSending] = useState(false);
   const aiAbort = useRef(null);
   const fileInput = useRef(null);
   const typingTimer = useRef(null);
@@ -90,7 +91,14 @@ export default function Composer({ chatId, isNotification }) {
   const [mentionQuery, setMentionQuery] = useState(null);
   const [mentionIdx, setMentionIdx] = useState(0);
 
-  const saved = useRef(loadSettings() || { ...defaultSettings });
+  const saved = useRef((() => {
+    const s = loadSettings() || { ...defaultSettings };
+    if (s.sendContext !== undefined && s.contextLimit === undefined) {
+      s.contextLimit = s.sendContext ? 50 : 0;
+    }
+    delete s.sendContext;
+    return s;
+  })());
   const [settings, setSettings] = useState({ ...saved.current });
 
   const setField = useCallback((k, v) => {
@@ -205,31 +213,19 @@ export default function Composer({ chatId, isNotification }) {
   const doSendAI = useCallback(async (content) => {
     if (!content || isNotification) return;
     const msgId = crypto.randomUUID();
-    const botMsg = {
-      id: msgId,
-      chat_id: chatId,
-      user_id: user.id,
-      content: '',
-      thinking: '',
-      created_at: new Date().toISOString(),
-      streaming: true,
-      author: { id: user.id, username: user.username, avatar_color: user.avatar_color },
-    };
-    useChatStore.getState().onMessageCreate(botMsg);
     setAiLoading(true);
 
+    const f = saved.current;
     const store = useChatStore.getState();
     const messages = store.messages;
-    const context = [...buildContext(messages), { role: 'user', content }];
+    const context = [...buildContext(messages, f.contextLimit || 0), { role: 'user', content }];
 
     const controller = new AbortController();
     aiAbort.current = controller;
-
-    const f = saved.current;
     let body;
     if (f.mode === 'json') {
-      try { body = JSON.parse(f.jsonBody); } catch {
-        notify('Invalid JSON body', 'error');
+      try { body = JSON.parse(f.jsonBody); } catch (e) {
+        notify('Invalid JSON body: ' + (e.message || 'Unknown parse error'), 'error');
         useChatStore.setState(s => ({
           messages: s.messages.map(m => m.id === msgId ? { ...m, streaming: false } : m),
         }));
@@ -239,7 +235,7 @@ export default function Composer({ chatId, isNotification }) {
     } else {
       body = {
         model: (f.model || '').trim() || undefined,
-        messages: f.sendContext ? context : [{ role: 'user', content }],
+        messages: f.contextLimit ? context : [{ role: 'user', content }],
         temperature: parseFloat(f.temperature) || 0.7,
         max_tokens: parseInt(f.maxTokens) || 32768,
         top_p: parseFloat(f.topP) || 1,
@@ -280,8 +276,8 @@ export default function Composer({ chatId, isNotification }) {
           }
         },
         done,
-        () => {
-          notify('AI response failed', 'error');
+        (err) => {
+          notify(err?.message ? 'AI response failed: ' + err.message : 'AI response failed', 'error');
           done();
         },
       );
@@ -291,26 +287,36 @@ export default function Composer({ chatId, isNotification }) {
       });
     } catch (e) {
       if (e.name === 'AbortError') return;
-      notify('AI request failed', 'error');
+      notify('AI request failed: ' + (e.message || e.statusText || e.error || 'Unknown error'), 'error');
       done();
     }
   }, [chatId, user, accessToken]);
 
   const handleSend = async () => {
+    if (sending) return;
+    setSending(true);
     const content = text.trim();
-    if (!content && attachments.length === 0) return;
+    const savedText = text;
+    const savedAttachments = attachments;
+    if (!content && savedAttachments.length === 0) { setSending(false); return; }
     try {
       if (isNotification) {
-        await api.notifications.sendMessage(accessToken, content, attachments);
+        await api.notifications.sendMessage(accessToken, content, savedAttachments);
       } else {
-        await sendMessage(accessToken, chatId, content, attachments);
+        await sendMessage(accessToken, chatId, content, savedAttachments);
       }
       setText('');
       setAttachments([]);
       if (aiActive && content) {
         await doSendAI(content);
       }
-    } catch (e) { notify('Failed to send message', 'error'); }
+    } catch (e) {
+      setText(prev => prev || savedText);
+      setAttachments(prev => prev.length > 0 ? prev : savedAttachments);
+      notify('Failed to send message: ' + (e.message || e.statusText || e.error || 'Unknown error'), 'error');
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleKey = (e) => {
@@ -338,7 +344,7 @@ export default function Composer({ chatId, isNotification }) {
         results.push({ _key: crypto.randomUUID(), filename: data.filename, mime_type: data.mime_type, size: data.size, url: data.url });
       }
       setAttachments(prev => [...prev, ...results]);
-    } catch (err) { notify('Upload failed', 'error'); }
+    } catch (err) { notify('Upload failed: ' + (err.message || err.statusText || 'Unknown error'), 'error'); }
     setUploading(false);
   };
 
@@ -353,7 +359,7 @@ export default function Composer({ chatId, isNotification }) {
         results.push({ _key: crypto.randomUUID(), filename: data.filename, mime_type: data.mime_type, size: data.size, url: data.url });
       }
       setAttachments(prev => [...prev, ...results]);
-    } catch (err) { notify('Upload failed', 'error'); }
+    } catch (err) { notify('Upload failed: ' + (err.message || err.statusText || 'Unknown error'), 'error'); }
     setUploading(false);
     fileInput.current.value = '';
   };
@@ -430,9 +436,14 @@ export default function Composer({ chatId, isNotification }) {
                       <input style={{width:70,padding:'3px 5px',fontSize:13,background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)'}}
                         value={settings.maxTokens} onChange={e => setField('maxTokens',e.target.value)} type="number" step="1" min="1" />
                     </label>
-                    <label style={{...labelStyle,display:'flex',alignItems:'center',gap:3}}>
-                      <input type="checkbox" checked={settings.sendContext} onChange={e => setField('sendContext',e.target.checked)} />
-                      最近50条聊天记录
+                    <label style={{...labelStyle,display:'flex',alignItems:'center',gap:6}}>
+                      <input type="range" min="0" max="100" step="1"
+                        value={settings.contextLimit}
+                        onChange={e => setField('contextLimit', Number(e.target.value))}
+                        style={{width:80,height:4,accentColor:'var(--accent)',cursor:'pointer'}} />
+                      <span style={{fontSize:12,whiteSpace:'nowrap',color:'var(--text-muted)'}}>
+                        {settings.contextLimit ? `最近${settings.contextLimit}条` : '不发送'}
+                      </span>
                     </label>
                   </div>
                 </>
@@ -474,7 +485,7 @@ export default function Composer({ chatId, isNotification }) {
               </button>
             )}
             <button className="btn-ghost" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',padding:'4px 10px'}}
-              disabled={(!text.trim() && attachments.length === 0) || uploading}
+              disabled={(!text.trim() && attachments.length === 0) || uploading || sending}
               onClick={handleSend} title={aiActive ? 'Send + AI reply' : 'Send'}>
               {uploading ? <span style={{fontSize:14}}>...</span> : (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

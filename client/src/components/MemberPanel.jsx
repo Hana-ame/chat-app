@@ -22,8 +22,8 @@ export default function MemberPanel({ chatId }) {
     setLocalMembers(prev => prev.filter(m => m.id !== userId));
     try {
       await api.removeMember(accessToken, chatId, userId);
-    } catch {
-      notify('Failed to remove member');
+    } catch (e) {
+      notify('Failed to remove member: ' + (e.message || e.statusText || 'Unknown error'));
       if (removed) setLocalMembers(prev => [...prev, removed]);
     }
   };
