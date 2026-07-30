@@ -37,7 +37,7 @@ export default function ChatView({ chatId, isNotification, onBack }) {
   const chat = useMemo(() => chats.find(c => c.id === chatId), [chats, chatId]);
 
   const sortedMessages = useMemo(() =>
-    messages.filter(m => m.chat_id === chatId).sort((a, b) => new Date(a.created_at) - new Date(b.created_at)),
+    messages.filter(m => m.chat_id === chatId).sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at)),
     [messages, chatId],
   );
 

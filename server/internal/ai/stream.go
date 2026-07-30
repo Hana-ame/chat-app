@@ -14,6 +14,8 @@ import (
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
 )
 
+var aiHTTPClient = &http.Client{Timeout: 5 * time.Minute}
+
 type Source struct {
 	Endpoint string          `json:"endpoint"`
 	AuthKey  string          `json:"auth_key"`
@@ -39,8 +41,7 @@ func StreamFromSource(ctx context.Context, src Source) (<-chan Chunk, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+src.AuthKey)
 
-	client := &http.Client{Timeout: 5 * time.Minute}
-	resp, err := client.Do(req)
+	resp, err := aiHTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("upstream: %w", err)
 	}
@@ -51,6 +52,7 @@ func StreamFromSource(ctx context.Context, src Source) (<-chan Chunk, error) {
 		return nil, fmt.Errorf("upstream returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
 	ch := make(chan Chunk, 64)
 
 	go func() {
@@ -59,9 +61,15 @@ func StreamFromSource(ctx context.Context, src Source) (<-chan Chunk, error) {
 	}()
 
 	if isStreaming(resp.Header) {
-		go readStream(resp, ch)
+		go func() {
+			readStream(resp, ch)
+			cancel()
+		}()
 	} else {
-		go readOnce(resp, ch)
+		go func() {
+			readOnce(resp, ch)
+			cancel()
+		}()
 	}
 
 	return ch, nil
@@ -96,7 +104,7 @@ func readStream(resp *http.Response, ch chan<- Chunk) {
 		var event struct {
 			Choices []struct {
 				Delta struct {
-					Content         string `json:"content"`
+					Content          string `json:"content"`
 					ReasoningContent string `json:"reasoning_content"`
 				} `json:"delta"`
 			} `json:"choices"`

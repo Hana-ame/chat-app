@@ -25,27 +25,27 @@ func setAuthCookie(w http.ResponseWriter, r *http.Request, name, value string, p
 }
 
 func setRefreshCookie(w http.ResponseWriter, r *http.Request, raw string, ttl time.Duration) {
-    http.SetCookie(w, &http.Cookie{
-        Name:     "refresh_token",
-        Value:    raw,
-        Path:     "/api/auth/refresh",
-        HttpOnly: true,
-        Secure:   isSecure(r),
-        SameSite: http.SameSiteLaxMode,
-        MaxAge:   int(ttl.Seconds()),
-    })
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    raw,
+		Path:     "/api/auth/refresh",
+		HttpOnly: true,
+		Secure:   isSecure(r),
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   int(ttl.Seconds()),
+	})
 }
 
 func clearRefreshCookie(w http.ResponseWriter, r *http.Request) {
-    http.SetCookie(w, &http.Cookie{
-        Name:     "refresh_token",
-        Value:    "",
-        Path:     "/api/auth/refresh",
-        HttpOnly: true,
-        Secure:   isSecure(r),
-        SameSite: http.SameSiteLaxMode,
-        MaxAge:   -1,
-    })
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		Path:     "/api/auth/refresh",
+		HttpOnly: true,
+		Secure:   isSecure(r),
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+	})
 }
 
 func intQueryParam(r *http.Request, key string, def int) int {
@@ -61,13 +61,13 @@ func intQueryParam(r *http.Request, key string, def int) int {
 }
 
 func clearAccessTokenCookie(w http.ResponseWriter, r *http.Request) {
-    http.SetCookie(w, &http.Cookie{
-        Name:     "access_token",
-        Value:    "",
-        Path:     "/",
-        HttpOnly: true,
-        Secure:   isSecure(r),
-        SameSite: http.SameSiteLaxMode,
-        MaxAge:   -1,
-    })
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   isSecure(r),
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+	})
 }

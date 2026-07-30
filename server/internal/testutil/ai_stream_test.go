@@ -52,13 +52,15 @@ func TestSendStreamMessage(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "AI Chat", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
 	// Send stream message
 	sendRes := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", alice.AccessToken, map[string]any{
-		"type": "stream",
+		"type":    "stream",
 		"content": "",
 		"source": map[string]any{
 			"endpoint": mockAI.URL + "/v1/chat/completions",
@@ -148,7 +150,9 @@ func TestSendStreamMessage_NonStreamingResponse(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "NonStream", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -195,12 +199,14 @@ func TestSendStreamMessage_MissingSource(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "NoSource", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
 	sendRes := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", alice.AccessToken, map[string]any{
-		"type": "stream",
+		"type":    "stream",
 		"content": "",
 	})
 	defer sendRes.Body.Close()
@@ -217,7 +223,9 @@ func TestSendStreamMessage_NilSource(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "NilSource", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -240,7 +248,9 @@ func TestSendStreamMessage_NonMember(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "Exclusive", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -274,7 +284,9 @@ func TestSendStreamMessage_EndpointConfig(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "ConfigTest", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -304,14 +316,16 @@ func TestSSEReplay_AfterStreamComplete(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "Replay", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
 	// send stream message with unique msg_id, read SSE body until done
 	msgID := "replay-test-msg"
 	sendRes := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", alice.AccessToken, map[string]any{
-		"type":   "stream",
+		"type":    "stream",
 		"content": "",
 		"source": map[string]any{
 			"endpoint": mockAI.URL + "/v1/chat/completions",
@@ -394,13 +408,15 @@ func TestSendStreamMessage_ReplayAfterCleanup(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "Replay2", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
 	msgID := "replay-cleanup-msg"
 	sendRes := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", alice.AccessToken, map[string]any{
-		"type":   "stream",
+		"type":    "stream",
 		"content": "",
 		"source": map[string]any{
 			"endpoint": mockAI.URL + "/v1/chat/completions",
@@ -462,7 +478,9 @@ func TestSendStreamMessage_ReplayNonexistentMessage(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "Replay3", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -494,7 +512,9 @@ func TestSendStreamMessage_ReplayNonMember(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "Replay4", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -522,7 +542,9 @@ func TestSendStreamMessage_UpstreamError(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "UpstreamErr", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -548,7 +570,9 @@ func TestSendStreamMessage_UpstreamTransportError(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "TransportErr", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -577,7 +601,9 @@ func TestSendStreamMessage_ResponseHeaders(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "Headers", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -628,14 +654,16 @@ func TestSendStreamMessage_ReplayLiveWithNotification(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "LiveNotify", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
 	// send the stream message, consume chunks in background
 	msgID := "replay-live-notify"
 	sendRes := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", alice.AccessToken, map[string]any{
-		"type":   "stream",
+		"type":    "stream",
 		"content": "",
 		"source": map[string]any{
 			"endpoint": mockAI.URL + "/v1/chat/completions",
@@ -685,7 +713,9 @@ func TestSendStreamMessage_ReplayNonStreamMessage(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "NonStreamReplay", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -694,7 +724,9 @@ func TestSendStreamMessage_ReplayNonStreamMessage(t *testing.T) {
 		"content": "regular message",
 	})
 	defer msgRes.Body.Close()
-	var msg struct{ ID string `json:"id"` }
+	var msg struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(msgRes.Body).Decode(&msg)
 
 	// replay non-stream message — stream endpoint should return [DONE] only
@@ -736,7 +768,9 @@ func TestSendStreamMessage_ReasoningContent(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "ReasonTest", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -791,7 +825,9 @@ func TestSendStreamMessage_EmptySourceBody(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "EmptyBody", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -819,7 +855,9 @@ func TestSendStreamMessage_SourceWithoutBody(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "NoBody", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -844,7 +882,9 @@ func TestSendStreamMessage_EmptyEndpoint(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "EmptyEP", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -870,7 +910,9 @@ func TestSendStreamMessage_EmptyAuthKey(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "EmptyAuth", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -899,7 +941,9 @@ func TestSendStreamMessage_MissingMsgID(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "NoMsgID", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -936,13 +980,15 @@ func TestSendStreamMessage_ReplayWithEmptyLiveBuffer(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "EmptyReplay", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
 	msgID := "empty-replay-msg"
 	sendRes := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", alice.AccessToken, map[string]any{
-		"type":   "stream",
+		"type":    "stream",
 		"content": "",
 		"source": map[string]any{
 			"endpoint": mockAI.URL + "/v1/chat/completions",
@@ -1001,7 +1047,9 @@ func TestSendStreamMessage_SlowAI(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "SlowAITest", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -1059,7 +1107,9 @@ func TestRealAIEndpoint(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "RealAITest", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 

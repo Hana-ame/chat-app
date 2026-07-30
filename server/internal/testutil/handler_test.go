@@ -657,7 +657,9 @@ func TestSendMessageNonMember(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", a.AccessToken, map[string]any{
 		"type": "group", "name": "Exclusive", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -773,7 +775,9 @@ func TestSendMessageWithAttachments(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "AttTest", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -838,7 +842,9 @@ func TestMessageContentTooLong(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "LongTest", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -850,7 +856,9 @@ func TestMessageContentTooLong(t *testing.T) {
 	if res2.StatusCode != 413 {
 		t.Fatalf("long content: want 413 got %d", res2.StatusCode)
 	}
-	var errResp struct{ Error string `json:"error"` }
+	var errResp struct {
+		Error string `json:"error"`
+	}
 	json.NewDecoder(res2.Body).Decode(&errResp)
 	if errResp.Error != "content_too_long" {
 		t.Fatalf("want error='content_too_long' got '%s'", errResp.Error)
@@ -899,7 +907,9 @@ func TestPinMessage(t *testing.T) {
 		res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 			"type": "group", "name": "SmallChat", "member_ids": []string{},
 		})
-		var small struct{ ID string `json:"id"` }
+		var small struct {
+			ID string `json:"id"`
+		}
 		json.NewDecoder(res.Body).Decode(&small)
 		res.Body.Close()
 
@@ -1215,7 +1225,9 @@ func TestGetChat_AsMemberAndNonMember(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "GetChatTest", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -1250,7 +1262,9 @@ func TestRenameDelete_DMNotAllowed(t *testing.T) {
 	res := f.Do(t, "POST", "/api/dms", alice.AccessToken, map[string]string{
 		"user_id": bob.UserID,
 	})
-	var dm struct{ ID string `json:"id"` }
+	var dm struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&dm)
 	res.Body.Close()
 
@@ -1281,14 +1295,18 @@ func TestDeleteMessage_NonAuthor(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "DelMsgTest", "member_ids": []string{bob.UserID},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
 	msgRes := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", bob.AccessToken, map[string]string{
 		"content": "bob's msg",
 	})
-	var msg struct{ ID string `json:"id"` }
+	var msg struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(msgRes.Body).Decode(&msg)
 	msgRes.Body.Close()
 
@@ -1310,7 +1328,9 @@ func TestDeleteMessage_NonAuthor(t *testing.T) {
 		res2 := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 			"type": "group", "name": "OtherChat2", "member_ids": []string{},
 		})
-		var otherChat struct{ ID string `json:"id"` }
+		var otherChat struct {
+			ID string `json:"id"`
+		}
 		json.NewDecoder(res2.Body).Decode(&otherChat)
 		res2.Body.Close()
 
@@ -1330,7 +1350,9 @@ func TestListMembers_NonMember(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "ListMemTest", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -1350,7 +1372,9 @@ func TestAddMember_DMAndDuplicate(t *testing.T) {
 	res := f.Do(t, "POST", "/api/dms", alice.AccessToken, map[string]string{
 		"user_id": bob.UserID,
 	})
-	var dm struct{ ID string `json:"id"` }
+	var dm struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&dm)
 	res.Body.Close()
 
@@ -1368,7 +1392,9 @@ func TestAddMember_DMAndDuplicate(t *testing.T) {
 		res3 := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 			"type": "group", "name": "AddDup", "member_ids": []string{bob.UserID},
 		})
-		var c struct{ ID string `json:"id"` }
+		var c struct {
+			ID string `json:"id"`
+		}
 		json.NewDecoder(res3.Body).Decode(&c)
 		res3.Body.Close()
 
@@ -1385,7 +1411,9 @@ func TestAddMember_DMAndDuplicate(t *testing.T) {
 		res5 := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 			"type": "group", "name": "AddNoUser", "member_ids": []string{},
 		})
-		var c2 struct{ ID string `json:"id"` }
+		var c2 struct {
+			ID string `json:"id"`
+		}
 		json.NewDecoder(res5.Body).Decode(&c2)
 		res5.Body.Close()
 
@@ -1408,7 +1436,9 @@ func TestRemoveMember_DMAndOwner(t *testing.T) {
 	res := f.Do(t, "POST", "/api/dms", alice.AccessToken, map[string]string{
 		"user_id": bob.UserID,
 	})
-	var dm struct{ ID string `json:"id"` }
+	var dm struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&dm)
 	res.Body.Close()
 
@@ -1424,7 +1454,9 @@ func TestRemoveMember_DMAndOwner(t *testing.T) {
 		res3 := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 			"type": "group", "name": "KickOwner", "member_ids": []string{bob.UserID, carol.UserID},
 		})
-		var c struct{ ID string `json:"id"` }
+		var c struct {
+			ID string `json:"id"`
+		}
 		json.NewDecoder(res3.Body).Decode(&c)
 		res3.Body.Close()
 
@@ -1443,7 +1475,9 @@ func TestSendMessage_BadJSON(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "BadJSON", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -1467,7 +1501,9 @@ func TestMarkRead_NoBody(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "MarkReadEmpty", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
@@ -1502,7 +1538,9 @@ func TestSendMessage_EmptyContentNoAttachments(t *testing.T) {
 	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
 		"type": "group", "name": "EmptyMsgH", "member_ids": []string{},
 	})
-	var chat struct{ ID string `json:"id"` }
+	var chat struct {
+		ID string `json:"id"`
+	}
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 

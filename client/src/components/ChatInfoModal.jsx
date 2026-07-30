@@ -47,10 +47,11 @@ export default function ChatInfoModal({ chatId, onClose }) {
           chat={chat}
           currentUserId={user.id}
           onProfile={setProfileUser}
+          onKick={null}
         />
       </div>
       {profileUser && (
-        <UserProfileModal user={profileUser} onClose={() => setProfileUser(null)} />
+        <UserProfileModal user={profileUser} onClose={() => setProfileUser(null)} chatId={chatId} />
       )}
     </div>
   );

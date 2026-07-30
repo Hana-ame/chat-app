@@ -381,6 +381,7 @@ export default function Composer({ chatId, isNotification, replyTo, onCancelRepl
     }
   };
 
+  /** @type {import('react').CSSProperties} */
   const inputStyle = {
     width: '100%', padding: '4px 6px', fontSize: 13, fontFamily: 'monospace',
     background: 'var(--bg-secondary)', border: '1px solid var(--border)',

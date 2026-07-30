@@ -9,9 +9,9 @@
     "strict": false,
     "jsx": "react-jsx",
     "skipLibCheck": true,
-    "baseUrl": ".",
+    "types": ["vite/client"],
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx"],

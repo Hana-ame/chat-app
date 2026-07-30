@@ -92,7 +92,9 @@ func (c *Client) readPump() {
 		case OpPing:
 			c.queue(Envelope{Op: OpPong})
 		case OpSubscribe:
-			var p struct{ ChatID string `json:"chat_id"` }
+			var p struct {
+				ChatID string `json:"chat_id"`
+			}
 			if err := json.Unmarshal(env.Payload, &p); err != nil || p.ChatID == "" {
 				continue
 			}
@@ -107,13 +109,17 @@ func (c *Client) readPump() {
 				}
 			}
 		case OpUnsubscribe:
-			var p struct{ ChatID string `json:"chat_id"` }
+			var p struct {
+				ChatID string `json:"chat_id"`
+			}
 			if err := json.Unmarshal(env.Payload, &p); err != nil || p.ChatID == "" {
 				continue
 			}
 			c.unsubscribe(p.ChatID)
 		case OpListMembers:
-			var p struct{ ChatID string `json:"chat_id"` }
+			var p struct {
+				ChatID string `json:"chat_id"`
+			}
 			if err := json.Unmarshal(env.Payload, &p); err != nil || p.ChatID == "" {
 				continue
 			}
@@ -129,7 +135,9 @@ func (c *Client) readPump() {
 				}
 			}
 		case OpTyping:
-			var p struct{ ChatID string `json:"chat_id"` }
+			var p struct {
+				ChatID string `json:"chat_id"`
+			}
 			if err := json.Unmarshal(env.Payload, &p); err != nil || p.ChatID == "" {
 				continue
 			}

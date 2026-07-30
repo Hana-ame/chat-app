@@ -104,15 +104,15 @@ func (d *DB) CreateChat(ctx context.Context, typ, name, visibility, ownerID stri
 
 func (d *DB) GetChat(ctx context.Context, id string) (*models.Chat, error) {
 	var (
-		c              models.Chat
-		name           sql.NullString
-		owner          sql.NullString
-		createdAt      string
-		lastMsgAt      sql.NullString
-		lastMsgID      sql.NullString
-		pinnedMsg      sql.NullString
-		pinnedUpdAt    sql.NullString
-		memberCount    int
+		c           models.Chat
+		name        sql.NullString
+		owner       sql.NullString
+		createdAt   string
+		lastMsgAt   sql.NullString
+		lastMsgID   sql.NullString
+		pinnedMsg   sql.NullString
+		pinnedUpdAt sql.NullString
+		memberCount int
 	)
 	err := d.QueryRowContext(ctx,
 		`SELECT id, type, name, icon_color, avatar_url, banner_url, banner_opacity, background_url, visibility, owner_id, created_at, last_message_at, last_message_id, pinned_message, pinned_updated_at, member_count
@@ -156,8 +156,6 @@ func (d *DB) GetChat(ctx context.Context, id string) (*models.Chat, error) {
 	logutil.Debug("get chat %s: type=%s name=%s members=%d", id, c.Type, c.Name, c.MemberCount)
 	return &c, nil
 }
-
-
 
 func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, error) {
 	rows, err := d.QueryContext(ctx,
@@ -290,16 +288,30 @@ func (d *DB) FindDMBetween(ctx context.Context, a, b string) (*models.Chat, erro
 	return d.GetChat(ctx, id)
 }
 
-
-
 func (d *DB) DeleteChat(ctx context.Context, chatID string) error {
-	_, err := d.ExecContext(ctx, `DELETE FROM chats WHERE id = ?`, chatID)
+	tx, err := d.BeginTx(ctx, nil)
 	if err != nil {
-		logutil.Error("delete chat %s: %v", chatID, err)
-	} else {
-		logutil.Warn("deleted chat %s", chatID)
+		return err
 	}
-	return err
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM reactions WHERE message_id IN (SELECT id FROM messages WHERE chat_id = ?)`, chatID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM messages WHERE chat_id = ?`, chatID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM chat_members WHERE chat_id = ?`, chatID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM chats WHERE id = ?`, chatID); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	logutil.Warn("deleted chat %s and all associated data", chatID)
+	return nil
 }
 
 func (d *DB) RenameChat(ctx context.Context, chatID, name string) error {
@@ -360,5 +372,3 @@ func (d *DB) UpdateLastRead(ctx context.Context, chatID, userID, messageID strin
 	)
 	return err
 }
-
-

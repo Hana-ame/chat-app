@@ -16,7 +16,7 @@ function sortChats(a, b) {
   if (pa !== pb) return pa ? -1 : 1;
   const da = a.last_message_at || a.created_at;
   const db = b.last_message_at || b.created_at;
-  return new Date(db) - new Date(da);
+  return +new Date(db) - +new Date(da);
 }
 
 coord.setHandlers({

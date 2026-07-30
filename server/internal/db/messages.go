@@ -168,7 +168,9 @@ func (d *DB) GetMessage(ctx context.Context, id string) (*models.Message, error)
 	return m, nil
 }
 
-type scanner interface{ Scan(dest ...interface{}) error }
+type scanner interface {
+	Scan(dest ...interface{}) error
+}
 
 func (d *DB) scanMessage(s scanner) (*models.Message, error) {
 	var (

@@ -1,4 +1,4 @@
-export default function ScrollArea({ children, style, className }) {
+export default function ScrollArea({ children, style = undefined, className = undefined }) {
   return (
     <div className={className} style={{
       flex: 1, overflowY: 'auto', minHeight: 0,

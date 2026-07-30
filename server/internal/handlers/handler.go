@@ -29,12 +29,13 @@ const (
 )
 
 type Server struct {
-	Cfg          *config.Config
-	Auth         *auth.Service
-	Version      string
-	Services     *service.Service
-	aapiLocalDriver  *localfs.Driver
-	refreshMu        sync.Mutex
+	Cfg             *config.Config
+	Auth            *auth.Service
+	Version         string
+	Services        *service.Service
+	aapiLocalDriver *localfs.Driver
+	aapiLocalOnce   sync.Once
+	refreshMu       sync.Mutex
 }
 
 func New(cfg *config.Config, database *db.DB, authSvc *auth.Service, hub *ws.Hub) *Server {

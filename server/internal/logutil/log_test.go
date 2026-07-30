@@ -18,10 +18,10 @@ func captureOutput(fn func()) string {
 
 func TestLevelFiltering(t *testing.T) {
 	tests := []struct {
-		name       string
-		setLevel   Level
-		callLevel  Level
-		expectLog  bool
+		name      string
+		setLevel  Level
+		callLevel Level
+		expectLog bool
 	}{
 		{"DEBUG when DEBUG", DEBUG, DEBUG, true},
 		{"DEBUG when INFO", INFO, DEBUG, false},

@@ -52,6 +52,9 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	})
+	// NOTE: AllowCredentials with AllowOriginFunc (not "*") works because chi
+	// echoes the request Origin, avoiding the CORS spec violation of
+	// credentials + wildcard origin. Keep AllowOriginFunc; don't swap to "*".
 	r.Use(cors.Handler(cors.Options{
 		AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
 		AllowedMethods:   []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},

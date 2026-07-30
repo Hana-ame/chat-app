@@ -1,7 +1,7 @@
 package ws_test
 
 import (
-    "os"
+	"os"
 
 	"encoding/json"
 	"net/http"
@@ -17,9 +17,9 @@ import (
 // If it is missing, the WebSocket related tests are skipped to avoid false failures
 // in environments where WebSockets are intentionally disabled.
 func maybeSkipWS(t *testing.T) {
-    if _, ok := os.LookupEnv("WS_ENABLED"); !ok {
-        t.Skip("WS tests skipped because WS_ENABLED not set")
-    }
+	if _, ok := os.LookupEnv("WS_ENABLED"); !ok {
+		t.Skip("WS tests skipped because WS_ENABLED not set")
+	}
 }
 
 type wsEnvelope struct {
@@ -124,14 +124,16 @@ func (c *wsClient) write(t *testing.T, v interface{}) {
 }
 
 func TestWSConnectAndReady(t *testing.T) {
-    maybeSkipWS(t)
+	maybeSkipWS(t)
 	f := testutil.New(t)
 	alice := f.Register(t, "ws1@w.t", "AliceWS", "testtest123")
 	ws := dialWS(t, f.WSURL(alice.AccessToken))
 	defer ws.close()
 
 	env := ws.expectOp(t, "ready")
-	var ready struct{ User map[string]any `json:"user"` }
+	var ready struct {
+		User map[string]any `json:"user"`
+	}
 	json.Unmarshal(env.Payload, &ready)
 	if ready.User["username"] != "AliceWS" {
 		t.Fatalf("wrong user: %v", ready.User)
@@ -139,7 +141,7 @@ func TestWSConnectAndReady(t *testing.T) {
 }
 
 func TestWSPingPong(t *testing.T) {
-    maybeSkipWS(t)
+	maybeSkipWS(t)
 	f := testutil.New(t)
 	alice := f.Register(t, "ping@w.t", "Pinger", "testtest123")
 	ws := dialWS(t, f.WSURL(alice.AccessToken))
@@ -155,7 +157,7 @@ func TestWSPingPong(t *testing.T) {
 }
 
 func TestWSSubscribeAndReceiveMessage(t *testing.T) {
-    maybeSkipWS(t)
+	maybeSkipWS(t)
 	f := testutil.New(t)
 	alice := f.Register(t, "sub1@w.t", "SubAlice", "testtest123")
 	bob := f.Register(t, "sub2@w.t", "SubBob", "testtest123")
@@ -191,7 +193,9 @@ func TestWSSubscribeAndReceiveMessage(t *testing.T) {
 	if env.Op != "message_create" {
 		t.Fatalf("expected message_create, got %s", env.Op)
 	}
-	var msg struct{ Content string `json:"content"` }
+	var msg struct {
+		Content string `json:"content"`
+	}
 	json.Unmarshal(env.Payload, &msg)
 	if msg.Content != "ws test message" {
 		t.Fatalf("wrong content: %s", msg.Content)
@@ -199,7 +203,7 @@ func TestWSSubscribeAndReceiveMessage(t *testing.T) {
 }
 
 func TestWSTyping(t *testing.T) {
-    maybeSkipWS(t)
+	maybeSkipWS(t)
 	f := testutil.New(t)
 	alice := f.Register(t, "type1@w.t", "Typer", "testtest123")
 	bob := f.Register(t, "type2@w.t", "Typed", "testtest123")
@@ -221,7 +225,7 @@ func TestWSTyping(t *testing.T) {
 }
 
 func TestWSUnauthorized(t *testing.T) {
-    maybeSkipWS(t)
+	maybeSkipWS(t)
 	f := testutil.New(t)
 	conn, resp, err := websocket.DefaultDialer.Dial(f.WSURL("bad-token"), nil)
 	if err != nil {
@@ -235,7 +239,7 @@ func TestWSUnauthorized(t *testing.T) {
 }
 
 func TestWSPresence(t *testing.T) {
-    maybeSkipWS(t)
+	maybeSkipWS(t)
 	f := testutil.New(t)
 	alice := f.Register(t, "pres1@w.t", "PresAlice", "testtest123")
 	bob := f.Register(t, "pres2@w.t", "PresBob", "testtest123")

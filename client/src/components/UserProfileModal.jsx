@@ -4,7 +4,7 @@ import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 import UserAvatar from './UserAvatar';
 
-export default function UserProfileModal({ user: profileUser, onClose, chatId }) {
+export default function UserProfileModal({ user: profileUser, onClose, chatId = undefined }) {
   const { user: me, accessToken } = useAuthStore();
   const { chats } = useChatStore();
   const isMe = profileUser.id === me.id;
@@ -26,7 +26,8 @@ export default function UserProfileModal({ user: profileUser, onClose, chatId })
     setSaving(true);
     try {
       const payload = { username: name, avatar_color: color || undefined };
-      const file = document.getElementById('profile-avatar-input')?.files?.[0];
+      const avatarInput = document.getElementById('profile-avatar-input');
+      const file = avatarInput instanceof HTMLInputElement ? avatarInput.files?.[0] : undefined;
       if (file) {
         const data = await api.uploadAvatar(accessToken, file);
         payload.avatar_url = data.url + '?v=' + Date.now();

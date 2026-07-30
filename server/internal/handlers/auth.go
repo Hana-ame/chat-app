@@ -19,9 +19,9 @@ type loginReq struct {
 }
 
 type sessionResp struct {
-	User        any   `json:"user"`
+	User        any    `json:"user"`
 	AccessToken string `json:"access_token"`
-	ExpiresIn   int64 `json:"expires_in"`
+	ExpiresIn   int64  `json:"expires_in"`
 }
 
 // Register godoc

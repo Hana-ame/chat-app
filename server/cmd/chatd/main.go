@@ -45,6 +45,7 @@ func main() {
 		Handler:           r,
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		ReadTimeout:       cfg.ReadTimeout,
+		WriteTimeout:      cfg.ReadTimeout,
 		IdleTimeout:       120 * time.Second,
 	}
 

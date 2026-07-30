@@ -1142,9 +1142,9 @@ func TestAuthz_MustBeMember(t *testing.T) {
 
 func TestAuthz_RequireOwnerOrAdmin(t *testing.T) {
 	tests := []struct {
-		name   string
-		setup  func(f *testutil.Fixture) (chatID, userID string, ctx context.Context)
-		wantOK bool
+		name    string
+		setup   func(f *testutil.Fixture) (chatID, userID string, ctx context.Context)
+		wantOK  bool
 		wantErr error
 	}{
 		{

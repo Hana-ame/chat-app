@@ -70,9 +70,9 @@ func (d *DB) CreateUser(ctx context.Context, email, username, passwordHash strin
 
 func (d *DB) GetUserByID(ctx context.Context, id string) (*models.User, error) {
 	var (
-		u            models.User
-		lastSeen     string
-		createdAt    string
+		u             models.User
+		lastSeen      string
+		createdAt     string
 		notifyBlocked sql.NullString
 	)
 	err := d.QueryRowContext(ctx,
@@ -100,10 +100,10 @@ func (d *DB) GetUserByID(ctx context.Context, id string) (*models.User, error) {
 func (d *DB) GetUserByEmail(ctx context.Context, email string) (*models.User, string, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	var (
-		u            models.User
-		pwHash       string
-		lastSeen     string
-		createdAt    string
+		u             models.User
+		pwHash        string
+		lastSeen      string
+		createdAt     string
 		notifyBlocked sql.NullString
 	)
 	err := d.QueryRowContext(ctx,

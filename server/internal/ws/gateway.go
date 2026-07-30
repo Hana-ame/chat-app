@@ -67,6 +67,7 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing access_token", http.StatusUnauthorized)
 		return
 	}
+	logutil.Warn("ws connect: access_token in URL query — this leaks to logs and Referer headers; prefer Sec-WebSocket-Protocol or Authorization header")
 	claims, err := g.authSvc.ParseAccessToken(tok)
 	if err != nil {
 		logutil.Warn("ws connect: invalid token")

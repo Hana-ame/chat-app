@@ -14,14 +14,14 @@ import (
 // @Description  Connect to server-sent events for real-time updates
 // @Tags         sse
 // @Security     BearerAuth
-// @Param        access_token  query  string  true  "JWT access token"
+// @Param        access_token  query  string  false  "JWT access token (deprecated, use Authorization header)"
 // @Success      200  {string}  string  "text/event-stream"
 // @Router       /api/events [get]
 func (s *Server) SSE(w http.ResponseWriter, r *http.Request) {
-	// Deprecated: URL query token leaks via server logs, browser history, and Referer headers.
-	// Frontend should use Authorization header or cookie for the initial request.
-	// Query string fallback is kept for EventSource API compatibility and will be removed in a future version.
 	tok := bearerToken(r)
+	if tok != "" && r.URL.Query().Get("access_token") != "" {
+		logutil.Warn("SSE connect via ?access_token= — this leaks to logs and Referer; frontend should use Authorization header or cookie")
+	}
 	if tok == "" {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "missing token")
 		return

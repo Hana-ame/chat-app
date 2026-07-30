@@ -427,8 +427,8 @@ func TestStreamFromSource_RequestBodySentAsIs(t *testing.T) {
 	mux.HandleFunc("/v1/chat/completions", func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		var req struct {
-			Model   string `json:"model"`
-			Stream  bool   `json:"stream"`
+			Model  string `json:"model"`
+			Stream bool   `json:"stream"`
 		}
 		json.Unmarshal(body, &req)
 		capturedModel = req.Model
