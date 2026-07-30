@@ -3,12 +3,11 @@ let _reqId = 0;
 
 export function createWsTransport({ token, onReady, onEvent, onClose }) {
   const wsUrl = import.meta.env.VITE_WS_URL;
-  if (!wsUrl) console.warn('[WS] VITE_WS_URL not set — auto-detecting from hostname');
   const url = wsUrl || (() => {
     const isProd = location.hostname.endsWith('pages.dev');
     const host = isProd ? 'chat.moonchan.xyz' : location.host;
     const proto = isProd ? 'wss' : (location.protocol === 'https:' ? 'wss' : 'ws');
-    return `${proto}://${host}/ws?access_token=${token}`;
+    return `${proto}://${host}/ws`;
   })();
   const ws = new WebSocket(url);
 

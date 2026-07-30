@@ -75,7 +75,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 	r.Route("/api", func(r chi.Router) {
 		// Upload — 5min timeout (big files on slow connections)
 		r.Group(func(r chi.Router) {
-			r.Use(chimid.Timeout(s.Cfg.UploadTimeout))
+			r.Use(s.authMiddleware, chimid.Timeout(s.Cfg.UploadTimeout))
 			r.Get("/upload", s.AAPIUpload)
 			r.Put("/upload", s.AAPIUpload)
 			r.Put("/upload/*", s.AAPIUpload)

@@ -10,12 +10,13 @@ const STORAGE_KEY = 'ai_settings';
 
 function buildContext(msgs, limit) {
   const context = [];
-  for (const m of msgs) {
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i];
     if (context.length >= limit) break;
     if (m.type === 'stream' || m.user_id === 'ai') {
-      context.push({ role: 'assistant', content: m.content });
+      context.unshift({ role: 'assistant', content: m.content });
     } else if (m.user_id && m.content) {
-      context.push({ role: 'user', content: m.content });
+      context.unshift({ role: 'user', content: m.content });
     }
   }
   return context;
@@ -58,7 +59,7 @@ const defaultSettings = {
 defaultSettings.jsonBody = toJsonBody(defaultSettings);
 
 function compressImage(file) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
@@ -71,6 +72,7 @@ function compressImage(file) {
         resolve(new File([blob], name, { type: 'image/webp' }));
       }, 'image/webp', 0.75);
     };
+    img.onerror = () => reject(new Error('Failed to load image'));
     img.src = URL.createObjectURL(file);
   });
 }
@@ -152,9 +154,9 @@ export default function Composer({ chatId, isNotification, replyTo, onCancelRepl
   useEffect(() => { autoResize(); }, [text, autoResize]);
 
   const handleTyping = () => {
+    if (typingTimer.current) return;
     sendTyping(chatId);
-    if (typingTimer.current) clearTimeout(typingTimer.current);
-    typingTimer.current = setTimeout(() => {}, 2000);
+    typingTimer.current = setTimeout(() => { typingTimer.current = null; }, 2000);
   };
 
   const mentionMembers = (() => {

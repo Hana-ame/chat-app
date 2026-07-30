@@ -42,12 +42,7 @@ func (c *Client) unsubscribe(chatID string) {
 }
 
 func (c *Client) queue(env Envelope) {
-	c.mu.RLock()
-	if c.closed {
-		c.mu.RUnlock()
-		return
-	}
-	c.mu.RUnlock()
+	defer func() { recover() }()
 	select {
 	case c.send <- env:
 	default:
@@ -60,6 +55,7 @@ func (c *Client) close() {
 		c.mu.Lock()
 		c.closed = true
 		c.mu.Unlock()
+		close(c.send)
 		_ = c.conn.WriteControl(websocket.CloseMessage,
 			websocket.FormatCloseMessage(websocket.CloseNormalClosure, "bye"),
 			time.Now().Add(writeWait))

@@ -123,43 +123,6 @@ func (d *DB) RemoveReaction(ctx context.Context, messageID, userID, emoji string
 	return nil
 }
 
-func (d *DB) reactionsFor(ctx context.Context, messageID, viewerID string) ([]models.Reaction, error) {
-	rows, err := d.QueryContext(ctx,
-		`SELECT emoji, user_id FROM reactions WHERE message_id = ? ORDER BY created_at`,
-		messageID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	grouped := map[string]*models.Reaction{}
-	order := []string{}
-	for rows.Next() {
-		var emoji, uid string
-		if err := rows.Scan(&emoji, &uid); err != nil {
-			return nil, err
-		}
-		if r, ok := grouped[emoji]; ok {
-			r.Count++
-		} else {
-			r := &models.Reaction{
-				Emoji: emoji,
-				Count: 1,
-			}
-			grouped[emoji] = r
-			order = append(order, emoji)
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	out := make([]models.Reaction, 0, len(order))
-	for _, e := range order {
-		out = append(out, *grouped[e])
-	}
-	return out, nil
-}
-
 func (d *DB) ListReactions(ctx context.Context, messageID, viewerID string) ([]models.Reaction, error) {
 	rows, err := d.QueryContext(ctx,
 		`SELECT emoji, user_id FROM reactions WHERE message_id = ? ORDER BY created_at`,

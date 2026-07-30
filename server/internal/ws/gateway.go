@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Hana-ame/chat-app/server/internal/auth"
@@ -61,13 +62,26 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "WebSocket is disabled in this version", http.StatusForbidden)
 		return
 	}
-	tok := r.URL.Query().Get("access_token")
+	tok := ""
+	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
+		tok = strings.TrimSpace(h[7:])
+	}
+	if tok == "" {
+		if c, err := r.Cookie("access_token"); err == nil {
+			tok = c.Value
+		}
+	}
+	if tok == "" {
+		tok = r.URL.Query().Get("access_token")
+		if tok != "" {
+			logutil.Warn("ws connect: access_token in URL query — prefer Authorization header")
+		}
+	}
 	if tok == "" {
 		logutil.Warn("ws connect: missing access_token")
 		http.Error(w, "missing access_token", http.StatusUnauthorized)
 		return
 	}
-	logutil.Warn("ws connect: access_token in URL query — this leaks to logs and Referer headers; prefer Sec-WebSocket-Protocol or Authorization header")
 	claims, err := g.authSvc.ParseAccessToken(tok)
 	if err != nil {
 		logutil.Warn("ws connect: invalid token")

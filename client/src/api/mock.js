@@ -346,7 +346,7 @@ export function mockSendMessage(_token, chatId, content, attachments = undefined
   if (_store) _store.getState().onMessageCreate(userMsg);
 
   if (Math.random() < 0.5) {
-    const text = AI_RESPONSES[0];
+    const text = AI_RESPONSES[Math.floor(Math.random() * AI_RESPONSES.length)];
     const aiId = randid();
     const aiCreatedAt = new Date(Date.now() + 1).toISOString();
 

@@ -57,14 +57,13 @@ func (s *StreamService) StartStream(ctx context.Context, chatID, userID, msgID s
 func (s *StreamService) AppendChunk(msgID, chunkType, content string) {
 	s.liveMu.Lock()
 	s.liveChunks[msgID] = append(s.liveChunks[msgID], ChunkInfo{Type: chunkType, Content: content})
-	subs := s.liveSubs[msgID]
-	s.liveMu.Unlock()
-	for _, sub := range subs {
+	for _, sub := range s.liveSubs[msgID] {
 		select {
 		case sub <- struct{}{}:
 		default:
 		}
 	}
+	s.liveMu.Unlock()
 }
 
 func (s *StreamService) FinishStream(ctx context.Context, chatID, userID, msgID, content, thinking string) {
@@ -154,7 +153,8 @@ func (s *StreamService) Unsubscribe(msgID string, sub chan struct{}) {
 	subs := s.liveSubs[msgID]
 	for i, c := range subs {
 		if c == sub {
-			s.liveSubs[msgID] = append(subs[:i], subs[i+1:]...)
+			subs = append(subs[:i:i], subs[i+1:]...)
+			s.liveSubs[msgID] = subs
 			return
 		}
 	}

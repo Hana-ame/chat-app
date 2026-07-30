@@ -6,7 +6,9 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const { register, loading, error } = useAuthStore();
+  const register = useAuthStore(s => s.register);
+  const loading = useAuthStore(s => s.loading);
+  const error = useAuthStore(s => s.error);
   const nav = useNavigate();
 
   const handle = async (e) => {

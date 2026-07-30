@@ -56,8 +56,10 @@ function timeFormat(t) {
 
 /** @type {import('react').FunctionComponent<{msg:any,sameAuthor:boolean,chatId:any,onReply:any}>} */
 const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId, onReply }) {
-  const { user, accessToken } = useAuthStore();
-  const { pinnedMessage, chats } = useChatStore();
+  const user = useAuthStore(s => s.user);
+  const accessToken = useAuthStore(s => s.accessToken);
+  const pinnedMessage = useChatStore(s => s.pinnedMessage);
+  const chats = useChatStore(s => s.chats);
   const isMe = msg.user_id === user.id;
   const [showEmoji, setShowEmoji] = useState(false);
   const [editing, setEditing] = useState(false);

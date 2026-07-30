@@ -377,29 +377,6 @@ func (d *DB) DeleteMessage(ctx context.Context, id, userID string, allowAny bool
 	return nil
 }
 
-// ── Attachments ──────────────────────────────────────────────────────
-
-// Deprecated.
-func (d *DB) attachmentsFor(ctx context.Context, messageID string) ([]models.Attachment, error) {
-	rows, err := d.QueryContext(ctx,
-		`SELECT id, message_id, filename, mime_type, size, url FROM attachments WHERE message_id = ?`,
-		messageID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := []models.Attachment{}
-	for rows.Next() {
-		var a models.Attachment
-		if err := rows.Scan(&a.ID, &a.MessageID, &a.Filename, &a.MimeType, &a.Size, &a.URL); err != nil {
-			return nil, err
-		}
-		out = append(out, a)
-	}
-	return out, rows.Err()
-}
-
 // ── Mentions ─────────────────────────────────────────────────────────
 
 func truncate(s string, n int) string {
@@ -409,22 +386,4 @@ func truncate(s string, n int) string {
 	return s[:n] + "..."
 }
 
-func (d *DB) mentionsFor(ctx context.Context, messageID string) ([]string, error) {
-	rows, err := d.QueryContext(ctx,
-		`SELECT user_id FROM mentions WHERE message_id = ?`,
-		messageID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := []string{}
-	for rows.Next() {
-		var uid string
-		if err := rows.Scan(&uid); err != nil {
-			return nil, err
-		}
-		out = append(out, uid)
-	}
-	return out, rows.Err()
-}
+

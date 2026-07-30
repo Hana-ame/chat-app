@@ -1,4 +1,5 @@
 import { useAuthStore } from '../store/auth';
+import { useChatStore } from '../store/chat';
 import { requestNotifyPermission, sendBrowserNotification } from './browserNotify';
 
 export function maybeNotifyMessage(msg, chats) {
@@ -12,10 +13,10 @@ export function maybeNotifyMessage(msg, chats) {
   const chatName = chats.find(c => c.id === msg.chat_id)?.name || 'Chat';
   const authorName = msg.author?.username || 'Someone';
   if (mentioned) {
-    requestNotifyPermission().then(() => {
+    requestNotifyPermission().then(granted => {
+      if (!granted) return;
       sendBrowserNotification(`@mentioned in ${chatName}`, msg.content?.replace(/<@[^>]+>/g, '').slice(0, 120) || '', () => {
-        const s = useAuthStore.getState();
-        if (s.setActiveChatId) s.setActiveChatId(msg.chat_id);
+        useChatStore.getState().setActiveChatId(msg.chat_id);
       });
     });
   }

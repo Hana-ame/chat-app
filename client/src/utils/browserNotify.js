@@ -12,7 +12,7 @@ export function requestNotifyPermission() {
 export function sendBrowserNotification(title, body, onClick) {
   if (!permitted) return;
   try {
-    const n = new Notification(title, { body, icon: '/favicon.ico' });
+    const n = new Notification(title, { body, icon: '/icon.svg' });
     if (onClick) n.onclick = () => { window.focus(); onClick(); };
     setTimeout(() => n.close(), 8000);
   } catch (e) {

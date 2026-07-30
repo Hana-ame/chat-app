@@ -63,10 +63,15 @@ type Hub struct {
 	presenceHandler PresenceHandler
 	memberMu        sync.Mutex
 	memberCache     map[string]*memberCacheEntry
+	ctx             context.Context
+	cancel          context.CancelFunc
 }
 
 func NewHub(memberStore MemberStore) *Hub {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Hub{
+		ctx:         ctx,
+		cancel:      cancel,
 		clients:     make(map[string]map[*Client]struct{}),
 		sseClients:  make(map[string][]chan []byte),
 		memberStore: memberStore,
@@ -93,7 +98,7 @@ func (h *Hub) register(c *Client) bool {
 	logutil.Info("ws client registered: user=%s (total=%d)", logutil.SafeID(c.userID), h.ClientCount())
 	if wasOffline {
 		if h.presenceHandler != nil {
-			h.presenceHandler(context.Background(), c.userID, true)
+			h.presenceHandler(h.ctx, c.userID, true)
 		}
 		h.broadcastPresence(c.userID, "online")
 	}
@@ -115,7 +120,7 @@ func (h *Hub) unregister(c *Client) bool {
 	logutil.Info("ws client unregistered: user=%s (total=%d)", logutil.SafeID(c.userID), h.ClientCount())
 	if wasLast {
 		if h.presenceHandler != nil {
-			h.presenceHandler(context.Background(), c.userID, false)
+			h.presenceHandler(h.ctx, c.userID, false)
 		}
 		h.broadcastPresence(c.userID, "offline")
 	}
@@ -186,7 +191,7 @@ func (h *Hub) sendToChat(chatID string, env Envelope, exceptUser string) {
 	members, ok := h.getCachedMembers(chatID)
 	if !ok {
 		var err error
-		members, err = h.memberStore.GetChatMembers(context.Background(), chatID)
+		members, err = h.memberStore.GetChatMembers(h.ctx, chatID)
 		if err != nil {
 			logutil.Error("ws: failed to load members for chat %s: %v", logutil.SafeID(chatID), err)
 			return
@@ -388,11 +393,17 @@ func (h *Hub) SSERegister(userID string, ch chan []byte) {
 
 func (h *Hub) SSEUnregister(userID string) {
 	h.mu.Lock()
-	delete(h.sseClients, userID)
+	if chs, ok := h.sseClients[userID]; ok {
+		for _, ch := range chs {
+			close(ch)
+		}
+		delete(h.sseClients, userID)
+	}
 	h.mu.Unlock()
 }
 
 func (h *Hub) Shutdown() {
+	h.cancel()
 	h.mu.Lock()
 	for _, set := range h.clients {
 		for c := range set {
@@ -413,8 +424,9 @@ func (h *Hub) Shutdown() {
 func (h *Hub) sseSend(userID string, data []byte) {
 	h.mu.RLock()
 	chs := h.sseClients[userID]
+	snapshot := append([]chan []byte{}, chs...)
 	h.mu.RUnlock()
-	for _, ch := range chs {
+	for _, ch := range snapshot {
 		select {
 		case ch <- data:
 		default:

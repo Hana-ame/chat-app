@@ -25,7 +25,7 @@ export function useMembers(chatId) {
           chats: s.chats.map(c => c.id === chatId ? { ...c, members: data } : c),
         }));
       } catch (e) {
-        notify('Failed to load members: ' + (e.message || e.statusText || 'Unknown error'));
+        notify('Failed to load members: ' + (e.message || e.error || 'Unknown error'));
       }
     })();
     return () => { cancelled = true; };
@@ -42,7 +42,7 @@ export function useMembers(chatId) {
         chats: s.chats.map(c => c.id === chatId ? { ...c, members: data } : c),
       }));
     } catch (e) {
-      notify('Failed to load members: ' + (e.message || e.statusText || 'Unknown error'));
+      notify('Failed to load members: ' + (e.message || e.error || 'Unknown error'));
     }
   }, [chatId, accessToken]);
 

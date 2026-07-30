@@ -9,6 +9,7 @@ export async function fetchStream(url, msgId, onChunk) {
   try {
     const res = await fetch(url, { headers: token ? { Authorization: 'Bearer ' + token } : {} });
     if (!res.ok) { console.error('fetchStream: HTTP', res.status); return; }
+    if (!res.body) { console.error('fetchStream: response body is null'); return; }
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buf = '';

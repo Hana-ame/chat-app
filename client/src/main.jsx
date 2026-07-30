@@ -6,7 +6,7 @@ import { useAuthStore } from './store/auth'
 import Toast from './components/Toast'
 import './styles/global.css'
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
   window.__mockLogin = () => useAuthStore.getState().mockLogin();
 }
 

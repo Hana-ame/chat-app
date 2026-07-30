@@ -123,8 +123,10 @@ func (d *DB) Migrate() error {
 	// Go migrations (version 1000+)
 	for _, gm := range goMigrations {
 		var exists int
-		d.QueryRowContext(ctx,
-			`SELECT 1 FROM schema_migrations WHERE version = ?`, 1000+gm.version).Scan(&exists)
+		if err := d.QueryRowContext(ctx,
+			`SELECT 1 FROM schema_migrations WHERE version = ?`, 1000+gm.version).Scan(&exists); err != nil {
+			exists = 0
+		}
 		if exists == 1 {
 			continue
 		}

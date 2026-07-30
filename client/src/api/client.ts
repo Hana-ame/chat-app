@@ -214,7 +214,7 @@ const _apiMethods = {
     }).then(r => { if (!r.ok) throw r; return r; }),
 
   // ── Misc ──
-  sseUrl: (token: string) => API_BASE + '/api/events?access_token=' + encodeURIComponent(token),
+  sseUrl: () => API_BASE + '/api/events',
 };
 
 export type ApiType = typeof _apiMethods & {
