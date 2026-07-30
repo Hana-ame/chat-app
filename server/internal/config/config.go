@@ -76,7 +76,7 @@ func Load() *Config {
 	_ = godotenv.Load()
 	secret := os.Getenv("CHAT_JWT_SECRET")
 	if secret == "" {
-		secret = randomHex(32)
+		logutil.Fatal("CHAT_JWT_SECRET is required but not set in environment")
 	}
 
 	dbPath := getenv("CHAT_DB_PATH", "chat.db")

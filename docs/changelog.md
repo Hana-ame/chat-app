@@ -5722,3 +5722,56 @@ f73e3b3 bump v0.8.12 -> v0.8.13
 ### 验证
 - Client build: ✅
 - Version: `0.8.16` → `0.8.17`
+
+---
+
+## 2026-07-30 全量代码审计报告（100 项问题）
+
+### 背景
+对 chat-app 项目进行了全面代码审计，涵盖安全、代码质量、架构、配置、前端、后端、测试、性能和不一致性问题，共发现 **93 项独立问题**（7 项在合并中去重）。
+
+### 关键发现
+- **安全**: JWT 在 URL 中泄露、CORS 过于宽松、无 CSRF、JWT 密钥重启自动生成等 12 项
+- **代码质量**: 竞态条件、内存泄漏、不安全的错误比较等 12 项
+- **架构**: 无 DB 接口、Hub 逻辑重复、单体 Service 等 10 项
+- **配置**: 默认值危险、文档与实际不符、未使用的配置项等 8 项
+- **前端**: 竞态条件、内存泄漏、XSS 风险、性能问题等 17 项
+- **后端**: 错误处理不当、N+1 查询、缺少索引等 22 项（含测试和性能）
+- **不一致**: API 文档与实际行为不符字段 12 项
+
+### 报告
+- 完整报告文件：`docs/reports/codebase-audit-20260730.md`
+
+### 文件
+- `docs/reports/codebase-audit-20260730.md`（新建）
+- `docs/reports/index.md`（更新 — 添加新报告引用）
+
+---
+
+## 2026-07-30 代码审计反馈修复（第 28 轮）
+
+### 环境
+- 审计报告反馈处理
+
+### 变更
+
+#### 配置
+- **`server/internal/config/config.go`**: `CHAT_JWT_SECRET` 改为必填，不设置则 `logutil.Fatal` 退出。移除自动生成 fallback。
+
+#### Bug 修复
+- **`server/internal/handlers/handler.go`**: `decodeJSON` 移除冗余 `defer r.Body.Close()`（Go HTTP server 自动关闭 body）
+- **`server/internal/handlers/local_upload.go`**: 错误检测从字符串比较 `err.Error() == "http: request body too large"` 改为 `errors.As` + `*http.MaxBytesError`
+- **`server/internal/handlers/auth.go`**: 移除未使用的 `_ = exp` 赋值；`Logout` 中 `refreshMu` 锁移到清除 cookie 之前修复竞态
+- **`server/internal/db/chats.go`**: `ListUserChats` 中 `defer rows.Close()` 从循环外移到 `for rows.Next()` 之前
+
+#### 代码质量
+- **`server/internal/handlers/util_test.go`**: `mapServiceError` 测试变量 `code, str` 重命名为 `statusCode, errorCode` 以反映实际语义
+
+### 说明
+- JWT URL query token 保留（兼容性设计）— 在 `bearerToken` 中添加注释说明
+- CORS 全局允许保留（前后端部署架构需求）
+- SQLite `MaxOpenConns(1)` 保留（单例模式设计）
+- AI auth_key 仅透传不持久化 — `CreateAIMessage` 只存 content/thinking，不存 source
+
+### 验证
+- Go build: ✅

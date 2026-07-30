@@ -33,8 +33,15 @@ func (d *DB) CreateAIMessage(ctx context.Context, chatID, userID, msgID, content
 		return nil, err
 	}
 	_, err = tx.ExecContext(ctx,
-		`UPDATE chats SET last_message_at = ?, last_message_id = ? WHERE id = ?`,
-		now, msgID, chatID,
+		`UPDATE chats SET last_message_at = ?, last_message_id = ?, last_message_user_id = ?, last_message_content = ?, last_message_created_at = ? WHERE id = ?`,
+		now, msgID, userID, content, now, chatID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	_, err = tx.ExecContext(ctx,
+		`UPDATE chat_members SET unread_count = unread_count + 1 WHERE chat_id = ? AND user_id != ?`,
+		chatID, userID,
 	)
 	if err != nil {
 		return nil, err
@@ -97,8 +104,8 @@ func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, 
 		return nil, err
 	}
 	_, err = tx.ExecContext(ctx,
-		`UPDATE chats SET last_message_at = ?, last_message_id = ? WHERE id = ?`,
-		now, id, chatID,
+		`UPDATE chats SET last_message_at = ?, last_message_id = ?, last_message_user_id = ?, last_message_content = ?, last_message_created_at = ? WHERE id = ?`,
+		now, id, userID, content, now, chatID,
 	)
 	if err != nil {
 		return nil, err
@@ -106,6 +113,13 @@ func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, 
 	_, err = tx.ExecContext(ctx,
 		`UPDATE chat_members SET last_active_at = ? WHERE chat_id = ? AND user_id = ?`,
 		now, chatID, userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	_, err = tx.ExecContext(ctx,
+		`UPDATE chat_members SET unread_count = unread_count + 1 WHERE chat_id = ? AND user_id != ?`,
+		chatID, userID,
 	)
 	if err != nil {
 		return nil, err

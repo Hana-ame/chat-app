@@ -3,6 +3,7 @@ package handlers
 import (
 	"crypto/sha256"
 	_ "embed"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -140,7 +141,8 @@ func (s *Server) AAPIUpload(w http.ResponseWriter, r *http.Request) {
 
 	result, err := drv.Put(path, ct, body)
 	if err != nil {
-		if err.Error() == "http: request body too large" {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
 			writeError(w, http.StatusRequestEntityTooLarge, "too_large", fmt.Sprintf("max %d bytes", s.Cfg.MaxUploadBytes))
 			return
 		}

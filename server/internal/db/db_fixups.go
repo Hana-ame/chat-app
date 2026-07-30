@@ -101,6 +101,9 @@ func migrateV2DropChatTypeCheck(ctx context.Context, d *DB) error {
 		"banner_url TEXT NOT NULL DEFAULT ''",
 		"background_url TEXT NOT NULL DEFAULT ''",
 		"banner_opacity REAL NOT NULL DEFAULT 0.9",
+		"last_message_user_id TEXT NOT NULL DEFAULT ''",
+		"last_message_content TEXT NOT NULL DEFAULT ''",
+		"last_message_created_at TEXT NOT NULL DEFAULT ''",
 	}
 
 	schema := strings.Join(defs, ", ")

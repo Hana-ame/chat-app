@@ -123,7 +123,7 @@ func (d *DB) UpdatePinnedLastReadAt(ctx context.Context, chatID, userID string) 
 func (d *DB) UpdateLastActiveAt(ctx context.Context, chatID, userID string) error {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	_, err := d.ExecContext(ctx,
-		`UPDATE chat_members SET last_active_at = ? WHERE chat_id = ? AND user_id = ?`,
+		`UPDATE chat_members SET last_active_at = ?, unread_count = 0 WHERE chat_id = ? AND user_id = ?`,
 		now, chatID, userID,
 	)
 	return err

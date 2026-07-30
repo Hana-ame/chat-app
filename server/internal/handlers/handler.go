@@ -127,7 +127,6 @@ func decodeJSON(r *http.Request, into interface{}) error {
 	if r.Body == nil {
 		return errors.New("empty body")
 	}
-	defer r.Body.Close()
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	return dec.Decode(into)

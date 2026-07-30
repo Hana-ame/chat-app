@@ -114,7 +114,7 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) issueSession(w http.ResponseWriter, r *http.Request, userID string) {
-	access, exp, err := s.Auth.IssueAccessToken(userID)
+	access, _, err := s.Auth.IssueAccessToken(userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
@@ -132,7 +132,6 @@ func (s *Server) issueSession(w http.ResponseWriter, r *http.Request, userID str
 	}
 	setAuthCookie(w, r, "access_token", access, "/", s.Cfg.AccessTokenTTL)
 	setRefreshCookie(w, r, raw, s.Cfg.RefreshTokenTTL)
-	_ = exp
 	writeJSON(w, http.StatusOK, sessionResp{
 		User:        u,
 		AccessToken: access,
@@ -181,11 +180,11 @@ func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "missing user")
 		return
 	}
-	clearRefreshCookie(w, r)
-	clearAccessTokenCookie(w, r)
 	s.refreshMu.Lock()
 	err := s.DB.DeleteUserRefreshTokens(r.Context(), u.ID)
 	s.refreshMu.Unlock()
+	clearRefreshCookie(w, r)
+	clearAccessTokenCookie(w, r)
 	if err != nil {
 		w.Header().Set("X-Error", err.Error())
 	}

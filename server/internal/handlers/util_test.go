@@ -28,10 +28,10 @@ func TestMapServiceError(t *testing.T) {
 		{errors.New("unknown"), http.StatusInternalServerError, "internal"},
 	}
 	for _, tc := range tests {
-		code, str := mapServiceError(tc.err)
-		if code != tc.wantCode || str != tc.wantStr {
+		statusCode, errorCode := mapServiceError(tc.err)
+		if statusCode != tc.wantCode || errorCode != tc.wantStr {
 			t.Errorf("mapServiceError(%v): got (%d, %s), want (%d, %s)",
-				tc.err, code, str, tc.wantCode, tc.wantStr)
+				tc.err, statusCode, errorCode, tc.wantCode, tc.wantStr)
 		}
 	}
 }

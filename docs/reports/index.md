@@ -33,3 +33,4 @@
 |---|---|
 | [`testing-guide-20260709.md`](testing-guide-20260709.md) | 测试指南 |
 | [`backend-test-coverage-20260716.md`](backend-test-coverage-20260716.md) | 后端测试覆盖报告（2026-07-16） |
+| [`codebase-audit-20260730.md`](codebase-audit-20260730.md) | 全量代码审计报告（93 项问题，2026-07-30） |
