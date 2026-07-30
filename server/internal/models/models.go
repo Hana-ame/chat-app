@@ -81,6 +81,8 @@ type Message struct {
 	Attachments     json.RawMessage `json:"attachments,omitempty"`
 	Reactions       json.RawMessage `json:"reactions,omitempty"`
 	Mentions        json.RawMessage `json:"mentions,omitempty"`
+	ReplyTo         string          `json:"reply_to,omitempty"`
+	RepliedTo       *Message        `json:"replied_to,omitempty"`
 }
 
 type Attachment struct {

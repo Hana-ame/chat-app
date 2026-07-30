@@ -54,7 +54,7 @@ function timeFormat(t) {
   return d.toLocaleDateString();
 }
 
-const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId }) {
+const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId, onReply }) {
   const { user, accessToken } = useAuthStore();
   const { pinnedMessage, chats } = useChatStore();
   const isMe = msg.user_id === user.id;
@@ -137,7 +137,7 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId }) {
   };
 
   return (
-    <div className="msg-group">
+    <div className="msg-group" id={'msg-' + msg.id}>
       <div className={'msg-row' + (sameAuthor ? ' msg-continuation' : '')}>
           {!sameAuthor && (
             <div onClick={() => setProfileUser(author)} style={{ cursor: 'pointer' }}>
@@ -168,6 +168,16 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId }) {
                  </button>
                 <button className="btn-ghost" style={{fontSize:12}} onClick={()=>setEditing(false)}>Cancel</button>
               </div>
+            ) : msg.replied_to ? (
+              <div className="reply-indicator" onClick={() => document.getElementById('msg-' + msg.replied_to.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                style={{display:'flex',alignItems:'center',gap:6,padding:'2px 8px',marginBottom:2,borderLeft:'3px solid var(--accent)',background:'var(--bg-secondary)',borderRadius:4,cursor:'pointer',fontSize:12}}>
+                <span style={{fontWeight:600,color:'var(--accent)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:120}}>
+                  {msg.replied_to.author?.username || 'Unknown'}
+                </span>
+                <span style={{color:'var(--text-muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>
+                  {msg.replied_to.content || '(deleted)'}
+                </span>
+              </div>
             ) : msg.type === 'thinking' ? (
               <ThinkingContent content={msg.content} streaming={msg.streaming} />
             ) : (
@@ -187,6 +197,7 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId }) {
             {!msg.deleted && (
               <div className="msg-actions">
                 <button ref={emojiBtnRef} className="msg-btn" onClick={() => setShowEmoji(!showEmoji)} disabled={opPending}>😀</button>
+                <button className="msg-btn" onClick={() => onReply?.(msg)} disabled={opPending}>Reply</button>
                 {isMe && <button className="msg-btn" onClick={() => { setEditing(true); setEditText(msg.content); }} disabled={opPending}>Edit</button>}
                 {isMe && <button className="msg-btn" onClick={handleDelete} disabled={opPending}>Delete</button>}
               </div>

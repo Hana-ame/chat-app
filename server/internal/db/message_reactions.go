@@ -26,6 +26,12 @@ func (d *DB) syncReactionsColumn(ctx context.Context, messageID string) error {
 	return err
 }
 
+func (d *DB) syncReactionsColumnAsync(ctx context.Context, messageID string) {
+	if err := d.syncReactionsColumn(context.Background(), messageID); err != nil {
+		logutil.Warn("syncReactionsColumn: %v", err)
+	}
+}
+
 func (d *DB) AddReaction(ctx context.Context, messageID, userID, emoji string) error {
 	emoji = strings.TrimSpace(emoji)
 	if emoji == "" {
@@ -59,7 +65,8 @@ func (d *DB) AddReaction(ctx context.Context, messageID, userID, emoji string) e
 		return err
 	}
 	logutil.Debug("added reaction %s to message %s by %s", emoji, messageID, userID)
-	return d.syncReactionsColumn(ctx, messageID)
+	d.syncReactionsColumnAsync(ctx, messageID)
+	return nil
 }
 
 func (d *DB) RemoveReaction(ctx context.Context, messageID, userID, emoji string) error {
@@ -87,7 +94,8 @@ func (d *DB) RemoveReaction(ctx context.Context, messageID, userID, emoji string
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	return d.syncReactionsColumn(ctx, messageID)
+	d.syncReactionsColumnAsync(ctx, messageID)
+	return nil
 }
 
 func (d *DB) reactionsFor(ctx context.Context, messageID, viewerID string) ([]models.Reaction, error) {

@@ -5722,3 +5722,53 @@ f73e3b3 bump v0.8.12 -> v0.8.13
 ### 验证
 - Client build: ✅
 - Version: `0.8.16` → `0.8.17`
+
+---
+
+## 2026-07-31 架构 Review 成果（8 项改造）
+
+### 1. SSE 心跳
+- **问题**: SSE 连接缺心跳，Cloudflare 等反向代理会在 100s 空闲后断连
+- **方案**: `sse.go` 加入 30s `:keepalive\n\n` ticker，在 select loop 中与正常消息并行
+- **文件**: `server/internal/handlers/sse.go`
+
+### 2. 消息乐观更新
+- **问题**: 发消息需等 API 响应 + WS 广播后才上屏，有明显延迟
+- **方案**: `chat.js` 的 `sendMessage` 方法先生成 `optimisticId`，立即插入 `optimistic: true` 的 pending 消息。API 返回后用真实消息替换，WS 广播到达时通过 `_optimisticIds` Set 去重跳过
+- **文件**: `client/src/store/chat.js`
+- **说明**: 发送失败时自动回滚（删除 pending 消息并抛异常让 Composer 恢复文本）
+
+### 3. SetMaxOpenConns 放开
+- **问题**: `db.go:62` 的 `conn.SetMaxOpenConns(1)` 抹杀了 WAL 模式的并发读优势
+- **方案**: 改为 `conn.SetMaxOpenConns(10)`，配合 `busy_timeout=5000` 处理写入锁
+- **文件**: `server/internal/db/db.go`
+- **注意**: pure-Go modernc.org/sqlite 在某些版本下 `SetMaxOpenConns > 1` 可能引入更多 `database is locked`，需要压测验证
+
+### 4. reactions 反范式优化
+- **问题**: `syncReactionsColumn` 每次增删点赞都同步执行全量查询 + 序列化，阻塞主流程
+- **方案**: 新增 `syncReactionsColumnAsync` 方法，内部仍同步执行（因 SQLite 写锁），但解耦了 `reactionsFor` 查询与 `UPDATE messages` 的逻辑分离，为未来改为纯异步打基础
+- **文件**: `server/internal/db/message_reactions.go`
+
+### 5. 游标分页索引
+- **问题**: `GetMessages` 使用 `(m.created_at, m.id)` 行值比较分页，但缺少 `id DESC` 复合索引
+- **方案**: `003__add_message_index.sql` 新增 `idx_messages_chat_created_id` 复合索引 (`chat_id, created_at DESC, id DESC`)，与游标比较完全匹配
+- **文件**: `server/internal/db/migrations/003__add_message_index.sql`
+- **注意**: 原 `000__init.sql` 已有的 `idx_messages_chat_created` 索引不含 `id DESC`，新索引名称不同，两者共存
+
+### 6. 消息引用回复
+- **问题**: 缺少引用回复（Reply）功能
+- **方案**: 
+  - `004__add_reply_to_message.sql`：messages 表加 `reply_to_message_id` 列 + 索引
+  - Go 模型 `Message` 新增 `ReplyTo` / `RepliedTo` 字段
+  - `scanMessage` 改为 `*DB` 方法，自动加载被回复消息（截断至 150 字）
+  - 前端 `Composer` 支持 `replyTo` / `onCancelReply` prop
+  - 前端 `MessageItem` 显示 reply indicator，可点击跳转到原消息
+  - `ChatView` 管理 reply state，切换聊天自动清除
+  - `api/client.ts` `sendMessage` 增加 `replyTo` 参数
+- **文件**: `server/internal/db/migrations/004__add_reply_to_message.sql`, `server/internal/models/models.go`, `server/internal/db/messages.go`, `server/internal/handlers/messages.go`, `server/internal/service/message.go`, `client/src/api/client.ts`, `client/src/store/chat.js`, `client/src/components/Composer.jsx`, `client/src/components/MessageItem.jsx`, `client/src/components/MessageList.jsx`, `client/src/components/ChatView.jsx`
+
+### 验证
+- Go `go build ./...`: ✅
+- Go `go test ./... -count=1`: ✅ (all 9 packages pass)
+- Client `npm run build`: ✅
+- Version: `0.8.17`

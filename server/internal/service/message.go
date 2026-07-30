@@ -34,7 +34,7 @@ func (s *MessageService) SendAI(ctx context.Context, chatID, userID, content, th
 	return msg, nil
 }
 
-func (s *MessageService) Send(ctx context.Context, chatID, userID, content string, attachments []models.Attachment) (*models.Message, error) {
+func (s *MessageService) Send(ctx context.Context, chatID, userID, content string, attachments []models.Attachment, replyTo ...string) (*models.Message, error) {
 	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func (s *MessageService) Send(ctx context.Context, chatID, userID, content strin
 		}
 	}
 	mentions := extractMentions(content)
-	msg, err := s.db.CreateMessage(ctx, chatID, userID, content, mentions, attachments)
+	msg, err := s.db.CreateMessage(ctx, chatID, userID, content, mentions, attachments, replyTo...)
 	if err != nil {
 		if isContentTooLong(err) {
 			return nil, ErrContentTooLong

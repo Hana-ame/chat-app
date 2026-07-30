@@ -57,12 +57,13 @@ func (d *DB) CreateAIMessage(ctx context.Context, chatID, userID, msgID, content
 
 const messageColumns = `m.id, m.chat_id, m.user_id, m.type, m.content, m.created_at, m.edited_at, m.deleted_at,
 		        m.thinking, m.attachment_count, m.mention_count, m.reaction_count, m.reactions, m.attachments, m.mentions,
+		        COALESCE(m.reply_to_message_id,''),
 		        u.id, u.username, u.avatar_color, u.avatar_url, u.status, u.last_seen, COALESCE(cm.role,'')`
 
 const messageJoins = ` FROM messages m JOIN users u ON u.id = m.user_id
 		 LEFT JOIN chat_members cm ON cm.chat_id = m.chat_id AND cm.user_id = m.user_id`
 
-func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, mentions []string, attachments []models.Attachment) (*models.Message, error) {
+func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, mentions []string, attachments []models.Attachment, replyTo ...string) (*models.Message, error) {
 	content = strings.TrimRight(content, " \n\t")
 	if len(content) > d.maxContentLength {
 		return nil, ErrContentTooLong
@@ -96,9 +97,13 @@ func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, 
 	if err != nil {
 		mentJSON = []byte("[]")
 	}
+	replyToID := ""
+	if len(replyTo) > 0 {
+		replyToID = replyTo[0]
+	}
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO messages (id, chat_id, user_id, content, created_at, attachment_count, mention_count, attachments, mentions) VALUES (?,?,?,?,?,?,?,?,?)`,
-		id, chatID, userID, content, now, len(attachments), len(dedupe(mentions)), string(attJSON), string(mentJSON),
+		`INSERT INTO messages (id, chat_id, user_id, content, created_at, attachment_count, mention_count, attachments, mentions, reply_to_message_id) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+		id, chatID, userID, content, now, len(attachments), len(dedupe(mentions)), string(attJSON), string(mentJSON), replyToID,
 	)
 	if err != nil {
 		return nil, err
@@ -153,12 +158,19 @@ func (d *DB) GetMessage(ctx context.Context, id string) (*models.Message, error)
 	if err != nil {
 		return nil, err
 	}
+	if m.ReplyTo != "" {
+		replied, err := d.GetMessage(ctx, m.ReplyTo)
+		if err == nil {
+			replied.Content = truncate(replied.Content, 150)
+			m.RepliedTo = replied
+		}
+	}
 	return m, nil
 }
 
 type scanner interface{ Scan(dest ...interface{}) error }
 
-func scanMessage(s scanner) (*models.Message, error) {
+func (d *DB) scanMessage(s scanner) (*models.Message, error) {
 	var (
 		m         models.Message
 		author    models.User
@@ -179,6 +191,7 @@ func scanMessage(s scanner) (*models.Message, error) {
 		&m.ID, &m.ChatID, &m.UserID, &m.Type, &m.Content, &created, &edited, &deletedAt,
 		&thinking,
 		&attCnt, &mentCnt, &rxnCnt, &rxnJSON, &attJSON, &mentJSON,
+		&m.ReplyTo,
 		&author.ID, &author.Username, &author.AvatarColor, &author.AvatarURL, &author.Status, &lastSeen, &role,
 	)
 	if err != nil {
@@ -218,7 +231,7 @@ func scanMessage(s scanner) (*models.Message, error) {
 }
 
 func (d *DB) fetchMessageRow(ctx context.Context, q, id string) (*models.Message, error) {
-	m, err := scanMessage(d.QueryRowContext(ctx, q, id))
+	m, err := d.scanMessage(d.QueryRowContext(ctx, q, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -262,7 +275,7 @@ func (d *DB) GetMessages(ctx context.Context, chatID, before string, limit int) 
 
 	out := []models.Message{}
 	for rows.Next() {
-		m, err := scanMessage(rows)
+		m, err := d.scanMessage(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -270,6 +283,15 @@ func (d *DB) GetMessages(ctx context.Context, chatID, before string, limit int) 
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+	for i := range out {
+		if out[i].ReplyTo != "" {
+			replied, err := d.GetMessage(ctx, out[i].ReplyTo)
+			if err == nil {
+				replied.Content = truncate(replied.Content, 150)
+				out[i].RepliedTo = replied
+			}
+		}
 	}
 	// Reverse to chronological ascending order for client
 	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
@@ -377,6 +399,13 @@ func (d *DB) attachmentsFor(ctx context.Context, messageID string) ([]models.Att
 }
 
 // ── Mentions ─────────────────────────────────────────────────────────
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
+}
 
 func (d *DB) mentionsFor(ctx context.Context, messageID string) ([]string, error) {
 	rows, err := d.QueryContext(ctx,

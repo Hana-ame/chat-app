@@ -59,7 +59,7 @@ func Open(path string, maxContentLength int) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn.SetMaxOpenConns(1)
+	conn.SetMaxOpenConns(10)
 	if err := conn.PingContext(context.Background()); err != nil {
 		conn.Close()
 		return nil, err
