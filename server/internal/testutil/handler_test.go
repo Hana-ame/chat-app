@@ -326,7 +326,7 @@ func TestAuthEndpoints(t *testing.T) {
 
 	t.Run("register accepts any input (validations removed)", func(t *testing.T) {
 		res := f.Do(t, "POST", "/api/auth/register", "", map[string]string{
-			"email": "not-an-email", "username": "a", "password": "12",
+			"email": "not-an-email", "username": "a", "password": "password123",
 		})
 		res.Body.Close()
 		if res.StatusCode != 200 {
