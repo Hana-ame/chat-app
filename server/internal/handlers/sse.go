@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
 )
@@ -78,11 +79,16 @@ func (s *Server) SSE(w http.ResponseWriter, r *http.Request) {
 	defer s.Services.SSEUnregister(userID)
 
 	notify := r.Context().Done()
+	keepalive := time.NewTicker(30 * time.Second)
+	defer keepalive.Stop()
 	for {
 		select {
 		case <-notify:
 			logutil.Info("SSE disconnected: user=%s", logutil.SafeID(userID))
 			return
+		case <-keepalive.C:
+			fmt.Fprintf(w, ":keepalive\n\n")
+			flusher.Flush()
 		case data, ok := <-ch:
 			if !ok {
 				return

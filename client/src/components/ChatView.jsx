@@ -18,6 +18,7 @@ function getChatDisplayName(chat) {
 export default function ChatView({ chatId, isNotification, onBack }) {
   const { user, accessToken } = useAuthStore();
   const { chats, messages, loadMessages, subscribe, markRead, pinnedMessage, setAnnouncement, clearAnnouncement, markAnnouncementRead, onChatUpdate } = useChatStore();
+  const [replyTo, setReplyTo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [noticeInput, setNoticeInput] = useState('');
@@ -46,6 +47,7 @@ export default function ChatView({ chatId, isNotification, onBack }) {
   }, [chatId, accessToken, isNotification]);
 
   useEffect(() => {
+    setReplyTo(null);
     if (chatId && accessToken) {
       subscribe(chatId);
       if (isNotification) {
@@ -363,8 +365,9 @@ export default function ChatView({ chatId, isNotification, onBack }) {
             backgroundAttachment: 'fixed',
           } : undefined}
           hasBackground={!!chat?.background_url}
+          onReply={setReplyTo}
         />
-      <Composer chatId={chatId} isNotification={isNotification} />
+      <Composer chatId={chatId} isNotification={isNotification} replyTo={replyTo} onCancelReply={() => setReplyTo(null)} />
     </div>
   );
 }

@@ -87,6 +87,8 @@ export const useChatStore = create((set, get) => ({
   onlineUserIds: [],
   notifyEnabled: {},
   _localStreaming: {},
+  _optimisticIds: new Set(),
+  pendingReply: null,
 
   mode: 'ws',
   wsReady: false,
@@ -176,6 +178,10 @@ export const useChatStore = create((set, get) => ({
   },
 
   onMessageCreate(msg) {
+    if (get()._optimisticIds.has(msg.id)) {
+      get()._optimisticIds.delete(msg.id);
+      return;
+    }
     let wasNew = false;
     set(s => {
       const exists = s.messages.find(m => m.id === msg.id);
@@ -279,8 +285,37 @@ export const useChatStore = create((set, get) => ({
     } catch (e) { console.error('loadMessages error:', e); }
   },
 
-  async sendMessage(token, chatId, content, attachments) {
-    await api.sendMessage(token, chatId, content, attachments);
+  async sendMessage(token, chatId, content, attachments, replyTo) {
+    const optimisticId = crypto.randomUUID();
+    const optimisticMsg = {
+      id: optimisticId,
+      chat_id: chatId,
+      content,
+      user_id: useAuthStore.getState().user?.id,
+      author: useAuthStore.getState().user,
+      created_at: new Date().toISOString(),
+      attachments: attachments || [],
+      reactions: [],
+      reply_to: replyTo || '',
+      optimistic: true,
+    };
+    get()._optimisticIds.add(optimisticId);
+    set(s => {
+      if (s.activeChatId !== chatId) return {};
+      return { messages: [...s.messages, optimisticMsg] };
+    });
+    try {
+      const created = await api.sendMessage(token, chatId, content, attachments, replyTo);
+      set(s => ({
+        messages: s.messages.map(m => m.id === optimisticId ? created : m),
+      }));
+    } catch (e) {
+      set(s => ({
+        messages: s.messages.filter(m => m.id !== optimisticId),
+      }));
+      get()._optimisticIds.delete(optimisticId);
+      throw e;
+    }
   },
 
   sendTyping(chatId) { coord.sendTyping(chatId); },

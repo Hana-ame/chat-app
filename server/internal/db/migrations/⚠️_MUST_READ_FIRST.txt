@@ -1,0 +1,18 @@
+⚠️  MIGRATION 编号规则  ⚠️
+══════════════════════════════
+
+1. 文件名格式: NNN__description.sql (三个数字 + 双下划线)
+   示例: 003__add_message_index.sql
+
+2. 迁移系统用 glob: migrations/%03d_*.sql 查找
+   → 即 "003_" 开头（一个下划线），但文件名是 "003__"（双下划线）
+   → fs.Glob 的 * 能匹配额外下划线，所以双下划线也能找到
+
+3. ⚠️ 注意: 永远不要修改、删除、或重命名已有的 migration 文件。
+   已部署的数据库的 schema_migrations 表记录了已应用的版本号，
+   修改已有文件会导致版本错乱。
+
+4. ⚠️ 注意: 永远不要创建已存在的版本号。
+   假如已有 003__xxx.sql，下一个必须是 004__xxx.sql。
+
+5. 新 migration 必须是幂等的（IF NOT EXISTS、ALTER TABLE ADD COLUMN 等）。

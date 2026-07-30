@@ -75,7 +75,7 @@ function compressImage(file) {
   });
 }
 
-export default function Composer({ chatId, isNotification }) {
+export default function Composer({ chatId, isNotification, replyTo, onCancelReply }) {
   const { user, accessToken } = useAuthStore();
   const { sendMessage, sendTyping } = useChatStore();
   const [text, setText] = useState('');
@@ -303,9 +303,10 @@ export default function Composer({ chatId, isNotification }) {
       if (isNotification) {
         await api.notifications.sendMessage(accessToken, content, savedAttachments);
       } else {
-        await sendMessage(accessToken, chatId, content, savedAttachments);
+        await sendMessage(accessToken, chatId, content, savedAttachments, replyTo?.id || '');
       }
       setText('');
+      if (onCancelReply) onCancelReply();
       setAttachments([]);
       if (aiActive && content) {
         await doSendAI(content);
@@ -400,6 +401,13 @@ export default function Composer({ chatId, isNotification }) {
               <button className="btn-ghost" style={{fontSize:14,lineHeight:1,width:18,height:18,borderRadius:'50%',padding:0,flexShrink:0}} onClick={() => setAttachments(a => a.filter((_,j) => j!==i))}>×</button>
             </div>
           ))}
+        </div>
+      )}
+      {replyTo && (
+        <div className="reply-preview" style={{display:'flex',alignItems:'center',gap:8,padding:'4px 8px',marginBottom:4,background:'var(--bg-secondary)',borderRadius:4,borderLeft:'3px solid var(--accent)',fontSize:12}}>
+          <span style={{fontWeight:600,color:'var(--accent)',whiteSpace:'nowrap'}}>Replying to {replyTo.author?.username || 'Unknown'}</span>
+          <span style={{color:'var(--text-muted)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{replyTo.content}</span>
+          <button className="btn-ghost" style={{fontSize:14,lineHeight:1,padding:'2px 6px'}} onClick={onCancelReply}>×</button>
         </div>
       )}
       <div className="chat-input">

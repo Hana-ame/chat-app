@@ -22,6 +22,7 @@ type sendMsgReq struct {
 	Type        string              `json:"type"`
 	Source      *ai.Source          `json:"source"`
 	MsgID       string              `json:"msg_id"`
+	ReplyTo     string              `json:"reply_to"`
 }
 
 type editMsgReq struct {
@@ -77,7 +78,7 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msg, err := s.Services.Message.Send(r.Context(), id, u.ID, req.Content, req.Attachments)
+	msg, err := s.Services.Message.Send(r.Context(), id, u.ID, req.Content, req.Attachments, req.ReplyTo)
 	if err != nil {
 		status, code := mapServiceError(err)
 		writeError(w, status, code, err.Error())

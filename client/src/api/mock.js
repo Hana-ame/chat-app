@@ -326,7 +326,7 @@ export function mockUpdateProfile(_token, data) {
  * @param {Attachment[]} [attachments]
  * @returns {Message}
  */
-export function mockSendMessage(_token, chatId, content, attachments) {
+export function mockSendMessage(_token, chatId, content, attachments, _replyTo) {
   const d = ensureData();
   const now = new Date().toISOString();
 
