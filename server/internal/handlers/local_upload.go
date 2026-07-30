@@ -55,6 +55,9 @@ func (s *Server) aapiHash(path string) string {
 }
 
 func (s *Server) aapiRequestBaseURL(r *http.Request) string {
+	if s.Cfg.BaseURL != "" {
+		return s.Cfg.BaseURL
+	}
 	scheme := "http"
 	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
 		scheme = proto
@@ -71,7 +74,7 @@ func (s *Server) aapiUploadResp(w http.ResponseWriter, r *http.Request, path str
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id":         h,
 		"path":       "/" + path,
-		"url":        "/api/local/" + path,
+		"url":        reqBase + "/api/local/" + path,
 		"delete_url": reqBase + "/api/local/" + path + "?delete=" + h,
 	})
 }

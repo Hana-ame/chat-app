@@ -5671,3 +5671,54 @@ f73e3b3 bump v0.8.12 -> v0.8.13
 
 ### 验证
 - Client build: ✅
+
+---
+
+## 2026-07-30 v0.8.17 — 错误详情完善 + AI 设置滑块 + 部署脚本 + API 文档
+
+### 背景
+从前端用户反馈看，大量 `catch` 块只给通用提示（"Failed to load members"）不包含具体原因，后端 AI 错误也只返回固定字符串。同时旧版 AI 设置是 sendContext 开关（要么全发最近 50 条，要么不发），缺乏灵活度。
+
+### 变更
+
+#### 错误详情全面具体化
+- **前端所有 catch 块**（ChatView: listMembers/getChat/loadMore/updateAvatar/banner/background, Composer: upload/AI/发送, useMembers, MemberPanel）：
+  - 原 `notify('Failed to ...')` → `notify('Failed to ...: ' + (e.message || e.statusText || 'Unknown error'))`
+- **后端** `messages.go`：AI upstream error 原返回固定 `"AI upstream request failed"` → 返回 `err.Error()` 具体原因
+- **文件**: `ChatView.jsx`, `Composer.jsx`, `useMembers.js`, `MemberPanel.jsx`, `messages.go`
+
+#### AI 设置改进
+- `sendContext` checkbox（布尔） → `contextLimit` slider（0–100 整数）
+  - 0 = 不发送上下文，50 = 最近 50 条，100 = 最近 100 条
+  - 兼容旧 `sendContext` 配置自动迁移
+- 对应 `buildContext(msgs, limit)` 接受 limit 参数
+- **文件**: `Composer.jsx`
+
+#### 部署脚本
+- `scripts/deploy_local.py`：一键化本地构建 + 启动流程
+  - `all`: kill → build → start
+  - `build`: 编译前端 + 后端
+  - `start`: 启动并自检 health
+  - `kill`: taskkill
+  - `restart`: kill + start
+- 「Local Build & Debug」文档移至 `AGENTS.md` 方便 AI 自动执行
+- **文件**: `scripts/deploy_local.py`, `AGENTS.md`
+
+#### 文档资产（新增）
+- `docs/api.md`：完整 API 文档（所有端点、请求/响应体、错误码、实时事件格式）
+- `LOCAL_DEPLOYMENT.md`：本地部署指南
+- `docs/todo.md`：待办 & 完成情况跟踪
+
+#### 回归修复：上传 URL 缺 host
+- **背景**: v0.8.15 commit `c47d4e7` "upload URL cleanup" 将 `url` 字段从 `publicURL + "/api/local/" + path`（绝对 URL）改成 `"/api/local/" + path`（相对路径）。原因不明（changelog 未记录，可能是认为前端同源只需相对路径）。
+- **影响**: upload.html 的"复制所有链接"用 `startsWith(ENDPOINT)` 判断，相对路径不匹配 → 复制功能无效。前端其他消费者也可能依赖绝对 URL。
+- **修复**: `aapiRequestBaseURL` 优先读 `CHAT_BASE_URL`，非空时直接返回（不再拼 `r.Host`）；`url` 字段恢复为 `reqBase + "/api/local/" + path`，与 `delete_url` 一致。
+- **文件**: `local_upload.go`
+
+### 其他（23/24 轮已有详细记录，此处摘要）
+- **第 23 轮**：`sending` state guard 防止 prompt 双发；发送按钮 disabled
+- **第 24 轮**：`setText(prev => ...)` functional updater 修复发送失败文本翻倍；`fetchStream` contentAcc/thinkingAcc 全量替换消除 AI stream 竞态；`onMessageUpdate` 剥离 Go 零值字段；对 stream 消息设 `streaming: true`
+
+### 验证
+- Client build: ✅
+- Version: `0.8.16` → `0.8.17`

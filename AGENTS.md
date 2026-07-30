@@ -1,22 +1,22 @@
-# AGENTS.md — Project Context for AI Agents
+# AGENTS.md — AI 代理项目上下文
 
-## Project
-Chat application with Go backend + React frontend.
+## 项目
+Go 后端 + React 前端的聊天应用。
 
-## Key Paths
-- `server/` — Go backend (chi router, SQLite, WebSocket)
-- `client/` — React frontend (Vite, Zustand)
+## 关键路径
+- `server/` — Go 后端（chi 路由、SQLite、WebSocket）
+- `client/` — React 前端（Vite、Zustand）
 
-## Architecture
-- Handlers in `server/internal/handlers/` — HTTP layer only
-- Service in `server/internal/service/` — business logic, permissions, broadcasts
-- DB in `server/internal/db/` — data access
-- WS in `server/internal/ws/` — WebSocket hub + client
+## 架构
+- `server/internal/handlers/` — 处理器，仅 HTTP 层
+- `server/internal/service/` — 业务逻辑、权限、广播
+- `server/internal/db/` — 数据访问
+- `server/internal/ws/` — WebSocket hub + client
 
-## Notes
-- This file is for initialization context only. Session logs and changelogs go in `docs/changelog.md`.
+## 说明
+- 本文件仅提供初始化上下文。会话日志和修改日志放在 `docs/changelog.md`。
 
-## Local Build & Debug
+## 本地构建与调试
 - 一键全流程: `python scripts/deploy_local.py all`
 - 单独编译: `python scripts/deploy_local.py build`
 - 单独启动（捕获日志到 server.log）: `python scripts/deploy_local.py start`
@@ -27,16 +27,28 @@ Chat application with Go backend + React frontend.
 - 手动启动: `./chatd.exe`（需先配置 `.env`，参考 `LOCAL_DEPLOYMENT.md`）
 - 日志: `server.log`（启动后自动写入）
 
-## Changelog Rules
-- Always append new entries to the **end** of `docs/changelog.md`.
-- When appending, anchor `edit`'s `oldString` on the **last section heading** (e.g., `## 2026-... 统一前端错误通知通道（第 21 轮）`) to guarantee a unique match — never match a generic line like `- Client build: ✅` that appears multiple times.
+## 通用原则
+- **不要假设字段/配置没用。** 如果一个配置字段（如 `UploadPublicURL` / `CHAT_BASE_URL`）存在，就有人有理由放它在那。删除或改动前先理解完整数据流。
+- **清理前追踪全链路。** 任何对 API 响应字段的"清理"都必须追溯该字段从生产者（handler）经传输格式到每一个消费者（HTML 页面、前端组件、其他服务、脚本）。漏掉一个消费者 = 功能损坏。
+- **先 grep 再动手。** 改动任何 API 响应字段前，grep 所有消费者：`client/src/`、`*.html`、`docs/api.md`、`scripts/`。常有消费者在直接代码路径之外。
+- **配置优于魔法。** 如果一个值可以从配置（如 `CHAT_BASE_URL`）获得，优先使用配置，而不是通过请求头临时拼凑。配置是显式的，请求头是隐式的且可能随部署拓扑变化。
 
-## Deployment
-- Frontend (Cloudflare Pages): `https://chat.moonchan.xyz`
-- Backend API: `https://chat.moonchan.xyz` (same domain, proxied)
-- API version endpoint: `GET /api/version`
+## API 响应约定
+- **API 响应中的 URL 字段必须始终是绝对 URL**（包含 scheme + host）。永远不要在 `url` 字段中返回 `/api/local/...` 这样的相对路径。
+- 使用 `CHAT_BASE_URL` 环境变量作为对外暴露的 host。如果为空，则从请求（`X-Forwarded-Proto` + `Host`）推导。
+- 改动任何 API 响应字段前，grep 所有消费者（前端 `.jsx`、`.ts`、`.html`、其他服务）。
+- 这条规则的存在是因为 v0.8.15 去掉了上传 `url` 响应中的 host，导致 upload.html 的"复制所有链接"功能和其他消费者被破坏。
 
-## CI/CD Workflow (production release)
+## 修改日志规则
+- 始终在 `docs/changelog.md` 的**末尾**追加新条目。
+- 追加时，`edit` 的 `oldString` 锚定在**最后一个章节标题**（例如 `## 2026-... 统一前端错误通知通道（第 21 轮）`）以保证唯一匹配——永远不要匹配像 `- Client build: ✅` 这样出现多次的通用行。
+
+## 部署
+- 前端（Cloudflare Pages）: `https://chat.moonchan.xyz`
+- 后端 API: `https://chat.moonchan.xyz`（同一域名，反向代理）
+- API 版本端点: `GET /api/version`
+
+## CI/CD 工作流（生产发布）
 1. 修改代码 → `git add` + `git commit`
 2. 如需 bump version，先同步两处版本号：
    - `client/package.json` — `"version": "x.y.z"`
