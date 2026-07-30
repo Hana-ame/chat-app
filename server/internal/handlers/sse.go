@@ -66,7 +66,7 @@ func (s *Server) SSE(w http.ResponseWriter, r *http.Request) {
 
 	ready, _ := json.Marshal(map[string]any{
 		"user": user, "chats": chats,
-		"online_user_ids": s.Hub.OnlineUserIDs(),
+		"online_user_ids": s.Services.OnlineUserIDs(),
 	})
 	fmt.Fprintf(w, "id: 0\nevent: ready\ndata: %s\n\n", ready)
 	flusher.Flush()
@@ -74,8 +74,8 @@ func (s *Server) SSE(w http.ResponseWriter, r *http.Request) {
 	logutil.Info("SSE connected: user=%s", logutil.SafeID(userID))
 
 	ch := make(chan []byte, 64)
-	s.Hub.SSERegister(userID, ch)
-	defer s.Hub.SSEUnregister(userID)
+	s.Services.SSERegister(userID, ch)
+	defer s.Services.SSEUnregister(userID)
 
 	notify := r.Context().Done()
 	for {

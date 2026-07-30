@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Hana-ame/chat-app/server/internal/db"
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/Hana-ame/chat-app/server/internal/models"
 )
@@ -47,25 +46,41 @@ type memberCacheEntry struct {
 	expires time.Time
 }
 
-type Hub struct {
-	mu         sync.RWMutex
-	clients    map[string]map[*Client]struct{}
-	sseClients map[string][]chan []byte
-	db         *db.DB
-	memberMu   sync.Mutex
-	memberCache map[string]*memberCacheEntry
+// MemberStore is the interface Hub uses to look up chat members.
+type MemberStore interface {
+	GetChatMembers(ctx context.Context, chatID string) ([]models.User, error)
+	IsChatMember(ctx context.Context, chatID, userID string) (bool, error)
 }
 
-func NewHub(database *db.DB) *Hub {
+// PresenceHandler is called when a user comes online or goes offline.
+type PresenceHandler func(ctx context.Context, userID string, online bool)
+
+type Hub struct {
+	mu              sync.RWMutex
+	clients         map[string]map[*Client]struct{}
+	sseClients      map[string][]chan []byte
+	memberStore     MemberStore
+	presenceHandler PresenceHandler
+	memberMu        sync.Mutex
+	memberCache     map[string]*memberCacheEntry
+}
+
+func NewHub(memberStore MemberStore) *Hub {
 	return &Hub{
 		clients:     make(map[string]map[*Client]struct{}),
 		sseClients:  make(map[string][]chan []byte),
-		db:          database,
+		memberStore: memberStore,
 		memberCache: make(map[string]*memberCacheEntry),
 	}
 }
 
-func (h *Hub) register(c *Client) {
+// SetPresenceHandler sets the handler called when a user comes online/goes offline.
+func (h *Hub) SetPresenceHandler(handler PresenceHandler) {
+	h.presenceHandler = handler
+}
+
+// register adds a client and returns true if the user was previously offline.
+func (h *Hub) register(c *Client) bool {
 	h.mu.Lock()
 	set, ok := h.clients[c.userID]
 	if !ok {
@@ -76,19 +91,17 @@ func (h *Hub) register(c *Client) {
 	wasOffline := len(set) == 1
 	h.mu.Unlock()
 	logutil.Info("ws client registered: user=%s (total=%d)", logutil.SafeID(c.userID), h.ClientCount())
-	if wasOffline && h.db != nil {
-		if err := h.db.UpdateUserStatus(context.Background(), c.userID, "online"); err != nil {
-			logutil.Error("presence: failed to set online for %s: %v", logutil.SafeID(c.userID), err)
+	if wasOffline {
+		if h.presenceHandler != nil {
+			h.presenceHandler(context.Background(), c.userID, true)
 		}
-		if err := h.db.UpdateUserLastSeen(context.Background(), c.userID); err != nil {
-			logutil.Error("presence: failed to update last_seen for %s: %v", logutil.SafeID(c.userID), err)
-		}
-		logutil.Debug("presence: %s -> online", logutil.SafeID(c.userID))
 		h.broadcastPresence(c.userID, "online")
 	}
+	return wasOffline
 }
 
-func (h *Hub) unregister(c *Client) {
+// unregister removes a client and returns true if the user is now fully offline.
+func (h *Hub) unregister(c *Client) bool {
 	h.mu.Lock()
 	wasLast := false
 	if set, ok := h.clients[c.userID]; ok {
@@ -100,16 +113,13 @@ func (h *Hub) unregister(c *Client) {
 	}
 	h.mu.Unlock()
 	logutil.Info("ws client unregistered: user=%s (total=%d)", logutil.SafeID(c.userID), h.ClientCount())
-	if wasLast && h.db != nil {
-		if err := h.db.UpdateUserStatus(context.Background(), c.userID, "offline"); err != nil {
-			logutil.Error("presence: failed to set offline for %s: %v", logutil.SafeID(c.userID), err)
+	if wasLast {
+		if h.presenceHandler != nil {
+			h.presenceHandler(context.Background(), c.userID, false)
 		}
-		if err := h.db.UpdateUserLastSeen(context.Background(), c.userID); err != nil {
-			logutil.Error("presence: failed to update last_seen for %s: %v", logutil.SafeID(c.userID), err)
-		}
-		logutil.Debug("presence: %s -> offline", logutil.SafeID(c.userID))
 		h.broadcastPresence(c.userID, "offline")
 	}
+	return wasLast
 }
 
 func (h *Hub) ClientCount() int {
@@ -170,13 +180,13 @@ func (h *Hub) sendToUser(userID string, env Envelope) {
 }
 
 func (h *Hub) sendToChat(chatID string, env Envelope, exceptUser string) {
-	if h.db == nil {
+	if h.memberStore == nil {
 		return
 	}
 	members, ok := h.getCachedMembers(chatID)
 	if !ok {
 		var err error
-		members, err = h.db.GetChatMembers(context.Background(), chatID)
+		members, err = h.memberStore.GetChatMembers(context.Background(), chatID)
 		if err != nil {
 			logutil.Error("ws: failed to load members for chat %s: %v", logutil.SafeID(chatID), err)
 			return

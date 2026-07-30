@@ -1,47 +1,9 @@
-/**
- * @typedef {import('../schemas').Chat} Chat
- * @typedef {import('../schemas').Message} Message
- * @typedef {import('../schemas').User} User
- * @typedef {import('../schemas').PinnedContent} PinnedContent
- */
-
-/**
- * @typedef {Object} ChatStore
- * @property {Chat[]} chats
- * @property {string|null} activeChatId
- * @property {Message[]} messages
- * @property {Object<string, PinnedContent|null>} pinnedMessage
- * @property {string[]} onlineUserIds
- * @property {'ws'|'sse'|'poll'} mode
- * @property {boolean} wsReady
- * @property {boolean} sseReady
- * @property {(mode: string) => void} setMode
- * @property {(token: string|null) => void} connect
- * @property {(chats: Chat[]) => void} setChats
- * @property {(chat: Partial<Chat>) => void} onChatUpdate
- * @property {(payload: {chat_id?:string, id?:string}) => void} onChatDelete
- * @property {(payload: {chat_id:string}) => void} onChatRemove
- * @property {(msg: Message) => void} onMessageCreate
- * @property {(msg: Partial<Message>) => void} onMessageUpdate
- * @property {(payload: {message_id:string}) => void} onMessageDelete
- * @property {(payload: {message_id:string, emoji:string, user_id:string}, added: boolean) => void} onReaction
- * @property {(token: string) => Promise<void>} loadChats
- * @property {(token: string, chatId: string, before?: string) => Promise<void>} loadMessages
- * @property {(token: string, chatId: string, content: string, attachments?: import('../schemas').Attachment[]) => Promise<void>} sendMessage
- * @property {(chatId: string) => void} sendTyping
- * @property {(chatId: string) => void} subscribe
- * @property {(op: string, payload?: any) => Promise<any>} wsRequest
- * @property {(token: string, chatId: string, content: string) => Promise<void>} setAnnouncement
- * @property {(token: string, chatId: string) => Promise<void>} clearAnnouncement
- * @property {(chatId: string) => Promise<void>} markAnnouncementRead
- * @property {() => void} reset
- */
-
 import { create } from 'zustand';
 import { api } from '../api/client';
 import { getCoordinator } from '../realtime/coordinator';
-import { useAuthStore } from '../store/auth';
-import { requestNotifyPermission, sendBrowserNotification } from '../utils/browserNotify';
+import { useAuthStore } from './auth';
+import { fetchStream } from '../realtime/fetchStream';
+import { maybeNotifyMessage } from '../utils/notifyMessage';
 
 const coord = getCoordinator();
 
@@ -57,57 +19,11 @@ function sortChats(a, b) {
   return new Date(db) - new Date(da);
 }
 
-async function fetchStream(url, msgId) {
-  const token = useAuthStore.getState().accessToken;
-  let contentAcc = '';
-  let thinkingAcc = '';
-  try {
-    const res = await fetch(url, { headers: token ? { Authorization: 'Bearer ' + token } : {} });
-    if (!res.ok) { console.error('fetchStream: HTTP', res.status); return; }
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = '';
-    let streamDone = false;
-    while (!streamDone) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      const lines = buf.split('\n');
-      buf = lines.pop() || '';
-      for (const line of lines) {
-        const t = line.trim();
-        if (!t.startsWith('data: ')) continue;
-        const p = t.slice(6);
-        if (p === '[DONE]') { streamDone = true; break; }
-        try {
-          const json = JSON.parse(p);
-          if (json.type === 'reasoning' && json.content) {
-            thinkingAcc += json.content;
-            useChatStore.setState(s => ({ messages: s.messages.map(m =>
-              m.id === msgId ? { ...m, thinking: thinkingAcc } : m
-            ) }));
-          } else if (json.content) {
-            contentAcc += json.content;
-            useChatStore.setState(s => ({ messages: s.messages.map(m =>
-              m.id === msgId ? { ...m, content: contentAcc } : m
-            ) }));
-          }
-        } catch {}
-      }
-    }
-    useChatStore.setState(s => ({ messages: s.messages.map(m =>
-      m.id === msgId ? { ...m, streaming: false } : m
-    ) }));
-  } catch (e) { console.error('fetchStream error:', e); }
-}
-
 coord.setHandlers({
-  /** @param {{ onlineUserIds?: string[], chats?: import('../schemas').Chat[] }} payload */
   onReady: ({ onlineUserIds, chats }) => {
     set({ onlineUserIds, wsReady: true, sseReady: true });
     get().setChats(chats || []);
   },
-  /** @param {string} op @param {any} payload */
   onEvent: (op, payload) => {
     const s = get();
     switch (op) {
@@ -148,7 +64,6 @@ coord.setHandlers({
   getActiveChatId: () => get().activeChatId,
 });
 
-/** @param {Partial<ChatStore>|((s: ChatStore) => Partial<ChatStore>)} fn */
 const set = (fn) => useChatStore.setState(fn);
 const get = () => useChatStore.getState();
 
@@ -156,7 +71,14 @@ function getAccessToken() {
   try { const a = JSON.parse(localStorage.getItem('auth') || '{}'); return a.accessToken; } catch { return null; }
 }
 
-/** @type {import('zustand').StateCreator<ChatStore>} */
+function onStreamChunk(msgId, contentAcc, thinkingAcc, done) {
+  set(s => ({
+    messages: s.messages.map(m =>
+      m.id === msgId ? { ...m, content: contentAcc, thinking: thinkingAcc, streaming: !done } : m
+    ),
+  }));
+}
+
 export const useChatStore = create((set, get) => ({
   chats: [],
   activeChatId: null,
@@ -164,13 +86,12 @@ export const useChatStore = create((set, get) => ({
   pinnedMessage: {},
   onlineUserIds: [],
   notifyEnabled: {},
-  _localStreaming: {}, // msgId → true: Composer 正在本地处理 AI 流, fetchStream 应跳过
+  _localStreaming: {},
 
   mode: 'ws',
   wsReady: false,
   sseReady: false,
 
-  /** @param {string} mode */
   setMode(mode) {
     coord.disconnect();
     set({ mode, wsReady: false, sseReady: false });
@@ -178,14 +99,12 @@ export const useChatStore = create((set, get) => ({
     if (token) coord.connect(mode, token);
   },
 
-  /** @param {string|null} token */
   connect(token) {
     if (!token) { coord.disconnect(); set({ wsReady: false, sseReady: false }); return; }
     const mode = get().mode;
     coord.connect(mode, token);
   },
 
-  /** @param {import('../schemas').Chat[]} chats */
   setChats(chats) {
     set(s => {
       const existing = new Map(s.chats.map(c => [c.id, c]));
@@ -210,7 +129,6 @@ export const useChatStore = create((set, get) => ({
     });
   },
 
-  /** @param {Partial<import('../schemas').Chat>} chat */
   onChatUpdate(chat) {
     set(s => {
       const idx = s.chats.findIndex(c => c.id === chat.id);
@@ -229,7 +147,6 @@ export const useChatStore = create((set, get) => ({
     });
   },
 
-  /** @param {{ chat_id?: string, id?: string }} payload */
   onChatDelete(payload) {
     const id = payload.chat_id || payload.id;
     set(s => ({
@@ -239,7 +156,6 @@ export const useChatStore = create((set, get) => ({
     }));
   },
 
-  /** @param {{ chat_id: string }} payload */
   onChatRemove(payload) {
     set(s => ({
       chats: s.chats.filter(c => c.id !== payload.chat_id),
@@ -248,7 +164,6 @@ export const useChatStore = create((set, get) => ({
     }));
   },
 
-  /** @param {string} chatId */
   setNotifyEnabled(chatId, enabled) {
     const token = getAccessToken();
     if (token) {
@@ -260,7 +175,6 @@ export const useChatStore = create((set, get) => ({
     });
   },
 
-  /** @param {import('../schemas').Message} msg */
   onMessageCreate(msg) {
     let wasNew = false;
     set(s => {
@@ -290,40 +204,15 @@ export const useChatStore = create((set, get) => ({
       if (streamUrl) {
         const uid = getAuth().user?.id;
         if (msg.user_id !== uid && !get()._localStreaming[msg.id]) {
-          fetchStream(streamUrl, msg.id);
+          fetchStream(streamUrl, msg.id, onStreamChunk);
         }
       }
     }
-    const st = get();
-    if (msg.chat_id !== st.activeChatId && msg.type !== 'stream') {
-      const uid = getAuth().user?.id;
-      const token = getAuth().accessToken;
-      const blocked = getAuth().user?.notify_blocked || [];
-      if (blocked.includes(msg.user_id)) return;
-      const mentioned = uid && msg.content?.includes(`<@${uid}>`);
-      const chatName = st.chats.find(c => c.id === msg.chat_id)?.name || 'Chat';
-      const authorName = msg.author?.username || 'Someone';
-      if (mentioned) {
-        requestNotifyPermission().then(() => {
-          sendBrowserNotification(`@mentioned in ${chatName}`, msg.content?.replace(/<@[^>]+>/g, '').slice(0, 120) || '', () => {
-            const s = get();
-            s.setActiveChatId(msg.chat_id);
-            s.loadMessages(token, msg.chat_id);
-          });
-        });
-      } else if (st.notifyEnabled?.[msg.chat_id]) {
-        requestNotifyPermission().then(() => {
-          sendBrowserNotification(authorName + ' — ' + chatName, msg.content?.slice(0, 120) || '(attachment)', () => {
-            const s = get();
-            s.setActiveChatId(msg.chat_id);
-            s.loadMessages(token, msg.chat_id);
-          });
-        });
-      }
+    if (msg.chat_id !== get().activeChatId) {
+      maybeNotifyMessage(msg, get().chats);
     }
   },
 
-  /** @param {Partial<import('../schemas').Message>} msg */
   onMessageUpdate(msg) {
     set(s => {
       if (s._localStreaming[msg.id]) return {};
@@ -332,12 +221,10 @@ export const useChatStore = create((set, get) => ({
     });
   },
 
-  /** @param {{ message_id: string }} payload */
   onMessageDelete(payload) {
     set(s => ({ messages: s.messages.map(m => m.id === payload.message_id ? { ...m, deleted: true, content: '' } : m) }));
   },
 
-  /** @param {{ message_id: string, emoji: string, user_id: string }} payload @param {boolean} added */
   onReaction(payload, added) {
     const myId = getAuth().user?.id;
     set(s => ({ messages: s.messages.map(m => {
@@ -360,7 +247,6 @@ export const useChatStore = create((set, get) => ({
     }) }));
   },
 
-  /** @param {string} token */
   async loadChats(token) {
     try {
       const data = await api.listChats(token);
@@ -368,7 +254,6 @@ export const useChatStore = create((set, get) => ({
     } catch (e) { console.error('loadChats error:', e); }
   },
 
-  /** @param {import('../schemas').Message} m */
   _normalize(m) {
     if (m.deleted_at) {
       return { ...m, deleted: true, content: '' };
@@ -380,7 +265,6 @@ export const useChatStore = create((set, get) => ({
   },
 
   _msgLoadId: 0,
-  /** @param {string} token @param {string} chatId @param {string} [before] */
   async loadMessages(token, chatId, before) {
     const loadId = ++get()._msgLoadId;
     try {
@@ -395,19 +279,14 @@ export const useChatStore = create((set, get) => ({
     } catch (e) { console.error('loadMessages error:', e); }
   },
 
-  /** @param {string} token @param {string} chatId @param {string} content @param {import('../schemas').Attachment[]} [attachments] */
   async sendMessage(token, chatId, content, attachments) {
     await api.sendMessage(token, chatId, content, attachments);
   },
 
-  /** @param {string} chatId */
   sendTyping(chatId) { coord.sendTyping(chatId); },
-  /** @param {string} chatId */
   subscribe(chatId) { coord.subscribe(chatId); },
-  /** @param {string} op @param {any} [payload] @returns {Promise<any>} */
   wsRequest(op, payload) { return coord.wsRequest(op, payload); },
 
-  /** @param {string} token @param {string} chatId @param {string} content */
   async setAnnouncement(token, chatId, content) {
     const res = await api.setAnnouncement(token, chatId, content);
     const p = res.pinned_message || { id: '', content, pinned_at: new Date().toISOString() };
@@ -416,7 +295,6 @@ export const useChatStore = create((set, get) => ({
     }));
   },
 
-  /** @param {string} token @param {string} chatId */
   async clearAnnouncement(token, chatId) {
     await api.clearAnnouncement(token, chatId);
     set(s => {
@@ -426,7 +304,6 @@ export const useChatStore = create((set, get) => ({
     });
   },
 
-  /** @param {string} chatId */
   async markAnnouncementRead(chatId) {
     const { accessToken } = getAuth();
     try { await api.markAnnouncementRead(accessToken, chatId); } catch (e) { console.error('markAnnouncementRead error:', e); }
@@ -435,7 +312,6 @@ export const useChatStore = create((set, get) => ({
     }));
   },
 
-  /** @param {string|null} id */
   setActiveChatId(id) {
     set(s => {
       if (id && s.activeChatId !== id) {

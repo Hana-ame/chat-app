@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/Hana-ame/chat-app/server/internal/auth"
 	"github.com/Hana-ame/chat-app/server/internal/config"
@@ -18,7 +17,7 @@ import (
 	"github.com/Hana-ame/chat-app/server/internal/models"
 	"github.com/Hana-ame/chat-app/server/internal/service"
 	localfs "github.com/Hana-ame/chat-app/server/internal/storage/local"
-	"github.com/Hana-ame/chat-app/server/internal/ws"
+	ws "github.com/Hana-ame/chat-app/server/internal/ws"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -29,32 +28,21 @@ const (
 	ctxKeyToken ctxKey = "token"
 )
 
-// Server is the HTTP handler container holding shared dependencies.
 type Server struct {
 	Cfg          *config.Config
-	DB           *db.DB
 	Auth         *auth.Service
-	Hub          *ws.Hub
 	Version      string
 	Services     *service.Service
 	aapiLocalDriver  *localfs.Driver
 	refreshMu        sync.Mutex
-	loginLimiter     *loginRateLimiter
-	registerLimiter  *registerLimiter
 }
 
-// New creates a new Server.
 func New(cfg *config.Config, database *db.DB, authSvc *auth.Service, hub *ws.Hub) *Server {
-	s := &Server{
-		Cfg:          cfg,
-		DB:           database,
-		Auth:         authSvc,
-		Hub:          hub,
-		Services:     service.New(database, hub, cfg),
-		loginLimiter:    newLoginRateLimiter(5, 1*time.Hour),
-		registerLimiter: newRegisterLimiter(100, 24*time.Hour),
+	return &Server{
+		Cfg:      cfg,
+		Auth:     authSvc,
+		Services: service.New(database, hub, cfg),
 	}
-	return s
 }
 
 func userFrom(ctx context.Context) *models.User {
@@ -138,15 +126,12 @@ func bearerToken(r *http.Request) string {
 	if strings.HasPrefix(h, "Bearer ") {
 		return strings.TrimSpace(h[7:])
 	}
-	// URL query token is a backward-compat fallback for SSE (EventSource API) which
-	// cannot set custom headers. Token exposure via Referer/logs is accepted for this path.
 	if t := r.URL.Query().Get("access_token"); t != "" {
 		return t
 	}
 	return ""
 }
 
-// authMiddleware authenticates requests via Bearer JWT token.
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tok := bearerToken(r)
@@ -184,7 +169,6 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// trackLastActive updates chat_members.last_active_at on every request to a chat endpoint.
 func (s *Server) trackLastActive(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		chatID := chi.URLParam(r, "chatID")
@@ -192,7 +176,7 @@ func (s *Server) trackLastActive(next http.Handler) http.Handler {
 		if chatID != "" && u != nil {
 			id := u.ID
 			go func() {
-				if err := s.DB.UpdateLastActiveAt(context.Background(), chatID, id); err != nil {
+				if err := s.Services.TrackLastActive(context.Background(), chatID, id); err != nil {
 					logutil.Error("trackLastActive error: %v", err)
 				}
 			}()

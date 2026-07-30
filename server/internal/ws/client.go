@@ -96,8 +96,8 @@ func (c *Client) readPump() {
 			if err := json.Unmarshal(env.Payload, &p); err != nil || p.ChatID == "" {
 				continue
 			}
-			if c.hub.db != nil {
-				ok, err := c.hub.db.IsChatMember(context.Background(), p.ChatID, c.userID)
+			if c.hub.memberStore != nil {
+				ok, err := c.hub.memberStore.IsChatMember(context.Background(), p.ChatID, c.userID)
 				if err != nil {
 					logutil.Error("ws: check member for subscribe %s: %v", logutil.SafeID(p.ChatID), err)
 					continue
@@ -117,8 +117,8 @@ func (c *Client) readPump() {
 			if err := json.Unmarshal(env.Payload, &p); err != nil || p.ChatID == "" {
 				continue
 			}
-			if c.hub.db != nil {
-				members, err := c.hub.db.GetChatMembers(context.Background(), p.ChatID)
+			if c.hub.memberStore != nil {
+				members, err := c.hub.memberStore.GetChatMembers(context.Background(), p.ChatID)
 				if err == nil {
 					b, err := json.Marshal(map[string]any{"chat_id": p.ChatID, "members": members})
 					if err != nil {
@@ -133,8 +133,8 @@ func (c *Client) readPump() {
 			if err := json.Unmarshal(env.Payload, &p); err != nil || p.ChatID == "" {
 				continue
 			}
-			if c.hub.db != nil {
-				ok, err := c.hub.db.IsChatMember(context.Background(), p.ChatID, c.userID)
+			if c.hub.memberStore != nil {
+				ok, err := c.hub.memberStore.IsChatMember(context.Background(), p.ChatID, c.userID)
 				if err != nil {
 					logutil.Error("ws: check member for typing %s: %v", logutil.SafeID(p.ChatID), err)
 					continue

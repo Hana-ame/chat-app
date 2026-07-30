@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -27,9 +28,9 @@ const (
 )
 
 type Gateway struct {
-	hub           *Hub
-	db            *db.DB
-	authSvc       *auth.Service
+	hub            *Hub
+	db             *db.DB
+	authSvc        *auth.Service
 	maxMessageSize int64
 }
 
@@ -37,16 +38,29 @@ func NewGateway(hub *Hub, database *db.DB, authSvc *auth.Service, maxMessageSize
 	if maxMessageSize <= 0 {
 		maxMessageSize = 1 << 16
 	}
+	hub.SetPresenceHandler(func(ctx context.Context, userID string, online bool) {
+		var status string
+		if online {
+			status = "online"
+		} else {
+			status = "offline"
+		}
+		if err := database.UpdateUserStatus(ctx, userID, status); err != nil {
+			logutil.Error("presence: failed to set %s for %s: %v", status, logutil.SafeID(userID), err)
+		}
+		if err := database.UpdateUserLastSeen(ctx, userID); err != nil {
+			logutil.Error("presence: failed to update last_seen for %s: %v", logutil.SafeID(userID), err)
+		}
+	})
 	return &Gateway{hub: hub, db: database, authSvc: authSvc, maxMessageSize: maxMessageSize}
 }
 
 func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-    // Enable WebSocket by default; optional env var WS_ENABLED can be used to disable.
-    if v := os.Getenv("WS_ENABLED"); v != "" && v != "true" {
-        logutil.Warn("WebSocket disabled by WS_ENABLED env")
-        http.Error(w, "WebSocket is disabled in this version", http.StatusForbidden)
-        return
-    }
+	if v := os.Getenv("WS_ENABLED"); v != "" && v != "true" {
+		logutil.Warn("WebSocket disabled by WS_ENABLED env")
+		http.Error(w, "WebSocket is disabled in this version", http.StatusForbidden)
+		return
+	}
 	tok := r.URL.Query().Get("access_token")
 	if tok == "" {
 		logutil.Warn("ws connect: missing access_token")

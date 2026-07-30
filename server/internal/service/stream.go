@@ -47,8 +47,8 @@ func (s *StreamService) StartStream(ctx context.Context, chatID, userID, msgID s
 		CreatedAt: time.Now().UTC(),
 		Author:    author,
 	}
-	if s.Hub != nil {
-		s.Hub.BroadcastMessageCreate(placeholder)
+	if s.hub != nil {
+		s.hub.BroadcastMessageCreate(placeholder)
 	}
 
 	return ch, nil
@@ -161,5 +161,5 @@ func (s *StreamService) Unsubscribe(msgID string, sub chan struct{}) {
 }
 
 func (s *StreamService) GetMessage(ctx context.Context, msgID string) (*models.Message, error) {
-	return s.DB.GetMessage(ctx, msgID)
+	return s.db.GetMessage(ctx, msgID)
 }

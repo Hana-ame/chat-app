@@ -13,7 +13,7 @@ type UserService struct {
 }
 
 func (s *UserService) GetByID(ctx context.Context, id string) (*models.User, error) {
-	u, err := s.DB.GetUserByID(ctx, id)
+	u, err := s.db.GetUserByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, db.ErrNotFound) {
 			return nil, ErrNotFound
@@ -24,7 +24,7 @@ func (s *UserService) GetByID(ctx context.Context, id string) (*models.User, err
 }
 
 func (s *UserService) GetByEmail(ctx context.Context, email string) (*models.User, string, error) {
-	u, hash, err := s.DB.GetUserByEmail(ctx, email)
+	u, hash, err := s.db.GetUserByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, db.ErrNotFound) {
 			return nil, "", ErrNotFound
@@ -35,7 +35,7 @@ func (s *UserService) GetByEmail(ctx context.Context, email string) (*models.Use
 }
 
 func (s *UserService) Create(ctx context.Context, email, username, hash string) (*models.User, error) {
-	u, err := s.DB.CreateUser(ctx, email, username, hash)
+	u, err := s.db.CreateUser(ctx, email, username, hash)
 	if err != nil {
 		if errors.Is(err, db.ErrConflict) {
 			return nil, ErrConflict
@@ -46,7 +46,7 @@ func (s *UserService) Create(ctx context.Context, email, username, hash string) 
 }
 
 func (s *UserService) UpdateProfile(ctx context.Context, id, username, avatarColor, avatarURL string) (*models.User, error) {
-	u, err := s.DB.UpdateUserProfile(ctx, id, username, avatarColor, avatarURL)
+	u, err := s.db.UpdateUserProfile(ctx, id, username, avatarColor, avatarURL)
 	if err != nil {
 		if errors.Is(err, db.ErrNotFound) {
 			return nil, ErrNotFound
@@ -63,12 +63,12 @@ func (s *UserService) UpdateNotifyBlocked(ctx context.Context, userID string, bl
 	if blocked == nil {
 		blocked = []string{}
 	}
-	if err := s.DB.SetUserNotifyBlocked(ctx, userID, blocked); err != nil {
+	if err := s.db.SetUserNotifyBlocked(ctx, userID, blocked); err != nil {
 		return nil, err
 	}
-	return s.DB.GetUserByID(ctx, userID)
+	return s.db.GetUserByID(ctx, userID)
 }
 
 func (s *UserService) Search(ctx context.Context, query string, limit int) ([]models.User, error) {
-	return s.DB.SearchUsers(ctx, query, limit)
+	return s.db.SearchUsers(ctx, query, limit)
 }

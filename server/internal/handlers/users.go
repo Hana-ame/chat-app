@@ -70,9 +70,7 @@ func (s *Server) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	logutil.Info("profile updated: user=%s username=%s", logutil.SafeID(u.ID), name)
-	if s.Hub != nil {
-		s.Hub.BroadcastUserUpdate(updated)
-	}
+	s.Services.BroadcastUserUpdate(updated)
 	writeJSON(w, http.StatusOK, updated)
 }
 

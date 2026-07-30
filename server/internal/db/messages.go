@@ -55,6 +55,13 @@ func (d *DB) CreateAIMessage(ctx context.Context, chatID, userID, msgID, content
 
 // ── Messages ─────────────────────────────────────────────────────────
 
+const messageColumns = `m.id, m.chat_id, m.user_id, m.type, m.content, m.created_at, m.edited_at, m.deleted_at,
+		        m.thinking, m.attachment_count, m.mention_count, m.reaction_count, m.reactions, m.attachments, m.mentions,
+		        u.id, u.username, u.avatar_color, u.avatar_url, u.status, u.last_seen, COALESCE(cm.role,'')`
+
+const messageJoins = ` FROM messages m JOIN users u ON u.id = m.user_id
+		 LEFT JOIN chat_members cm ON cm.chat_id = m.chat_id AND cm.user_id = m.user_id`
+
 func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, mentions []string, attachments []models.Attachment) (*models.Message, error) {
 	content = strings.TrimRight(content, " \n\t")
 	if len(content) > d.maxContentLength {
@@ -140,12 +147,7 @@ func dedupe(in []string) []string {
 
 func (d *DB) GetMessage(ctx context.Context, id string) (*models.Message, error) {
 	m, err := d.fetchMessageRow(ctx,
-		`SELECT m.id, m.chat_id, m.user_id, m.type, m.content, m.created_at, m.edited_at, m.deleted_at,
-		        m.thinking, m.attachment_count, m.mention_count, m.reaction_count, m.reactions, m.attachments, m.mentions,
-		        u.id, u.username, u.avatar_color, u.avatar_url, u.status, u.last_seen, COALESCE(cm.role,'')
-		 FROM messages m JOIN users u ON u.id = m.user_id
-		 LEFT JOIN chat_members cm ON cm.chat_id = m.chat_id AND cm.user_id = m.user_id
-		 WHERE m.id = ?`,
+		`SELECT `+messageColumns+messageJoins+` WHERE m.id = ?`,
 		id,
 	)
 	if err != nil {
@@ -240,23 +242,13 @@ func (d *DB) GetMessages(ctx context.Context, chatID, before string, limit int) 
 	)
 	if before == "" {
 		rows, err = d.QueryContext(ctx,
-			`SELECT m.id, m.chat_id, m.user_id, m.type, m.content, m.created_at, m.edited_at, m.deleted_at,
-			        m.thinking, m.attachment_count, m.mention_count, m.reaction_count, m.reactions, m.attachments, m.mentions,
-			        u.id, u.username, u.avatar_color, u.avatar_url, u.status, u.last_seen, COALESCE(cm.role,'')
-			 FROM messages m JOIN users u ON u.id = m.user_id
-			 LEFT JOIN chat_members cm ON cm.chat_id = m.chat_id AND cm.user_id = m.user_id
-			 WHERE m.chat_id = ?
+			`SELECT `+messageColumns+messageJoins+` WHERE m.chat_id = ?
 			 ORDER BY m.created_at DESC, m.id DESC LIMIT ?`,
 			chatID, limit,
 		)
 	} else {
 		rows, err = d.QueryContext(ctx,
-			`SELECT m.id, m.chat_id, m.user_id, m.type, m.content, m.created_at, m.edited_at, m.deleted_at,
-			        m.thinking, m.attachment_count, m.mention_count, m.reaction_count, m.reactions, m.attachments, m.mentions,
-			        u.id, u.username, u.avatar_color, u.avatar_url, u.status, u.last_seen, COALESCE(cm.role,'')
-			 FROM messages m JOIN users u ON u.id = m.user_id
-			 LEFT JOIN chat_members cm ON cm.chat_id = m.chat_id AND cm.user_id = m.user_id
-			 WHERE m.chat_id = ? AND (m.created_at, m.id) < (
+			`SELECT `+messageColumns+messageJoins+` WHERE m.chat_id = ? AND (m.created_at, m.id) < (
 			    SELECT created_at, id FROM messages WHERE id = ?
 			 )
 			 ORDER BY m.created_at DESC, m.id DESC LIMIT ?`,
@@ -288,12 +280,7 @@ func (d *DB) GetMessages(ctx context.Context, chatID, before string, limit int) 
 
 func (d *DB) LastMessage(ctx context.Context, chatID string) (*models.Message, error) {
 	m, err := d.fetchMessageRow(ctx,
-		`SELECT m.id, m.chat_id, m.user_id, m.type, m.content, m.created_at, m.edited_at, m.deleted_at,
-		        m.thinking, m.attachment_count, m.mention_count, m.reaction_count, m.reactions, m.attachments, m.mentions,
-		        u.id, u.username, u.avatar_color, u.avatar_url, u.status, u.last_seen, COALESCE(cm.role,'')
-		 FROM messages m JOIN users u ON u.id = m.user_id
-		 LEFT JOIN chat_members cm ON cm.chat_id = m.chat_id AND cm.user_id = m.user_id
-		 WHERE m.chat_id = ?
+		`SELECT `+messageColumns+messageJoins+` WHERE m.chat_id = ?
 		 ORDER BY m.created_at DESC, m.id DESC LIMIT 1`,
 		chatID,
 	)

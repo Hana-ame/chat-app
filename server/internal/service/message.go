@@ -16,20 +16,20 @@ func (s *MessageService) List(ctx context.Context, chatID, userID string, before
 	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return nil, err
 	}
-	return s.DB.GetMessages(ctx, chatID, before, limit)
+	return s.db.GetMessages(ctx, chatID, before, limit)
 }
 
 func (s *MessageService) SendAI(ctx context.Context, chatID, userID, content, thinking, msgID string, author *models.User) (*models.Message, error) {
 	if strings.TrimSpace(content) == "" && strings.TrimSpace(thinking) == "" {
 		return nil, ErrInvalidInput
 	}
-	msg, err := s.DB.CreateAIMessage(ctx, chatID, userID, msgID, content, thinking)
+	msg, err := s.db.CreateAIMessage(ctx, chatID, userID, msgID, content, thinking)
 	if err != nil {
 		return nil, err
 	}
 	msg.Author = author
-	if s.Hub != nil {
-		s.Hub.BroadcastMessageCreate(msg)
+	if s.hub != nil {
+		s.hub.BroadcastMessageCreate(msg)
 	}
 	return msg, nil
 }
@@ -53,15 +53,15 @@ func (s *MessageService) Send(ctx context.Context, chatID, userID, content strin
 		}
 	}
 	mentions := extractMentions(content)
-	msg, err := s.DB.CreateMessage(ctx, chatID, userID, content, mentions, attachments)
+	msg, err := s.db.CreateMessage(ctx, chatID, userID, content, mentions, attachments)
 	if err != nil {
 		if isContentTooLong(err) {
 			return nil, ErrContentTooLong
 		}
 		return nil, err
 	}
-	if s.Hub != nil {
-		s.Hub.BroadcastMessageCreate(msg)
+	if s.hub != nil {
+		s.hub.BroadcastMessageCreate(msg)
 	}
 	return msg, nil
 }
@@ -70,7 +70,7 @@ func (s *MessageService) Edit(ctx context.Context, chatID, messageID, userID, co
 	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return nil, err
 	}
-	msg, err := s.DB.UpdateMessage(ctx, messageID, userID, content)
+	msg, err := s.db.UpdateMessage(ctx, messageID, userID, content)
 	if err != nil {
 		if isNotFound(err) {
 			return nil, ErrNotFound
@@ -80,8 +80,8 @@ func (s *MessageService) Edit(ctx context.Context, chatID, messageID, userID, co
 	if msg.ChatID != chatID {
 		return nil, ErrInvalidInput
 	}
-	if s.Hub != nil {
-		s.Hub.BroadcastMessageUpdate(msg)
+	if s.hub != nil {
+		s.hub.BroadcastMessageUpdate(msg)
 	}
 	return msg, nil
 }
@@ -90,7 +90,7 @@ func (s *MessageService) Delete(ctx context.Context, chatID, messageID, userID s
 	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return err
 	}
-	existing, err := s.DB.GetMessage(ctx, messageID)
+	existing, err := s.db.GetMessage(ctx, messageID)
 	if err != nil {
 		return err
 	}
@@ -98,17 +98,17 @@ func (s *MessageService) Delete(ctx context.Context, chatID, messageID, userID s
 		return ErrInvalidInput
 	}
 	canDeleteAny := false
-	if chat, err := s.DB.GetChat(ctx, chatID); err == nil {
+	if chat, err := s.db.GetChat(ctx, chatID); err == nil {
 		canDeleteAny = chat.OwnerID == userID || s.Authz.RequireOwnerOrAdmin(ctx, chatID, userID) == nil
 	}
 	if existing.UserID != userID && !canDeleteAny {
 		return ErrForbidden
 	}
-	if err := s.DB.DeleteMessage(ctx, messageID, userID, canDeleteAny); err != nil {
+	if err := s.db.DeleteMessage(ctx, messageID, userID, canDeleteAny); err != nil {
 		return err
 	}
-	if s.Hub != nil {
-		s.Hub.BroadcastMessageDelete(chatID, messageID)
+	if s.hub != nil {
+		s.hub.BroadcastMessageDelete(chatID, messageID)
 	}
 	return nil
 }
@@ -117,7 +117,7 @@ func (s *MessageService) MarkRead(ctx context.Context, chatID, userID string) er
 	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return err
 	}
-	return s.DB.UpdateLastActiveAt(ctx, chatID, userID)
+	return s.db.UpdateLastActiveAt(ctx, chatID, userID)
 }
 
 var mentionRegex = regexp.MustCompile(`<@([a-f0-9-]{36})>`)

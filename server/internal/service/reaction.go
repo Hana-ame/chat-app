@@ -14,7 +14,7 @@ func (s *ReactionService) Add(ctx context.Context, chatID, messageID, userID, em
 	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return nil, err
 	}
-	msg, err := s.DB.GetMessage(ctx, messageID)
+	msg, err := s.db.GetMessage(ctx, messageID)
 	if err != nil {
 		if isNotFound(err) {
 			return nil, ErrNotFound
@@ -24,13 +24,13 @@ func (s *ReactionService) Add(ctx context.Context, chatID, messageID, userID, em
 	if msg.ChatID != chatID {
 		return nil, ErrNotFound
 	}
-	if err := s.DB.AddReaction(ctx, messageID, userID, emoji); err != nil {
+	if err := s.db.AddReaction(ctx, messageID, userID, emoji); err != nil {
 		return nil, err
 	}
-	if s.Hub != nil {
-		s.Hub.BroadcastReaction(chatID, messageID, emoji, userID, true)
+	if s.hub != nil {
+		s.hub.BroadcastReaction(chatID, messageID, emoji, userID, true)
 	}
-	updated, err := s.DB.GetMessage(ctx, messageID)
+	updated, err := s.db.GetMessage(ctx, messageID)
 	if err != nil {
 		return nil, err
 	}
@@ -41,13 +41,13 @@ func (s *ReactionService) Remove(ctx context.Context, chatID, messageID, userID,
 	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return nil, err
 	}
-	if err := s.DB.RemoveReaction(ctx, messageID, userID, emoji); err != nil {
+	if err := s.db.RemoveReaction(ctx, messageID, userID, emoji); err != nil {
 		return nil, err
 	}
-	if s.Hub != nil {
-		s.Hub.BroadcastReaction(chatID, messageID, emoji, userID, false)
+	if s.hub != nil {
+		s.hub.BroadcastReaction(chatID, messageID, emoji, userID, false)
 	}
-	updated, err := s.DB.GetMessage(ctx, messageID)
+	updated, err := s.db.GetMessage(ctx, messageID)
 	if err != nil {
 		return nil, err
 	}
@@ -58,5 +58,5 @@ func (s *ReactionService) List(ctx context.Context, chatID, messageID, viewerID 
 	if err := s.Authz.MustBeMember(ctx, chatID, viewerID); err != nil {
 		return nil, err
 	}
-	return s.DB.ListReactions(ctx, messageID, viewerID)
+	return s.db.ListReactions(ctx, messageID, viewerID)
 }
