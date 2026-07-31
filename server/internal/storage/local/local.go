@@ -75,10 +75,7 @@ func (d *Driver) Get(path string) (io.ReadCloser, int64, string, error) {
 		return nil, 0, "", err
 	}
 
-	contentType := mime.TypeByExtension(filepath.Ext(path))
-	if contentType == "" {
-		contentType = "application/octet-stream"
-	}
+	contentType, _ := SafeContentType(mime.TypeByExtension(filepath.Ext(path)))
 	return f, info.Size(), contentType, nil
 }
 
@@ -111,9 +108,29 @@ func (d *Driver) Head(path string) (int64, string, error) {
 		}
 		return 0, "", err
 	}
-	contentType := mime.TypeByExtension(filepath.Ext(path))
-	if contentType == "" {
-		contentType = "application/octet-stream"
-	}
+	contentType, _ := SafeContentType(mime.TypeByExtension(filepath.Ext(path)))
 	return info.Size(), contentType, nil
+}
+
+// SafeContentType maps a browser-detected content type to one that is safe to
+// serve inline. Active content types (HTML, SVG, XML, JS, ...) are replaced
+// with application/octet-stream so browsers download them instead of rendering
+// them on the same origin (stored XSS). The second return value reports
+// whether the type is safe for inline rendering.
+func SafeContentType(ct string) (string, bool) {
+	ct = strings.TrimSpace(strings.SplitN(ct, ";", 2)[0])
+	if ct == "" {
+		return "application/octet-stream", false
+	}
+	switch {
+	case ct == "application/octet-stream", ct == "text/plain", ct == "application/pdf":
+		return ct, true
+	case strings.HasPrefix(ct, "image/") && ct != "image/svg+xml":
+		return ct, true
+	case strings.HasPrefix(ct, "video/"):
+		return ct, true
+	case strings.HasPrefix(ct, "audio/"):
+		return ct, true
+	}
+	return "application/octet-stream", false
 }

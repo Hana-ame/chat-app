@@ -16,8 +16,9 @@ export default function MessageList({ messages, hasMore, loading, onLoadMore, ch
       };
     }
     loadingMoreRef.current = true;
-    onLoadMore();
-    loadingMoreRef.current = false;
+    Promise.resolve(onLoadMore()).finally(() => {
+      loadingMoreRef.current = false;
+    });
   }, [onLoadMore, loading]);
 
   useEffect(() => {

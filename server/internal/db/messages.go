@@ -316,18 +316,6 @@ func (d *DB) GetMessages(ctx context.Context, chatID, before string, limit int) 
 	return out, nil
 }
 
-func (d *DB) LastMessage(ctx context.Context, chatID string) (*models.Message, error) {
-	m, err := d.fetchMessageRow(ctx,
-		`SELECT `+messageColumns+messageJoins+` WHERE m.chat_id = ?
-		 ORDER BY m.created_at DESC, m.id DESC LIMIT 1`,
-		chatID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
 func (d *DB) UnreadCount(ctx context.Context, chatID string, lastActiveAt time.Time) int {
 	var n int
 	err := d.QueryRowContext(ctx,

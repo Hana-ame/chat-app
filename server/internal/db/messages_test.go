@@ -234,30 +234,6 @@ func TestUnreadCount(t *testing.T) {
 	}
 }
 
-func TestLastMessage(t *testing.T) {
-	f := testutil.New(t)
-	a, _ := f.DB.CreateUser(f.Ctx(), "lastmsg@x.com", "LastMsg", "pw00000000")
-	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "LastMsgTest", "", a.ID, []string{a.ID})
-
-	_, err := f.DB.LastMessage(f.Ctx(), chat.ID)
-	if err != db.ErrNotFound {
-		t.Fatal("no messages yet: want ErrNotFound")
-	}
-
-	msg, _ := f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, "first", nil, nil)
-	f.DB.CreateMessage(f.Ctx(), chat.ID, a.ID, "last", nil, nil)
-	last, err := f.DB.LastMessage(f.Ctx(), chat.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if last.Content != "last" {
-		t.Fatalf("want 'last' got '%s'", last.Content)
-	}
-	if last.ID == msg.ID {
-		t.Fatal("should be different message")
-	}
-}
-
 func TestUpdateUserProfile(t *testing.T) {
 	f := testutil.New(t)
 	a, _ := f.DB.CreateUser(f.Ctx(), "prof@x.com", "OldName", "pw00000000")
@@ -314,25 +290,23 @@ func TestRefreshTokenCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	found, err := f.DB.FindRefreshToken(f.Ctx(), "abc-hash")
+	found, err := f.DB.FindAndDeleteRefreshToken(f.Ctx(), "abc-hash")
 	if err != nil {
 		t.Fatalf("find: %v", err)
 	}
 	if found.ID != rt.ID {
 		t.Fatal("token mismatch")
 	}
-	if err := f.DB.DeleteRefreshToken(f.Ctx(), rt.ID); err != nil {
-		t.Fatal(err)
-	}
-	_, err = f.DB.FindRefreshToken(f.Ctx(), "abc-hash")
+	_, err = f.DB.FindAndDeleteRefreshToken(f.Ctx(), "abc-hash")
 	if err != db.ErrNotFound {
 		t.Fatal("should be gone")
 	}
 	f.DB.CreateRefreshToken(f.Ctx(), a.ID, "expired-hash", -1)
-	_, err = f.DB.FindRefreshToken(f.Ctx(), "expired-hash")
+	_, err = f.DB.FindAndDeleteRefreshToken(f.Ctx(), "expired-hash")
 	if err != nil {
 		t.Fatal("expired token not found (TTL enforcement is at handler level)")
 	}
+	f.DB.CreateRefreshToken(f.Ctx(), a.ID, "expired-hash-2", -1)
 	n, _ := f.DB.PurgeExpiredTokens(f.Ctx())
 	if n != 1 {
 		t.Fatalf("purge should clean 1 expired token, got %d", n)

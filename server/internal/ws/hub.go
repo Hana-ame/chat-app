@@ -430,9 +430,16 @@ func (h *Hub) sseSend(userID string, data []byte) {
 	snapshot := append([]chan []byte{}, chs...)
 	h.mu.RUnlock()
 	for _, ch := range snapshot {
-		select {
-		case ch <- data:
-		default:
-		}
+		safeSSESend(ch, data)
+	}
+}
+
+func safeSSESend(ch chan []byte, data []byte) {
+	defer func() {
+		recover() // channel may be closed concurrently by SSEUnregister/Shutdown
+	}()
+	select {
+	case ch <- data:
+	default:
 	}
 }

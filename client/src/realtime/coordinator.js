@@ -82,7 +82,10 @@ class RealtimeCoordinator {
         this._reconnectAttempt = 0;
         this._handlers.onReady?.(data);
       },
-      onEvent: (op, payload) => this._handlers.onEvent?.(op, payload),
+      onEvent: (op, payload) => {
+        if (this._gen !== gen) return;
+        this._handlers.onEvent?.(op, payload);
+      },
       onClose: () => {
         if (this._gen !== gen) return;
         this._state = STATE.IDLE;
@@ -104,8 +107,16 @@ class RealtimeCoordinator {
       case 'poll':
         this._transport = createPollTransport({
           token,
-          onChats: (chats) => this._handlers.onEvent?.('poll:chats', chats),
-          onMessages: (msgs) => this._handlers.onEvent?.('poll:messages', msgs),
+          onChats: (chats) => {
+            if (this._gen !== gen) return;
+            this._handlers.onEvent?.('poll:chats', chats);
+          },
+          onMessages: (chatId, msgs) => {
+            if (this._gen !== gen) return;
+            // Drop responses for a chat that is no longer active (stale in-flight fetch)
+            if (this._handlers.getActiveChatId?.() !== chatId) return;
+            this._handlers.onEvent?.('poll:messages', msgs);
+          },
           getActiveChatId: () => this._handlers.getActiveChatId?.(),
           onClose: ctx.onClose,
         });

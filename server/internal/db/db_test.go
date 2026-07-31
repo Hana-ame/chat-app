@@ -147,17 +147,6 @@ func TestGetChatMemberRole_NotFound(t *testing.T) {
 	}
 }
 
-func TestChatMemberCount_Nonexistent(t *testing.T) {
-	f := testutil.New(t)
-	n, err := f.DB.ChatMemberCount(f.Ctx(), "nonexistent")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if n != 0 {
-		t.Fatalf("want 0 got %d", n)
-	}
-}
-
 func TestIsChatMember_Nonexistent(t *testing.T) {
 	f := testutil.New(t)
 	ok, err := f.DB.IsChatMember(f.Ctx(), "nochat", "nouser")
@@ -873,18 +862,18 @@ func TestDeleteUserRefreshTokens(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Verify a's tokens are gone
-	_, err := f.DB.FindRefreshToken(f.Ctx(), "a1")
+	// Verify a's tokens are gone (FindAndDeleteRefreshToken returns ErrNotFound on replay)
+	_, err := f.DB.FindAndDeleteRefreshToken(f.Ctx(), "a1")
 	if err != db.ErrNotFound {
 		t.Fatalf("want ErrNotFound, got %v", err)
 	}
-	_, err = f.DB.FindRefreshToken(f.Ctx(), "a2")
+	_, err = f.DB.FindAndDeleteRefreshToken(f.Ctx(), "a2")
 	if err != db.ErrNotFound {
 		t.Fatalf("want ErrNotFound, got %v", err)
 	}
 
 	// Verify b's token unaffected
-	if _, err = f.DB.FindRefreshToken(f.Ctx(), "b1"); err != nil {
+	if _, err = f.DB.FindAndDeleteRefreshToken(f.Ctx(), "b1"); err != nil {
 		t.Fatal(err)
 	}
 

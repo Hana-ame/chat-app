@@ -32,7 +32,7 @@ jobs:
           echo "=== Debug: fetch root ==="
           curl -s http://localhost:5173/ | head -30
           echo "=== Running tests ==="
-          npx playwright test tests/ci.spec.mjs tests/real-time.spec.mjs --reporter=list 2>&1
+          npx playwright test tests/boundary.spec.mjs tests/ai-panel.spec.mjs --reporter=list 2>&1
 
   full-e2e:
     needs: mock-test

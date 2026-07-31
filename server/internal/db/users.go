@@ -168,24 +168,6 @@ func (d *DB) UpdateUserLastSeen(ctx context.Context, id string) error {
 	return err
 }
 
-func (d *DB) GetUserNotifyBlocked(ctx context.Context, userID string) ([]string, error) {
-	var raw string
-	err := d.QueryRowContext(ctx,
-		`SELECT COALESCE(notify_blocked, '[]') FROM users WHERE id = ?`, userID,
-	).Scan(&raw)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrNotFound
-		}
-		return nil, err
-	}
-	var ids []string
-	if err := json.Unmarshal([]byte(raw), &ids); err != nil {
-		ids = []string{}
-	}
-	return ids, nil
-}
-
 func (d *DB) SetUserNotifyBlocked(ctx context.Context, userID string, blocked []string) error {
 	b, err := json.Marshal(blocked)
 	if err != nil {

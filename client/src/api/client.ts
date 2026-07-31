@@ -190,9 +190,13 @@ const _apiMethods = {
   },
 
   // ── Uploads ──
-  upload: async (file: File) => {
+  upload: async (file: File, token?: string) => {
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = 'Bearer ' + token;
     const res = await fetch(UPLOAD_BASE + '/api/upload', {
       method: 'PUT',
+      headers,
+      credentials: 'include',
       body: file,
     });
     if (!res.ok) throw { status: res.status, message: 'Upload failed' } as ApiError;
@@ -249,11 +253,11 @@ function buildMockProxy(target: typeof _apiMethods): ApiType {
       if (mockEnabled && prop in mockHandlers) {
         return (...args: unknown[]) => {
           const fn = mockHandlers[prop];
-          console.log(`[Mock API] ${prop}(`, ...args, ')');
+          console.debug(`[Mock API] ${prop}(`, ...args, ')');
           const result = fn(...args);
           const promise = result && typeof (result as Promise<unknown>).then === 'function'
             ? (result as Promise<unknown>) : Promise.resolve(result);
-          return promise.then(v => { console.log(`[Mock API] ${prop} =>`, v); return v; });
+          return promise.then(v => { console.debug(`[Mock API] ${prop} =>`, v); return v; });
         };
       }
       return (t as Record<string, unknown>)[prop];

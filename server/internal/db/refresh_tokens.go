@@ -66,29 +66,6 @@ func (d *DB) FindAndDeleteRefreshToken(ctx context.Context, tokenHash string) (*
 	return &rt, nil
 }
 
-func (d *DB) FindRefreshToken(ctx context.Context, tokenHash string) (*models.RefreshToken, error) {
-	var rt models.RefreshToken
-	var expires, created string
-	err := d.QueryRowContext(ctx,
-		`SELECT id, user_id, token_hash, expires_at, created_at FROM refresh_tokens WHERE token_hash = ?`,
-		tokenHash,
-	).Scan(&rt.ID, &rt.UserID, &rt.TokenHash, &expires, &created)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	rt.ExpiresAt = parseTime(expires)
-	rt.CreatedAt = parseTime(created)
-	return &rt, nil
-}
-
-func (d *DB) DeleteRefreshToken(ctx context.Context, id string) error {
-	_, err := d.ExecContext(ctx, `DELETE FROM refresh_tokens WHERE id = ?`, id)
-	return err
-}
-
 func (d *DB) DeleteUserRefreshTokens(ctx context.Context, userID string) error {
 	_, err := d.ExecContext(ctx, `DELETE FROM refresh_tokens WHERE user_id = ?`, userID)
 	return err

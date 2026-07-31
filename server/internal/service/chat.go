@@ -221,11 +221,13 @@ func (s *ChatService) Delete(ctx context.Context, chatID, userID string) error {
 	if chat.OwnerID != userID {
 		return ErrForbidden
 	}
-	if err := s.db.DeleteChat(ctx, chatID); err != nil {
-		return err
-	}
+	// Broadcast before deleting chat_members: sendToChat resolves recipients
+	// via the member table, which DeleteChat wipes first.
 	if s.hub != nil {
 		s.hub.BroadcastChatDeleted(chat, chatID)
+	}
+	if err := s.db.DeleteChat(ctx, chatID); err != nil {
+		return err
 	}
 	return nil
 }
@@ -303,10 +305,6 @@ func (s *ChatService) SetChatNotifyEnabled(ctx context.Context, chatID, userID s
 		return err
 	}
 	return s.db.SetChatNotifyEnabled(ctx, chatID, userID, enabled)
-}
-
-func (s *ChatService) Visit(ctx context.Context, chatID, userID string) error {
-	return s.db.UpdateLastActiveAt(ctx, chatID, userID)
 }
 
 func (s *ChatService) MarkRead(ctx context.Context, chatID, userID string) error {

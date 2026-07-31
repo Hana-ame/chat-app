@@ -14,7 +14,7 @@ export function createPollTransport({ token, onChats, onMessages, getActiveChatI
     if (chatId) {
       try {
         const data = await api.listMessages(token, chatId);
-        onMessages(data.messages || []);
+        onMessages(chatId, data.messages || []);
       } catch (e) { console.error('Poll messages error:', e); }
     }
 

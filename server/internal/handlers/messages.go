@@ -140,45 +140,43 @@ func (s *Server) handleStreamMessage(w http.ResponseWriter, r *http.Request, u *
 		})
 	}
 
-	for {
-		chunk, ok := <-ch
-		if !ok || chunk.Done {
-			break
+	finish := func() {
+		content := buf.String()
+		thinking := thinkingBuf.String()
+		if content == "" && thinking == "" {
+			content = "（AI 响应为空，请检查 endpoint / auth_key / body 设置）"
 		}
-		writeChunk(chunk)
-		data, _ := json.Marshal(map[string]string{"type": chunk.Type, "content": chunk.Content})
-		fmt.Fprintf(w, "data: %s\n\n", data)
-		flusher.Flush()
+		s.Services.Stream.FinishStream(context.Background(), chatID, u.ID, msgID, content, thinking)
 	}
 
-	// If client disconnected mid-stream, keep consuming in background
-	if r.Context().Err() != nil {
-		go func() {
-			for chunk := range ch {
-				if chunk.Done {
-					break
+	for {
+		select {
+		case <-r.Context().Done():
+			// Client disconnected mid-stream: keep consuming and persisting
+			// in the background so other clients still see the full reply.
+			go func() {
+				for chunk := range ch {
+					if chunk.Done {
+						break
+					}
+					writeChunk(chunk)
 				}
-				writeChunk(chunk)
+				finish()
+			}()
+			return
+		case chunk, ok := <-ch:
+			if !ok || chunk.Done {
+				finish()
+				fmt.Fprintf(w, "data: [DONE]\n\n")
+				flusher.Flush()
+				return
 			}
-			content := buf.String()
-			thinking := thinkingBuf.String()
-			if content == "" && thinking == "" {
-				content = "（AI 响应为空，请检查 endpoint / auth_key / body 设置）"
-			}
-			s.Services.Stream.FinishStream(context.Background(), chatID, u.ID, msgID, content, thinking)
-		}()
-		return
+			writeChunk(chunk)
+			data, _ := json.Marshal(map[string]string{"type": chunk.Type, "content": chunk.Content})
+			fmt.Fprintf(w, "data: %s\n\n", data)
+			flusher.Flush()
+		}
 	}
-
-	content := buf.String()
-	thinking := thinkingBuf.String()
-	if content == "" && thinking == "" {
-		content = "（AI 响应为空，请检查 endpoint / auth_key / body 设置）"
-	}
-	s.Services.Stream.FinishStream(context.Background(), chatID, u.ID, msgID, content, thinking)
-
-	fmt.Fprintf(w, "data: [DONE]\n\n")
-	flusher.Flush()
 }
 
 func (s *Server) StreamMessageContent(w http.ResponseWriter, r *http.Request) {

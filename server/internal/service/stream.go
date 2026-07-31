@@ -91,6 +91,7 @@ func (s *StreamService) FinishStream(ctx context.Context, chatID, userID, msgID,
 		delete(s.liveSubs, msgID)
 		delete(s.liveAuthor, msgID)
 		delete(s.liveChat, msgID)
+		delete(s.liveDone, msgID)
 		s.liveMu.Unlock()
 	})
 }

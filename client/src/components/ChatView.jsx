@@ -17,7 +17,7 @@ function getChatDisplayName(chat) {
 
 export default function ChatView({ chatId, isNotification, onBack }) {
   const { user, accessToken } = useAuthStore();
-  const { chats, messages, loadMessages, subscribe, markRead, pinnedMessage, setAnnouncement, clearAnnouncement, markAnnouncementRead, onChatUpdate } = useChatStore();
+  const { chats, messages, loadMessages, subscribe, pinnedMessage, setAnnouncement, clearAnnouncement, markAnnouncementRead, onChatUpdate } = useChatStore();
   const [replyTo, setReplyTo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -91,7 +91,12 @@ export default function ChatView({ chatId, isNotification, onBack }) {
         : await api.listMessages(accessToken, chatId, messages[0]?.id, 100);
       const list = (msgs.messages || []);
       if (list.length) {
-        useChatStore.setState(s => ({ messages: [...list, ...s.messages] }));
+        useChatStore.setState(s => {
+          const existing = new Set(s.messages.map(m => m.id));
+          const fresh = list.filter(m => !existing.has(m.id));
+          if (fresh.length === 0) return {};
+          return { messages: [...fresh, ...s.messages] };
+        });
       }
       if (list.length < 100) setHasMore(false);
     } catch (e) {

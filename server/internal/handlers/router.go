@@ -142,7 +142,11 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 					r.Put("/notify", s.UpdateChatNotify)
 				})
 			}) // end auth group
+		})
 
+		// Long-lived connections (SSE) — read timeout, NOT the 10s API timeout
+		r.Group(func(r chi.Router) {
+			r.Use(chimid.Timeout(s.Cfg.ReadTimeout))
 			r.Get("/events", s.SSE)
 		})
 

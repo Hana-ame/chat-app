@@ -5890,3 +5890,56 @@ f73e3b3 bump v0.8.12 -> v0.8.13
 - `go vet ./...`: ✅
 - `go test ./...`: ✅（10 包全绿；上游既有 flaky `TestSetPinnedMessage_MultipleUpdates` 除外，上游 `b51b7cb2` 同样失败）
 - `vite build`: ✅
+
+---
+
+## 2026-07-31 代码审阅修复：SSRF / 竞态 / 死代码（第 22 轮）
+
+### 修复清单
+
+| 严重度 | 编号 | 分类 | 描述 |
+|--------|------|------|------|
+| 🔴 HIGH | H1 | 可靠性 | **SSE 被 API 超时组误杀** — `/api/events` 移出 10s 超时组，独立 `ReadTimeout` 组 |
+| 🔴 HIGH | H2 | 并发 | **SSE send 竞态 panic** — `sseSend` 改为 `safeSSESend`（每 channel 发送包 `defer recover()`） |
+| 🔴 HIGH | H3 | 安全 | **文件上传类型伪装** — `SafeContentType` 白名单 + 上传文件名 sanitize（危险扩展名→`.bin`）+ 下载 inline/attachment 判定 |
+| 🔴 HIGH | H4 | 安全 | **SSRF：AI endpoint 未校验** — `ValidateEndpoint` 拒绝非 http/https、私网/回环/链路本地 IP；新增 `CHAT_ALLOW_PRIVATE_AI=1` 显式豁免（自托管/测试） |
+| 🔴 HIGH | H5 | 安全 | **上传接口未带 token** — 前端 `api.upload` 携带 `Authorization: Bearer` + `credentials: 'include'` |
+| 🔴 HIGH | H6 | 前端 | **loadMore 竞态** — 滚动加载 Promise 时序 + ChatView 合并去重 |
+| 🟠 MEDIUM | M1 | 权限 | **WS OpListMembers 未校验成员资格** — 非成员静默忽略 |
+| 🟠 MEDIUM | M2 | 权限 | **JoinChatByID 可加入私聊** — 仅允许 `type='group'` |
+| 🟠 MEDIUM | M3 | 数据一致 | **DeleteChat 广播顺序** — 先广播再删成员表，避免广播找不到收件人 |
+| 🟠 MEDIUM | M4 | 可靠性 | **AI 流客户端断开未持久化** — `select` 感知 `r.Context().Done()`，后台 goroutine 消费完并 finish |
+| 🟠 MEDIUM | M5 | 前端 | **poll 传输过期响应** — coordinator generation 守卫 + 校验响应 chatId 是否为当前活跃会话 |
+| 🟠 MEDIUM | M6 | 测试 | **npm test 空转** — 指向被禁用的 skip 套件；改为 boundary + ai-panel，CI mock-test 同步更新 |
+| 🔵 LOW | L1 | 清理 | 删除无引用文件：`DmSearchPanel.jsx` / `SettingsModal.jsx` / `utils/time.js` |
+| 🔵 LOW | L2 | 清理 | 删除未使用依赖 `react-markdown` / `remark-gfm`（渲染实为自研 `renderContent`） |
+| 🔵 LOW | L3 | 清理 | `ChatView.jsx` 删除不存在的 `markRead` 解构 |
+| 🔵 LOW | L4 | 清理 | 后端死代码：`FindRefreshToken` / `DeleteRefreshToken` / `ChatMemberCount` / `GetUserNotifyBlocked` / `LastMessage` / `ChatService.Visit`（同步修测试） |
+| 🔵 LOW | L5 | 泄漏 | `liveDone` map 条目 30s 清理时补删，防止无限增长 |
+| 🔵 LOW | L6 | 降噪 | mock proxy `console.log` → `console.debug` |
+| 🔵 LOW | L7 | 加固 | `chat.js reset()` 清空 `_optimisticIds`；`npm run build` 前置 `tsc --noEmit` |
+
+### Affected 文件
+- `server/internal/handlers/router.go` — SSE 超时组分离
+- `server/internal/ws/hub.go` — safeSSESend
+- `server/internal/storage/local/local.go` — SafeContentType 白名单
+- `server/internal/handlers/local_upload.go` — sanitize + inline/attachment
+- `server/internal/ai/stream.go` — ValidateEndpoint（+ allowPrivate 参数）
+- `server/internal/handlers/messages.go` — SSRF 校验 + AI 流断开感知
+- `server/internal/config/config.go` — `CHAT_ALLOW_PRIVATE_AI` 配置
+- `server/internal/ws/client.go` — OpListMembers 成员校验
+- `server/internal/db/chats_ext.go` — JoinChatByID group 限制
+- `server/internal/service/chat.go` — Delete 广播顺序
+- `server/internal/service/stream.go` — liveDone 清理
+- `client/src/api/client.ts` — upload 带 token / mock debug 降噪
+- `client/src/components/Composer.jsx` — upload 传 accessToken
+- `client/src/components/MessageList.jsx` / `ChatView.jsx` — loadMore 修复
+- `client/src/realtime/coordinator.js` / `transports/poll.js` — generation 守卫
+- `client/package.json` / `.github/workflows/frontend-ci.yml` — test 脚本 + CI 套件
+- `client/src/store/chat.js` — reset 清理
+
+### 验证
+- Go `go vet ./...`: ✅
+- Go `go test ./...`: ✅（10 包全绿）
+- `tsc --noEmit`: ✅
+- `npm run build`: ✅

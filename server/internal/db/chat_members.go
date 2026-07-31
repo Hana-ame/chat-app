@@ -51,15 +51,6 @@ func (d *DB) GetChatMemberRole(ctx context.Context, chatID, userID string) (stri
 	return role, nil
 }
 
-func (d *DB) ChatMemberCount(ctx context.Context, chatID string) (int, error) {
-	var n int
-	err := d.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM chat_members WHERE chat_id = ?`,
-		chatID,
-	).Scan(&n)
-	return n, err
-}
-
 func (d *DB) IsChatMember(ctx context.Context, chatID, userID string) (bool, error) {
 	var x int
 	err := d.QueryRowContext(ctx,

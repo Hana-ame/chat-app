@@ -343,7 +343,7 @@ export default function Composer({ chatId, isNotification, replyTo, onCancelRepl
       const results = [];
       for (const f of files) {
         const file = await compressImage(f);
-        const data = await api.upload(file);
+        const data = await api.upload(file, accessToken);
         results.push({ _key: crypto.randomUUID(), filename: data.filename, mime_type: data.mime_type, size: data.size, url: data.url });
       }
       setAttachments(prev => [...prev, ...results]);
@@ -358,7 +358,7 @@ export default function Composer({ chatId, isNotification, replyTo, onCancelRepl
     try {
       const results = [];
       for (const f of files) {
-        const data = await api.upload(f);
+        const data = await api.upload(f, accessToken);
         results.push({ _key: crypto.randomUUID(), filename: data.filename, mime_type: data.mime_type, size: data.size, url: data.url });
       }
       setAttachments(prev => [...prev, ...results]);

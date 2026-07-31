@@ -367,16 +367,6 @@ func TestChatService_Join_Nonexistent(t *testing.T) {
 	}
 }
 
-func TestChatService_Visit(t *testing.T) {
-	f := testutil.New(t)
-	a := createTestUser(t, f, "visit@x.com", "VisitUser")
-	chat := createTestChat(t, f, "VisitTest", a, []string{a})
-	err := f.Server.Services.Chat.Visit(f.Ctx(), chat.ID, a)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestChatService_MarkRead(t *testing.T) {
 	f := testutil.New(t)
 	a := createTestUser(t, f, "mr@x.com", "MRUser")
