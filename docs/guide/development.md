@@ -2,37 +2,31 @@
 
 ## 测试
 
-### 后端（Go）
+测试体系总纲见 [testing.md](../testing.md)(金字塔、运行命令、断言/命名/
+注释规范),Mock 策略见 [mock-strategy.md](../mock-strategy.md)。速记:
 
 ```bash
-cd server && go test ./...        # 10 个包
-go vet ./...                      # 静态检查
+cd server && go vet ./... && go test ./... -count=1   # Go 全量(含 WS)
+cd client && npm test                                  # vitest 单元测试
+cd client && npm run test:e2e:mock                     # Playwright mock 模式(需 Vite :5173)
+cd client && npm run build                             # tsc --noEmit + vite build
 ```
 
-覆盖范围：config、db（含迁移）、handlers、ws、ai（SSRF 校验）、service（权限/广播/流式）。
-
-### 前端（Playwright）
-
-```bash
-cd client && npm test             # = ci.spec.mjs + real-time.spec.mjs（mock 模式，无需后端）
-npx playwright test tests/e2e.spec.mjs   # 需要本地后端（真实 API）
-npm run build                     # tsc --noEmit + vite build（构建前必跑）
-```
-
-| 套件 | 依赖 | 内容 |
-|---|---|---|
-| `ci.spec.mjs` | 仅 Mock | 登录、聊天列表、发送/编辑/删除消息、通知、设置、上传头像 |
-| `real-time.spec.mjs` | 仅 Mock | WS/SSE/Poll 三传输的事件同步 |
-| `e2e.spec.mjs` | 真实后端 | 全链路 E2E |
-| `boundary.spec.mjs` / `ai-panel.spec.mjs` | — | 早期遗留弱断言套件，不作为 CI 目标 |
+- Go 断言一律用 `testkit.Require*`(handlers 内部测试)或 `testutil.Require*`(转发)。
+- 单元测试(Go)放包内 `*_test.go`;集成测试放 `internal/testutil/`;
+  JS 单测与源码同目录 `*.test.js`;E2E 全在 `client/tests/`。
+- **提交前**:`go test ./...` + `npm test` + `npm run build` 必须通过。
 
 ### Mock 模式（关键机制）
 
-前端测试依赖 `client/src/api/mock.js`：`window.__mockLogin()` 启用 `api.enableMock()` 后，`client.ts` 的 Proxy 把所有 API 调用拦截到内存 mock 数据（聊天、消息、通知、上传等），不发起真实网络请求。注意：
+前端开发/E2E mock 依赖 `client/src/api/mock.js`:`window.__mockLogin()`
+启用 `api.enableMock()` 后,`client.ts` 的 Proxy 把所有 API 调用拦截到
+内存 mock 数据,不发起真实网络请求。注意:
 
 - **mock 分支返回必须包 `Promise.resolve(...)`**（如 `notifications` 特殊分支），否则调用方 `.then()` 崩溃
 - mock 数据为模块级，每个测试页面独立；`localStorage.clear()` 用于重置登录态
 - Mock 模式下 WebSocket 传输由 `realtime/transports/mock.js` 模拟（定时事件）
+- 这是**运行时代码**;单元测试禁止依赖它(用 vitest `vi.mock`),详见 mock-strategy.md
 
 ## CI 结构
 

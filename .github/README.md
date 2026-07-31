@@ -1,5 +1,7 @@
 # GitHub Actions — 踩坑记录
 
+当前工作流：`.github/workflows/ci.yml`（后端测试 + 前端构建 + 交叉编译 + release）与 `frontend-ci.yml`（mock E2E + full E2E）。本文是 CI 配置过程中踩过的坑，历史有效。
+
 ## 目标
 
 CI 需要完成：

@@ -28,6 +28,14 @@ Go 后端 + React 前端的聊天应用。
 - 手动启动: `./chatd.exe`（需先配置 `.env`，参考 `docs/guide/quickstart.md`）
 - 日志: `server.log`（启动后自动写入）
 
+## 测试（权威文档: docs/testing.md）
+- 金字塔: Go 包内单元 / testutil 集成(真实 SQLite + httptest) / vitest 单测 / Playwright E2E。
+- 提交前必跑: `cd server && go vet ./... && go test ./... -count=1` + `cd client && npm test && npm run build`。
+- Go 断言一律 `testkit.Require*`(handlers 内部测试)或 `testutil.Require*`;禁止手写 `if x != y { t.Fatalf }`。
+- 新增导出函数必须带测试;改 UI 元素/API 字段必须同步测试(否则会变成死用例)。
+- WS 测试默认启用;`WS_ENABLED` 仅是生产关闭开关。
+- Mock 三层边界见 `docs/mock-strategy.md`:DB 永不 mock;单测用 vi.mock;应用内建 mock 只服务 dev/E2E。
+
 ## 通用原则
 - **不要假设字段/配置没用。** 如果一个配置字段（如 `CHAT_BASE_URL` / `CHAT_CSP_CONNECT_SRC`）存在，就有人有理由放它在那。删除或改动前先理解完整数据流。
 - **清理前追踪全链路。** 任何对 API 响应字段的"清理"都必须追溯该字段从生产者（handler）经传输格式到每一个消费者（HTML 页面、前端组件、其他服务、脚本）。漏掉一个消费者 = 功能损坏。

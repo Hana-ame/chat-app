@@ -8,7 +8,14 @@
 |---|---|
 | [guide/quickstart.md](guide/quickstart.md) | 5 分钟跑起来：环境、配置、构建、启动、验证 |
 | [guide/deployment.md](guide/deployment.md) | 生产部署（nginx、环境变量）与发布流程（版本、CI） |
-| [guide/development.md](guide/development.md) | 开发工作流：测试、CI、Mock 模式、代码约定 |
+| [guide/development.md](guide/development.md) | 开发工作流：构建、CI、Mock 模式、代码约定 |
+
+## 测试（Testing）
+
+| 文档 | 内容 |
+|---|---|
+| [testing.md](testing.md) | 测试体系总纲：金字塔、运行命令、命名/断言/注释规范、同步审计 |
+| [mock-strategy.md](mock-strategy.md) | Mock 三层体系：边界、数据流、历史迁移 |
 
 ## 架构（Architecture）
 
@@ -33,7 +40,14 @@
 | 文档 | 内容 |
 |---|---|
 | [security.md](security.md) | 安全：CSP、CORS、JWT、Cookie、真实 IP |
+| [testing.md](testing.md) | 测试体系总纲（金字塔、命令、断言规范） |
+| [mock-strategy.md](mock-strategy.md) | Mock 三层体系与边界 |
 | [changelog.md](changelog.md) | 修改日志（从 v0.9.4 起，末尾追加） |
+
+## Agent 上下文
+
+- 根目录 `AGENTS.md` — AI 代理项目约定（构建/测试/CI/CD）
+- `.claude/AGENT.md` — 英文快速指南（结构 + 链接同上）
 
 ## 变更日志规则
 

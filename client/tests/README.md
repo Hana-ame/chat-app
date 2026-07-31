@@ -1,63 +1,75 @@
-# tests — 测试目录
+# tests — Playwright E2E 测试目录
+
+本目录只放 **浏览器级 E2E** 测试(Playwright)。前端单元测试不在
+这里,一律放在 `client/src/**/*.test.{js,ts}` 下由 vitest 运行(见
+`client/vitest.config.js`)。
 
 ## 文件说明
 
-| 文件 | 类型 | 用途 |
-|------|------|------|
-| `e2e.spec.js` | Playwright E2E | 前端核心流程测试（登录、注册、建群、发消息、响应式布局） |
-| `upload_test.sh` | Bash + curl | 外部上传服务 `upload.moonchan.xyz` 的可用性测试 |
+| 文件 | project | 依赖 | 用途 |
+|------|---------|------|------|
+| `ci.spec.mjs` | mock | 无后端 | Mock API 模式核心回归:登录、发消息、公告、建群、删除、成员面板、上传 |
+| `real-time.spec.mjs` | mock | 无后端 | Mock 传输层的实时事件驱动:消息增删改、反应、聊天增删、未读数 |
+| `ai-panel.spec.mjs` | mock | 无后端 | AI 面板 UI 与 SSE 流式请求(用 page.route 拦截真实 SSE) |
+| `e2e.spec.mjs` | e2e | Go 后端 | 真实后端全流程:认证、建群、收发消息、公告、边界(超长消息/越权) |
+| `upload_test.sh` | — | 外部服务 | 上传服务 `upload.moonchan.xyz` 可用性检查(curl) |
 
----
-
-## 前置条件
-
-- **Go 1.21+**（运行后端）
-- **Node 18+**（运行前端 dev server 或 build）
-- **curl**（`upload_test.sh` 需要）
-- 外部服务域名 `upload.moonchan.xyz` 可解析
-
----
+已删除:`boundary.spec.mjs`(骨架假绿,边界场景迁入 `e2e.spec.mjs` 真实
+断言)、`boundary-runner.mjs`(孤儿文件,无任何引用)。
 
 ## 运行方式
 
-### E2E 测试 (Playwright)
+所有 Playwright 测试要求 **Vite dev server 运行在 5173**(baseURL),
+CI 中手动 `npx vite --port 5173 &` 启动;e2e 项目另需 Go 后端
+(`:8080`,`/api` 由 Vite proxy 转发)。
 
 ```bash
-# 安装 playwright 依赖（首次）
-cd client && npx playwright install chromium
+cd client
+npm install
+npx playwright install chromium   # 首次
 
-# 运行测试（自动启动 Go 后端）
-cd client && npx playwright test
+npm run test:e2e:mock   # 仅 mock 模式(不依赖后端)
+npm run test:e2e:full   # 仅真实后端(先起后端)
+npm run test:e2e        # 全部
 ```
 
-配置见 `client/playwright.config.js`:
-- 后端启动命令: `go run server/cmd/chatd`
-- 默认连接 `http://localhost:8080`
+单测(不需要浏览器):
 
-### 上传服务测试
+```bash
+npm test              # vitest run
+npm run test:watch    # 监听模式
+```
+
+上传服务检查(依赖外部服务可用):
 
 ```bash
 ./client/tests/upload_test.sh
 ```
 
-脚本测试:
-1. 上传文本文件 → 返回 `id`
-2. 上传 PNG 图片 → 返回 `id`
-3. OPTIONS 预检 → CORS 正常
+## Mock 分层说明(与测试的关系)
 
----
+前端有三层 mock,测试各用各的:
+
+1. **应用内建 Mock API**(`src/api/mock.js` + `client.ts` 的 Proxy):
+   mock project 的 spec 通过 `window.__mockLogin()` 进入,覆盖 API 层
+   与 mock transport(500ms 轮询)。详见 `docs/mock-strategy.md`。
+2. **page.route 拦截**:仅 `ai-panel.spec.mjs` 用来注入真实格式的 SSE
+   响应,绕过应用 mock 直接测流式渲染。
+3. **vitest 单元 mock**(`vi.mock` / `vi.stubGlobal`):只出现在
+   `src/**/*.test.js`,与 E2E 完全隔离。
 
 ## 注意事项
 
-- E2E 测试依赖 mock 无用户的后端数据库（独立 SQLite），不会影响真实数据。
-- `upload_test.sh` 依赖外部服务 `upload.moonchan.xyz`；若该服务不可用或变更 API，测试可能失败。
-- 新增测试文件时，Playwright 会自动发现 `tests/**/*.spec.{js,ts}` 下的文件。
-
----
+- mock project 不依赖后端,CI 必须保证它零外部依赖(若失败说明
+  mock API 与源码脱节,属 bug 而非环境问题)。
+- e2e 的边界测试用 Playwright `request` fixture 直连后端 API 断言
+  错误码(403/413),比 UI 级断言更稳定。
+- 新增 spec 文件时按 `playwright.config.js` 的 project `testMatch`
+  规则命名(ci/real-time/ai-panel → mock;e2e → e2e)。
 
 ## 修改记录
 
 | 日期 | 变更 |
 |------|------|
-| 2026-07-06 | 创建 `upload_test.sh`：测试外部上传服务的可用性 |
-| 2026-07-06 | 创建 `README.md` |
+| 2026-07-06 | 创建 `upload_test.sh` 与 `README.md` |
+| 2026-08-01 | 大翻新:引入 vitest 单测、删除 boundary 骨架与孤儿 runner、边界场景迁入 e2e.spec.mjs、playwright.config.js 落地 projects 机制、重写本 README |
