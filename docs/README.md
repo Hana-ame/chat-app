@@ -1,45 +1,41 @@
-# Documentation
+# 文档导航
 
-Technical specifications, feature breakdowns, and development references for the WebChat App.
+本文档树是唯一权威文档来源。旧版文档（v0.9.4 之前）已归档至 `archive/legacy-20260731/`，不再维护。
 
-## Release Checklist
+## 指南（Guide）
 
-每次推送前检查：
-1. **版本号** — `client/package.json` 的 `version` 是否已递增？
-2. **构建** — `npm run build` 是否通过
-3. **后端测试** — `go test ./...` 是否通过
-4. **修改日志** — [`changelog.md`](./changelog.md) 是否已追加本次变更
+| 文档 | 内容 |
+|---|---|
+| [guide/quickstart.md](guide/quickstart.md) | 5 分钟跑起来：环境、配置、构建、启动、验证 |
+| [guide/deployment.md](guide/deployment.md) | 生产部署（nginx、环境变量）与发布流程（版本、CI） |
+| [guide/development.md](guide/development.md) | 开发工作流：测试、CI、Mock 模式、代码约定 |
 
-## Directory
+## 架构（Architecture）
 
-```
-docs/
-├── README.md               # 本文档
-├── changelog.md            # 修改日志
-├── quickstart.md           # 快速开始（环境变量、运行、测试）
-├── deployment-guide.md     # 部署指南
-├── features/               # 功能特性 + API 文档
-│   ├── toc.md
-│   ├── visibility.md       # 可见性等级
-│   ├── search.md           # 搜索机制
-│   ├── create-group.md     # 创建群组
-│   ├── chat-list.md        # 侧栏逻辑
-│   ├── ai-stream.md        # AI 流式输出
-│   ├── add-member.md       # 成员管理
-│   ├── go-api-routes.md    # Go 路由表
-│   ├── go-api-models.md    # 请求/响应模型
-│   ├── api-endpoints.md    # 前端 API 概览
-│   ├── mock-vs-go-api-report.md  # Mock vs Go 对照
-│   └── frontend-architecture.md  # 前端架构
-├── reports/                # 架构规格（见 index.md）
-├── reference/              # 跨维度参考文档
-│   ├── security.md         # 安全模型（CSP、CORS、JWT、Cookie）
-│   ├── rate-limiting.md    # 速率限制
-│   ├── realtime-protocol.md # WS/SSE 实时协议格式
-│   ├── error-codes.md      # 错误码参考
-│   └── database.md         # 数据库 Schema
-└── archive/                # 已归档
-    ├── reports/            # 39 份过时报告
-    ├── sessions/           # 9 份会话文档
-    └── temp/               # 6 个临时文件
-```
+| 文档 | 内容 |
+|---|---|
+| [architecture/overview.md](architecture/overview.md) | 系统总览、请求链路、目录结构 |
+| [architecture/backend.md](architecture/backend.md) | Go 后端分层（handlers/service/db/ws/ai）、中间件、配置 |
+| [architecture/frontend.md](architecture/frontend.md) | 前端状态、实时协调器、Mock 模式 |
+| [architecture/database.md](architecture/database.md) | 数据库 schema、迁移、设计决策 |
+| [architecture/realtime.md](architecture/realtime.md) | WS / SSE / Poll 协议：事件、payload、SSE 行格式 |
+
+## API 参考（API）
+
+| 文档 | 内容 |
+|---|---|
+| [api/reference.md](api/reference.md) | 全部端点、认证、错误格式、上传响应 |
+| [api/error-codes.md](api/error-codes.md) | 错误码表 |
+| [api/rate-limiting.md](api/rate-limiting.md) | 限速规则 |
+
+## 其他
+
+| 文档 | 内容 |
+|---|---|
+| [security.md](security.md) | 安全：CSP、CORS、JWT、Cookie、真实 IP |
+| [changelog.md](changelog.md) | 修改日志（从 v0.9.4 起，末尾追加） |
+
+## 变更日志规则
+
+- 每次代码修改后，在 `docs/changelog.md` **末尾**追加条目。
+- 归档目录只进不出：任何被新文档替代的内容移入 `archive/legacy-*/`，不删除历史。

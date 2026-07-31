@@ -6,6 +6,7 @@ Go 后端 + React 前端的聊天应用。
 ## 关键路径
 - `server/` — Go 后端（chi 路由、SQLite、WebSocket）
 - `client/` — React 前端（Vite、Zustand）
+- 文档：`README.md` + `docs/`（导航入口 `docs/README.md`；旧文档在 `docs/archive/legacy-20260731/`，只进不出）
 
 ## 架构
 - `server/internal/handlers/` — 处理器，仅 HTTP 层
@@ -24,13 +25,13 @@ Go 后端 + React 前端的聊天应用。
 - kill + start（不编译）: `python scripts/deploy_local.py restart`
 - 手动编译前端: `cd client && npm ci && npm run build`
 - 手动编译后端: `cd server && go build -ldflags="-s -w -X main.Version=dev" -o ../chatd.exe ./cmd/chatd/`
-- 手动启动: `./chatd.exe`（需先配置 `.env`，参考 `LOCAL_DEPLOYMENT.md`）
+- 手动启动: `./chatd.exe`（需先配置 `.env`，参考 `docs/guide/quickstart.md`）
 - 日志: `server.log`（启动后自动写入）
 
 ## 通用原则
-- **不要假设字段/配置没用。** 如果一个配置字段（如 `UploadPublicURL` / `CHAT_BASE_URL`）存在，就有人有理由放它在那。删除或改动前先理解完整数据流。
+- **不要假设字段/配置没用。** 如果一个配置字段（如 `CHAT_BASE_URL` / `CHAT_CSP_CONNECT_SRC`）存在，就有人有理由放它在那。删除或改动前先理解完整数据流。
 - **清理前追踪全链路。** 任何对 API 响应字段的"清理"都必须追溯该字段从生产者（handler）经传输格式到每一个消费者（HTML 页面、前端组件、其他服务、脚本）。漏掉一个消费者 = 功能损坏。
-- **先 grep 再动手。** 改动任何 API 响应字段前，grep 所有消费者：`client/src/`、`*.html`、`docs/api.md`、`scripts/`。常有消费者在直接代码路径之外。
+- **先 grep 再动手。** 改动任何 API 响应字段前，grep 所有消费者：`client/src/`、`*.html`、`docs/api/reference.md`、`scripts/`。常有消费者在直接代码路径之外。
 - **配置优于魔法。** 如果一个值可以从配置（如 `CHAT_BASE_URL`）获得，优先使用配置，而不是通过请求头临时拼凑。配置是显式的，请求头是隐式的且可能随部署拓扑变化。
 
 ## API 响应约定
