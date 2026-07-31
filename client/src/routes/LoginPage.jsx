@@ -5,7 +5,9 @@ import { useAuthStore } from '../store/auth';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, loading, error } = useAuthStore();
+  const login = useAuthStore(s => s.login);
+  const loading = useAuthStore(s => s.loading);
+  const error = useAuthStore(s => s.error);
   const nav = useNavigate();
 
   const handle = async (e) => {

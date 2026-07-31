@@ -19,9 +19,9 @@ type loginReq struct {
 }
 
 type sessionResp struct {
-	User        any   `json:"user"`
+	User        any    `json:"user"`
 	AccessToken string `json:"access_token"`
-	ExpiresIn   int64 `json:"expires_in"`
+	ExpiresIn   int64  `json:"expires_in"`
 }
 
 // Register godoc
@@ -33,11 +33,6 @@ type sessionResp struct {
 // @Failure      409  {object}  map[string]any
 // @Router       /api/auth/register [post]
 func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
-	if !s.registerLimiter.allow() {
-		logutil.Warn("register rate limited: global limit reached")
-		writeError(w, http.StatusTooManyRequests, "rate_limited", "registration limit reached, try again later")
-		return
-	}
 	var req registerReq
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
@@ -66,7 +61,6 @@ func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logutil.Info("user registered: %s (username=%s email=%s)", logutil.SafeID(u.ID), username, email)
-	s.registerLimiter.record()
 	s.issueSession(w, r, u.ID)
 }
 
@@ -79,12 +73,6 @@ func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
 // @Failure      401  {object}  map[string]any
 // @Router       /api/auth/login [post]
 func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
-	ip := clientIP(r)
-	if !s.loginLimiter.allow(ip) {
-		logutil.Warn("login rate limited: ip=%s", ip)
-		writeError(w, http.StatusTooManyRequests, "rate_limited", "too many login attempts, try again later")
-		return
-	}
 	var req loginReq
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
@@ -96,7 +84,6 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 		status, code := mapServiceError(err)
 		if status == http.StatusNotFound {
 			logutil.Warn("login failed: email=%s (not found)", email)
-			s.loginLimiter.record(ip)
 			writeError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 			return
 		}
@@ -105,7 +92,6 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := auth.VerifyPassword(hash, req.Password); err != nil {
 		logutil.Warn("login failed: email=%s (wrong password)", email)
-		s.loginLimiter.record(ip)
 		writeError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 		return
 	}
@@ -120,7 +106,7 @@ func (s *Server) issueSession(w http.ResponseWriter, r *http.Request, userID str
 		return
 	}
 	raw, hash := auth.GenerateRefreshToken()
-	if _, err := s.DB.CreateRefreshToken(r.Context(), userID, hash, s.Cfg.RefreshTokenTTL); err != nil {
+	if _, err := s.Services.CreateRefreshToken(r.Context(), userID, hash, s.Cfg.RefreshTokenTTL); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
@@ -155,7 +141,7 @@ func (s *Server) Refresh(w http.ResponseWriter, r *http.Request) {
 	s.refreshMu.Lock()
 	defer s.refreshMu.Unlock()
 	hash := auth.HashRefreshToken(c.Value)
-	rt, err := s.DB.FindAndDeleteRefreshToken(r.Context(), hash)
+	rt, err := s.Services.FindAndDeleteRefreshToken(r.Context(), hash)
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, "refresh_invalid", "invalid refresh token")
 		return
@@ -181,7 +167,7 @@ func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.refreshMu.Lock()
-	err := s.DB.DeleteUserRefreshTokens(r.Context(), u.ID)
+	err := s.Services.DeleteUserRefreshTokens(r.Context(), u.ID)
 	s.refreshMu.Unlock()
 	clearRefreshCookie(w, r)
 	clearAccessTokenCookie(w, r)

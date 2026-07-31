@@ -22,6 +22,7 @@ type sendMsgReq struct {
 	Type        string              `json:"type"`
 	Source      *ai.Source          `json:"source"`
 	MsgID       string              `json:"msg_id"`
+	ReplyTo     string              `json:"reply_to"`
 }
 
 type editMsgReq struct {
@@ -77,7 +78,7 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msg, err := s.Services.Message.Send(r.Context(), id, u.ID, req.Content, req.Attachments)
+	msg, err := s.Services.Message.Send(r.Context(), id, u.ID, req.Content, req.Attachments, req.ReplyTo)
 	if err != nil {
 		status, code := mapServiceError(err)
 		writeError(w, status, code, err.Error())
@@ -131,14 +132,12 @@ func (s *Server) handleStreamMessage(w http.ResponseWriter, r *http.Request, u *
 			buf.WriteString(chunk.Content)
 		}
 		s.Services.Stream.AppendChunk(msgID, chunk.Type, chunk.Content)
-		if s.Hub != nil {
-			s.Hub.BroadcastMessageUpdate(&models.Message{
-				ID:       msgID,
-				ChatID:   chatID,
-				Content:  buf.String(),
-				Thinking: thinkingBuf.String(),
-			})
-		}
+		s.Services.BroadcastMessageUpdate(&models.Message{
+			ID:       msgID,
+			ChatID:   chatID,
+			Content:  buf.String(),
+			Thinking: thinkingBuf.String(),
+		})
 	}
 
 	for {

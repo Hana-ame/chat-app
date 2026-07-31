@@ -1,4 +1,5 @@
 export function streamAI(response, onChunk, onDone, onError) {
+  if (!response.body) { onError?.(new Error('Response body is null')); return { cancel() {} }; }
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -7,7 +8,7 @@ export function streamAI(response, onChunk, onDone, onError) {
   function parseSSE(line) {
     if (!line.startsWith('data: ')) return;
     const payload = line.slice(6);
-    if (payload === '[DONE]') return;
+    if (payload === '[DONE]') { onDone?.(); return; }
     try {
       const json = JSON.parse(payload);
       if (json.type === 'reasoning') {

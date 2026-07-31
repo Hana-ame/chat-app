@@ -149,8 +149,8 @@ const _apiMethods = {
     if (before) url += '&before=' + before;
     return request<{ messages: Message[] }>('GET', url, token);
   },
-  sendMessage: (token: string, chatId: string, content: string, attachments?: Attachment[]) =>
-    request<Message>('POST', '/api/chats/' + chatId + '/messages', token, { content, attachments: (attachments || []).map(({ ...a }) => a) }),
+  sendMessage: (token: string, chatId: string, content: string, attachments?: Attachment[], replyTo?: string) =>
+    request<Message>('POST', '/api/chats/' + chatId + '/messages', token, { content, attachments: (attachments || []).map(({ ...a }) => a), reply_to: replyTo || '' }),
   editMessage: (token: string, chatId: string, msgId: string, content: string) =>
     request<Message>('PATCH', '/api/chats/' + chatId + '/messages/' + msgId, token, { content }),
   deleteMessage: (token: string, chatId: string, msgId: string) =>
@@ -214,7 +214,7 @@ const _apiMethods = {
     }).then(r => { if (!r.ok) throw r; return r; }),
 
   // ── Misc ──
-  sseUrl: (token: string) => API_BASE + '/api/events?access_token=' + encodeURIComponent(token),
+  sseUrl: () => API_BASE + '/api/events',
 };
 
 export type ApiType = typeof _apiMethods & {

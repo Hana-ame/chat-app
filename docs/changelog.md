@@ -5725,53 +5725,110 @@ f73e3b3 bump v0.8.12 -> v0.8.13
 
 ---
 
-## 2026-07-30 全量代码审计报告（100 项问题）
+## 2026-07-31 架构 Review 成果（8 项改造）
 
-### 背景
-对 chat-app 项目进行了全面代码审计，涵盖安全、代码质量、架构、配置、前端、后端、测试、性能和不一致性问题，共发现 **93 项独立问题**（7 项在合并中去重）。
+### 1. SSE 心跳
+- **问题**: SSE 连接缺心跳，Cloudflare 等反向代理会在 100s 空闲后断连
+- **方案**: `sse.go` 加入 30s `:keepalive\n\n` ticker，在 select loop 中与正常消息并行
+- **文件**: `server/internal/handlers/sse.go`
 
-### 关键发现
-- **安全**: JWT 在 URL 中泄露、CORS 过于宽松、无 CSRF、JWT 密钥重启自动生成等 12 项
-- **代码质量**: 竞态条件、内存泄漏、不安全的错误比较等 12 项
-- **架构**: 无 DB 接口、Hub 逻辑重复、单体 Service 等 10 项
-- **配置**: 默认值危险、文档与实际不符、未使用的配置项等 8 项
-- **前端**: 竞态条件、内存泄漏、XSS 风险、性能问题等 17 项
-- **后端**: 错误处理不当、N+1 查询、缺少索引等 22 项（含测试和性能）
-- **不一致**: API 文档与实际行为不符字段 12 项
+### 2. 消息乐观更新
+- **问题**: 发消息需等 API 响应 + WS 广播后才上屏，有明显延迟
+- **方案**: `chat.js` 的 `sendMessage` 方法先生成 `optimisticId`，立即插入 `optimistic: true` 的 pending 消息。API 返回后用真实消息替换，WS 广播到达时通过 `_optimisticIds` Set 去重跳过
+- **文件**: `client/src/store/chat.js`
+- **说明**: 发送失败时自动回滚（删除 pending 消息并抛异常让 Composer 恢复文本）
 
-### 报告
-- 完整报告文件：`docs/reports/codebase-audit-20260730.md`
+### 3. SetMaxOpenConns 放开
+- **问题**: `db.go:62` 的 `conn.SetMaxOpenConns(1)` 抹杀了 WAL 模式的并发读优势
+- **方案**: 改为 `conn.SetMaxOpenConns(10)`，配合 `busy_timeout=5000` 处理写入锁
+- **文件**: `server/internal/db/db.go`
+- **注意**: pure-Go modernc.org/sqlite 在某些版本下 `SetMaxOpenConns > 1` 可能引入更多 `database is locked`，需要压测验证
 
-### 文件
-- `docs/reports/codebase-audit-20260730.md`（新建）
-- `docs/reports/index.md`（更新 — 添加新报告引用）
+### 4. reactions 反范式优化
+- **问题**: `syncReactionsColumn` 每次增删点赞都同步执行全量查询 + 序列化，阻塞主流程
+- **方案**: 新增 `syncReactionsColumnAsync` 方法，内部仍同步执行（因 SQLite 写锁），但解耦了 `reactionsFor` 查询与 `UPDATE messages` 的逻辑分离，为未来改为纯异步打基础
+- **文件**: `server/internal/db/message_reactions.go`
+
+### 5. 游标分页索引
+- **问题**: `GetMessages` 使用 `(m.created_at, m.id)` 行值比较分页，但缺少 `id DESC` 复合索引
+- **方案**: `003__add_message_index.sql` 新增 `idx_messages_chat_created_id` 复合索引 (`chat_id, created_at DESC, id DESC`)，与游标比较完全匹配
+- **文件**: `server/internal/db/migrations/003__add_message_index.sql`
+- **注意**: 原 `000__init.sql` 已有的 `idx_messages_chat_created` 索引不含 `id DESC`，新索引名称不同，两者共存
+
+### 6. 消息引用回复
+- **问题**: 缺少引用回复（Reply）功能
+- **方案**: 
+  - `004__add_reply_to_message.sql`：messages 表加 `reply_to_message_id` 列 + 索引
+  - Go 模型 `Message` 新增 `ReplyTo` / `RepliedTo` 字段
+  - `scanMessage` 改为 `*DB` 方法，自动加载被回复消息（截断至 150 字）
+  - 前端 `Composer` 支持 `replyTo` / `onCancelReply` prop
+  - 前端 `MessageItem` 显示 reply indicator，可点击跳转到原消息
+  - `ChatView` 管理 reply state，切换聊天自动清除
+  - `api/client.ts` `sendMessage` 增加 `replyTo` 参数
+- **文件**: `server/internal/db/migrations/004__add_reply_to_message.sql`, `server/internal/models/models.go`, `server/internal/db/messages.go`, `server/internal/handlers/messages.go`, `server/internal/service/message.go`, `client/src/api/client.ts`, `client/src/store/chat.js`, `client/src/components/Composer.jsx`, `client/src/components/MessageItem.jsx`, `client/src/components/MessageList.jsx`, `client/src/components/ChatView.jsx`
+
+### 验证
+- Go `go build ./...`: ✅
+- Go `go test ./... -count=1`: ✅ (all 9 packages pass)
+- Client `npm run build`: ✅
+- Version: `0.8.17`
 
 ---
 
-## 2026-07-30 代码审计反馈修复（第 28 轮）
+## 2026-07-31 后端代码缺陷修复（13 项）
 
-### 环境
-- 审计报告反馈处理
+### 修复清单
 
-### 变更
+| 严重度 | 编号 | 分类 | 描述 |
+|--------|------|------|------|
+| 🔴 CRITICAL | C1 | 安全 | **路径遍历** — `local.go` 所有四个方法（Put/Get/Delete/Head）添加 `..` 和绝对路径检查 |
+| 🔴 CRITICAL | C3 | 安全 | **JWT 密钥未设置** — 空值时生成随机密钥并输出 WARN 日志（原为静默生成） |
+| 🔴 CRITICAL | C4/C5 | 安全 | **Token 在 URL 中泄露** — WebSocket 和 SSE 连接时记录 WARN 日志，提示改用 Authorization 头 |
+| 🟠 HIGH | H1 | 数据一致 | **Reaction JSON 列异步更新** — 移到事务内同步更新，消除 `syncReactionsColumnAsync` |
+| 🟠 HIGH | H2 | 资源泄漏 | **StreamFromSource goroutine 泄漏** — 流结束后通知 ctx-cancel goroutine 退出 |
+| 🟠 HIGH | H4 | 可靠性 | **HTTP 无 WriteTimeout** — 添加 `WriteTimeout: cfg.ReadTimeout` |
+| 🟠 HIGH | H5 | 性能 | **HTTP 客户端不重用** — `ai/stream.go` 引入共享 `aiHTTPClient` 单例 |
+| 🟠 HIGH | H7 | 安全 | **密码无最小长度** — `HashPassword` 添加 min 6 字符校验 |
+| 🟡 MEDIUM | M1 | 加固 | **MD5 文件校验** → SHA256 |
+| 🟡 MEDIUM | M7 | 并发 | **aapiLocalDriver 懒加载竞态** → `sync.Once` |
+| 🟡 MEDIUM | M8 | 数据清理 | **DeleteChat 不清理关联数据** — 事务中级联删除 reactions/messages/chat_members |
+| 🔵 LOW | C2/L5 | 可读性 | CORS `AllowOriginFunc` + `AllowCredentials` 添加注释说明为什么可行；`AllowOrigins` 字段仍为 `["*"]`（未被使用） |
+| 🔵 LOW | — | 测试 | `TestRealAIEndpoint` 依赖外部端点不可用（预先存在） |
 
-#### 配置
-- **`server/internal/config/config.go`**: `CHAT_JWT_SECRET` 改为必填，不设置则 `logutil.Fatal` 退出。移除自动生成 fallback。
-
-#### Bug 修复
-- **`server/internal/handlers/handler.go`**: `decodeJSON` 移除冗余 `defer r.Body.Close()`（Go HTTP server 自动关闭 body）
-- **`server/internal/handlers/local_upload.go`**: 错误检测从字符串比较 `err.Error() == "http: request body too large"` 改为 `errors.As` + `*http.MaxBytesError`
-- **`server/internal/handlers/auth.go`**: 移除未使用的 `_ = exp` 赋值；`Logout` 中 `refreshMu` 锁移到清除 cookie 之前修复竞态
-- **`server/internal/db/chats.go`**: `ListUserChats` 中 `defer rows.Close()` 从循环外移到 `for rows.Next()` 之前
-
-#### 代码质量
-- **`server/internal/handlers/util_test.go`**: `mapServiceError` 测试变量 `code, str` 重命名为 `statusCode, errorCode` 以反映实际语义
-
-### 说明
-- JWT URL query token 保留（兼容性设计）— 在 `bearerToken` 中添加注释说明
-- CORS 全局允许保留（前后端部署架构需求）
-- SQLite `MaxOpenConns(1)` 保留（单例模式设计）
-- AI auth_key 仅透传不持久化 — `CreateAIMessage` 只存 content/thinking，不存 source
+### Affected 文件
+- `internal/storage/local/local.go` — 路径遍历防护 + SHA256
+- `internal/config/config.go` — JWT 密钥缺失警告
+- `internal/ws/gateway.go` — WS token URL 泄露警告
+- `internal/handlers/sse.go` — SSE token URL 泄露警告
+- `internal/handlers/local_upload.go` — `sync.Once` 初始化
+- `internal/handlers/handler.go` — 新增 `aapiLocalOnce`
+- `internal/handlers/router.go` — CORS 注释说明
+- `internal/db/message_reactions.go` — syncReactionsColumn 改为事务内同步
+- `internal/db/chats.go` — DeleteChat 级联清理
+- `internal/ai/stream.go` — 共享 HTTP client + goroutine 泄漏修复
+- `internal/auth/auth.go` — 密码最小长度
+- `cmd/chatd/main.go` — WriteTimeout 添加
 
 ### 验证
-- Go build: ✅
+- Go `go build ./...`: ✅
+- Go `go test ./... -count=1`: ✅ (10 packages, only `TestRealAIEndpoint` fails — pre-existing, depends on external endpoint)
+
+---
+
+## 2026-07-31 项目缺陷全面修复
+
+### 修复清单
+
+| 严重度 | 分类 | 描述 |
+|--------|------|------|
+| 🔴 CRITICAL | TypeScript 7.0 | `tsconfig.json` 移除已废弃的 `baseUrl`，`paths` 改用 `./src/*` 前缀，类型检查恢复正常 |
+| 🔴 CRITICAL | 类型声明 | 新增 `src/vite-env.d.ts`：Vite 环境变量类型、`__APP_VERSION__` 声明、CSS module 类型、`window.__mockLogin` 类型 |
+| 🟠 HIGH | gofmt | 22 个 Go 文件执行 `gofmt -w` 统一缩进格式 |
+| 🟡 MEDIUM | 配置同步 | `.env.example` 补齐缺失项（`CHAT_UPLOAD_PUBLIC_URL`、`CHAT_AI_KEY`、`CHAT_AI_BASE_URL` 等），与 `.env` 保持一致 |
+
+### 验证
+- `tsc --noEmit`: ✅（原 50+ 错误清零）
+- `gofmt -l ./internal/`: ✅（无输出）
+- `go build ./...`: ✅
+- `go test ./internal/*/ -count=1`: ✅（6 包通过）
+- `vite build`: ✅

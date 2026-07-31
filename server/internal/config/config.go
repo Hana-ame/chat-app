@@ -22,9 +22,9 @@ type Config struct {
 	StaticDir       string
 	AllowOrigins    []string
 	CSPConnectSrc   string
-	UploadDir        string
-	MaxUploadBytes   int64
-	UploadSalt       string
+	UploadDir       string
+	MaxUploadBytes  int64
+	UploadSalt      string
 
 	MaxMessageContentLength int
 	WSMaxMessageSize        int64
@@ -76,7 +76,8 @@ func Load() *Config {
 	_ = godotenv.Load()
 	secret := os.Getenv("CHAT_JWT_SECRET")
 	if secret == "" {
-		logutil.Fatal("CHAT_JWT_SECRET is required but not set in environment")
+		secret = randomHex(32)
+		logutil.Warn("CHAT_JWT_SECRET not set — generated random key (all existing sessions invalidated). Set CHAT_JWT_SECRET in production.")
 	}
 
 	dbPath := getenv("CHAT_DB_PATH", "chat.db")
@@ -102,9 +103,9 @@ func Load() *Config {
 		MaxUploadBytes:  getenvInt64("CHAT_MAX_UPLOAD", 20<<20),
 		UploadSalt:      uploadSalt,
 
-		StaticDir:       getenv("CHAT_STATIC_DIR", "../client/dist"),
-		AllowOrigins:    []string{"*"},
-		CSPConnectSrc:   getenv("CHAT_CSP_CONNECT_SRC", "'self' wss://wsl-8080.moonchan.xyz"),
+		StaticDir:     getenv("CHAT_STATIC_DIR", "../client/dist"),
+		AllowOrigins:  []string{"*"},
+		CSPConnectSrc: getenv("CHAT_CSP_CONNECT_SRC", "'self' wss://wsl-8080.moonchan.xyz"),
 
 		MaxMessageContentLength: int(getenvInt64("CHAT_MAX_MESSAGE_LENGTH", 4000)),
 		WSMaxMessageSize:        getenvInt64("CHAT_WS_MAX_MSG_SIZE", 1<<16),

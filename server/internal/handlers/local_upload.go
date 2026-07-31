@@ -22,31 +22,31 @@ import (
 var uploadHTML string
 
 var contentTypeExt = map[string]string{
-	"image/jpeg":           ".jpg",
-	"image/png":            ".png",
-	"image/gif":            ".gif",
-	"image/webp":           ".webp",
-	"video/mp4":            ".mp4",
-	"video/webm":           ".webm",
-	"audio/mpeg":           ".mp3",
-	"audio/ogg":            ".ogg",
-	"audio/wav":            ".wav",
-	"application/pdf":      ".pdf",
-	"text/plain":           ".txt",
-	"application/zip":      ".zip",
-	"application/json":     ".json",
+	"image/jpeg":               ".jpg",
+	"image/png":                ".png",
+	"image/gif":                ".gif",
+	"image/webp":               ".webp",
+	"video/mp4":                ".mp4",
+	"video/webm":               ".webm",
+	"audio/mpeg":               ".mp3",
+	"audio/ogg":                ".ogg",
+	"audio/wav":                ".wav",
+	"application/pdf":          ".pdf",
+	"text/plain":               ".txt",
+	"application/zip":          ".zip",
+	"application/json":         ".json",
 	"application/octet-stream": ".bin",
 }
 
 func (s *Server) aapiUploadDriver() *localfs.Driver {
-	if s.aapiLocalDriver == nil {
+	s.aapiLocalOnce.Do(func() {
 		d, err := localfs.New(s.Cfg.UploadDir)
 		if err != nil {
 			logutil.Error("aapi local driver init: %v", err)
-			return nil
+			return
 		}
 		s.aapiLocalDriver = d
-	}
+	})
 	return s.aapiLocalDriver
 }
 

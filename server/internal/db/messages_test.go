@@ -348,4 +348,3 @@ func TestEmptyMessageRejected(t *testing.T) {
 		t.Fatal("empty message should fail")
 	}
 }
-

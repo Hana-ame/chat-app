@@ -17,8 +17,6 @@ import (
 	"github.com/Hana-ame/chat-app/server/internal/ws"
 )
 
-// Version is set at build time via -ldflags -X main.Version=build-xxxxx.
-// Default "dev" for local builds.
 var Version = "dev"
 
 func main() {
@@ -47,15 +45,23 @@ func main() {
 		Handler:           r,
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		ReadTimeout:       cfg.ReadTimeout,
+		WriteTimeout:      cfg.ReadTimeout,
 		IdleTimeout:       120 * time.Second,
 	}
 
+	purgeCtx, purgeCancel := context.WithCancel(context.Background())
+	defer purgeCancel()
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
-		for range ticker.C {
-			if _, err := database.PurgeExpiredTokens(context.Background()); err != nil {
-				logutil.Warn("purge tokens: %v", err)
+		for {
+			select {
+			case <-ticker.C:
+				if _, err := database.PurgeExpiredTokens(context.Background()); err != nil {
+					logutil.Warn("purge tokens: %v", err)
+				}
+			case <-purgeCtx.Done():
+				return
 			}
 		}
 	}()
@@ -66,6 +72,7 @@ func main() {
 		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 		<-sigCh
 		logutil.Info("chatd: shutting down")
+		purgeCancel()
 		hub.Shutdown()
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()

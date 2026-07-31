@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -10,16 +11,42 @@ import (
 	"github.com/Hana-ame/chat-app/server/internal/models"
 )
 
-func (d *DB) syncReactionsColumn(ctx context.Context, messageID string) error {
-	rxs, err := d.reactionsFor(ctx, messageID, "")
+func (d *DB) syncReactionsColumn(ctx context.Context, tx *sql.Tx, messageID string) error {
+	rows, err := tx.QueryContext(ctx,
+		`SELECT emoji, user_id FROM reactions WHERE message_id = ? ORDER BY created_at`,
+		messageID,
+	)
 	if err != nil {
 		return err
 	}
-	data, err := json.Marshal(rxs)
+	defer rows.Close()
+	grouped := map[string]*models.Reaction{}
+	order := []string{}
+	for rows.Next() {
+		var emoji, uid string
+		if err := rows.Scan(&emoji, &uid); err != nil {
+			return err
+		}
+		if r, ok := grouped[emoji]; ok {
+			r.Count++
+		} else {
+			r := &models.Reaction{Emoji: emoji, Count: 1}
+			grouped[emoji] = r
+			order = append(order, emoji)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	out := make([]models.Reaction, 0, len(order))
+	for _, e := range order {
+		out = append(out, *grouped[e])
+	}
+	data, err := json.Marshal(out)
 	if err != nil {
 		data = []byte("[]")
 	}
-	_, err = d.ExecContext(ctx,
+	_, err = tx.ExecContext(ctx,
 		`UPDATE messages SET reactions = ? WHERE id = ?`,
 		string(data), messageID,
 	)
@@ -55,11 +82,14 @@ func (d *DB) AddReaction(ctx context.Context, messageID, userID, emoji string) e
 	if err != nil {
 		return err
 	}
+	if err := d.syncReactionsColumn(ctx, tx, messageID); err != nil {
+		return err
+	}
 	if err := tx.Commit(); err != nil {
 		return err
 	}
 	logutil.Debug("added reaction %s to message %s by %s", emoji, messageID, userID)
-	return d.syncReactionsColumn(ctx, messageID)
+	return nil
 }
 
 func (d *DB) RemoveReaction(ctx context.Context, messageID, userID, emoji string) error {
@@ -84,47 +114,13 @@ func (d *DB) RemoveReaction(ctx context.Context, messageID, userID, emoji string
 	if err != nil {
 		return err
 	}
+	if err := d.syncReactionsColumn(ctx, tx, messageID); err != nil {
+		return err
+	}
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	return d.syncReactionsColumn(ctx, messageID)
-}
-
-func (d *DB) reactionsFor(ctx context.Context, messageID, viewerID string) ([]models.Reaction, error) {
-	rows, err := d.QueryContext(ctx,
-		`SELECT emoji, user_id FROM reactions WHERE message_id = ? ORDER BY created_at`,
-		messageID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	grouped := map[string]*models.Reaction{}
-	order := []string{}
-	for rows.Next() {
-		var emoji, uid string
-		if err := rows.Scan(&emoji, &uid); err != nil {
-			return nil, err
-		}
-		if r, ok := grouped[emoji]; ok {
-			r.Count++
-		} else {
-			r := &models.Reaction{
-				Emoji: emoji,
-				Count: 1,
-			}
-			grouped[emoji] = r
-			order = append(order, emoji)
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	out := make([]models.Reaction, 0, len(order))
-	for _, e := range order {
-		out = append(out, *grouped[e])
-	}
-	return out, nil
+	return nil
 }
 
 func (d *DB) ListReactions(ctx context.Context, messageID, viewerID string) ([]models.Reaction, error) {

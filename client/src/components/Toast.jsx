@@ -1,7 +1,16 @@
+import { useEffect, useRef } from 'react';
 import { useNotificationStore } from '../store/notification';
 
 export default function Toast() {
   const notifications = useNotificationStore(s => s.notifications);
+  const injected = useRef(false);
+  useEffect(() => {
+    if (injected.current) return;
+    injected.current = true;
+    const style = document.createElement('style');
+    style.textContent = '@keyframes toastIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }';
+    document.head.appendChild(style);
+  }, []);
   if (!notifications.length) return null;
   return (
     <div style={{
@@ -19,9 +28,6 @@ export default function Toast() {
           {n.message}
         </div>
       ))}
-      <style>{`
-        @keyframes toastIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
-      `}</style>
     </div>
   );
 }

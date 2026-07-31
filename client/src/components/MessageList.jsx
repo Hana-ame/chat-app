@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import MessageItem from './MessageItem';
 
-export default function MessageList({ messages, hasMore, loading, onLoadMore, chatId, backgroundStyle, hasBackground }) {
+export default function MessageList({ messages, hasMore, loading, onLoadMore, chatId, backgroundStyle, hasBackground, onReply }) {
   const bodyRef = useRef(null);
   const snapshotRef = useRef(null);
   const loadingMoreRef = useRef(false);
@@ -17,6 +17,7 @@ export default function MessageList({ messages, hasMore, loading, onLoadMore, ch
     }
     loadingMoreRef.current = true;
     onLoadMore();
+    loadingMoreRef.current = false;
   }, [onLoadMore, loading]);
 
   useEffect(() => {
@@ -63,7 +64,7 @@ export default function MessageList({ messages, hasMore, loading, onLoadMore, ch
         {messages.map((msg, i) => {
           const prev = i > 0 ? messages[i - 1] : null;
           const sameAuthor = prev && prev.user_id === msg.user_id && !prev.deleted && !msg.deleted;
-          return <MessageItem key={msg.id || `msg-${i}`} msg={msg} sameAuthor={sameAuthor} chatId={chatId} />;
+          return <MessageItem key={msg.id || `msg-${i}`} msg={msg} sameAuthor={sameAuthor} chatId={chatId} onReply={onReply} />;
         })}
       </div>
     </div>

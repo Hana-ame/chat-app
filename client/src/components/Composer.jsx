@@ -10,12 +10,13 @@ const STORAGE_KEY = 'ai_settings';
 
 function buildContext(msgs, limit) {
   const context = [];
-  for (const m of msgs) {
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i];
     if (context.length >= limit) break;
     if (m.type === 'stream' || m.user_id === 'ai') {
-      context.push({ role: 'assistant', content: m.content });
+      context.unshift({ role: 'assistant', content: m.content });
     } else if (m.user_id && m.content) {
-      context.push({ role: 'user', content: m.content });
+      context.unshift({ role: 'user', content: m.content });
     }
   }
   return context;
@@ -58,7 +59,7 @@ const defaultSettings = {
 defaultSettings.jsonBody = toJsonBody(defaultSettings);
 
 function compressImage(file) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
@@ -71,11 +72,12 @@ function compressImage(file) {
         resolve(new File([blob], name, { type: 'image/webp' }));
       }, 'image/webp', 0.75);
     };
+    img.onerror = () => reject(new Error('Failed to load image'));
     img.src = URL.createObjectURL(file);
   });
 }
 
-export default function Composer({ chatId, isNotification }) {
+export default function Composer({ chatId, isNotification, replyTo, onCancelReply }) {
   const { user, accessToken } = useAuthStore();
   const { sendMessage, sendTyping } = useChatStore();
   const [text, setText] = useState('');
@@ -152,9 +154,9 @@ export default function Composer({ chatId, isNotification }) {
   useEffect(() => { autoResize(); }, [text, autoResize]);
 
   const handleTyping = () => {
+    if (typingTimer.current) return;
     sendTyping(chatId);
-    if (typingTimer.current) clearTimeout(typingTimer.current);
-    typingTimer.current = setTimeout(() => {}, 2000);
+    typingTimer.current = setTimeout(() => { typingTimer.current = null; }, 2000);
   };
 
   const mentionMembers = (() => {
@@ -303,9 +305,10 @@ export default function Composer({ chatId, isNotification }) {
       if (isNotification) {
         await api.notifications.sendMessage(accessToken, content, savedAttachments);
       } else {
-        await sendMessage(accessToken, chatId, content, savedAttachments);
+        await sendMessage(accessToken, chatId, content, savedAttachments, replyTo?.id || '');
       }
       setText('');
+      if (onCancelReply) onCancelReply();
       setAttachments([]);
       if (aiActive && content) {
         await doSendAI(content);
@@ -380,6 +383,7 @@ export default function Composer({ chatId, isNotification }) {
     }
   };
 
+  /** @type {import('react').CSSProperties} */
   const inputStyle = {
     width: '100%', padding: '4px 6px', fontSize: 13, fontFamily: 'monospace',
     background: 'var(--bg-secondary)', border: '1px solid var(--border)',
@@ -400,6 +404,13 @@ export default function Composer({ chatId, isNotification }) {
               <button className="btn-ghost" style={{fontSize:14,lineHeight:1,width:18,height:18,borderRadius:'50%',padding:0,flexShrink:0}} onClick={() => setAttachments(a => a.filter((_,j) => j!==i))}>×</button>
             </div>
           ))}
+        </div>
+      )}
+      {replyTo && (
+        <div className="reply-preview" style={{display:'flex',alignItems:'center',gap:8,padding:'4px 8px',marginBottom:4,background:'var(--bg-secondary)',borderRadius:4,borderLeft:'3px solid var(--accent)',fontSize:12}}>
+          <span style={{fontWeight:600,color:'var(--accent)',whiteSpace:'nowrap'}}>Replying to {replyTo.author?.username || 'Unknown'}</span>
+          <span style={{color:'var(--text-muted)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{replyTo.content}</span>
+          <button className="btn-ghost" style={{fontSize:14,lineHeight:1,padding:'2px 6px'}} onClick={onCancelReply}>×</button>
         </div>
       )}
       <div className="chat-input">

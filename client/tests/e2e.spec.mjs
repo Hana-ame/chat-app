@@ -65,8 +65,7 @@ test('send and receive message', async ({ page }) => {
 
   await page.fill('.chat-input textarea', 'Hello E2E!');
   await page.click('button[title="Send"]');
-  await page.waitForSelector('.msg-content');
-  await expect(page.locator('.msg-content').first()).toContainText('Hello E2E');
+  await expect(page.locator('.msg-content').first()).toContainText('Hello E2E', { timeout: 15000 });
 });
 
 test('responsive layout on mobile', async ({ page }) => {

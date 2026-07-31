@@ -1,7 +1,7 @@
 import { api } from '../../api/client';
 
 export function createSseTransport({ token, onReady, onEvent, onClose }) {
-  const sse = new EventSource(api.sseUrl(token));
+  const sse = new EventSource(api.sseUrl(), { withCredentials: true });
 
   sse.addEventListener('ready', (e) => {
     try {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function UserAvatar({ user, size = 32, onClick, onFallbackClick }) {
+export default function UserAvatar({ user, size = 32, onClick = undefined, onFallbackClick = undefined }) {
   const [imgError, setImgError] = useState(false);
   const showImg = user?.avatar_url && !imgError;
 

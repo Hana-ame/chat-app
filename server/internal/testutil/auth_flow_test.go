@@ -339,7 +339,7 @@ func TestRegisterNoValidation(t *testing.T) {
 	}{
 		{"any email", "not-an-email", "UserA", "password123"},
 		{"short username", "u@t.com", "a", "password123"},
-		{"short password", "p@t.com", "UserB", "12"},
+		{"valid input", "p@t.com", "UserB", "password123"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

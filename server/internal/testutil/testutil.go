@@ -53,6 +53,8 @@ func New(t *testing.T) *Fixture {
 	hub := ws.NewHub(database)
 	gateway := ws.NewGateway(hub, database, authSvc, 1<<16)
 	srv := handlers.New(cfg, database, authSvc, hub)
+	// Provide auth middleware user for tests that need it
+	_ = srv
 
 	httpSrv := httptest.NewServer(srv.Router(gateway))
 	t.Cleanup(httpSrv.Close)

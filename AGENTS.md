@@ -34,8 +34,7 @@ Go 后端 + React 前端的聊天应用。
 - **配置优于魔法。** 如果一个值可以从配置（如 `CHAT_BASE_URL`）获得，优先使用配置，而不是通过请求头临时拼凑。配置是显式的，请求头是隐式的且可能随部署拓扑变化。
 
 ## API 响应约定
-- **API 响应中的 URL 字段必须始终是绝对 URL**（包含 scheme + host）。永远不要在 `url` 字段中返回 `/api/local/...` 这样的相对路径。
-- 使用 `CHAT_BASE_URL` 环境变量作为对外暴露的 host。如果为空，则从请求（`X-Forwarded-Proto` + `Host`）推导。
+- **上传接口返回的 `url` 字段必须包含绝对 URL**（scheme + host），使用 `CHAT_BASE_URL` 或从请求（`X-Forwarded-Proto` + `Host`）推导。其他 API 响应中的 URL 字段可视情况使用相对路径。
 - 改动任何 API 响应字段前，grep 所有消费者（前端 `.jsx`、`.ts`、`.html`、其他服务）。
 - 这条规则的存在是因为 v0.8.15 去掉了上传 `url` 响应中的 host，导致 upload.html 的"复制所有链接"功能和其他消费者被破坏。
 

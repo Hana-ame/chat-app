@@ -59,7 +59,7 @@ func Open(path string, maxContentLength int) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn.SetMaxOpenConns(1)
+	conn.SetMaxOpenConns(10)
 	if err := conn.PingContext(context.Background()); err != nil {
 		conn.Close()
 		return nil, err
@@ -123,8 +123,10 @@ func (d *DB) Migrate() error {
 	// Go migrations (version 1000+)
 	for _, gm := range goMigrations {
 		var exists int
-		d.QueryRowContext(ctx,
-			`SELECT 1 FROM schema_migrations WHERE version = ?`, 1000+gm.version).Scan(&exists)
+		if err := d.QueryRowContext(ctx,
+			`SELECT 1 FROM schema_migrations WHERE version = ?`, 1000+gm.version).Scan(&exists); err != nil {
+			exists = 0
+		}
 		if exists == 1 {
 			continue
 		}

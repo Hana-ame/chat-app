@@ -12,14 +12,14 @@ type ChatService struct {
 }
 
 func (s *ChatService) ListForUser(ctx context.Context, userID string) ([]models.Chat, error) {
-	return s.DB.ListUserChats(ctx, userID)
+	return s.db.ListUserChats(ctx, userID)
 }
 
 func (s *ChatService) GetByID(ctx context.Context, chatID, userID string) (*models.Chat, error) {
 	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return nil, err
 	}
-	chat, err := s.DB.GetChat(ctx, chatID)
+	chat, err := s.db.GetChat(ctx, chatID)
 	if err != nil {
 		if isNotFound(err) {
 			return nil, ErrNotFound
@@ -44,52 +44,52 @@ func (s *ChatService) Create(ctx context.Context, userID, name, visibility strin
 	if !hasMe {
 		members = append(members, userID)
 	}
-	chat, err := s.DB.CreateChat(ctx, "group", name, visibility, userID, members)
+	chat, err := s.db.CreateChat(ctx, "group", name, visibility, userID, members)
 	if err != nil {
 		return nil, err
 	}
-	if s.Hub != nil {
-		s.Hub.BroadcastChatCreated(chat)
+	if s.hub != nil {
+		s.hub.BroadcastChatCreated(chat)
 	}
 	return chat, nil
 }
 
 func (s *ChatService) CreateOrGetNotificationsChat(ctx context.Context, userID string) (*models.Chat, error) {
-	if chat, err := s.DB.FindNotificationsChat(ctx, userID); err == nil {
+	if chat, err := s.db.FindNotificationsChat(ctx, userID); err == nil {
 		return chat, nil
 	}
-	chat, err := s.DB.CreateNotificationsChat(ctx, userID)
+	chat, err := s.db.CreateNotificationsChat(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	if s.Hub != nil {
-		s.Hub.BroadcastChatCreated(chat)
+	if s.hub != nil {
+		s.hub.BroadcastChatCreated(chat)
 	}
 	return chat, nil
 }
 
 func (s *ChatService) CreateOrGetDM(ctx context.Context, userID, otherUserID string) (*models.Chat, bool, error) {
-	if _, err := s.DB.GetUserByID(ctx, otherUserID); err != nil {
+	if _, err := s.db.GetUserByID(ctx, otherUserID); err != nil {
 		if isNotFound(err) {
 			return nil, false, ErrNotFound
 		}
 		return nil, false, err
 	}
-	if dm, err := s.DB.FindDMBetween(ctx, userID, otherUserID); err == nil {
+	if dm, err := s.db.FindDMBetween(ctx, userID, otherUserID); err == nil {
 		return dm, true, nil
 	}
-	chat, err := s.DB.CreateChat(ctx, "dm", "", "", "", []string{userID, otherUserID})
+	chat, err := s.db.CreateChat(ctx, "dm", "", "", "", []string{userID, otherUserID})
 	if err != nil {
 		return nil, false, err
 	}
-	if s.Hub != nil {
-		s.Hub.BroadcastChatCreated(chat)
+	if s.hub != nil {
+		s.hub.BroadcastChatCreated(chat)
 	}
 	return chat, false, nil
 }
 
 func (s *ChatService) Rename(ctx context.Context, chatID, userID, name string) (*models.Chat, error) {
-	chat, err := s.DB.GetChat(ctx, chatID)
+	chat, err := s.db.GetChat(ctx, chatID)
 	if err != nil {
 		if isNotFound(err) {
 			return nil, ErrNotFound
@@ -102,21 +102,21 @@ func (s *ChatService) Rename(ctx context.Context, chatID, userID, name string) (
 	if chat.OwnerID != userID {
 		return nil, ErrForbidden
 	}
-	if err := s.DB.RenameChat(ctx, chatID, name); err != nil {
+	if err := s.db.RenameChat(ctx, chatID, name); err != nil {
 		return nil, err
 	}
-	updated, err := s.DB.GetChat(ctx, chatID)
+	updated, err := s.db.GetChat(ctx, chatID)
 	if err != nil {
 		return nil, err
 	}
-	if s.Hub != nil {
-		s.Hub.BroadcastChatUpdated(updated)
+	if s.hub != nil {
+		s.hub.BroadcastChatUpdated(updated)
 	}
 	return updated, nil
 }
 
 func (s *ChatService) UpdateAvatar(ctx context.Context, chatID, userID, avatarURL string) (*models.Chat, error) {
-	chat, err := s.DB.GetChat(ctx, chatID)
+	chat, err := s.db.GetChat(ctx, chatID)
 	if err != nil {
 		if isNotFound(err) {
 			return nil, ErrNotFound
@@ -129,21 +129,21 @@ func (s *ChatService) UpdateAvatar(ctx context.Context, chatID, userID, avatarUR
 	if chat.OwnerID != userID {
 		return nil, ErrForbidden
 	}
-	if err := s.DB.UpdateChatAvatar(ctx, chatID, avatarURL); err != nil {
+	if err := s.db.UpdateChatAvatar(ctx, chatID, avatarURL); err != nil {
 		return nil, err
 	}
-	updated, err := s.DB.GetChat(ctx, chatID)
+	updated, err := s.db.GetChat(ctx, chatID)
 	if err != nil {
 		return nil, err
 	}
-	if s.Hub != nil {
-		s.Hub.BroadcastChatUpdated(updated)
+	if s.hub != nil {
+		s.hub.BroadcastChatUpdated(updated)
 	}
 	return updated, nil
 }
 
 func (s *ChatService) UpdateBanner(ctx context.Context, chatID, userID, bannerURL string, opacity float64) (*models.Chat, error) {
-	chat, err := s.DB.GetChat(ctx, chatID)
+	chat, err := s.db.GetChat(ctx, chatID)
 	if err != nil {
 		if isNotFound(err) {
 			return nil, ErrNotFound
@@ -156,26 +156,26 @@ func (s *ChatService) UpdateBanner(ctx context.Context, chatID, userID, bannerUR
 	if chat.OwnerID != userID {
 		return nil, ErrForbidden
 	}
-	if err := s.DB.UpdateChatBanner(ctx, chatID, bannerURL); err != nil {
+	if err := s.db.UpdateChatBanner(ctx, chatID, bannerURL); err != nil {
 		return nil, err
 	}
 	if opacity > 0 {
-		if err := s.DB.UpdateChatBannerOpacity(ctx, chatID, opacity); err != nil {
+		if err := s.db.UpdateChatBannerOpacity(ctx, chatID, opacity); err != nil {
 			return nil, err
 		}
 	}
-	updated, err := s.DB.GetChat(ctx, chatID)
+	updated, err := s.db.GetChat(ctx, chatID)
 	if err != nil {
 		return nil, err
 	}
-	if s.Hub != nil {
-		s.Hub.BroadcastChatUpdated(updated)
+	if s.hub != nil {
+		s.hub.BroadcastChatUpdated(updated)
 	}
 	return updated, nil
 }
 
 func (s *ChatService) UpdateBackground(ctx context.Context, chatID, userID, backgroundURL string) (*models.Chat, error) {
-	chat, err := s.DB.GetChat(ctx, chatID)
+	chat, err := s.db.GetChat(ctx, chatID)
 	if err != nil {
 		if isNotFound(err) {
 			return nil, ErrNotFound
@@ -188,21 +188,21 @@ func (s *ChatService) UpdateBackground(ctx context.Context, chatID, userID, back
 	if chat.OwnerID != userID {
 		return nil, ErrForbidden
 	}
-	if err := s.DB.UpdateChatBackground(ctx, chatID, backgroundURL); err != nil {
+	if err := s.db.UpdateChatBackground(ctx, chatID, backgroundURL); err != nil {
 		return nil, err
 	}
-	updated, err := s.DB.GetChat(ctx, chatID)
+	updated, err := s.db.GetChat(ctx, chatID)
 	if err != nil {
 		return nil, err
 	}
-	if s.Hub != nil {
-		s.Hub.BroadcastChatUpdated(updated)
+	if s.hub != nil {
+		s.hub.BroadcastChatUpdated(updated)
 	}
 	return updated, nil
 }
 
 func (s *ChatService) Delete(ctx context.Context, chatID, userID string) error {
-	chat, err := s.DB.GetChat(ctx, chatID)
+	chat, err := s.db.GetChat(ctx, chatID)
 	if err != nil {
 		if isNotFound(err) {
 			return ErrNotFound
@@ -215,30 +215,30 @@ func (s *ChatService) Delete(ctx context.Context, chatID, userID string) error {
 	if chat.OwnerID != userID {
 		return ErrForbidden
 	}
-	if err := s.DB.DeleteChat(ctx, chatID); err != nil {
+	if err := s.db.DeleteChat(ctx, chatID); err != nil {
 		return err
 	}
-	if s.Hub != nil {
-		s.Hub.BroadcastChatDeleted(chat, chatID)
+	if s.hub != nil {
+		s.hub.BroadcastChatDeleted(chat, chatID)
 	}
 	return nil
 }
 
 func (s *ChatService) ListPublic(ctx context.Context, page, limit int) ([]models.Chat, error) {
-	return s.DB.ListPublicChats(ctx, page, limit)
+	return s.db.ListPublicChats(ctx, page, limit)
 }
 
 func (s *ChatService) Join(ctx context.Context, chatID, userID string) (*models.Chat, error) {
-	if err := s.DB.JoinChatByID(ctx, chatID, userID); err != nil {
+	if err := s.db.JoinChatByID(ctx, chatID, userID); err != nil {
 		return nil, err
 	}
-	chat, err := s.DB.GetChat(ctx, chatID)
+	chat, err := s.db.GetChat(ctx, chatID)
 	if err != nil {
 		return nil, err
 	}
-	if s.Hub != nil {
-		s.Hub.NotifyUserNewChat(userID, chat)
-		s.Hub.BroadcastChatUpdated(chat)
+	if s.hub != nil {
+		s.hub.NotifyUserNewChat(userID, chat)
+		s.hub.BroadcastChatUpdated(chat)
 	}
 	return chat, nil
 }
@@ -247,12 +247,12 @@ func (s *ChatService) SetAnnouncement(ctx context.Context, chatID, userID, conte
 	if err := s.Authz.RequireOwnerOrAdmin(ctx, chatID, userID); err != nil {
 		return err
 	}
-	if err := s.DB.SetPinnedMessage(ctx, chatID, content); err != nil {
+	if err := s.db.SetPinnedMessage(ctx, chatID, content); err != nil {
 		return err
 	}
-	if s.Hub != nil {
-		if updated, err := s.DB.GetChat(ctx, chatID); err == nil {
-			s.Hub.BroadcastChatUpdated(updated)
+	if s.hub != nil {
+		if updated, err := s.db.GetChat(ctx, chatID); err == nil {
+			s.hub.BroadcastChatUpdated(updated)
 		}
 	}
 	return nil
@@ -262,31 +262,31 @@ func (s *ChatService) ClearAnnouncement(ctx context.Context, chatID, userID stri
 	if err := s.Authz.RequireOwnerOrAdmin(ctx, chatID, userID); err != nil {
 		return err
 	}
-	if err := s.DB.ClearPinnedMessage(ctx, chatID); err != nil {
+	if err := s.db.ClearPinnedMessage(ctx, chatID); err != nil {
 		return err
 	}
-	if s.Hub != nil {
-		if updated, err := s.DB.GetChat(ctx, chatID); err == nil {
-			s.Hub.BroadcastChatUpdated(updated)
+	if s.hub != nil {
+		if updated, err := s.db.GetChat(ctx, chatID); err == nil {
+			s.hub.BroadcastChatUpdated(updated)
 		}
 	}
 	return nil
 }
 
 func (s *ChatService) MarkAnnouncementRead(ctx context.Context, chatID, userID string) error {
-	return s.DB.UpdatePinnedLastReadAt(ctx, chatID, userID)
+	return s.db.UpdatePinnedLastReadAt(ctx, chatID, userID)
 }
 
 func (s *ChatService) SetPinned(ctx context.Context, chatID, userID string, pinned bool) error {
 	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return err
 	}
-	if err := s.DB.SetPinned(ctx, chatID, userID, pinned); err != nil {
+	if err := s.db.SetPinned(ctx, chatID, userID, pinned); err != nil {
 		return err
 	}
-	if s.Hub != nil {
-		if updated, err := s.DB.GetChat(ctx, chatID); err == nil {
-			s.Hub.BroadcastChatUpdated(updated)
+	if s.hub != nil {
+		if updated, err := s.db.GetChat(ctx, chatID); err == nil {
+			s.hub.BroadcastChatUpdated(updated)
 		}
 	}
 	return nil
@@ -296,16 +296,16 @@ func (s *ChatService) SetChatNotifyEnabled(ctx context.Context, chatID, userID s
 	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return err
 	}
-	return s.DB.SetChatNotifyEnabled(ctx, chatID, userID, enabled)
+	return s.db.SetChatNotifyEnabled(ctx, chatID, userID, enabled)
 }
 
 func (s *ChatService) Visit(ctx context.Context, chatID, userID string) error {
-	return s.DB.UpdateLastActiveAt(ctx, chatID, userID)
+	return s.db.UpdateLastActiveAt(ctx, chatID, userID)
 }
 
 func (s *ChatService) MarkRead(ctx context.Context, chatID, userID string) error {
 	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return err
 	}
-	return s.DB.UpdateLastActiveAt(ctx, chatID, userID)
+	return s.db.UpdateLastActiveAt(ctx, chatID, userID)
 }

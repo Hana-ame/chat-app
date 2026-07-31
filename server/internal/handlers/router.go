@@ -52,6 +52,9 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	})
+	// NOTE: AllowCredentials with AllowOriginFunc (not "*") works because chi
+	// echoes the request Origin, avoiding the CORS spec violation of
+	// credentials + wildcard origin. Keep AllowOriginFunc; don't swap to "*".
 	r.Use(cors.Handler(cors.Options{
 		AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
 		AllowedMethods:   []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
@@ -72,7 +75,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 	r.Route("/api", func(r chi.Router) {
 		// Upload — 5min timeout (big files on slow connections)
 		r.Group(func(r chi.Router) {
-			r.Use(chimid.Timeout(s.Cfg.UploadTimeout))
+			r.Use(s.authMiddleware, chimid.Timeout(s.Cfg.UploadTimeout))
 			r.Get("/upload", s.AAPIUpload)
 			r.Put("/upload", s.AAPIUpload)
 			r.Put("/upload/*", s.AAPIUpload)

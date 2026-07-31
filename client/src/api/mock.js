@@ -54,10 +54,10 @@ const AI_RESPONSES = [
 ];
 
 /**
- * @type {{ chats: Chat[], messages: Message[] }|null}
+ * @type {{ chats: Chat[], messages: Message[], onlineUserIds: string[] }|null}
  */
 let data = null;
-/** @type {import('zustand').UseBoundStore<import('zustand').StoreApi<import('../store/chat').ChatStore>>|null} */
+/** @type {import('zustand').UseBoundStore<import('zustand').StoreApi<any>>|null} */
 let _store = null;
 import('../store/chat').then(m => { _store = m.useChatStore; }).catch(() => {});
 
@@ -76,7 +76,7 @@ const MOCK_USERS = [
 function ensureData() {
   if (!data) {
     const gen = generateDummyData({ chatCount: 10, msgPerChat: 150 });
-    data = { chats: gen.chats, messages: [...(gen.messages || [])], onlineUserIds: gen.onlineUserIds || [] };
+    data = /** @type {any} */ ({ chats: gen.chats, messages: [...(gen.messages || [])], onlineUserIds: gen.onlineUserIds || [] });
     if (_store) _store.setState({ onlineUserIds: data.onlineUserIds });
   }
   return data;
@@ -101,7 +101,7 @@ function userById(id) {
  */
 function messagesFor(chatId) {
   const d = ensureData();
-  return d.messages.filter(m => m.chat_id === chatId).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  return d.messages.filter(m => m.chat_id === chatId).sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at));
 }
 
 /** @returns {{ chats: Chat[] }} */
@@ -118,7 +118,7 @@ export function mockListChats() {
       members: c.members || [],
     };
   });
-  return { chats: enriched };
+  return /** @type {any} */ ({ chats: enriched });
 }
 
 /**
@@ -158,7 +158,7 @@ export function mockListMessages(_token, chatId, before, limit) {
 export function mockGetChat(_token, id) {
   const d = ensureData();
   const chat = d.chats.find(c => c.id === id);
-  if (!chat) return { error: 'not_found' };
+  if (!chat) return /** @type {any} */ ({ error: 'not_found' });
   return { ...chat, members: chat.members || [] };
 }
 
@@ -326,7 +326,7 @@ export function mockUpdateProfile(_token, data) {
  * @param {Attachment[]} [attachments]
  * @returns {Message}
  */
-export function mockSendMessage(_token, chatId, content, attachments) {
+export function mockSendMessage(_token, chatId, content, attachments = undefined, _replyTo = undefined) {
   const d = ensureData();
   const now = new Date().toISOString();
 
@@ -346,7 +346,7 @@ export function mockSendMessage(_token, chatId, content, attachments) {
   if (_store) _store.getState().onMessageCreate(userMsg);
 
   if (Math.random() < 0.5) {
-    const text = AI_RESPONSES[0];
+    const text = AI_RESPONSES[Math.floor(Math.random() * AI_RESPONSES.length)];
     const aiId = randid();
     const aiCreatedAt = new Date(Date.now() + 1).toISOString();
 
@@ -363,7 +363,7 @@ export function mockSendMessage(_token, chatId, content, attachments) {
       attachments: [],
       reactions: [],
       streaming: true,
-      source: async (emit) => {
+      source: /** @type {any} */ (async (emit) => {
         let acc = '';
         for (let i = 0; i < text.length; i++) {
           await new Promise(r => setTimeout(r, 25 + 10 * i));
@@ -374,7 +374,7 @@ export function mockSendMessage(_token, chatId, content, attachments) {
         }
         const m = d.messages.find(m => m.id === aiId);
         if (m) m.streaming = false;
-      },
+      }),
     };
 
     /** @type {Message} */
@@ -520,9 +520,9 @@ export function mockJoinChat(_token, chatId) {
   const d = ensureData();
   const cu = currentUser();
   const chat = d.chats.find(c => c.id === chatId);
-  if (!chat) return { error: 'not_found' };
+      if (!chat) return /** @type {any} */ ({ error: 'not_found', ok: false });
   if (chat.visibility !== 'public' && chat.visibility !== 'unlisted') {
-    return { error: 'private' };
+    return /** @type {any} */ ({ error: 'private', ok: false });
   }
   if (!chat.members?.some(m => m.id === cu.id)) {
     if (!chat.members) chat.members = [];
@@ -609,12 +609,12 @@ export function mockListPublicChats(_token, page = 1, limit = 20) {
       if (last?.content) {
         lastMsgContent = last.content.length > 100 ? last.content.slice(0, 100) + '...' : last.content;
       }
-      return { ...c, last_message: lastMsgContent ? { content: lastMsgContent } : undefined };
+      return { ...c, last_message: lastMsgContent ? /** @type {any} */ ({ content: lastMsgContent }) : undefined };
     })
     .sort((a, b) => {
       const da = a.last_message_at || a.created_at;
       const db = b.last_message_at || b.created_at;
-      return new Date(db) - new Date(da);
+      return +new Date(db) - +new Date(da);
     });
   const start = (page - 1) * limit;
   const chats = all.slice(start, start + limit);

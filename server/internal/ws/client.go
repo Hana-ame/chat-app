@@ -42,12 +42,7 @@ func (c *Client) unsubscribe(chatID string) {
 }
 
 func (c *Client) queue(env Envelope) {
-	c.mu.RLock()
-	if c.closed {
-		c.mu.RUnlock()
-		return
-	}
-	c.mu.RUnlock()
+	defer func() { recover() }()
 	select {
 	case c.send <- env:
 	default:
@@ -60,6 +55,7 @@ func (c *Client) close() {
 		c.mu.Lock()
 		c.closed = true
 		c.mu.Unlock()
+		close(c.send)
 		_ = c.conn.WriteControl(websocket.CloseMessage,
 			websocket.FormatCloseMessage(websocket.CloseNormalClosure, "bye"),
 			time.Now().Add(writeWait))
@@ -92,12 +88,14 @@ func (c *Client) readPump() {
 		case OpPing:
 			c.queue(Envelope{Op: OpPong})
 		case OpSubscribe:
-			var p struct{ ChatID string `json:"chat_id"` }
+			var p struct {
+				ChatID string `json:"chat_id"`
+			}
 			if err := json.Unmarshal(env.Payload, &p); err != nil || p.ChatID == "" {
 				continue
 			}
-			if c.hub.db != nil {
-				ok, err := c.hub.db.IsChatMember(context.Background(), p.ChatID, c.userID)
+			if c.hub.memberStore != nil {
+				ok, err := c.hub.memberStore.IsChatMember(context.Background(), p.ChatID, c.userID)
 				if err != nil {
 					logutil.Error("ws: check member for subscribe %s: %v", logutil.SafeID(p.ChatID), err)
 					continue
@@ -107,18 +105,22 @@ func (c *Client) readPump() {
 				}
 			}
 		case OpUnsubscribe:
-			var p struct{ ChatID string `json:"chat_id"` }
+			var p struct {
+				ChatID string `json:"chat_id"`
+			}
 			if err := json.Unmarshal(env.Payload, &p); err != nil || p.ChatID == "" {
 				continue
 			}
 			c.unsubscribe(p.ChatID)
 		case OpListMembers:
-			var p struct{ ChatID string `json:"chat_id"` }
+			var p struct {
+				ChatID string `json:"chat_id"`
+			}
 			if err := json.Unmarshal(env.Payload, &p); err != nil || p.ChatID == "" {
 				continue
 			}
-			if c.hub.db != nil {
-				members, err := c.hub.db.GetChatMembers(context.Background(), p.ChatID)
+			if c.hub.memberStore != nil {
+				members, err := c.hub.memberStore.GetChatMembers(context.Background(), p.ChatID)
 				if err == nil {
 					b, err := json.Marshal(map[string]any{"chat_id": p.ChatID, "members": members})
 					if err != nil {
@@ -129,12 +131,14 @@ func (c *Client) readPump() {
 				}
 			}
 		case OpTyping:
-			var p struct{ ChatID string `json:"chat_id"` }
+			var p struct {
+				ChatID string `json:"chat_id"`
+			}
 			if err := json.Unmarshal(env.Payload, &p); err != nil || p.ChatID == "" {
 				continue
 			}
-			if c.hub.db != nil {
-				ok, err := c.hub.db.IsChatMember(context.Background(), p.ChatID, c.userID)
+			if c.hub.memberStore != nil {
+				ok, err := c.hub.memberStore.IsChatMember(context.Background(), p.ChatID, c.userID)
 				if err != nil {
 					logutil.Error("ws: check member for typing %s: %v", logutil.SafeID(p.ChatID), err)
 					continue

@@ -153,10 +153,3 @@ func (d *DB) SetChatNotifyEnabled(ctx context.Context, chatID, userID string, en
 	return err
 }
 
-func (d *DB) TogglePinned(ctx context.Context, chatID, userID string) error {
-	_, err := d.ExecContext(ctx,
-		`UPDATE chat_members SET pinned = CASE WHEN pinned = 0 THEN 1 ELSE 0 END WHERE chat_id = ? AND user_id = ?`,
-		chatID, userID,
-	)
-	return err
-}

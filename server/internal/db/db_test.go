@@ -939,7 +939,7 @@ func TestListReactions(t *testing.T) {
 	}
 }
 
-func TestSetAndTogglePinned(t *testing.T) {
+func TestSetPinned(t *testing.T) {
 	f := testutil.New(t)
 	a, _ := f.DB.CreateUser(f.Ctx(), "pin@x.com", "Pin", "pw00000000")
 	b, _ := f.DB.CreateUser(f.Ctx(), "pin2@x.com", "Pin2", "pw00000000")
@@ -983,35 +983,6 @@ func TestSetAndTogglePinned(t *testing.T) {
 	}
 }
 
-func TestTogglePinned(t *testing.T) {
-	f := testutil.New(t)
-	a, _ := f.DB.CreateUser(f.Ctx(), "tog@x.com", "Tog", "pw00000000")
-	chat, _ := f.DB.CreateChat(f.Ctx(), "group", "TogTest", "", a.ID, []string{a.ID})
-
-	if err := f.DB.TogglePinned(context.Background(), chat.ID, a.ID); err != nil {
-		t.Fatal(err)
-	}
-	chats, _ := f.DB.ListUserChats(context.Background(), a.ID)
-	var pinnedCount int
-	for _, c := range chats {
-		if c.ID == chat.ID && c.Pinned {
-			pinnedCount++
-		}
-	}
-	if pinnedCount == 0 {
-		t.Fatal("a should have chat pinned after toggle")
-	}
-
-	if err := f.DB.TogglePinned(context.Background(), chat.ID, a.ID); err != nil {
-		t.Fatal(err)
-	}
-	chats, _ = f.DB.ListUserChats(context.Background(), a.ID)
-	for _, c := range chats {
-		if c.ID == chat.ID && c.Pinned {
-			t.Fatal("a should NOT have chat pinned after second toggle")
-		}
-	}
-}
 
 func TestGetChatMemberRole_Success(t *testing.T) {
 	f := testutil.New(t)

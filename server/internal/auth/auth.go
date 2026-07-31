@@ -106,6 +106,9 @@ func HashRefreshToken(raw string) string {
 }
 
 func HashPassword(password string) (string, error) {
+	if len(password) < 6 {
+		return "", errors.New("password too short (min 6 characters)")
+	}
 	if len(password) > 72 {
 		return "", errors.New("password too long (max 72 bytes)")
 	}

@@ -257,7 +257,7 @@ export default function ChatList({ onSelectChat, activeId, onLogout }) {
             onSelectChat={chats.find(c => c.id === uuidChat.id) ? onSelectChat : () => handleJoinPublic(uuidChat.id)}
             onContextMenu={setContextMenu} />
         ) : showPublicList && !chatSearch.trim() ? (
-          <PublicChannelList results={publicResults} searching={publicSearching} onJoin={handleJoinPublic} />
+          <PublicChannelList results={publicResults} searching={publicSearching} onJoin={handleJoinPublic} activeId={activeId} onContextMenu={setContextMenu} />
         ) : !showPublicList || chatSearch.trim() ? (
           filteredChats.map(c => (
             <ChatListItem key={c.id} chat={c} activeId={activeId} onSelectChat={onSelectChat}

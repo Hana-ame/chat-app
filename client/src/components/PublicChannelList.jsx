@@ -1,6 +1,6 @@
 import ChatListItem from './ChatListItem';
 
-export default function PublicChannelList({ results, searching, onJoin }) {
+export default function PublicChannelList({ results, searching, onJoin, activeId, onContextMenu }) {
   if (searching) {
     return (
       <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
@@ -25,7 +25,7 @@ export default function PublicChannelList({ results, searching, onJoin }) {
         Public Channels
       </div>
       {results.map(c => (
-        <ChatListItem key={c.id} chat={c} onSelectChat={onJoin} />
+        <ChatListItem key={c.id} chat={c} onSelectChat={onJoin} activeId={activeId} onContextMenu={onContextMenu} />
       ))}
     </>
   );

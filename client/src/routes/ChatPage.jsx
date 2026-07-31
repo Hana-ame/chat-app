@@ -25,7 +25,7 @@ export default function ChatPage() {
     : loc.pathname.startsWith('/g/') ? loc.pathname.slice(3) : null;
 
   useEffect(() => {
-    useChatStore.setState({ activeChatId: urlChatId || null });
+    useChatStore.getState().setActiveChatId(urlChatId || null);
   }, [urlChatId, accessToken]);
 
   useEffect(() => {

@@ -16,6 +16,10 @@ export default function App() {
   const booted = useRef(false)
 
   useEffect(() => {
+    if (token) unauthGuard.current = false
+  }, [token])
+
+  useEffect(() => {
     if (booted.current) return
     booted.current = true
     booting()

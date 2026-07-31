@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
 )
@@ -13,14 +14,14 @@ import (
 // @Description  Connect to server-sent events for real-time updates
 // @Tags         sse
 // @Security     BearerAuth
-// @Param        access_token  query  string  true  "JWT access token"
+// @Param        access_token  query  string  false  "JWT access token (deprecated, use Authorization header)"
 // @Success      200  {string}  string  "text/event-stream"
 // @Router       /api/events [get]
 func (s *Server) SSE(w http.ResponseWriter, r *http.Request) {
-	// Deprecated: URL query token leaks via server logs, browser history, and Referer headers.
-	// Frontend should use Authorization header or cookie for the initial request.
-	// Query string fallback is kept for EventSource API compatibility and will be removed in a future version.
 	tok := bearerToken(r)
+	if tok != "" && r.URL.Query().Get("access_token") != "" {
+		logutil.Warn("SSE connect via ?access_token= — this leaks to logs and Referer; frontend should use Authorization header or cookie")
+	}
 	if tok == "" {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "missing token")
 		return
@@ -66,7 +67,7 @@ func (s *Server) SSE(w http.ResponseWriter, r *http.Request) {
 
 	ready, _ := json.Marshal(map[string]any{
 		"user": user, "chats": chats,
-		"online_user_ids": s.Hub.OnlineUserIDs(),
+		"online_user_ids": s.Services.OnlineUserIDs(),
 	})
 	fmt.Fprintf(w, "id: 0\nevent: ready\ndata: %s\n\n", ready)
 	flusher.Flush()
@@ -74,15 +75,20 @@ func (s *Server) SSE(w http.ResponseWriter, r *http.Request) {
 	logutil.Info("SSE connected: user=%s", logutil.SafeID(userID))
 
 	ch := make(chan []byte, 64)
-	s.Hub.SSERegister(userID, ch)
-	defer s.Hub.SSEUnregister(userID)
+	s.Services.SSERegister(userID, ch)
+	defer s.Services.SSEUnregister(userID)
 
 	notify := r.Context().Done()
+	keepalive := time.NewTicker(30 * time.Second)
+	defer keepalive.Stop()
 	for {
 		select {
 		case <-notify:
 			logutil.Info("SSE disconnected: user=%s", logutil.SafeID(userID))
 			return
+		case <-keepalive.C:
+			fmt.Fprintf(w, ":keepalive\n\n")
+			flusher.Flush()
 		case data, ok := <-ch:
 			if !ok {
 				return

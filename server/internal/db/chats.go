@@ -104,24 +104,21 @@ func (d *DB) CreateChat(ctx context.Context, typ, name, visibility, ownerID stri
 
 func (d *DB) GetChat(ctx context.Context, id string) (*models.Chat, error) {
 	var (
-		c              models.Chat
-		name           sql.NullString
-		owner          sql.NullString
-		createdAt      string
-		lastMsgAt      sql.NullString
-		lastMsgID      sql.NullString
-		pinnedMsg      sql.NullString
-		pinnedUpdAt    sql.NullString
-		memberCount    int
-		lastMsgUserID  sql.NullString
-		lastMsgContent sql.NullString
-		lastMsgCreated sql.NullString
+		c           models.Chat
+		name        sql.NullString
+		owner       sql.NullString
+		createdAt   string
+		lastMsgAt   sql.NullString
+		lastMsgID   sql.NullString
+		pinnedMsg   sql.NullString
+		pinnedUpdAt sql.NullString
+		memberCount int
 	)
 	err := d.QueryRowContext(ctx,
-		`SELECT id, type, name, icon_color, avatar_url, banner_url, banner_opacity, background_url, visibility, owner_id, created_at, last_message_at, last_message_id, pinned_message, pinned_updated_at, member_count, last_message_user_id, last_message_content, last_message_created_at
+		`SELECT id, type, name, icon_color, avatar_url, banner_url, banner_opacity, background_url, visibility, owner_id, created_at, last_message_at, last_message_id, pinned_message, pinned_updated_at, member_count
 		 FROM chats WHERE id = ?`,
 		id,
-	).Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.AvatarURL, &c.BannerURL, &c.BannerOpacity, &c.BackgroundURL, &c.Visibility, &owner, &createdAt, &lastMsgAt, &lastMsgID, &pinnedMsg, &pinnedUpdAt, &memberCount, &lastMsgUserID, &lastMsgContent, &lastMsgCreated)
+	).Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.AvatarURL, &c.BannerURL, &c.BannerOpacity, &c.BackgroundURL, &c.Visibility, &owner, &createdAt, &lastMsgAt, &lastMsgID, &pinnedMsg, &pinnedUpdAt, &memberCount)
 	if errors.Is(err, sql.ErrNoRows) {
 		logutil.Debug("chat not found: %s", id)
 		return nil, ErrNotFound
@@ -150,31 +147,22 @@ func (d *DB) GetChat(ctx context.Context, id string) (*models.Chat, error) {
 	}
 	c.MemberCount = memberCount
 	c.LastMessageID = lastMsgID.String
-	if c.LastMessageID != "" && lastMsgUserID.Valid && lastMsgUserID.String != "" {
-		ct := c.CreatedAt
-		if lastMsgCreated.Valid && lastMsgCreated.String != "" {
-			ct = parseTime(lastMsgCreated.String)
-		}
-		c.LastMessage = &models.Message{
-			ID:        c.LastMessageID,
-			ChatID:    id,
-			UserID:    lastMsgUserID.String,
-			Content:   lastMsgContent.String,
-			CreatedAt: ct,
+	if c.LastMessageID != "" {
+		lastMsg, err := d.GetMessage(ctx, c.LastMessageID)
+		if err == nil {
+			c.LastMessage = lastMsg
 		}
 	}
 	logutil.Debug("get chat %s: type=%s name=%s members=%d", id, c.Type, c.Name, c.MemberCount)
 	return &c, nil
 }
 
-
-
 func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, error) {
 	rows, err := d.QueryContext(ctx,
 		`SELECT c.id, c.type, c.name, c.icon_color, c.avatar_url, c.banner_url, c.banner_opacity, c.background_url, c.visibility, c.owner_id, c.created_at, c.last_message_at, c.last_message_id,
 		        cm.last_read_message_id, c.pinned_message, c.pinned_updated_at, c.member_count,
 		        cm.pinned_last_read_at, cm.pinned, cm.last_active_at,
-		        cm.notify_enabled, cm.unread_count
+		        cm.notify_enabled
 		 FROM chat_members cm JOIN chats c ON c.id = cm.chat_id
 		 WHERE cm.user_id = ?
 		 ORDER BY COALESCE(c.last_message_at, c.created_at) DESC`,
@@ -184,15 +172,22 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 		return nil, err
 	}
 	defer rows.Close()
+
 	out := []models.Chat{}
+	type row struct {
+		chat             models.Chat
+		lastRead         sql.NullString
+		pinnedLastReadAt sql.NullString
+	}
+	rows2 := []row{}
 	for rows.Next() {
 		var c models.Chat
 		var name, owner, lastMsg, lastMsgID, lastRead, pinnedMsg, pinnedUpdAt, pinnedLastReadAt, lastActiveAt sql.NullString
 		var visibility sql.NullString
 		var created string
-		var memberCount, unreadCount int
+		var memberCount int
 		var pinnedBool, notifyEnabled bool
-		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.AvatarURL, &c.BannerURL, &c.BannerOpacity, &c.BackgroundURL, &visibility, &owner, &created, &lastMsg, &lastMsgID, &lastRead, &pinnedMsg, &pinnedUpdAt, &memberCount, &pinnedLastReadAt, &pinnedBool, &lastActiveAt, &notifyEnabled, &unreadCount); err != nil {
+		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.AvatarURL, &c.BannerURL, &c.BannerOpacity, &c.BackgroundURL, &visibility, &owner, &created, &lastMsg, &lastMsgID, &lastRead, &pinnedMsg, &pinnedUpdAt, &memberCount, &pinnedLastReadAt, &pinnedBool, &lastActiveAt, &notifyEnabled); err != nil {
 			return nil, err
 		}
 		c.Name = name.String
@@ -214,10 +209,6 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 			t := parseTime(pinnedUpdAt.String)
 			c.PinnedUpdatedAt = &t
 		}
-		if pinnedLastReadAt.Valid && pinnedLastReadAt.String != "" {
-			t := parseTime(pinnedLastReadAt.String)
-			c.PinnedLastReadAt = &t
-		}
 		if lastActiveAt.Valid && lastActiveAt.String != "" {
 			t := parseTime(lastActiveAt.String)
 			c.LastActiveAt = &t
@@ -226,14 +217,23 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 		c.NotifyEnabled = notifyEnabled
 		c.MemberCount = memberCount
 		c.LastMessageID = lastMsgID.String
-		if unreadCount > 99 {
-			unreadCount = 99
-		}
-		c.UnreadCount = unreadCount
-		out = append(out, c)
+		rows2 = append(rows2, row{chat: c, lastRead: lastRead, pinnedLastReadAt: pinnedLastReadAt})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+
+	for _, r := range rows2 {
+		c := r.chat
+		if r.pinnedLastReadAt.Valid && r.pinnedLastReadAt.String != "" {
+			t := parseTime(r.pinnedLastReadAt.String)
+			c.PinnedLastReadAt = &t
+		}
+		c.UnreadCount = 0
+		if c.LastActiveAt != nil {
+			c.UnreadCount = d.UnreadCount(ctx, c.ID, *c.LastActiveAt)
+		}
+		out = append(out, c)
 	}
 
 	sort.SliceStable(out, func(i, j int) bool {
@@ -288,16 +288,30 @@ func (d *DB) FindDMBetween(ctx context.Context, a, b string) (*models.Chat, erro
 	return d.GetChat(ctx, id)
 }
 
-
-
 func (d *DB) DeleteChat(ctx context.Context, chatID string) error {
-	_, err := d.ExecContext(ctx, `DELETE FROM chats WHERE id = ?`, chatID)
+	tx, err := d.BeginTx(ctx, nil)
 	if err != nil {
-		logutil.Error("delete chat %s: %v", chatID, err)
-	} else {
-		logutil.Warn("deleted chat %s", chatID)
+		return err
 	}
-	return err
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM reactions WHERE message_id IN (SELECT id FROM messages WHERE chat_id = ?)`, chatID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM messages WHERE chat_id = ?`, chatID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM chat_members WHERE chat_id = ?`, chatID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM chats WHERE id = ?`, chatID); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	logutil.Warn("deleted chat %s and all associated data", chatID)
+	return nil
 }
 
 func (d *DB) RenameChat(ctx context.Context, chatID, name string) error {
@@ -358,5 +372,3 @@ func (d *DB) UpdateLastRead(ctx context.Context, chatID, userID, messageID strin
 	)
 	return err
 }
-
-
