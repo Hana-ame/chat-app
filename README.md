@@ -87,15 +87,15 @@ cd server && go test ./... -cover -count=1 -timeout 120s
 | DELETE | `/api/chats/:id/messages/:mid/reactions/:emoji` | Bearer | Remove |
 | PUT | `upload.moonchan.xyz/api/upload` | - | External file upload (binary stream) |
 | POST | `/api/ai/chat` | Bearer | AI Chat (streaming SSE, multi-source) |
-| GET | `/ws?access_token=` | - | WebSocket gateway |
-| GET | `/api/events?access_token=` | - | SSE event stream |
+| GET | `/ws` | Bearer/cookie | WebSocket gateway |
+| GET | `/api/events` | Bearer/cookie | SSE event stream |
 
 ## WS / SSE / Polling
 
 前端支持三种实时模式，可在侧边栏切换：
 
-- **WS**: WebSocket, `GET /ws?access_token=token`
-- **SSE**: Server-Sent Events, `GET /api/events?access_token=token`
+- **WS**: WebSocket, `GET /ws`（`Authorization: Bearer` 或 `access_token` Cookie）
+- **SSE**: Server-Sent Events, `GET /api/events`（同上，浏览器自动带 Cookie）
 - **Polling**: HTTP轮询 `/api/chats` + `/api/messages`, 2s 间隔
 
 ## WS Protocol

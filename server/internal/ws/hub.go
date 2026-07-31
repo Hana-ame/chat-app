@@ -302,7 +302,10 @@ func (h *Hub) NotifyUserLeftChat(userID, chatID string) {
 }
 
 func (h *Hub) BroadcastUserUpdate(u *models.User) {
-	env := envelope(OpUserUpdate, u)
+	// Never broadcast the email address to other users.
+	redacted := *u
+	redacted.Email = ""
+	env := envelope(OpUserUpdate, &redacted)
 	h.mu.RLock()
 	all := make([]*Client, 0)
 	wsUserIDs := make(map[string]struct{})

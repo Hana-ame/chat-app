@@ -180,6 +180,11 @@ export const useChatStore = create((set, get) => ({
   onMessageCreate(msg) {
     if (get()._optimisticIds.has(msg.id)) {
       get()._optimisticIds.delete(msg.id);
+      set(s => ({
+        messages: s.activeChatId === msg.chat_id
+          ? s.messages.map(m => m.id === msg.id ? { ...m, ...msg, optimistic: false, streaming: false } : m)
+          : s.messages,
+      }));
       return;
     }
     let wasNew = false;
@@ -270,6 +275,19 @@ export const useChatStore = create((set, get) => ({
     return m;
   },
 
+  // Merge two message lists by id (later entries win), preserving the
+  // order of the first list. Used to combine server pages with live or
+  // optimistic messages without duplicates or data loss.
+  _mergeMessages(a, b) {
+    const byId = new Map();
+    for (const m of a) byId.set(m.id, m);
+    for (const m of b) {
+      if (!byId.has(m.id)) byId.set(m.id, m);
+      else byId.set(m.id, { ...byId.get(m.id), ...m });
+    }
+    return [...byId.values()];
+  },
+
   _msgLoadId: 0,
   async loadMessages(token, chatId, before) {
     const loadId = ++get()._msgLoadId;
@@ -278,9 +296,10 @@ export const useChatStore = create((set, get) => ({
       const norm = (data.messages || []).map(m => get()._normalize(m));
       set(s => {
         if (s._msgLoadId !== loadId) return {};
-        return {
-          messages: before ? [...norm, ...s.messages] : norm,
-        };
+        const merged = before
+          ? get()._mergeMessages(norm, s.messages)
+          : get()._mergeMessages(s.messages, norm);
+        return { messages: merged };
       });
     } catch (e) { console.error('loadMessages error:', e); }
   },
@@ -361,7 +380,17 @@ export const useChatStore = create((set, get) => ({
   },
 
   reset() {
-    set({ chats: [], activeChatId: null, messages: [], pinnedMessage: {} });
+    set({
+      chats: [], activeChatId: null, messages: [], pinnedMessage: {},
+      onlineUserIds: [], notifyEnabled: {}, _localStreaming: {},
+      _optimisticIds: new Set(), pendingReply: null,
+      wsReady: false, sseReady: false,
+    });
+  },
+
+  disconnect() {
+    coord.disconnect();
+    set({ wsReady: false, sseReady: false });
   },
 
 }));

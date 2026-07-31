@@ -70,15 +70,26 @@ func (s *MessageService) Edit(ctx context.Context, chatID, messageID, userID, co
 	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return nil, err
 	}
-	msg, err := s.db.UpdateMessage(ctx, messageID, userID, content)
+	// Validate that the message belongs to the requested chat BEFORE any
+	// write: UpdateMessage only filters by message ID and author, so a
+	// mismatched chatID would otherwise silently edit a message in another
+	// chat the caller is also a member of.
+	existing, err := s.db.GetMessage(ctx, messageID)
 	if err != nil {
 		if isNotFound(err) {
 			return nil, ErrNotFound
 		}
 		return nil, err
 	}
-	if msg.ChatID != chatID {
+	if existing.ChatID != chatID {
 		return nil, ErrInvalidInput
+	}
+	msg, err := s.db.UpdateMessage(ctx, messageID, userID, content)
+	if err != nil {
+		if isNotFound(err) {
+			return nil, ErrNotFound
+		}
+		return nil, err
 	}
 	if s.hub != nil {
 		s.hub.BroadcastMessageUpdate(msg)

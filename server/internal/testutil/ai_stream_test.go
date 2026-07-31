@@ -484,23 +484,11 @@ func TestSendStreamMessage_ReplayNonexistentMessage(t *testing.T) {
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
-	// replay a nonexistent message — should return SSE with just [DONE]
+	// replay a nonexistent message — should 404 (message not found)
 	replayRes := f.Do(t, "GET", "/api/chats/"+chat.ID+"/messages/nonexistent-msg/stream", alice.AccessToken, nil)
 	defer replayRes.Body.Close()
-	if replayRes.StatusCode != 200 {
-		t.Fatalf("replay: want 200 got %d", replayRes.StatusCode)
-	}
-	scanner := bufio.NewScanner(replayRes.Body)
-	foundDone := false
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "data: [DONE]" {
-			foundDone = true
-			break
-		}
-	}
-	if !foundDone {
-		t.Fatal("should receive [DONE] even for nonexistent message")
+	if replayRes.StatusCode != 404 {
+		t.Fatalf("replay: want 404 got %d", replayRes.StatusCode)
 	}
 }
 

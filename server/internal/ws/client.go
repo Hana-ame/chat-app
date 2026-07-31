@@ -120,6 +120,14 @@ func (c *Client) readPump() {
 				continue
 			}
 			if c.hub.memberStore != nil {
+				ok, err := c.hub.memberStore.IsChatMember(context.Background(), p.ChatID, c.userID)
+				if err != nil {
+					logutil.Error("ws: check member for list members %s: %v", logutil.SafeID(p.ChatID), err)
+					continue
+				}
+				if !ok {
+					continue
+				}
 				members, err := c.hub.memberStore.GetChatMembers(context.Background(), p.ChatID)
 				if err == nil {
 					b, err := json.Marshal(map[string]any{"chat_id": p.ChatID, "members": members})

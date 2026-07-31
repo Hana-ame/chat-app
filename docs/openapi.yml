@@ -960,15 +960,9 @@ paths:
         1. 客户端连接后立即收到 `ready` 事件，包含 user、chats、online_user_ids
         2. 后续收到 message_create、message_update、message_delete、reaction_update 等事件
 
-        认证方式: 查询参数 `access_token`（WebSocket 不支持自定义 header 的 fallback）
+        认证方式: `Authorization: Bearer <access_token>` 请求头，或 `access_token` Cookie（浏览器自动携带）。不接受 URL 查询参数传 token（防访问日志 / Referer 泄漏）
       operationId: sseEvents
       tags: [Realtime]
-      parameters:
-        - name: access_token
-          in: query
-          required: false
-          schema:
-            type: string
       responses:
         "200":
           description: SSE 事件流
@@ -984,18 +978,11 @@ paths:
       description: |
         WebSocket 端点，用于实时消息推送。
 
-        认证: URL 查询参数 `token` 携带 access_token。
-        （WebSocket 不支持自定义 header，因此用 URL 参数传递。）
+        认证: `Authorization: Bearer <access_token>` 请求头，或 `access_token` Cookie（浏览器自动携带）。不接受 URL 查询参数传 token（防访问日志 / Referer 泄漏）。
 
         事件类型与 SSE 一致。
       operationId: wsConnect
       tags: [Realtime]
-      parameters:
-        - name: token
-          in: query
-          required: true
-          schema:
-            type: string
       responses:
         "101":
           description: 切换协议成功

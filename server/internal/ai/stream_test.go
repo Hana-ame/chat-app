@@ -10,6 +10,84 @@ import (
 	"testing"
 )
 
+func TestValidateEndpoint(t *testing.T) {
+	tests := []struct {
+		name             string
+		endpoint         string
+		allowPrivateIPs  bool
+		wantErr          bool
+	}{
+		{"https public host", "https://api.openai.com/v1/chat/completions", false, false},
+		{"http public host", "http://example.com/chat", false, false},
+		{"bad scheme", "ftp://example.com/x", false, true},
+		{"no host", "http:///x", false, true},
+		{"invalid url", "://bad", false, true},
+		{"literal loopback", "http://127.0.0.1:8080/chat", false, true},
+		{"literal private", "http://192.168.1.10/chat", false, true},
+		{"literal link-local", "http://169.254.169.254/latest/meta-data", false, true},
+		{"localhost name", "http://localhost:11434/v1/chat/completions", false, true},
+		{"loopback allowed by flag", "http://127.0.0.1:11434/chat", true, false},
+		{"private allowed by flag", "http://192.168.1.10/chat", true, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateEndpoint(tt.endpoint, tt.allowPrivateIPs)
+			if tt.wantErr && err == nil {
+				t.Fatalf("expected error for %q", tt.endpoint)
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("unexpected error for %q: %v", tt.endpoint, err)
+			}
+		})
+	}
+}
+
+func TestStreamFromSource_NoRedirectFollow(t *testing.T) {
+	// a 3xx must surface as an error (redirect not followed)
+	targetHit := false
+	mux := http.NewServeMux()
+	mux.HandleFunc("/redirect", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/chat", http.StatusFound)
+	})
+	mux.HandleFunc("/chat", func(w http.ResponseWriter, r *http.Request) {
+		targetHit = true
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	src := Source{Endpoint: srv.URL + "/redirect", AuthKey: "key", Body: json.RawMessage(`{}`)}
+	_, err := StreamFromSource(context.Background(), src)
+	if err == nil {
+		t.Fatal("expected error for 3xx response")
+	}
+	if targetHit {
+		t.Fatal("redirect target should not have been requested")
+	}
+	if !strings.Contains(err.Error(), "302") {
+		t.Fatalf("error should mention status code, got: %v", err)
+	}
+}
+
+func TestStreamFromSource_ErrorBodyNotEchoed(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/chat", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"error":"internal-secret-detail"}`))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	src := Source{Endpoint: srv.URL + "/chat", AuthKey: "key", Body: json.RawMessage(`{}`)}
+	_, err := StreamFromSource(context.Background(), src)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if strings.Contains(err.Error(), "internal-secret-detail") {
+		t.Fatalf("upstream body leaked in error: %v", err)
+	}
+}
+
 func TestEnsureStreamEnabled(t *testing.T) {
 	t.Run("adds stream:true", func(t *testing.T) {
 		body := json.RawMessage(`{"model":"test","messages":[]}`)

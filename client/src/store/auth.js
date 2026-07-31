@@ -71,6 +71,7 @@ export const useAuthStore = create((set, get) => {
         try { await api.logout(get().accessToken); } catch (e) { console.error('Logout error:', e); }
       }
       const { useChatStore } = await import('./chat');
+      useChatStore.getState().disconnect();
       useChatStore.getState().reset();
       set({ user: null, accessToken: null });
     },

@@ -73,15 +73,18 @@ func (d *DB) ListPublicChats(ctx context.Context, page, limit int) ([]models.Cha
 }
 
 func (d *DB) JoinChatByID(ctx context.Context, chatID, userID string) error {
-	var visibility string
+	var typ, visibility string
 	err := d.QueryRowContext(ctx,
-		`SELECT COALESCE(visibility,'private') FROM chats WHERE id = ?`, chatID,
-	).Scan(&visibility)
+		`SELECT type, COALESCE(visibility,'') FROM chats WHERE id = ?`, chatID,
+	).Scan(&typ, &visibility)
 	if err != nil {
 		return err
 	}
-	if visibility == "private" {
-		logutil.Warn("join private chat %s rejected for %s", chatID, userID)
+	// Only group chats with public/unlisted visibility are joinable. DM and
+	// notify chats store an empty visibility — COALESCE keeps it as '', so it
+	// must be rejected explicitly.
+	if typ != "group" || (visibility != "public" && visibility != "unlisted") {
+		logutil.Warn("join non-public chat %s rejected for %s", chatID, userID)
 		return errors.New("chat is private, invitation required")
 	}
 	res, err := d.ExecContext(ctx,

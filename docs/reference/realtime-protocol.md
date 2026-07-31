@@ -4,8 +4,10 @@
 
 Two transport modes, both deliver the same event format:
 
-- **WebSocket** (`GET /ws?access_token=...`): Primary, bidirectional
-- **SSE** (`GET /api/events?access_token=...`): Fallback, unidirectional
+- **WebSocket** (`GET /ws`): Primary, bidirectional
+- **SSE** (`GET /api/events`): Fallback, unidirectional
+
+两者认证方式相同：`Authorization: Bearer <access_token>` 请求头，或 `access_token` Cookie（浏览器自动携带）。不接受 URL 查询参数传 token（防访问日志 / Referer 泄漏）。
 
 SSE delivers the same events as WS but does not receive client-to-server ops (typing, subscribe, etc.).
 

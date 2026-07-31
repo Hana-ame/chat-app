@@ -78,6 +78,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 		// protected by ?delete=<hash> key instead.
 		r.Group(func(r chi.Router) {
 			r.Use(chimid.Timeout(s.Cfg.UploadTimeout))
+			r.Use(httprate.LimitByIP(60, 1*time.Minute))
 			r.Get("/upload", s.AAPIUpload)
 			r.Put("/upload", s.AAPIUpload)
 			r.Put("/upload/*", s.AAPIUpload)

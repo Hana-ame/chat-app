@@ -162,7 +162,7 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 		`SELECT c.id, c.type, c.name, c.icon_color, c.avatar_url, c.banner_url, c.banner_opacity, c.background_url, c.visibility, c.owner_id, c.created_at, c.last_message_at, c.last_message_id,
 		        cm.last_read_message_id, c.pinned_message, c.pinned_updated_at, c.member_count,
 		        cm.pinned_last_read_at, cm.pinned, cm.last_active_at,
-		        cm.notify_enabled
+		        cm.notify_enabled, cm.unread_count
 		 FROM chat_members cm JOIN chats c ON c.id = cm.chat_id
 		 WHERE cm.user_id = ?
 		 ORDER BY COALESCE(c.last_message_at, c.created_at) DESC`,
@@ -187,7 +187,8 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 		var created string
 		var memberCount int
 		var pinnedBool, notifyEnabled bool
-		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.AvatarURL, &c.BannerURL, &c.BannerOpacity, &c.BackgroundURL, &visibility, &owner, &created, &lastMsg, &lastMsgID, &lastRead, &pinnedMsg, &pinnedUpdAt, &memberCount, &pinnedLastReadAt, &pinnedBool, &lastActiveAt, &notifyEnabled); err != nil {
+		var unreadCount int
+		if err := rows.Scan(&c.ID, &c.Type, &name, &c.IconColor, &c.AvatarURL, &c.BannerURL, &c.BannerOpacity, &c.BackgroundURL, &visibility, &owner, &created, &lastMsg, &lastMsgID, &lastRead, &pinnedMsg, &pinnedUpdAt, &memberCount, &pinnedLastReadAt, &pinnedBool, &lastActiveAt, &notifyEnabled, &unreadCount); err != nil {
 			return nil, err
 		}
 		c.Name = name.String
@@ -217,6 +218,10 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 		c.NotifyEnabled = notifyEnabled
 		c.MemberCount = memberCount
 		c.LastMessageID = lastMsgID.String
+		if unreadCount > 99 {
+			unreadCount = 99
+		}
+		c.UnreadCount = unreadCount
 		rows2 = append(rows2, row{chat: c, lastRead: lastRead, pinnedLastReadAt: pinnedLastReadAt})
 	}
 	if err := rows.Err(); err != nil {
@@ -228,10 +233,6 @@ func (d *DB) ListUserChats(ctx context.Context, userID string) ([]models.Chat, e
 		if r.pinnedLastReadAt.Valid && r.pinnedLastReadAt.String != "" {
 			t := parseTime(r.pinnedLastReadAt.String)
 			c.PinnedLastReadAt = &t
-		}
-		c.UnreadCount = 0
-		if c.LastActiveAt != nil {
-			c.UnreadCount = d.UnreadCount(ctx, c.ID, *c.LastActiveAt)
 		}
 		out = append(out, c)
 	}

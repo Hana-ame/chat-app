@@ -22,9 +22,13 @@ type StreamService struct {
 	liveSubs   map[string][]chan struct{}
 	liveDone   map[string]bool
 	liveAuthor map[string]*models.User
+	liveChat   map[string]string
 }
 
 func (s *StreamService) StartStream(ctx context.Context, chatID, userID, msgID string, src ai.Source, author *models.User) (<-chan ai.Chunk, error) {
+	if err := ai.ValidateEndpoint(src.Endpoint, s.Cfg.AIAllowPrivateIPs); err != nil {
+		return nil, err
+	}
 	ch, err := ai.StreamFromSource(ctx, src)
 	if err != nil {
 		return nil, err
@@ -34,6 +38,7 @@ func (s *StreamService) StartStream(ctx context.Context, chatID, userID, msgID s
 	s.liveChunks[msgID] = []ChunkInfo{}
 	s.liveDone[msgID] = false
 	s.liveAuthor[msgID] = author
+	s.liveChat[msgID] = chatID
 	s.liveMu.Unlock()
 
 	streamURL := "/api/chats/" + chatID + "/messages/" + msgID + "/stream"
@@ -85,6 +90,7 @@ func (s *StreamService) FinishStream(ctx context.Context, chatID, userID, msgID,
 		delete(s.liveChunks, msgID)
 		delete(s.liveSubs, msgID)
 		delete(s.liveAuthor, msgID)
+		delete(s.liveChat, msgID)
 		s.liveMu.Unlock()
 	})
 }
@@ -162,4 +168,12 @@ func (s *StreamService) Unsubscribe(msgID string, sub chan struct{}) {
 
 func (s *StreamService) GetMessage(ctx context.Context, msgID string) (*models.Message, error) {
 	return s.db.GetMessage(ctx, msgID)
+}
+
+// LiveChatID returns the chat a live (in-buffer) stream message belongs to.
+func (s *StreamService) LiveChatID(msgID string) (string, bool) {
+	s.liveMu.Lock()
+	defer s.liveMu.Unlock()
+	chatID, ok := s.liveChat[msgID]
+	return chatID, ok
 }

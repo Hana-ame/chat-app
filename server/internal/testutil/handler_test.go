@@ -1136,7 +1136,8 @@ func TestSSEConnection(t *testing.T) {
 	f := testutil.New(t)
 	alice := f.Register(t, "sse@t.t", "SSEUser", "password123")
 
-	req, _ := http.NewRequest("GET", f.HTTP.URL+"/api/events?access_token="+alice.AccessToken, nil)
+	req, _ := http.NewRequest("GET", f.HTTP.URL+"/api/events", nil)
+	req.Header.Set("Authorization", "Bearer "+alice.AccessToken)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("sse connect: %v", err)
@@ -1169,7 +1170,7 @@ func TestSSEConnection(t *testing.T) {
 func TestSSEInvalidToken(t *testing.T) {
 	f := testutil.New(t)
 
-	res := f.Do(t, "GET", "/api/events?access_token=invalid-jwt", "", nil)
+	res := f.Do(t, "GET", "/api/events", "invalid-jwt", nil)
 	defer res.Body.Close()
 	if res.StatusCode != 401 {
 		t.Fatalf("sse invalid token: want 401 got %d", res.StatusCode)

@@ -1557,20 +1557,10 @@
     "/api/events": {
       "get": {
         "summary": "SSE 事件流",
-        "description": "Server-Sent Events 端点，用于实时推送。\n\n连接流程:\n1. 客户端连接后立即收到 `ready` 事件，包含 user、chats、online_user_ids\n2. 后续收到 message_create、message_update、message_delete、reaction_update 等事件\n\n认证方式: 查询参数 `access_token`（WebSocket 不支持自定义 header 的 fallback）\n",
+        "description": "Server-Sent Events 端点，用于实时推送。\n\n连接流程:\n1. 客户端连接后立即收到 `ready` 事件，包含 user、chats、online_user_ids\n2. 后续收到 message_create、message_update、message_delete、reaction_update 等事件\n\n认证方式: `Authorization: Bearer <access_token>` 请求头，或 `access_token` Cookie（浏览器自动携带）。不接受 URL 查询参数传 token（防访问日志 / Referer 泄漏）\n",
         "operationId": "sseEvents",
         "tags": [
           "Realtime"
-        ],
-        "parameters": [
-          {
-            "name": "access_token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
         ],
         "responses": {
           "200": {
@@ -1589,20 +1579,10 @@
     "/ws": {
       "get": {
         "summary": "WebSocket 连接（实时消息）",
-        "description": "WebSocket 端点，用于实时消息推送。\n\n认证: URL 查询参数 `token` 携带 access_token。\n（WebSocket 不支持自定义 header，因此用 URL 参数传递。）\n\n事件类型与 SSE 一致。\n",
+        "description": "WebSocket 端点，用于实时消息推送。\n\n认证: `Authorization: Bearer <access_token>` 请求头，或 `access_token` Cookie（浏览器自动携带）。不接受 URL 查询参数传 token（防访问日志 / Referer 泄漏）。\n\n事件类型与 SSE 一致。\n",
         "operationId": "wsConnect",
         "tags": [
           "Realtime"
-        ],
-        "parameters": [
-          {
-            "name": "token",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
         ],
         "responses": {
           "101": {

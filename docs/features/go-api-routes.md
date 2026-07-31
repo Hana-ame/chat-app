@@ -37,7 +37,6 @@ X-Content-Type-Options: nosniff
 
 - **Header:** `Authorization: Bearer <token>` (primary)
 - **Cookie fallback:** `access_token` httpOnly cookie
-- **Query fallback:** `?access_token=<token>` (for SSE/WS; deprecated, will be removed)
 - **Algorithm:** HS256 (`github.com/golang-jwt/jwt/v5`)
 - **Context injection:** `*models.User` under key `"user"`, raw token under key `"token"`
 
@@ -65,8 +64,8 @@ X-Content-Type-Options: nosniff
 
 | # | Method | Path | Handler | Auth | Notes |
 |---|--------|------|---------|------|-------|
-| 9 | `GET` | `/ws` | `gateway.ServeHTTP` | `?access_token=` | WebSocket, gorilla/websocket |
-| 10 | `GET` | `/api/events` | `s.SSE` | Bearer or `?access_token=` | SSE stream |
+| 9 | `GET` | `/ws` | `gateway.ServeHTTP` | Bearer or `access_token` Cookie | WebSocket, gorilla/websocket |
+| 10 | `GET` | `/api/events` | `s.SSE` | Bearer or `access_token` Cookie | SSE stream |
 
 ### Users
 

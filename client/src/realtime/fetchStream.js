@@ -6,6 +6,12 @@ export async function fetchStream(url, msgId, onChunk) {
   const token = getState().accessToken;
   let contentAcc = '';
   let thinkingAcc = '';
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    onChunk(msgId, contentAcc, thinkingAcc, true);
+  };
   try {
     const res = await fetch(url, { headers: token ? { Authorization: 'Bearer ' + token } : {} });
     if (!res.ok) { console.error('fetchStream: HTTP', res.status); return; }
@@ -37,6 +43,7 @@ export async function fetchStream(url, msgId, onChunk) {
         } catch {}
       }
     }
-    onChunk(msgId, contentAcc, thinkingAcc, true);
+    finish();
   } catch (e) { console.error('fetchStream error:', e); }
+  finally { finish(); }
 }

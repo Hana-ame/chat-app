@@ -28,9 +28,11 @@ const API_BASE = IS_PAGES ? 'https://wsl-8080.moonchan.xyz' : '';
 
 ## 📡 实时通信
 
-**主协议:** WebSocket (`ws://` / `wss://`) — `GET /ws?access_token={token}`
-**降级协议:** SSE — `api.sseUrl(token)` → `API_BASE + '/api/events?access_token={token}'`
+**主协议:** WebSocket (`ws://` / `wss://`) — `GET /ws`
+**降级协议:** SSE — `GET /api/events`
 
+> 两者认证均为 `Authorization: Bearer <access_token>` 请求头或 `access_token` Cookie（浏览器自动携带），不接受 URL 查询参数传 token。
+>
 > 前端优先使用 WebSocket；仅在 mock 模式或 WS 不可用时降级到 SSE。
 
 ---

@@ -37,6 +37,7 @@ func New(database *db.DB, hub *ws.Hub, cfg *config.Config) *Service {
 		liveSubs:   map[string][]chan struct{}{},
 		liveDone:   map[string]bool{},
 		liveAuthor: map[string]*models.User{},
+		liveChat:   map[string]string{},
 	}
 	return s
 }

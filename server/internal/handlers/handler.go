@@ -126,9 +126,9 @@ func bearerToken(r *http.Request) string {
 	if strings.HasPrefix(h, "Bearer ") {
 		return strings.TrimSpace(h[7:])
 	}
-	if t := r.URL.Query().Get("access_token"); t != "" {
-		return t
-	}
+	// Note: no ?access_token= query support — tokens in URLs leak via access
+	// logs and Referer headers. Use the Authorization header or the
+	// access_token cookie instead.
 	return ""
 }
 

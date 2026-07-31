@@ -521,15 +521,17 @@ multipart/form-data 上传，字段名 `file`。
 
 ## 实时推送
 
-### `GET /ws?token=<access_token>`
+### `GET /ws`
 
 WebSocket 端点。事件类型与 SSE 一致。
 
-认证：URL 查询参数 `token`。
+认证：`Authorization: Bearer <access_token>` 请求头，或 `access_token` Cookie（浏览器自动携带）。不接受 URL 查询参数传 token（防访问日志 / Referer 泄漏）。
 
-### `GET /api/events?access_token=<token>`
+### `GET /api/events`
 
 SSE 端点（Server-Sent Events），用于不支持 WebSocket 的客户端。
+
+认证：同上（`Authorization: Bearer` 请求头或 `access_token` Cookie）。
 
 #### 事件格式
 

@@ -7,14 +7,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
 )
 
-var aiHTTPClient = &http.Client{Timeout: 5 * time.Minute}
+var aiHTTPClient = &http.Client{
+	Timeout: 5 * time.Minute,
+	// Never follow redirects: an attacker-controlled endpoint must not be
+	// able to redirect the server to an internal address.
+	CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	},
+}
 
 type Source struct {
 	Endpoint string          `json:"endpoint"`
@@ -47,9 +56,10 @@ func StreamFromSource(ctx context.Context, src Source) (<-chan Chunk, error) {
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		return nil, fmt.Errorf("upstream returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		// Do not echo the upstream response body: it may leak internal
+		// service details when probing internal endpoints.
+		return nil, fmt.Errorf("upstream returned HTTP %d", resp.StatusCode)
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -73,6 +83,48 @@ func StreamFromSource(ctx context.Context, src Source) (<-chan Chunk, error) {
 	}
 
 	return ch, nil
+}
+
+// ValidateEndpoint rejects endpoints that are not http/https or that resolve
+// to private / loopback / link-local / reserved addresses, preventing the
+// server from being used as an SSRF proxy into internal networks.
+func ValidateEndpoint(endpoint string, allowPrivateIPs bool) error {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return fmt.Errorf("invalid endpoint URL: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("endpoint must use http or https scheme")
+	}
+	if u.Host == "" {
+		return fmt.Errorf("endpoint host is required")
+	}
+	if allowPrivateIPs {
+		return nil
+	}
+	ips, err := net.LookupHost(u.Hostname())
+	if err != nil {
+		return fmt.Errorf("cannot resolve endpoint host: %w", err)
+	}
+	for _, ip := range ips {
+		parsed := net.ParseIP(ip)
+		if parsed == nil {
+			continue
+		}
+		if isRestrictedIP(parsed) {
+			return fmt.Errorf("endpoint host %q resolves to a private or reserved address", u.Host)
+		}
+	}
+	return nil
+}
+
+func isRestrictedIP(ip net.IP) bool {
+	return ip.IsLoopback() ||
+		ip.IsPrivate() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsUnspecified() ||
+		ip.IsMulticast()
 }
 
 func ensureStreamEnabled(body json.RawMessage) (json.RawMessage, error) {

@@ -71,12 +71,9 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			tok = c.Value
 		}
 	}
-	if tok == "" {
-		tok = r.URL.Query().Get("access_token")
-		if tok != "" {
-			logutil.Warn("ws connect: access_token in URL query — prefer Authorization header")
-		}
-	}
+	// Note: no ?access_token= query support — tokens in URLs leak via access
+	// logs and Referer headers. Browsers send cookies automatically; other
+	// clients must use the Authorization header or the cookie.
 	if tok == "" {
 		logutil.Warn("ws connect: missing access_token")
 		http.Error(w, "missing access_token", http.StatusUnauthorized)

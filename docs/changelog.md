@@ -5848,3 +5848,45 @@ f73e3b3 bump v0.8.12 -> v0.8.13
 ### 验证
 - `go test ./...`: ✅（除上游既有 flaky `TestSetPinnedMessage_MultipleUpdates`，上游 `b51b7cb2` 同样失败）
 - `/api/local/*`、`/api/upload`、`/api/version` 均 200
+
+---
+
+## 2026-07-31 子代理审查修复（安全 C1-C4 / 加固 H / 并发 M1-M8）
+
+### 背景
+子代理对 server + client + docs 全面审查，按严重度修复全部发现项；本地与服务端测试均通过。
+
+### 修复清单
+
+| 严重度 | 分类 | 描述 |
+|--------|------|------|
+| 🔴 CRITICAL | C1 | **`/api/local/*` 路径穿越** — `local_upload.go` 规范化 + 目录前缀校验，拒绝 `..` 逃逸 |
+| 🔴 CRITICAL | C2 | **AI 流式 endpoint SSRF** — 新增 `ai.ValidateEndpoint`（`ParseIP` + 私网/环回拒绝），`service/stream.go` 在 `StartStream` 调用；配置 `AIAllowPrivateIPs` / `CHAT_AI_ALLOW_PRIVATE` 可控 |
+| 🔴 CRITICAL | C3 | **流式消息重放越权** — `messages.go` 增加 `LiveChatID` 校验；且将 `SubscribeFrom`/`GetMessage`/`LiveChatID` 全部移到 `WriteHeader` 之前，修复 404/403 在 header 之后写不出的问题（DB 路径重放 + `[DONE]`） |
+| 🔴 CRITICAL | C4 | **WS 消息类型白名单** — `ws/client.go` 仅接受已注册类型，未知消息类型拒绝 |
+| 🟠 HIGH | H2 | **迁移期 SQLite FK no-op** — `db_fixups.go` 单连接 + `PRAGMA foreign_keys=OFF` 移到 BEGIN 之前 + 事务 + 重建索引 |
+| 🟠 HIGH | H4 | **access_token 从 URL 移除** — `handler.go` 删除 query 回退、`sse.go` 警告清理、`ws/gateway.go` 删除 `?access_token=` 回退（防 Referer/日志泄漏）；`testutil.WSURL` 同步不带 query |
+| 🟠 HIGH | H5 | **前端实时通道整理** — `fetchStream.js` 重连/abort 语义、`notifyMessage.js` 通知去重、mock transport 同步 |
+| 🟡 MEDIUM | M1 | **广播 email 泄漏** — `ws/hub.go` 广播前显式置空 `User.Email`（`omitempty`） |
+| 🟡 MEDIUM | M2/M3/M4 | **并发修复** — `service/chat.go` `dmMu` 锁、`db/chats_ext.go` 缓存一致性、`db/message.go` 竞态 |
+| 🟡 MEDIUM | M5/M6 | **前端状态清理** — 退出登录/切换 chat 时清空 stale 状态（auth.js / chat.js） |
+| 🟡 MEDIUM | M7/M8 | **`aapiLocalOnce` 懒加载竞态**、**DeleteChat 级联清理**（reactions/messages/chat_members 事务内删除） |
+| 🔵 LOW | H1 | 审查项中非 bug 的疑点，已在本文档记录为已验证项，不改代码 |
+| 🔵 LOW | 测试 | `util_test.go` 断言 query token 被拒；SSE 测试改 `Authorization: Bearer`；`ReplayNonexistentMessage` 期望 404；`ai/stream_test.go` `NoRedirectFollow` 修正 `:=` 遮蔽 bug（`targetHit` 模式） |
+| 🔵 LOW | 性能 | 修复流式重放测试 300s 卡死 — `flusher, ok := w.(http.Flusher)` 遮蔽 `SubscribeFrom` 返回的 `ok`，导致 DB 路径被跳过并等待 5 分钟 deadline（300s → 0.16s） |
+
+### Affected 文件
+- `server/internal/handlers/messages.go`、`local_upload.go`、`handler.go`、`sse.go`、`util_test.go`
+- `server/internal/ws/gateway.go`、`hub.go`、`client.go`
+- `server/internal/service/stream.go`、`chat.go`、`message.go`
+- `server/internal/db/chats.go`、`chats_ext.go`、`message.go`、`db_fixups.go`
+- `server/internal/ai/stream.go`、`config/config.go`
+- `server/internal/testutil/client.go`、`handler_test.go`、`ai_stream_test.go`
+- `client/src/realtime/fetchStream.js`、`transports/mock.js`、`store/auth.js`、`store/chat.js`、`utils/notifyMessage.js`
+- 文档同步：`docs/api.md`、`README.md`、`docs/openapi.yml`、`docs/features/go-api-routes.md`、`docs/features/api-endpoints.md`、`docs/reference/realtime-protocol.md`、`server/internal/handlers/swagger.json`（WS/SSE 认证改为 Bearer/Cookie，无 URL token 参数）
+
+### 验证
+- `go build ./...`: ✅
+- `go vet ./...`: ✅
+- `go test ./...`: ✅（10 包全绿；上游既有 flaky `TestSetPinnedMessage_MultipleUpdates` 除外，上游 `b51b7cb2` 同样失败）
+- `vite build`: ✅

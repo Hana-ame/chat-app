@@ -107,27 +107,58 @@ func migrateV2DropChatTypeCheck(ctx context.Context, d *DB) error {
 	}
 
 	schema := strings.Join(defs, ", ")
-
 	createSQL := fmt.Sprintf(`CREATE TABLE chats_new (%s)`, schema)
-	if _, err := d.ExecContext(ctx, `PRAGMA foreign_keys=OFF`); err != nil {
+
+	// The whole rebuild must run on ONE connection and inside a transaction:
+	//  1. PRAGMA foreign_keys is a no-op inside a transaction, so disable it
+	//     on the dedicated connection BEFORE BEGIN. Otherwise DROP TABLE
+	//     performs an implicit DELETE FROM chats, which cascades to
+	//     messages.chat_id and wipes every message.
+	//  2. A transaction makes the drop+rename atomic — a crash between the
+	//     two would otherwise lose the chats table entirely.
+	conn, err := d.Conn(ctx)
+	if err != nil {
 		return err
 	}
-	if _, err := d.ExecContext(ctx, createSQL); err != nil {
+	defer conn.Close()
+	if _, err := conn.ExecContext(ctx, `PRAGMA foreign_keys=OFF`); err != nil {
+		return fmt.Errorf("disable foreign keys: %w", err)
+	}
+	defer func() {
+		if _, err := conn.ExecContext(context.Background(), `PRAGMA foreign_keys=ON`); err != nil {
+			logutil.Error("re-enable foreign keys after chats rebuild: %v", err)
+		}
+	}()
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, createSQL); err != nil {
+		tx.Rollback()
 		return fmt.Errorf("create chats_new: %w", err)
 	}
-	if _, err := d.ExecContext(ctx,
+	if _, err := tx.ExecContext(ctx,
 		fmt.Sprintf(`INSERT INTO chats_new (%s) SELECT %s FROM chats`, colList, colList),
 	); err != nil {
+		tx.Rollback()
 		return fmt.Errorf("copy chats data: %w", err)
 	}
-	if _, err := d.ExecContext(ctx, `DROP TABLE chats`); err != nil {
+	if _, err := tx.ExecContext(ctx, `DROP TABLE chats`); err != nil {
+		tx.Rollback()
 		return fmt.Errorf("drop chats: %w", err)
 	}
-	if _, err := d.ExecContext(ctx, `ALTER TABLE chats_new RENAME TO chats`); err != nil {
+	if _, err := tx.ExecContext(ctx, `ALTER TABLE chats_new RENAME TO chats`); err != nil {
+		tx.Rollback()
 		return fmt.Errorf("rename chats_new: %w", err)
 	}
-	if _, err := d.ExecContext(ctx, `PRAGMA foreign_keys=ON`); err != nil {
-		return err
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit chats rebuild: %w", err)
+	}
+
+	// DROP TABLE removed the indexes on chats; recreate them.
+	if _, err := conn.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_chats_last_msg ON chats(last_message_at DESC)`); err != nil {
+		return fmt.Errorf("recreate idx_chats_last_msg: %w", err)
 	}
 	logutil.Info("migrated chats table: removed type CHECK constraint, added notify support")
 	return nil

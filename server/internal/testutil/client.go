@@ -198,13 +198,15 @@ func (f *Fixture) DoMultipart(t *testing.T, method, path, token string, fields m
 	return res
 }
 
-func (f *Fixture) WSURL(token string) string {
+func (f *Fixture) WSURL(_ string) string {
 	u, _ := url.Parse(f.HTTP.URL)
 	scheme := "ws"
 	if u.Scheme == "https" {
 		scheme = "wss"
 	}
-	return scheme + "://" + u.Host + "/ws?access_token=" + url.QueryEscape(token)
+	// Tokens are never put in the URL; connect with the Authorization header
+	// or the access_token cookie instead.
+	return scheme + "://" + u.Host + "/ws"
 }
 
 // NewRecorder gives a quick httptest recorder for in-process testing.

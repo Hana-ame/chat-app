@@ -32,6 +32,11 @@ type Config struct {
 	UploadTimeout           time.Duration
 	ReadTimeout             time.Duration
 	ReadHeaderTimeout       time.Duration
+
+	// AIAllowPrivateIPs permits AI stream endpoints that resolve to private,
+	// loopback, or link-local addresses (e.g. a local ollama). Off by default
+	// to prevent SSRF from a public deployment.
+	AIAllowPrivateIPs bool
 }
 
 func getenv(key, def string) string {
@@ -64,6 +69,18 @@ func getenvDuration(key string, def time.Duration) time.Duration {
 		return def
 	}
 	return d
+}
+
+func getenvBool(key string, def bool) bool {
+	v := os.Getenv(key)
+	if v == "" {
+		return def
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return def
+	}
+	return b
 }
 
 func randomHex(n int) string {
@@ -113,6 +130,8 @@ func Load() *Config {
 		UploadTimeout:           getenvDuration("CHAT_UPLOAD_TIMEOUT", 5*time.Minute),
 		ReadTimeout:             getenvDuration("CHAT_READ_TIMEOUT", 10*time.Minute),
 		ReadHeaderTimeout:       getenvDuration("CHAT_READ_HEADER_TIMEOUT", 10*time.Second),
+
+		AIAllowPrivateIPs: getenvBool("CHAT_AI_ALLOW_PRIVATE", false),
 	}
 	logutil.Info("config loaded: addr=%s db=%s upload_dir=%s static_dir=%s base_url=%s",
 		cfg.Addr, cfg.DBPath, cfg.UploadDir, cfg.StaticDir, cfg.BaseURL)

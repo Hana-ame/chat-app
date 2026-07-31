@@ -7,10 +7,13 @@ export function maybeNotifyMessage(msg, chats) {
   const uid = st.user?.id;
   if (!uid || msg.chat_id === undefined) return;
   if (msg.type === 'stream') return;
+  const chat = chats.find(c => c.id === msg.chat_id);
+  // Per-chat notification toggle: off mutes everything (including mentions).
+  if (chat && chat.notify_enabled === false) return;
   const blocked = st.user?.notify_blocked || [];
   if (blocked.includes(msg.user_id)) return;
   const mentioned = msg.content?.includes(`<@${uid}>`);
-  const chatName = chats.find(c => c.id === msg.chat_id)?.name || 'Chat';
+  const chatName = chat?.name || 'Chat';
   const authorName = msg.author?.username || 'Someone';
   if (mentioned) {
     requestNotifyPermission().then(granted => {

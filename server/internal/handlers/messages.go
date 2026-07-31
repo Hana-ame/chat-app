@@ -194,12 +194,28 @@ func (s *Server) StreamMessageContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Resolve the stream source BEFORE writing headers so 4xx responses are
+	// still possible (writeError after WriteHeader is a no-op).
+	chunks, done, ok, notify := s.Services.Stream.SubscribeFrom(msgID, 0)
+	if !ok {
+		// buffer 不存在 → 从 DB 读（DB 路径已校验 msg.ChatID）
+		msg, err := s.Services.Stream.GetMessage(r.Context(), msgID)
+		if err != nil || msg.ChatID != chatID {
+			writeError(w, http.StatusNotFound, "not_found", "message not found")
+			return
+		}
+	} else if liveChat, live := s.Services.Stream.LiveChatID(msgID); !live || liveChat != chatID {
+		// Live buffer path: the message must belong to the requested chat.
+		writeError(w, http.StatusNotFound, "not_found", "message not found")
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
-	flusher, ok := w.(http.Flusher)
-	if !ok {
+	flusher, flushOK := w.(http.Flusher)
+	if !flushOK {
 		return
 	}
 
@@ -216,18 +232,18 @@ func (s *Server) StreamMessageContent(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 	}
 
-	chunks, done, ok, notify := s.Services.Stream.SubscribeFrom(msgID, 0)
-
-	// buffer 不存在 → 从 DB 读
 	if !ok {
+		// DB path: replay the stored content.
 		msg, err := s.Services.Stream.GetMessage(r.Context(), msgID)
-		if err == nil {
-			if msg.Thinking != "" {
-				writeSSE("reasoning", msg.Thinking)
-			}
-			if msg.Content != "" {
-				writeSSE("content", msg.Content)
-			}
+		if err != nil {
+			sendDone()
+			return
+		}
+		if msg.Thinking != "" {
+			writeSSE("reasoning", msg.Thinking)
+		}
+		if msg.Content != "" {
+			writeSSE("content", msg.Content)
 		}
 		sendDone()
 		return

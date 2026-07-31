@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -36,6 +37,30 @@ var contentTypeExt = map[string]string{
 	"application/zip":          ".zip",
 	"application/json":         ".json",
 	"application/octet-stream": ".bin",
+}
+
+// Content types that browsers would render/execute from the same origin.
+// Files with these types are rejected at upload time so they can never be
+// served inline as script under /api/local/.
+var dangerousContentTypes = map[string]bool{
+	"text/html":               true,
+	"application/xhtml+xml":   true,
+	"image/svg+xml":           true,
+	"text/xml":                true,
+	"application/xml":         true,
+	"text/javascript":         true,
+	"application/javascript":  true,
+	"application/x-javascript": true,
+	"text/x-javascript":       true,
+}
+
+// File extensions that browsers may render/execute. Served as
+// application/octet-stream with attachment disposition if ever found on disk
+// (legacy files uploaded before the upload-time guard).
+var dangerousExtensions = map[string]bool{
+	".html": true, ".htm": true, ".xhtml": true,
+	".svg": true, ".xml": true,
+	".js": true, ".mjs": true,
 }
 
 func (s *Server) aapiUploadDriver() *localfs.Driver {
@@ -94,7 +119,11 @@ func (s *Server) AAPIUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ct := r.Header.Get("Content-Type")
+	ct := normalizeContentType(r.Header.Get("Content-Type"))
+	if err := validateContentType(ct); err != nil {
+		writeError(w, http.StatusUnsupportedMediaType, "unsupported_media_type", err.Error())
+		return
+	}
 
 	if strings.HasPrefix(ct, "multipart/form-data") {
 		if err := r.ParseMultipartForm(s.Cfg.MaxUploadBytes); err != nil {
@@ -108,15 +137,21 @@ func (s *Server) AAPIUpload(w http.ResponseWriter, r *http.Request) {
 		}
 		defer file.Close()
 
-		fn := header.Filename
-		if fn == "" {
-			fn = uuid.New().String()[:8] + contentTypeToExt(header.Header.Get("Content-Type"))
+		fileCT := normalizeContentType(header.Header.Get("Content-Type"))
+		if fileCT == "" {
+			fileCT = "application/octet-stream"
 		}
+		if err := validateContentType(fileCT); err != nil {
+			writeError(w, http.StatusUnsupportedMediaType, "unsupported_media_type", err.Error())
+			return
+		}
+
+		fn := sanitizeUploadFilename(header.Filename, fileCT)
 
 		ts := strconv.Itoa(int(time.Now().Unix()))
 		path := ts + "/" + fn
 
-		result, err := drv.Put(path, header.Header.Get("Content-Type"), file)
+		result, err := drv.Put(path, fileCT, file)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "internal", err.Error())
 			return
@@ -133,10 +168,7 @@ func (s *Server) AAPIUpload(w http.ResponseWriter, r *http.Request) {
 	defer body.Close()
 
 	ts := strconv.Itoa(int(time.Now().Unix()))
-	fn := strings.TrimPrefix(chi.URLParam(r, "*"), "/")
-	if fn == "" || fn == "/" {
-		fn = uuid.New().String()[:8] + contentTypeToExt(ct)
-	}
+	fn := sanitizeUploadFilename(chi.URLParam(r, "*"), ct)
 	path := ts + "/" + fn
 
 	result, err := drv.Put(path, ct, body)
@@ -156,9 +188,35 @@ func (s *Server) AAPIUpload(w http.ResponseWriter, r *http.Request) {
 	s.aapiUploadResp(w, r, path)
 }
 
-func contentTypeToExt(ct string) string {
+func normalizeContentType(ct string) string {
 	ct = strings.SplitN(ct, ";", 2)[0]
-	ct = strings.TrimSpace(ct)
+	return strings.TrimSpace(strings.ToLower(ct))
+}
+
+func validateContentType(ct string) error {
+	if ct == "" {
+		return errors.New("missing content type")
+	}
+	if dangerousContentTypes[ct] {
+		return fmt.Errorf("content type %q is not allowed", ct)
+	}
+	return nil
+}
+
+// sanitizeUploadFilename strips any original extension and appends one derived
+// from the validated content type, so the stored extension can never imply an
+// executable content type at serve time (extension-derived).
+func sanitizeUploadFilename(fn, ct string) string {
+	base := filepath.Base(fn)
+	base = strings.TrimSuffix(base, filepath.Ext(base))
+	if base == "" || base == "." || base == "/" {
+		base = uuid.New().String()[:8]
+	}
+	return base + contentTypeToExt(ct)
+}
+
+func contentTypeToExt(ct string) string {
+	ct = normalizeContentType(ct)
 	if ext, ok := contentTypeExt[ct]; ok {
 		return ext
 	}
@@ -202,8 +260,14 @@ func (s *Server) AAPILocalFile(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Content-Disposition", "inline")
+	ext := strings.ToLower(filepath.Ext(raw))
+	if dangerousExtensions[ext] {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Disposition", "attachment")
+	} else {
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Content-Disposition", "inline")
+	}
 	w.Header().Set("Cache-Control", "public, max-age=2592000")
 	w.WriteHeader(http.StatusOK)
 	io.Copy(w, file)

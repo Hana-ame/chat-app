@@ -3,12 +3,14 @@ package service
 import (
 	"context"
 	"strings"
+	"sync"
 
 	"github.com/Hana-ame/chat-app/server/internal/models"
 )
 
 type ChatService struct {
 	*Service
+	dmMu sync.Mutex
 }
 
 func (s *ChatService) ListForUser(ctx context.Context, userID string) ([]models.Chat, error) {
@@ -75,6 +77,10 @@ func (s *ChatService) CreateOrGetDM(ctx context.Context, userID, otherUserID str
 		}
 		return nil, false, err
 	}
+	// Serialize find-or-create: two concurrent requests would otherwise both
+	// miss FindDMBetween and create duplicate DM chats.
+	s.dmMu.Lock()
+	defer s.dmMu.Unlock()
 	if dm, err := s.db.FindDMBetween(ctx, userID, otherUserID); err == nil {
 		return dm, true, nil
 	}

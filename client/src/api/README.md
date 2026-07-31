@@ -75,7 +75,7 @@
 
 | 方法 | 说明 |
 |------|------|
-| `sseUrl(token)` | 拼接 SSE 事件流 URL（含 `access_token` 参数） |
+| `sseUrl()` | 返回 SSE 事件流 URL（`/api/events`，token 走 Cookie） |
 
 ---
 

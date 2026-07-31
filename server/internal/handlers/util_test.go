@@ -70,10 +70,11 @@ func TestBearerToken_NoHeader(t *testing.T) {
 }
 
 func TestBearerToken_QueryParam(t *testing.T) {
+	// Query-param tokens are rejected: they leak via access logs and Referer.
 	r := httptest.NewRequest("GET", "/?access_token=query-token", nil)
 	tok := bearerToken(r)
-	if tok != "query-token" {
-		t.Fatalf("want query-token, got %s", tok)
+	if tok != "" {
+		t.Fatalf("want empty (query param rejected), got %s", tok)
 	}
 }
 
