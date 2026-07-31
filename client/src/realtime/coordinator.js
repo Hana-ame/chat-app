@@ -29,9 +29,11 @@ class RealtimeCoordinator {
   connect(mode, token) {
     this._cancelReconnect();
     this._gen++;
-    if (this._state === STATE.CONNECTING || this._state === STATE.DISCONNECTING) return;
-    this._reconnectAttempt = 0;
+    // Always restart with the requested transport, even if a previous
+    // connect is still in flight (e.g. mode switch before WS handshake
+    // completes). Old transport callbacks are gated by _gen.
     this._teardown();
+    this._reconnectAttempt = 0;
     this._state = STATE.CONNECTING;
     this._mode = mode;
     this._token = token;

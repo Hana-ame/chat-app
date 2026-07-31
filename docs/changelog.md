@@ -5943,3 +5943,22 @@ f73e3b3 bump v0.8.12 -> v0.8.13
 - Go `go test ./...`: ✅（10 包全绿）
 - `tsc --noEmit`: ✅
 - `npm run build`: ✅
+
+## 2026-07-31 Frontend CI mock 模式修复 + 启用 CI 测试套件
+
+### 背景
+`frontend-ci.yml` 的 mock-test 步骤自 v0.9.3 起失败：`ci.spec.mjs` / `real-time.spec.mjs` 被 `test.describe.skip` 禁用，CI 实际跑的是 boundary/ai-panel（本地 3/13 通过，弱断言）。
+
+### 修复
+- `auth.js mockLogin`：`setMode('poll')` → `setMode('mock')`（原逻辑打真实 API，CI 无后端 → ECONNREFUSED）。
+- `realtime/coordinator.js connect()`：移除 CONNECTING/DISCONNECTING 守卫，总是 teardown 后按请求的 transport 重启（mode 切换时 WS 握手未完成会被吞掉），旧回调由 `_gen` 门控。
+- `store/chat.js setMode`：token 取 `coord.token || useAuthStore.getState().accessToken`（首次登录 coord.token 为 null 导致 connect 不触发）。
+- mock 通知 API：`mock.js` 新增 `mockNotificationsList` / `mockNotifySend` / `mockNotifyMarkRead` / `mockNotifyDelete`；`client.ts` Proxy 对 `notifications` 返回 Promise 包装的 mock handlers（同步返回会导致 ChatView/ChatPage `.then/.catch` TypeError 崩溃）。
+- mock notify chat `created_at` 固定为 epoch（系统聊天，避免排序抖动）。
+- 测试修正：`openFirstChat` 改点 `.chat-item` 第 2 个（第 1 个是产品置顶的 Notifications 聊天，无消息，导致 `.msg-content` 超时）。
+- 启用套件：`ci.spec.mjs` / `real-time.spec.mjs` 移除 `test.describe.skip`；`package.json test` 与 `frontend-ci.yml` mock-test 改跑这两个文件（本地 26 passed / 1 skipped）。
+
+### 验证
+- `npx playwright test tests/ci.spec.mjs tests/real-time.spec.mjs`：✅ 26 passed, 1 skipped
+- `tsc --noEmit`: ✅
+- `npm run build`: ✅

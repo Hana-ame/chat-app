@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe.skip('Real-time Events (WS / SSE / Polling)', () => {
+test.describe('Real-time Events (WS / SSE / Polling)', () => {
 
   async function mockLogin(page) {
     await page.addInitScript(() => localStorage.clear());
@@ -13,7 +13,7 @@ test.describe.skip('Real-time Events (WS / SSE / Polling)', () => {
   async function openFirstChat(page) {
     await mockLogin(page);
     await page.waitForSelector('.chat-item', { timeout: 5000 });
-    await page.locator('.chat-item').first().click();
+    await page.locator('.chat-item').nth(1).click();
   }
 
   test('WS ready event populates chat list', async ({ page }) => {
@@ -107,7 +107,7 @@ test.describe.skip('Real-time Events (WS / SSE / Polling)', () => {
   test('unread count updates on new message event', async ({ page }) => {
     await mockLogin(page);
     await page.waitForSelector('.chat-item', { timeout: 5000 });
-    await page.locator('.chat-item').first().click();
+    await page.locator('.chat-item').nth(1).click();
     await page.waitForSelector('.msg-content', { timeout: 5000 });
     const unreadBadges = page.locator('.unread-badge');
     const count = await unreadBadges.count();

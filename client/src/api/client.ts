@@ -8,7 +8,7 @@ import {
   mockMarkRead, mockAddReaction, mockRemoveReaction,
   mockUpload, mockUploadAvatar,
 	mockPinChat, mockUnpinChat, mockMarkAnnouncementRead, mockUpdateChatAvatar, mockUpdateChatBanner, mockUpdateChatBackground,
-	mockGetNotifyChat,
+	mockGetNotifyChat, mockNotificationsList, mockNotifySend, mockNotifyMarkRead, mockNotifyDelete,
 	resetMockData,
 } from './mock';
 import { useAuthStore } from '../store/auth';
@@ -250,6 +250,14 @@ function buildMockProxy(target: typeof _apiMethods): ApiType {
 
   const p = new Proxy(target, {
     get(t, prop: string) {
+      if (mockEnabled && prop === 'notifications') {
+        return {
+          listMessages: () => Promise.resolve(mockNotificationsList()),
+          sendMessage: (token: string, content: string, attachments?: Attachment[]) => Promise.resolve(mockNotifySend(token, content, attachments)),
+          deleteMessage: (token: string, msgId: string) => Promise.resolve(mockNotifyDelete(token, msgId)),
+          markRead: () => Promise.resolve(mockNotifyMarkRead()),
+        };
+      }
       if (mockEnabled && prop in mockHandlers) {
         return (...args: unknown[]) => {
           const fn = mockHandlers[prop];

@@ -761,7 +761,7 @@ export function mockGetNotifyChat(_token) {
       name: 'Notifications',
       icon_color: '#E8590C',
       owner_id: cu.id,
-      created_at: new Date().toISOString(),
+      created_at: new Date(0).toISOString(),
       last_message_at: new Date(0).toISOString(),
       member_count: 1,
       visibility: '',
@@ -782,3 +782,48 @@ export function mockGetNotifyChat(_token) {
 }
 
 
+
+/**
+ * Mock notifications list (empty by default; messages sent to the
+ * Notifications chat are visible here).
+ * @returns {{ messages: Message[] }}
+ */
+export function mockNotificationsList() {
+  const d = ensureData();
+  const notify = d.chats.find(c => c.type === 'notify');
+  return { messages: notify ? messagesFor(notify.id) : [] };
+}
+
+/**
+ * Mock sending to the Notifications chat.
+ * @returns {Message}
+ */
+export function mockNotifySend(_token, content, attachments = undefined) {
+  const d = ensureData();
+  const notify = d.chats.find(c => c.type === 'notify');
+  const chatId = notify ? notify.id : 'notify';
+  const msg = {
+    id: randid(),
+    chat_id: chatId,
+    content,
+    user_id: currentUser().id,
+    author: currentUser(),
+    created_at: new Date().toISOString(),
+    edited_at: null,
+    deleted: false,
+    attachments: attachments || [],
+    reactions: [],
+  };
+  d.messages.push(msg);
+  return msg;
+}
+
+/** @returns {{ ok: boolean }} */
+export function mockNotifyMarkRead() {
+  return { ok: true };
+}
+
+/** @returns {{ ok: boolean }} */
+export function mockNotifyDelete(_token, _msgId) {
+  return { ok: true };
+}

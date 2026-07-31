@@ -88,7 +88,7 @@ export const useAuthStore = create((set, get) => {
     mockLogin: () => {
       localStorage.setItem(MOCK_FLAG, 'true');
       api.enableMock();
-      import('./chat').then(m => m.useChatStore.getState().setMode('poll'));
+      import('./chat').then(m => m.useChatStore.getState().setMode('mock'));
       set({
         user: { id: 'dev-self', username: 'Alice', email: 'alice@test.com', avatar_color: '#5865F2' },
         accessToken: 'mock-token',

@@ -7,7 +7,7 @@
     "dev": "vite --host",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "playwright test tests/boundary.spec.mjs tests/ai-panel.spec.mjs",
+    "test": "playwright test tests/ci.spec.mjs tests/real-time.spec.mjs",
     "test:rt": "playwright test tests/real-time.spec.mjs",
     "test:full": "playwright test tests/e2e.spec.mjs",
     "test:all": "playwright test"

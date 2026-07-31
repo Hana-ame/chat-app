@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 
-test.describe.skip('Mock API Mode (CI)', () => {
+test.describe('Mock API Mode (CI)', () => {
 
   async function mockLogin(page) {
     await page.addInitScript(() => localStorage.clear());
@@ -14,7 +14,7 @@ test.describe.skip('Mock API Mode (CI)', () => {
   async function openFirstChat(page) {
     await mockLogin(page);
     await page.waitForSelector('.chat-item', { timeout: 5000 });
-    await page.locator('.chat-item').first().click();
+    await page.locator('.chat-item').nth(1).click();
   }
 
   test('mock login shows sidebar', async ({ page }) => {

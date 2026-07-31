@@ -95,9 +95,9 @@ export const useChatStore = create((set, get) => ({
   sseReady: false,
 
   setMode(mode) {
+    const token = coord.token || useAuthStore.getState().accessToken;
     coord.disconnect();
     set({ mode, wsReady: false, sseReady: false });
-    const token = coord.token;
     if (token) coord.connect(mode, token);
   },
 
