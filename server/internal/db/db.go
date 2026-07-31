@@ -42,6 +42,7 @@ func migrateV1EnsureColumns(ctx context.Context, d *DB) error {
 		{"chats", "background_url", "background_url TEXT NOT NULL DEFAULT ''"},
 		{"chats", "banner_opacity", "banner_opacity REAL NOT NULL DEFAULT 0.9"},
 		{"chat_members", "notify_enabled", "notify_enabled INTEGER NOT NULL DEFAULT 1"},
+		{"chat_members", "unread_count", "unread_count INTEGER NOT NULL DEFAULT 0"},
 		{"messages", "type", "type TEXT NOT NULL DEFAULT ''"},
 		{"users", "notify_blocked", "notify_blocked TEXT NOT NULL DEFAULT '[]'"},
 	}

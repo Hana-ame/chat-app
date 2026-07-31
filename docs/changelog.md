@@ -5832,3 +5832,19 @@ f73e3b3 bump v0.8.12 -> v0.8.13
 - `go build ./...`: ✅
 - `go test ./internal/*/ -count=1`: ✅（6 包通过）
 - `vite build`: ✅
+
+---
+
+## 2026-07-31 v0.9.3 合并修复（上传鉴权回归 + 迁移编号冲突）
+
+### 背景
+合并上游 v0.9.3（`b51b7cb2`）后出现两类回归。
+
+### 变更
+- **`server/internal/handlers/router.go`**: `/api/local/*`、`GET /api/upload` 从 `authMiddleware` 组移回无鉴权组（`b51b7cb2` 给整个上传组加了鉴权，导致图片 401、upload.html 无法上传 — 独立页面无登录流程，删除操作由 `?delete=<hash>` key 保护）
+- **`server/internal/db/db.go`**: `migrateV1EnsureColumns` 增加 `chat_members.unread_count` 列（启动时幂等修复）
+- **`server/internal/db/migrations/003__cache_last_message_and_unread.sql`**: 删除 — 本地 `9eef9a6` 与上游 `985ffa1` 都创建了 `003__` 号迁移，执行器只取排序第一个导致 `unread_count` 列迁移被静默跳过；改由启动 fixup 保证
+
+### 验证
+- `go test ./...`: ✅（除上游既有 flaky `TestSetPinnedMessage_MultipleUpdates`，上游 `b51b7cb2` 同样失败）
+- `/api/local/*`、`/api/upload`、`/api/version` 均 200

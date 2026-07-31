@@ -73,9 +73,11 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 	})
 
 	r.Route("/api", func(r chi.Router) {
-		// Upload — 5min timeout (big files on slow connections)
+		// Upload — 5min timeout (big files on slow connections). No auth:
+		// upload.html is a standalone page with no login flow, delete is
+		// protected by ?delete=<hash> key instead.
 		r.Group(func(r chi.Router) {
-			r.Use(s.authMiddleware, chimid.Timeout(s.Cfg.UploadTimeout))
+			r.Use(chimid.Timeout(s.Cfg.UploadTimeout))
 			r.Get("/upload", s.AAPIUpload)
 			r.Put("/upload", s.AAPIUpload)
 			r.Put("/upload/*", s.AAPIUpload)
