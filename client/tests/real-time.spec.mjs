@@ -75,14 +75,16 @@ test.describe('Real-time Events (WS / SSE / Polling)', () => {
 
   test('editing message triggers onMessageUpdate', async ({ page }) => {
     await openFirstChat(page);
-    const msg = await sendMessage(page, 'Edit me via onMessageUpdate');
+    await sendMessage(page, 'Edit me via onMessageUpdate');
     // 限定在刚发送消息的 msg-group 内(种子数据里也有自己的消息,全局 .first()
-    // 会匹配到未 hover 的按钮 → not visible)。
+    // 会匹配到未 hover 的按钮 → not visible)。编辑态下 hasText 失效,改用
+    // .msg-group:has(textarea.input-field) 定位编辑中的消息组。
     const group = page.locator('.msg-group', { hasText: 'Edit me via onMessageUpdate' }).last();
     await group.hover();
     await group.locator('.msg-actions button:has-text("Edit")').click();
-    await group.locator('textarea.input-field').fill('Updated via onMessageUpdate');
-    await group.locator('button:has-text("Save")').click();
+    const editing = page.locator('.msg-group:has(textarea.input-field)').last();
+    await editing.locator('textarea.input-field').fill('Updated via onMessageUpdate');
+    await editing.locator('button:has-text("Save")').click();
     await expect(
       page.locator('.msg-content', { hasText: 'Updated via onMessageUpdate' }).first()
     ).toBeVisible({ timeout: 5000 });
@@ -154,8 +156,8 @@ test.describe('Real-time Events (WS / SSE / Polling)', () => {
   });
 
   test('chat delete event removes chat from list', async ({ page }) => {
-    // 创建自己的群再删除:右键菜单必然出现(owner),count 确定 -1。
-    // 新建群不保证排首位,按名称定位右键目标。
+    // 创建自己的群再删除:菜单 Delete 必然出现(owner),count 确定 -1。
+    // 菜单由 chat-item 内 ⋮ 按钮打开(不是右键事件),按名称定位目标群。
     await mockLogin(page);
     await expect.poll(async () => {
       const a = await page.locator('.chat-item').count();
@@ -165,7 +167,8 @@ test.describe('Real-time Events (WS / SSE / Polling)', () => {
     }, { timeout: 10000 }).toBeGreaterThan(1);
     const before = await page.locator('.chat-item').count();
     await createGroup(page, 'To Be Deleted');
-    await page.locator('.chat-item', { hasText: 'To Be Deleted' }).click({ button: 'right' });
+    await page.locator('.chat-item', { hasText: 'To Be Deleted' })
+      .locator('.chat-item-menu-btn').click();
     page.once('dialog', d => d.accept());
     await page.locator('.context-menu button:has-text("Delete")').first().click();
     await expect
