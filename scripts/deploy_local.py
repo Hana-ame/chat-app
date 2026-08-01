@@ -28,8 +28,30 @@ def build():
         cwd=os.path.join(CWD, "server"), desc="building backend")
 
 
+def rotate_log(max_bytes=5 * 1024 * 1024, keep=5):
+    """server.log 超过 max_bytes 时轮转(改名保留,不压缩),保留最近 keep 份。
+    轮转文件名: server.log.20260801(同日多次轮转加序号)。"""
+    log_file = LOG_FILE
+    if not os.path.isfile(log_file) or os.path.getsize(log_file) < max_bytes:
+        return
+    stamp = time.strftime("%Y%m%d")
+    dest = f"{log_file}.{stamp}"
+    n = 1
+    while os.path.exists(f"{dest}.{n}"):
+        n += 1
+    os.rename(log_file, f"{dest}.{n}")
+    with open(log_file, "w"):
+        pass
+    backups = sorted(f for f in os.listdir(CWD)
+                     if f.startswith(os.path.basename(LOG_FILE) + "."))
+    for old in backups[:-keep]:
+        os.remove(os.path.join(CWD, old))
+    print(f"[deploy] rotated log -> {dest}.{n}")
+
+
 def start():
     print("[deploy] starting server...")
+    rotate_log()
     env = os.environ.copy()
     if os.path.isfile(ENV_FILE):
         with open(ENV_FILE) as f:
