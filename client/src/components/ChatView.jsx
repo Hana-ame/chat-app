@@ -333,12 +333,13 @@ export default function ChatView({ chatId, isNotification, onBack }) {
                 <div style={{flex: 1, display: 'flex', gap: 8}}>
                   <input
                     className="input-field"
+                    data-testid="notice-input"
                     style={{flex: 1, fontSize: 13, padding: '4px 8px'}}
                     value={noticeInput}
                     onChange={e => setNoticeInput(e.target.value)}
                     autoFocus
                   />
-                  <button className="btn btn-primary" style={{fontSize: 11, padding: '4px 8px'}} onClick={handleSaveNotice}>Save</button>
+                  <button className="btn btn-primary" data-testid="notice-save" style={{fontSize: 11, padding: '4px 8px'}} onClick={handleSaveNotice}>Save</button>
                   <button className="btn-ghost" style={{fontSize: 11, padding: '4px 8px'}} onClick={() => setIsEditingNotice(false)}>Cancel</button>
                 </div>
               ) : showNotice ? (
@@ -350,8 +351,8 @@ export default function ChatView({ chatId, isNotification, onBack }) {
             </div>
             {showNotice && pinnedMessage[chatId] && chat?.owner_id === user.id && !isEditingNotice && (
               <div style={{display: 'flex', justifyContent: 'flex-end', gap: 8}}>
-                <button className="btn-ghost" style={{fontSize: 11, padding: '2px 6px'}} onClick={() => { setNoticeInput(pinnedMessage[chatId]?.content); setIsEditingNotice(true); }}>Edit</button>
-                <button className="btn-ghost danger" style={{fontSize: 11, padding: '2px 6px'}} onClick={handleClearNotice}>Clear</button>
+                <button className="btn-ghost" data-testid="notice-edit" style={{fontSize: 11, padding: '2px 6px'}} onClick={() => { setNoticeInput(pinnedMessage[chatId]?.content); setIsEditingNotice(true); }}>Edit</button>
+                <button className="btn-ghost danger" data-testid="notice-clear" style={{fontSize: 11, padding: '2px 6px'}} onClick={handleClearNotice}>Clear</button>
               </div>
             )}
           </div>

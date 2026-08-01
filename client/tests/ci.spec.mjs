@@ -67,17 +67,17 @@ test.describe('Mock API Mode (CI)', () => {
     await mockLogin(page);
     await createGroup(page, 'CI Notice Chat');
     await page.click('button[title="Set announcement"]');
-    await page.fill('input.input-field', 'CI Pinned Notice');
-    await page.click('button:has-text("Save")');
+    await page.getByTestId('notice-input').fill('CI Pinned Notice');
+    await page.getByTestId('notice-save').click();
     await expect(page.locator('text=📢 公告')).toBeVisible();
     await expect(page.locator('text=CI Pinned Notice')).toBeVisible();
 
-    await page.click('button:has-text("Edit")');
-    await page.fill('input.input-field', 'Updated CI Notice');
-    await page.click('button:has-text("Save")');
+    await page.getByTestId('notice-edit').click();
+    await page.getByTestId('notice-input').fill('Updated CI Notice');
+    await page.getByTestId('notice-save').click();
     await expect(page.locator('text=Updated CI Notice')).toBeVisible();
 
-    await page.click('button:has-text("Clear")');
+    await page.getByTestId('notice-clear').click();
     await expect(page.locator('text=📢 公告')).not.toBeVisible();
   });
 
@@ -97,30 +97,40 @@ test.describe('Mock API Mode (CI)', () => {
   test('mock edit and delete own message', async ({ page }) => {
     await openFirstChat(page);
     const msg = await sendMessage(page, 'Editable CI message');
-    await msg.hover();
-
-    // 编辑:作者是自己 → Edit 按钮必然出现。
-    await page.locator('.msg-actions button:has-text("Edit")').first().click();
-    await page.fill('textarea.input-field', 'Edited content!');
-    await page.locator('.msg-actions button:has-text("Save")').first().click();
+    // 编辑:作者是自己 → Edit 按钮必然出现。限定在刚发送消息的 msg-group 内,
+    // 避免 .first() 误匹配种子数据里其他消息的按钮(hover 未生效 → not visible)。
+    const group = page.locator('.msg-group', { hasText: 'Editable CI message' }).last();
+    await group.hover();
+    await group.locator('.msg-actions button:has-text("Edit")').click();
+    await page.locator('.msg-group', { hasText: 'Editable CI message' }).last()
+      .locator('textarea.input-field').fill('Edited content!');
+    await page.locator('.msg-group', { hasText: 'Editable CI message' }).last()
+      .locator('button:has-text("Save")').click();
     await expect(page.locator('.msg-content', { hasText: 'Edited content!' }).first())
       .toBeVisible({ timeout: 5000 });
 
     // 删除:原生 confirm 弹窗 → dialog accept。
-    await page.locator('.msg-content', { hasText: 'Edited content!' }).first().hover();
+    const group2 = page.locator('.msg-group', { hasText: 'Edited content!' }).last();
+    await group2.hover();
     page.once('dialog', d => d.accept());
-    await page.locator('.msg-actions button:has-text("Delete")').first().click();
+    await group2.locator('.msg-actions button:has-text("Delete")').click();
     await expect(page.locator('.msg-deleted', { hasText: 'message deleted' }).first())
       .toBeVisible({ timeout: 5000 });
   });
 
   test('mock delete own chat from context menu', async ({ page }) => {
     // 创建自己的群 → 右键菜单 Delete 必然出现(owner),count 确定 -1。
+    // 新建群不保证排在列表首位,按名称定位,不依赖 first()。
     await mockLogin(page);
-    await page.waitForSelector('.chat-item', { timeout: 5000 });
+    await expect.poll(async () => {
+      const a = await page.locator('.chat-item').count();
+      await page.waitForTimeout(600);
+      const b = await page.locator('.chat-item').count();
+      return a === b ? a : -1;
+    }, { timeout: 10000 }).toBeGreaterThan(1);
     const before = await page.locator('.chat-item').count();
     await createGroup(page, 'CI Delete Me');
-    await page.locator('.chat-item').first().click({ button: 'right' });
+    await page.locator('.chat-item', { hasText: 'CI Delete Me' }).click({ button: 'right' });
     page.once('dialog', d => d.accept());
     await page.locator('.context-menu button:has-text("Delete")').first().click();
     await expect
@@ -143,7 +153,9 @@ test.describe('Mock API Mode (CI)', () => {
     await mockLogin(page);
     await page.click('button[title="Settings"]');
     await expect(page.locator('[aria-label="Settings"]')).toBeVisible({ timeout: 3000 });
-    await page.locator('.modal-overlay').first().click({ force: true });
+    // overlay 中心被 modal-box 覆盖(force click 点中 box → stopPropagation),
+    // 用弹窗内 ✕ 关闭按钮。
+    await page.locator('.modal-box button:has-text("✕")').click();
     await expect(page.locator('[aria-label="Settings"]')).not.toBeVisible({ timeout: 3000 });
   });
 
@@ -166,7 +178,7 @@ test.describe('Mock API Mode (CI)', () => {
     const fileChooser = await fileChooserPromise;
     await fileChooser.setFiles({ name: 'ci-avatar.png', mimeType: 'image/png', buffer: Buffer.from('CI avatar test') });
     await expect(page.locator('.modal-box button:has-text("Save")').first()).toBeVisible({ timeout: 3000 });
-    await page.locator('.modal-overlay').first().click({ force: true });
+    await page.locator('.modal-box button:has-text("✕")').click();
     await expect(page.locator('[aria-label="Settings"]')).not.toBeVisible({ timeout: 3000 });
   });
 
