@@ -2,37 +2,51 @@
 import { test, expect } from '@playwright/test';
 
 // ── 共享账号 ──
-// 后端 /api/auth/register 有硬编码限流 5 次/分钟/IP(router.go:
-// httprate.LimitByIP(5, 1min)),且本文件串行执行(playwright.config.js
-// 中 e2e project 设 workers:1)。因此需要注册账号的用例共用 beforeAll
-// 注册的用户池(3 个),UI 用例通过登录复用,而不是各自注册。
-// 每轮完整运行总注册数:beforeAll 3 次 + full auth flow 1 次 = 4 次 < 5。
+// 后端有硬编码限流:register 5 次/分钟/IP、login 10 次/分钟/IP
+// (router.go: httprate.LimitByIP),且本文件串行执行(playwright.config.js
+// 中 e2e project 设 workers:1)。因此注册账号的用例共用 beforeAll 用户池:
+// 池用固定邮箱,先登录复用(大多数运行 0 次注册),用户不存在才注册 →
+// 反复重跑不会撞 register 限流窗口。注册/登录接口均返回 200。
+const POOL = [
+  { name: 'ui', email: 'e2e-pool-ui@e2e.dev' },
+  { name: 'owner', email: 'e2e-pool-owner@e2e.dev' },
+  { name: 'member', email: 'e2e-pool-member@e2e.dev' },
+];
 
-/** 注册一个真实用户,返回 { email, token, userId }。注册接口返回 200。 */
-async function registerUser(request) {
-  const rand = Math.random().toString(36).slice(2, 8);
-  const email = `b${Date.now()}${rand}@e2e.dev`;
-  // 429 = 限流窗口未过(例如同一分钟内快速重跑)。等待 10s 重试,最多 3 次。
+/** POST 带 429 限流重试:按 Retry-After(缺省 10s)退避,最多 12 次。 */
+async function postWithRateLimitRetry(request, path, data) {
   for (let attempt = 0; ; attempt++) {
-    const res = await request.post('/api/auth/register', {
-      data: { email, username: 'Boundary' + rand, password: 'testtest123' },
-    });
-    if (res.status() === 429 && attempt < 3) {
-      await new Promise(r => setTimeout(r, 10000));
-      continue;
-    }
-    expect(res.status()).toBe(200);
-    const body = await res.json();
+    const res = await request.post(path, { data });
+    if (res.status() !== 429 || attempt >= 12) return res;
+    const retryAfter = Number(res.headers()['retry-after'] ?? 10);
+    await new Promise(r => setTimeout(r, Math.max(retryAfter, 5) * 1000));
+  }
+}
+
+/** 优先登录复用固定邮箱用户,不存在则注册(429 自动重试)。 */
+async function getOrCreateUser(request, email) {
+  const login = await request.post('/api/auth/login', {
+    data: { email, password: 'testtest123' },
+  });
+  if (login.status() === 200) {
+    const body = await login.json();
     return { email, token: body.access_token, userId: body.user.id };
   }
+  const res = await postWithRateLimitRetry(request, '/api/auth/register', {
+    email,
+    username: email.split('@')[0],
+    password: 'testtest123',
+  });
+  expect(res.status()).toBe(200);
+  const body = await res.json();
+  return { email, token: body.access_token, userId: body.user.id };
 }
 
 let users = null;
 test.beforeAll(async ({ request }) => {
-  const ui = await registerUser(request);
-  const owner = await registerUser(request);
-  const member = await registerUser(request);
-  users = { ui, owner, member };
+  const registered = {};
+  for (const p of POOL) registered[p.name] = await getOrCreateUser(request, p.email);
+  users = registered;
 });
 
 /** 通过登录表单进入应用(复用 beforeAll 注册的账号)。 */
@@ -41,7 +55,7 @@ async function loginViaUI(page, email) {
   await page.fill('input[type="email"]', email);
   await page.fill('input[type="password"]', 'testtest123');
   await page.click('button:has-text("Log In")');
-  await page.waitForURL('/');
+  await page.waitForURL(url => new URL(url).pathname === '/');
   await page.waitForSelector('.sidebar');
 }
 
@@ -67,14 +81,23 @@ test('register form renders correctly', async ({ page }) => {
 });
 
 test('full auth flow', async ({ page }) => {
-  await page.goto('/register');
   const stamp = Date.now();
   const email = `test${stamp}@e2e.dev`;
-  await page.fill('input[type="email"]', email);
-  await page.fill('input[type="text"]', `E2E${stamp}`);
-  await page.fill('input[type="password"]', 'testtest123');
-  await page.click('button:has-text("Continue")');
-  await page.waitForURL('/');
+  // UI 注册也可能撞 register 限流(5/分钟/IP):失败则等 10s 重填重试。
+  for (let attempt = 0; ; attempt++) {
+    await page.goto('/register');
+    await page.fill('input[type="email"]', email);
+    await page.fill('input[type="text"]', `E2E${stamp}`);
+    await page.fill('input[type="password"]', 'testtest123');
+    await page.click('button:has-text("Continue")');
+    try {
+      await page.waitForURL(url => new URL(url).pathname === '/', { timeout: 15000 });
+      break;
+    } catch {
+      if (attempt >= 3) throw new Error('register flow kept failing (rate limited?)');
+      await page.waitForTimeout(10000);
+    }
+  }
   await page.waitForSelector('.sidebar');
 });
 
