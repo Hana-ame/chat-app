@@ -39,12 +39,12 @@ jobs:
           APP_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.sha) }}
       - name: Start Vite and run tests
         run: |
-          npx vite --port 5173 &
+          npx vite --port 5173 --host 127.0.0.1 &
           sleep 3
           echo "=== Debug: fetch login page ==="
-          curl -s http://localhost:5173/login | head -30
+          curl -s http://127.0.0.1:5173/login | head -30
           echo "=== Debug: fetch root ==="
-          curl -s http://localhost:5173/ | head -30
+          curl -s http://127.0.0.1:5173/ | head -30
           echo "=== Running tests ==="
           npm run test:e2e:mock 2>&1
 
@@ -75,7 +75,7 @@ jobs:
           go build -o /tmp/chatd ./cmd/chatd/
           /tmp/chatd &
           cd ${{ github.workspace }}/client
-          npx vite --port 5173 &
+          npx vite --port 5173 --host 127.0.0.1 &
           for i in $(seq 1 30); do
             curl -sf http://localhost:8080/healthz >/dev/null 2>&1 && echo "backend ready" && break
             sleep 1

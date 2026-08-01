@@ -30,7 +30,11 @@ export default defineConfig({
     headless: true,
   },
   webServer: {
-    command: 'npx vite --port 5173',
+    // --host 127.0.0.1:CI 与本地统一绑定 IPv4,避免 Node 把 localhost
+    // 解析为 ::1 而健康检查连 127.0.0.1 失败,导致 playwright 自起第二个
+    // vite(--strictPort 下会直接报错而不是悄悄换端口)。复用检测基于
+    // 127.0.0.1:5173,与手动启动命令保持一致。
+    command: 'npx vite --port 5173 --host 127.0.0.1 --strictPort',
     // 用 127.0.0.1 而非 localhost:Node 的 fetch 会把 localhost 解析为
     // IPv6 ::1,而 vite 默认只监听 IPv4 → 健康检查永远失败(ECONNREFUSED)。
     url: 'http://127.0.0.1:5173',
