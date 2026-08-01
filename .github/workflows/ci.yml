@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-        with: { go-version: '1.26.3' }
+        with: { go-version: '1.26.3', cache-dependency-path: server/go.sum }
       - run: go vet ./...
       # WS 测试默认启用(ws_test.go 已去掉 WS_ENABLED 门控);
       # WS_ENABLED 仅是生产环境显式关闭 WS 的开关(gateway.go)。
@@ -36,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '22' }
+        with: { node-version: '22', cache: 'npm', cache-dependency-path: client/package-lock.json }
       - run: npm ci
       - run: npm run build
         env:
@@ -72,7 +72,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-        with: { go-version: '1.26.3' }
+        with: { go-version: '1.26.3', cache-dependency-path: server/go.sum }
       - name: Build chatd (${{ matrix.goos }}/${{ matrix.goarch }})
         run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
@@ -102,7 +102,7 @@ jobs:
           name: client-dist
           path: client-dist
       - uses: actions/setup-go@v5
-        with: { go-version: '1.26.3' }
+        with: { go-version: '1.26.3', cache-dependency-path: server/go.sum }
       - name: Verify embedded version
         run: |
           EMBEDDED=$(go version -m chatd-linux-amd64 2>/dev/null | grep "main.Version=" | sed 's/.*main.Version=//' | tr -d '"')
