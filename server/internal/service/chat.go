@@ -57,6 +57,10 @@ func (s *ChatService) Create(ctx context.Context, userID, name, visibility strin
 }
 
 func (s *ChatService) CreateOrGetNotificationsChat(ctx context.Context, userID string) (*models.Chat, error) {
+	// Serialize find-or-create:two concurrent requests would otherwise both
+	// miss FindNotificationsChat and create duplicate notify chats(与 DM 同模式)。
+	s.dmMu.Lock()
+	defer s.dmMu.Unlock()
 	if chat, err := s.db.FindNotificationsChat(ctx, userID); err == nil {
 		return chat, nil
 	}

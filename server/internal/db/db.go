@@ -32,6 +32,7 @@ type goMigration struct {
 // 被迫新增迁移版本)。往 requiredColumns 加列不再需要新版本。
 var goMigrations = []goMigration{
 	{2, migrateV2DropChatTypeCheck},
+	{3, migrateV3NotifyUniqueIndex},
 }
 
 // requiredColumns 是所有历史版本缺失过、需要幂等确保存在的列集合。

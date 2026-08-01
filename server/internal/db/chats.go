@@ -263,7 +263,12 @@ func (d *DB) FindNotificationsChat(ctx context.Context, userID string) (*models.
 }
 
 func (d *DB) CreateNotificationsChat(ctx context.Context, userID string) (*models.Chat, error) {
-	return d.CreateChat(ctx, "notify", "Notifications", "", userID, []string{userID})
+	chat, err := d.CreateChat(ctx, "notify", "Notifications", "", userID, []string{userID})
+	if err != nil && strings.Contains(err.Error(), "UNIQUE") {
+		// 撞上 ux_chats_notify_owner 唯一索引(多副本/竞态兜底):返回已存在的那条。
+		return d.FindNotificationsChat(ctx, userID)
+	}
+	return chat, err
 }
 
 // Deprecated.

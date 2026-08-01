@@ -163,3 +163,55 @@ func migrateV2DropChatTypeCheck(ctx context.Context, d *DB) error {
 	logutil.Info("migrated chats table: removed type CHECK constraint, added notify support")
 	return nil
 }
+
+// migrateV3NotifyUniqueIndex 保证"每用户最多一条 notify chat":
+//  1. 清理历史并发双插产生的重复行(保留最早一条,级联删成员/消息);
+//  2. 建立部分唯一索引 (type='notify'),让数据库层兜底。
+func migrateV3NotifyUniqueIndex(ctx context.Context, d *DB) error {
+	rows, err := d.QueryContext(ctx,
+		`SELECT owner_id FROM chats WHERE type='notify' GROUP BY owner_id HAVING COUNT(*) > 1`)
+	if err != nil {
+		return fmt.Errorf("find duplicate notify chats: %w", err)
+	}
+	var dupOwners []string
+	for rows.Next() {
+		var o string
+		if err := rows.Scan(&o); err != nil {
+			rows.Close()
+			return err
+		}
+		dupOwners = append(dupOwners, o)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	tx, err := d.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, owner := range dupOwners {
+		// 保留 created_at 最早的一条,其余删除;messages/chat_members 级联清除。
+		if _, err := tx.ExecContext(ctx,
+			`DELETE FROM chats WHERE type='notify' AND owner_id=?
+			 AND id NOT IN (SELECT id FROM chats WHERE type='notify' AND owner_id=?
+			                ORDER BY created_at LIMIT 1)`, owner, owner); err != nil {
+			return fmt.Errorf("dedupe notify chats for %s: %w", owner, err)
+		}
+	}
+	if _, err := tx.ExecContext(ctx,
+		`CREATE UNIQUE INDEX IF NOT EXISTS ux_chats_notify_owner
+		 ON chats(type, owner_id) WHERE type='notify'`); err != nil {
+		return fmt.Errorf("create ux_chats_notify_owner: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit notify dedupe: %w", err)
+	}
+	if len(dupOwners) > 0 {
+		logutil.Info("deduplicated notify chats for %d users", len(dupOwners))
+	}
+	logutil.Info("applied notify unique index (ux_chats_notify_owner)")
+	return nil
+}
