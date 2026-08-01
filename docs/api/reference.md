@@ -113,7 +113,7 @@ Base URL：生产 `https://chat.moonchan.xyz`，本地 `http://localhost:8080`�
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/healthz` | 健康检查（回显请求头） |
-| GET | `/api/version` | `{"version": "0.9.6"}` |
+| GET | `/api/version` | `{"version": "0.9.7"}` |
 | GET | `/swagger/` | OpenAPI UI |
 
 ## 主要模型
