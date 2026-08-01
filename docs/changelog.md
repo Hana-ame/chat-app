@@ -395,3 +395,28 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
   一条 / 不同用户互不干扰;本地 `go test` 3 例全过
 - 验证:go-test CI ✅ 4m1s(含 -race + govulncheck);mock-test 红为第 30 轮
   spec 重写回归(5b5a28a 自证),交并行会话修复
+
+## 2026-08-02 fix: mock/full E2E 全绿(11 失败根因修复,第 32 轮)
+
+- 背景:第 30 轮(5b5a28a)重写 ci/real-time spec 后 mock-test 11 失败、full-e2e
+  公告失败;全部为**测试断言与真实 UI 不符**,非产品缺陷,但暴露了 2 个产品侧
+  可测性缺口,一并修复
+- `ChatView.jsx`:公告输入框/Save/Edit/Clear 加 `data-testid`(notice-input/
+  notice-save/notice-edit/notice-clear),消除 `input.input-field` 与搜索框的
+  选择器歧义——原用例 fill 抢在编辑态渲染前填入了**搜索框**,`noticeInput`
+  为空致 Save 静默 no-op,公告区不渲染(📢 公告 not found)
+- `ci.spec.mjs` / `real-time.spec.mjs` / `e2e.spec.mjs` 修复:
+  - 编辑/删除/反应:`.msg-actions button` 全局 `.first()` 会命中种子数据里
+    其他消息的按钮(hover 未生效 → not visible),改为 `.msg-group` hasText
+    限定;编辑态消息内容进 textarea 后 hasText 失效,改用
+    `.msg-group:has(textarea.input-field)` 定位
+  - 右键菜单:ChatListItem **没有 onContextMenu 绑定**,菜单由 ⋮ 按钮
+    (`.chat-item-menu-btn`)onClick 打开,`.click({button:'right'})` 永远不弹
+    菜单;改用按群名定位 `.chat-item` 后点 ⋮
+  - 设置弹窗关闭:overlay 中心被 modal-box 覆盖(force click 点中 box 被
+    stopPropagation),改点 `.modal-box button:has-text("✕")`
+  - polling/删除群 count 基准:mock transport 500ms 轮询异步填充列表,
+    `waitForSelector('.chat-item')` 时可能只渲染 1 个,先 expect.poll 等
+    count 连续两次相同再取值
+- 验证:Frontend CI ✅(unit-test + mock-test 32 用例 + full-e2e 10 用例);
+  CI workflow ✅(go-test + frontend-build);提交 fc8a949/7b59020/7fe348a
