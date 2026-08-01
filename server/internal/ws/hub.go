@@ -137,13 +137,6 @@ func (h *Hub) ClientCount() int {
 	return n
 }
 
-func (h *Hub) Online(userID string) bool {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	_, ok := h.clients[userID]
-	return ok
-}
-
 func (h *Hub) OnlineUserIDs() []string {
 	h.mu.RLock()
 	defer h.mu.RUnlock()

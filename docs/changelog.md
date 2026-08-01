@@ -202,3 +202,38 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
 - docs/guide/development.md:test:e2e:mock 注释去掉"需 Vite :5173"
   (第 25 轮起由 playwright.config.js webServer 托管,无需手工起),
   并补充 test:e2e:full 与 webServer 托管说明。
+
+## 2026-08-01 全项目体检:API 文档同步 + swagger 对齐 + 死代码清理（第 27 轮）
+
+### API 文档（docs/api/reference.md）
+- `/api/chats/public`：认证改为 Bearer（实际在 auth 组内，swagger 亦标注）
+- 发消息字段：`reply_to_message_id`/`src` → `reply_to`/`source`/`msg_id`（对齐
+  sendMsgReq 与 models.Message）
+- 上传删除：DELETE 改为 GET + `?delete=`（复用 GET 处理器，缺省返回文件）
+- `/ws`：去掉 `?token=`，标注 Bearer 头或 cookie（代码明确拒绝 URL token）
+- 分页：区分消息列表 `before`/`limit` 与聊天列表 `page`/`limit`
+- 版本示例 0.9.4 → 0.9.5
+
+### swagger.json（权威副本）
+- 移除已删除的 `POST /api/chats/{chatID}/visit`（trackLastActive 中间件取代）
+- 补齐 5 个路由：`GET /api/chats/notify` + `/api/notifications/` 的
+  messages 列表/发送/删除、全部已读
+- 删除陈旧死文件 `server/docs/swagger/swagger.json`（0.3.0，无引用）
+
+### 配置
+- `server/.env.example` 对齐 config.go：补 CHAT_UPLOAD_DIR/CHAT_UPLOAD_SALT/
+  CHAT_MAX_UPLOAD/CHAT_CSP_CONNECT_SRC/CHAT_AI_ALLOW_PRIVATE 五个字段，
+  WS_ENABLED 加注释（gateway.go 读取），CHAT_STATIC_DIR 标注相对运行目录
+- CI 与 go.mod 统一：go-version '1.23' → '1.26.3'（4 处）
+- 本地 `.env` 清理 v0.9.4 已废弃的 CHAT_AI_*/CHAT_UPLOAD_PUBLIC_URL 键
+- `.gitignore` 去除重复的 `uploads/*`（覆盖了 `!uploads/.gitkeep` 豁免）
+
+### 死代码
+- `ws/hub.go` 删除 `Online()`（无调用者；`ClientCount()` 保留，注册/注销日志用）
+- 删除 `client/src/components/ImagePreviewModal.jsx`、
+  `client/src/dev/stream-source.js`（均无引用；`dev/dummy.js` 被 mock.js 引用，保留）
+
+### 验证
+- `go vet ./...` + `go test ./... -count=1`：全部 ✅（含 testutil 集成 35s）
+- `npm test`（vitest）：✅ 55 passed
+- `npm run build`：✅

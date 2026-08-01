@@ -10,7 +10,7 @@ Base URL：生产 `https://chat.moonchan.xyz`，本地 `http://localhost:8080`�
 - 时间戳：UTC ISO-8601（RFC3339）
 - 认证：`Authorization: Bearer <access_token>` 或 `access_token` Cookie；access token 默认 30m，refresh 轮换见 [backend.md](../architecture/backend.md#认证auth)
 - 错误响应：`{"error": "<code>", "message": "<human readable>"}`，错误码见 [error-codes.md](error-codes.md)
-- 分页：消息列表用 `before`（游标，排除该 id）+ `limit`（默认 50，上限 100）
+- 分页：消息列表用 `before`（游标，排除该 id）+ `limit`（默认 50，上限 100）；聊天/通知列表用 `page`（1 基）+ `limit`
 
 ## 认证
 
@@ -28,7 +28,7 @@ Base URL：生产 `https://chat.moonchan.xyz`，本地 `http://localhost:8080`�
 | 方法 | 路径 | 认证 | 说明 |
 |---|---|---|---|
 | GET | `/api/chats/my` | Bearer | 我的聊天列表（含未读计数、最后消息） |
-| GET | `/api/chats/public` | 无 | 公开频道列表（可分页 `before`/`limit`） |
+| GET | `/api/chats/public` | Bearer | 公开频道列表（可分页 `page`/`limit`） |
 | POST | `/api/chats` | Bearer | 创建群组 `{name, visibility, icon_color}` |
 | POST | `/api/dms` | Bearer | 创建/获取 DM `{user_id}` |
 | GET | `/api/chats/notify` | Bearer | 系统通知聊天（不存在则创建） |
@@ -56,7 +56,7 @@ Base URL：生产 `https://chat.moonchan.xyz`，本地 `http://localhost:8080`�
 | 方法 | 路径 | 认证 | 说明 |
 |---|---|---|---|
 | GET | `/api/chats/{chatID}/messages` | Bearer | 消息列表（`before`/`limit`，含 attachments/reactions 冗余字段） |
-| POST | `/api/chats/{chatID}/messages` | Bearer | 发送 `{content, attachments?, reply_to_message_id?, type?, src?}`；`type=stream` 时 `src` 为 AI 源（`{endpoint, auth_key, body}`），返回流式消息 |
+| POST | `/api/chats/{chatID}/messages` | Bearer | 发送 `{content, attachments?, reply_to?, type?, source?}`；`type=stream` 时 `source` 为 AI 源（`{endpoint, auth_key, body}`），响应含 `msg_id`，流式内容另取 |
 | PATCH | `/api/chats/{chatID}/messages/{messageID}` | Bearer | 编辑（本人） |
 | DELETE | `/api/chats/{chatID}/messages/{messageID}` | Bearer | 删除（本人；owner/admin 可删他人） |
 | GET | `/api/chats/{chatID}/messages/{messageID}/stream` | Bearer | 读取 AI 流式内容（SSE 行格式） |
@@ -86,7 +86,7 @@ Base URL：生产 `https://chat.moonchan.xyz`，本地 `http://localhost:8080`�
 | GET | `/api/upload` | 独立上传页（HTML） |
 | PUT / POST | `/api/upload` | 上传文件（raw body 或 multipart `file`；≤ `CHAT_MAX_UPLOAD`） |
 | GET | `/api/local/{path}` | 下载/预览文件 |
-| DELETE | `/api/local/{path}?delete=<hash>` | 删除文件（hash = 删除密钥，`sha256(path+salt)` 前 8 字节 hex） |
+| GET | `/api/local/{path}?delete=<hash>` | 删除文件（hash = 删除密钥，`sha256(path+salt)` 前 8 字节 hex；删除复用 GET 处理器，`?delete=` 缺省时返回文件本身） |
 
 上传响应 `200`：
 
@@ -105,7 +105,7 @@ Base URL：生产 `https://chat.moonchan.xyz`，本地 `http://localhost:8080`�
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/ws` | WebSocket（`?token=`），协议见 [realtime.md](../architecture/realtime.md) |
+| GET | `/ws` | WebSocket（Bearer 头或 cookie；**拒绝 URL `?token=`**，防访问日志/Referer 泄露），协议见 [realtime.md](../architecture/realtime.md) |
 | GET | `/api/events` | SSE（Bearer 头），协议同上 |
 
 ## 系统
@@ -113,7 +113,7 @@ Base URL：生产 `https://chat.moonchan.xyz`，本地 `http://localhost:8080`�
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/healthz` | 健康检查（回显请求头） |
-| GET | `/api/version` | `{"version": "0.9.4"}` |
+| GET | `/api/version` | `{"version": "0.9.5"}` |
 | GET | `/swagger/` | OpenAPI UI |
 
 ## 主要模型
@@ -130,6 +130,6 @@ Base URL：生产 `https://chat.moonchan.xyz`，本地 `http://localhost:8080`�
 
 // Message
 { id, chat_id, user_id, content, created_at, edited_at, deleted, type,
-  thinking, reply_to_message_id, attachments: [], reactions: [],
+  thinking, reply_to, attachments: [], reactions: [],
   author?: User, mention_count, reaction_count }
 ```

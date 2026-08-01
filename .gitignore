@@ -18,5 +18,3 @@ chatd
 docs/*.pptx
 scripts/__pycache__/
 *.tar.gz
-
-uploads/*
