@@ -286,3 +286,30 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
 ### 验证
 - `go vet ./...` + `go test ./... -count=1`：✅
 - `npm test`（vitest 55）+ `npm run build`：✅
+
+## 2026-08-01 架构改进二连:stream 内存状态聚合 / WS Origin 白名单（第 29 轮）
+
+### 后端
+- **stream.go 内存状态聚合**:`StreamService` 的 5 个平行 map
+  (`liveChunks/liveSubs/liveDone/liveAuthor/liveChat`)聚合为
+  `live map[string]*liveStream`(struct 含 chunks/subs/done/author/chatID),
+  增删条目从"删 5 个 key"变为"删 1 个 key",状态读取从"5 次 map 查"变为
+  单次;StartStream 建条目、AppendChunk/FinishStream/StreamStatus/
+  Subscribe/SubscribeFrom/Unsubscribe/LiveChatID 全部改为按 struct 操作,
+  删除流时对所有 subscriber 关闭由 `st.done` 守卫。
+- **WS 握手 Origin 校验**:`config.OriginAllowed()` 成为 CORS 与 WS 共用的
+  单一白名单判断源(通配符 `*` 全放行,否则大小写不敏感精确匹配);HTTP
+  CORS 的 `corsAllowedOrigin` 改为委托它;`ws.Gateway` 由包级共享
+  `upgrader`(CheckOrigin 恒真)改为实例持有,`NewGateway` 增加 `cfg`
+  参数注入 CheckOrigin——跨站页面发起的 WS 连接被拒(CSWSH 纵深防御)。
+  注意:gorilla Dialer 对未显式带 Origin 的客户端会自动补
+  `http://<ws-host>`,非浏览器客户端同样按白名单校验;默认 `*` 行为不变,
+  仅显式配置白名单时收紧。
+- 新增测试:`TestOriginAllowed`(config)、`TestWSOriginRejected`(ws,真实
+  握手三态:白名单外拒/白名单内通/自动 Origin 拒)。
+
+### 文档
+- `docs/security.md` CORS 小节补充 WS 握手同白名单说明。
+
+### 验证
+- `go vet ./...` + `go test ./internal/{ws,config,service,handlers}/ -count=1`：✅ 全绿

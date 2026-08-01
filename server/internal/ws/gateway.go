@@ -9,17 +9,12 @@ import (
 	"time"
 
 	"github.com/Hana-ame/chat-app/server/internal/auth"
+	"github.com/Hana-ame/chat-app/server/internal/config"
 	"github.com/Hana-ame/chat-app/server/internal/db"
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/Hana-ame/chat-app/server/internal/models"
 	"github.com/gorilla/websocket"
 )
-
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  4096,
-	WriteBufferSize: 4096,
-	CheckOrigin:     func(r *http.Request) bool { return true },
-}
 
 const (
 	writeWait     = 10 * time.Second
@@ -33,9 +28,15 @@ type Gateway struct {
 	db             *db.DB
 	authSvc        *auth.Service
 	maxMessageSize int64
+	upgrader       websocket.Upgrader
 }
 
-func NewGateway(hub *Hub, database *db.DB, authSvc *auth.Service, maxMessageSize int64) *Gateway {
+// NewGateway 装配 WS 网关。CheckOrigin 按 CORS 白名单注入:浏览器 WS 握手
+// 携带 Origin,跨站页面发起的连接在此被拒绝(CSWSH 纵深防御;认证本身由
+// access_token 负责)。gorilla 对未携带 Origin 的原始请求不调用
+// CheckOrigin;多数非浏览器库会自动补 "http://<ws-host>" 形式的 Origin,
+// 该值同样按白名单校验。
+func NewGateway(hub *Hub, database *db.DB, authSvc *auth.Service, maxMessageSize int64, cfg *config.Config) *Gateway {
 	if maxMessageSize <= 0 {
 		maxMessageSize = 1 << 16
 	}
@@ -53,7 +54,19 @@ func NewGateway(hub *Hub, database *db.DB, authSvc *auth.Service, maxMessageSize
 			logutil.Error("presence: failed to update last_seen for %s: %v", logutil.SafeID(userID), err)
 		}
 	})
-	return &Gateway{hub: hub, db: database, authSvc: authSvc, maxMessageSize: maxMessageSize}
+	return &Gateway{
+		hub:            hub,
+		db:             database,
+		authSvc:        authSvc,
+		maxMessageSize: maxMessageSize,
+		upgrader: websocket.Upgrader{
+			ReadBufferSize:  4096,
+			WriteBufferSize: 4096,
+			CheckOrigin: func(r *http.Request) bool {
+				return cfg.OriginAllowed(r.Header.Get("Origin"))
+			},
+		},
+	}
 }
 
 func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -92,7 +105,7 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conn, err := upgrader.Upgrade(w, r, nil)
+	conn, err := g.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logutil.Error("ws upgrade failed for %s: %v", logutil.SafeID(user.ID), err)
 		return

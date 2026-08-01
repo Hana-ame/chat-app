@@ -24,6 +24,10 @@ font-src 'self' data:
 - `AllowCredentials: true`——实现上**不能**改成通配符 `*`(凭证 + 通配符
   违反 CORS 规范,见 router.go 注释);含 `*` 时必须用 AllowOriginFunc 回显
 - SSE 响应的 `Access-Control-Allow-Origin` 与同一白名单保持一致
+- WebSocket 握手 `CheckOrigin` 使用同一白名单(`config.OriginAllowed`,
+  判断逻辑与 HTTP CORS 共享):跨站页面发起的 WS 连接被拒(CSWSH);
+  gorilla 对未携带 Origin 的原始请求不校验,多数非浏览器库会自动补
+  `http://<ws-host>` 形式的 Origin,同样按白名单校验
 - 暴露全部请求头/响应头;预检缓存 300s
 
 ## 认证与 Cookie

@@ -43,15 +43,15 @@ var contentTypeExt = map[string]string{
 // Files with these types are rejected at upload time so they can never be
 // served inline as script under /api/local/.
 var dangerousContentTypes = map[string]bool{
-	"text/html":               true,
-	"application/xhtml+xml":   true,
-	"image/svg+xml":           true,
-	"text/xml":                true,
-	"application/xml":         true,
-	"text/javascript":         true,
-	"application/javascript":  true,
+	"text/html":                true,
+	"application/xhtml+xml":    true,
+	"image/svg+xml":            true,
+	"text/xml":                 true,
+	"application/xml":          true,
+	"text/javascript":          true,
+	"application/javascript":   true,
 	"application/x-javascript": true,
-	"text/x-javascript":       true,
+	"text/x-javascript":        true,
 }
 
 // File extensions that browsers may render/execute. Served as

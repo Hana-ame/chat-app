@@ -37,6 +37,9 @@ Go 后端（chi + SQLite + WS/SSE）+ React 前端（Vite + Zustand）的实时�
 
 ## 通用原则
 
+- **不要轻信 subagent 的结论**:Task 工具派生的 subagent 输出可能过时或
+  想当然,涉及关键决策/修改时必须亲自读代码验证(subagent 只用来缩小
+  搜索范围,不当事实来源)
 - **先 grep 再动手**：改动任何 API 响应字段/配置前，grep 全部消费者（`client/src/`、`*.html`、`docs/api/reference.md`、`scripts/`）
 - **配置优于魔法**：能用 `CHAT_BASE_URL` 等配置就不用请求头临时拼凑
 - **上传 `url` 字段必须绝对 URL**（`CHAT_BASE_URL` 或 `X-Forwarded-Proto`+`Host` 推导）——v0.8.15 曾因去掉 host 破坏 upload.html

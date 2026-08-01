@@ -96,6 +96,18 @@ func splitCSV(v string) []string {
 	return out
 }
 
+// OriginAllowed 判断来源是否被 CORS/WS 白名单接受:配置含 "*" 时全放行,
+// 否则精确匹配(大小写不敏感)。HTTP CORS 与 WebSocket 握手共用这一判断,
+// 避免两处逻辑漂移。
+func (c *Config) OriginAllowed(origin string) bool {
+	for _, o := range c.AllowOrigins {
+		if o == "*" || strings.EqualFold(o, origin) {
+			return true
+		}
+	}
+	return false
+}
+
 func randomHex(n int) string {
 	b := make([]byte, n)
 	_, _ = rand.Read(b)

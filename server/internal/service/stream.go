@@ -15,14 +15,22 @@ type ChunkInfo struct {
 	Content string `json:"content"`
 }
 
+// liveStream 是一条正在进行中的 AI 流式消息的全部内存状态。
+// 之前用 5 个平行 map(liveChunks/liveSubs/liveDone/liveAuthor/liveChat)
+// 分别跟踪同一 msgID 的片段,生命周期必须同步增删,漏一处就产生
+// 悬空状态;聚合为单一结构后按 msgID 整体创建/删除。
+type liveStream struct {
+	chunks []ChunkInfo
+	subs   []chan struct{}
+	done   bool
+	author *models.User
+	chatID string
+}
+
 type StreamService struct {
 	*Service
-	liveMu     sync.Mutex
-	liveChunks map[string][]ChunkInfo
-	liveSubs   map[string][]chan struct{}
-	liveDone   map[string]bool
-	liveAuthor map[string]*models.User
-	liveChat   map[string]string
+	liveMu sync.Mutex
+	live   map[string]*liveStream
 }
 
 func (s *StreamService) StartStream(ctx context.Context, chatID, userID, msgID string, src ai.Source, author *models.User) (<-chan ai.Chunk, error) {
@@ -35,10 +43,11 @@ func (s *StreamService) StartStream(ctx context.Context, chatID, userID, msgID s
 	}
 
 	s.liveMu.Lock()
-	s.liveChunks[msgID] = []ChunkInfo{}
-	s.liveDone[msgID] = false
-	s.liveAuthor[msgID] = author
-	s.liveChat[msgID] = chatID
+	s.live[msgID] = &liveStream{
+		chunks: []ChunkInfo{},
+		author: author,
+		chatID: chatID,
+	}
 	s.liveMu.Unlock()
 
 	streamURL := "/api/chats/" + chatID + "/messages/" + msgID + "/stream"
@@ -61,11 +70,14 @@ func (s *StreamService) StartStream(ctx context.Context, chatID, userID, msgID s
 
 func (s *StreamService) AppendChunk(msgID, chunkType, content string) {
 	s.liveMu.Lock()
-	s.liveChunks[msgID] = append(s.liveChunks[msgID], ChunkInfo{Type: chunkType, Content: content})
-	for _, sub := range s.liveSubs[msgID] {
-		select {
-		case sub <- struct{}{}:
-		default:
+	st := s.live[msgID]
+	if st != nil {
+		st.chunks = append(st.chunks, ChunkInfo{Type: chunkType, Content: content})
+		for _, sub := range st.subs {
+			select {
+			case sub <- struct{}{}:
+			default:
+			}
 		}
 	}
 	s.liveMu.Unlock()
@@ -73,13 +85,19 @@ func (s *StreamService) AppendChunk(msgID, chunkType, content string) {
 
 func (s *StreamService) FinishStream(ctx context.Context, chatID, userID, msgID, content, thinking string) {
 	s.liveMu.Lock()
-	s.liveDone[msgID] = true
-	author := s.liveAuthor[msgID]
-	for _, ch := range s.liveSubs[msgID] {
-		close(ch)
+	st := s.live[msgID]
+	if st != nil {
+		st.done = true
+		for _, ch := range st.subs {
+			close(ch)
+		}
+		st.subs = nil
 	}
-	s.liveSubs[msgID] = nil
 	s.liveMu.Unlock()
+	author := (*models.User)(nil)
+	if st != nil {
+		author = st.author
+	}
 
 	if _, err := s.Message.SendAI(ctx, chatID, userID, content, thinking, msgID, author); err != nil {
 		logutil.Error("ai: save message failed: %v", err)
@@ -87,11 +105,7 @@ func (s *StreamService) FinishStream(ctx context.Context, chatID, userID, msgID,
 
 	time.AfterFunc(30*time.Second, func() {
 		s.liveMu.Lock()
-		delete(s.liveChunks, msgID)
-		delete(s.liveSubs, msgID)
-		delete(s.liveAuthor, msgID)
-		delete(s.liveChat, msgID)
-		delete(s.liveDone, msgID)
+		delete(s.live, msgID)
 		s.liveMu.Unlock()
 	})
 }
@@ -100,27 +114,27 @@ func (s *StreamService) StreamStatus(msgID string, idx int) (chunks []ChunkInfo,
 	s.liveMu.Lock()
 	defer s.liveMu.Unlock()
 
-	done = s.liveDone[msgID]
-	chunks, ok = s.liveChunks[msgID]
+	st, ok := s.live[msgID]
 	if !ok {
-		return nil, done, false
+		return nil, false, false
 	}
-	if idx >= len(chunks) {
+	done = st.done
+	if idx >= len(st.chunks) {
 		return nil, done, true
 	}
 	if idx < 0 {
 		idx = 0
 	}
-	return chunks[idx:], done, true
+	return st.chunks[idx:], done, true
 }
 
 func (s *StreamService) Subscribe(msgID string) chan struct{} {
 	ch := make(chan struct{}, 8)
 	s.liveMu.Lock()
-	if s.liveDone[msgID] {
-		close(ch)
+	if st := s.live[msgID]; st != nil && !st.done {
+		st.subs = append(st.subs, ch)
 	} else {
-		s.liveSubs[msgID] = append(s.liveSubs[msgID], ch)
+		close(ch)
 	}
 	s.liveMu.Unlock()
 	return ch
@@ -130,26 +144,26 @@ func (s *StreamService) SubscribeFrom(msgID string, fromIdx int) (chunks []Chunk
 	s.liveMu.Lock()
 	defer s.liveMu.Unlock()
 
-	done = s.liveDone[msgID]
-	allChunks, ok := s.liveChunks[msgID]
+	st, ok := s.live[msgID]
 	if !ok {
-		return nil, done, false, nil
+		return nil, false, false, nil
 	}
+	done = st.done
 
-	if fromIdx >= len(allChunks) {
+	if fromIdx >= len(st.chunks) {
 		chunks = nil
 	} else {
 		if fromIdx < 0 {
 			fromIdx = 0
 		}
-		chunks = allChunks[fromIdx:]
+		chunks = st.chunks[fromIdx:]
 	}
 
 	notify = make(chan struct{}, 8)
 	if done {
 		close(notify)
 	} else {
-		s.liveSubs[msgID] = append(s.liveSubs[msgID], notify)
+		st.subs = append(st.subs, notify)
 	}
 	return chunks, done, true, notify
 }
@@ -157,11 +171,13 @@ func (s *StreamService) SubscribeFrom(msgID string, fromIdx int) (chunks []Chunk
 func (s *StreamService) Unsubscribe(msgID string, sub chan struct{}) {
 	s.liveMu.Lock()
 	defer s.liveMu.Unlock()
-	subs := s.liveSubs[msgID]
-	for i, c := range subs {
+	st := s.live[msgID]
+	if st == nil {
+		return
+	}
+	for i, c := range st.subs {
 		if c == sub {
-			subs = append(subs[:i:i], subs[i+1:]...)
-			s.liveSubs[msgID] = subs
+			st.subs = append(st.subs[:i:i], st.subs[i+1:]...)
 			return
 		}
 	}
@@ -175,6 +191,9 @@ func (s *StreamService) GetMessage(ctx context.Context, msgID string) (*models.M
 func (s *StreamService) LiveChatID(msgID string) (string, bool) {
 	s.liveMu.Lock()
 	defer s.liveMu.Unlock()
-	chatID, ok := s.liveChat[msgID]
-	return chatID, ok
+	st, ok := s.live[msgID]
+	if !ok {
+		return "", false
+	}
+	return st.chatID, true
 }

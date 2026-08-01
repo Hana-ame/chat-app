@@ -31,7 +31,7 @@ func main() {
 
 	authSvc := auth.New(cfg.JWTSecret, cfg.AccessTokenTTL)
 	hub := ws.NewHub(database)
-	gateway := ws.NewGateway(hub, database, authSvc, cfg.WSMaxMessageSize)
+	gateway := ws.NewGateway(hub, database, authSvc, cfg.WSMaxMessageSize, cfg)
 	srv := handlers.New(cfg, database, authSvc, hub)
 	srv.Version = Version
 	r := srv.Router(gateway)

@@ -16,11 +16,19 @@ package ws_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/Hana-ame/chat-app/server/internal/auth"
+	"github.com/Hana-ame/chat-app/server/internal/config"
+	"github.com/Hana-ame/chat-app/server/internal/db"
 	"github.com/Hana-ame/chat-app/server/internal/testutil"
+	"github.com/Hana-ame/chat-app/server/internal/ws"
 	"github.com/gorilla/websocket"
 )
 
@@ -263,4 +271,68 @@ func TestWSPresence(t *testing.T) {
 	testutil.RequireNoError(t, json.Unmarshal(env.Payload, &pres))
 	testutil.RequireEqual(t, pres.UserID, bob.UserID)
 	testutil.RequireEqual(t, pres.Status, "online")
+}
+
+// TestWSOriginRejected 验证 CheckOrigin 按 CORS 白名单拒绝跨站页面发起的
+// WS 握手:白名单外的 Origin 握手失败,白名单内与无 Origin(非浏览器
+// 客户端)成功。独立装配最小栈,不依赖 testutil 的 "*" 默认配置。
+func TestWSOriginRejected(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &config.Config{
+		Addr:                    ":0",
+		DBPath:                  filepath.Join(dir, "test.db"),
+		UploadDir:               filepath.Join(dir, "uploads"),
+		JWTSecret:               []byte("test-secret-very-secret-test-secret-very-secret"),
+		AccessTokenTTL:          15 * time.Minute,
+		RefreshTokenTTL:         24 * time.Hour,
+		MaxUploadBytes:          5 << 20,
+		UploadSalt:              "test-salt",
+		AllowOrigins:            []string{"https://trusted.example"},
+		MaxMessageContentLength: 4000,
+		APITimeout:              30 * time.Second,
+		UploadTimeout:           5 * time.Minute,
+		ReadTimeout:             10 * time.Minute,
+	}
+	database, err := db.Open(cfg.DBPath, cfg.MaxMessageContentLength)
+	testutil.RequireNoError(t, err)
+	t.Cleanup(func() { _ = database.Close() })
+	authSvc := auth.New(cfg.JWTSecret, cfg.AccessTokenTTL)
+	gateway := ws.NewGateway(ws.NewHub(database), database, authSvc, 1<<16, cfg)
+	httpSrv := httptest.NewServer(gateway)
+	t.Cleanup(httpSrv.Close)
+
+	user, err := database.CreateUser(t.Context(), "origin@w.t", "OriginAlice", "testtest123")
+	testutil.RequireNoError(t, err)
+	token, _, err := authSvc.IssueAccessToken(user.ID)
+	testutil.RequireNoError(t, err)
+
+	wsURL := "ws" + strings.TrimPrefix(httpSrv.URL, "http")
+	dialWithOrigin := func(origin string) error {
+		header := http.Header{}
+		header.Set("Authorization", "Bearer "+token)
+		if origin != "" {
+			header.Set("Origin", origin)
+		}
+		conn, resp, err := websocket.DefaultDialer.Dial(wsURL, header)
+		if err != nil {
+			if resp != nil {
+				return fmt.Errorf("dial failed: %v (status %d)", err, resp.StatusCode)
+			}
+			return fmt.Errorf("dial failed: %v", err)
+		}
+		conn.Close()
+		return nil
+	}
+
+	// 白名单外 Origin:握手被拒绝。
+	err = dialWithOrigin("https://evil.example")
+	testutil.RequireError(t, err)
+
+	// 白名单内 Origin:握手成功。
+	testutil.RequireNoError(t, dialWithOrigin("https://trusted.example"))
+
+	// 未显式携带 Origin 的客户端:gorilla Dialer 会自动补
+	// "http://<ws-host>",该值不在白名单 → 同样拒绝(与浏览器 CSWSH 同权)。
+	err = dialWithOrigin("")
+	testutil.RequireError(t, err)
 }

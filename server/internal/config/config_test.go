@@ -123,3 +123,23 @@ func TestJWTSecretRandomGeneration(t *testing.T) {
 		t.Fatalf("hex-encoded 32 bytes should be 64 chars, got %d", len(cfg1.JWTSecret))
 	}
 }
+
+// TestOriginAllowed 验证 CORS/WS 白名单判断:通配符全放行、精确匹配
+// 大小写不敏感、白名单外拒绝。
+func TestOriginAllowed(t *testing.T) {
+	cfg := &config.Config{AllowOrigins: []string{"https://app.example", "https://b.example"}}
+	if !cfg.OriginAllowed("https://app.example") {
+		t.Fatal("exact match should be allowed")
+	}
+	if !cfg.OriginAllowed("HTTPS://APP.EXAMPLE") {
+		t.Fatal("match should be case-insensitive")
+	}
+	if cfg.OriginAllowed("https://evil.example") {
+		t.Fatal("non-whitelisted origin should be rejected")
+	}
+
+	open := &config.Config{AllowOrigins: []string{"*"}}
+	if !open.OriginAllowed("https://anything.example") {
+		t.Fatal("wildcard should allow any origin")
+	}
+}

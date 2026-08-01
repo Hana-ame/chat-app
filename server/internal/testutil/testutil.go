@@ -53,7 +53,7 @@ func New(t *testing.T) *Fixture {
 	t.Cleanup(func() { _ = database.Close() })
 	authSvc := auth.New(cfg.JWTSecret, cfg.AccessTokenTTL)
 	hub := ws.NewHub(database)
-	gateway := ws.NewGateway(hub, database, authSvc, 1<<16)
+	gateway := ws.NewGateway(hub, database, authSvc, 1<<16, cfg)
 	srv := handlers.New(cfg, database, authSvc, hub)
 	// Provide auth middleware user for tests that need it
 	_ = srv
