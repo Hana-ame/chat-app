@@ -78,14 +78,9 @@ func TestSendStreamMessage(t *testing.T) {
 	})
 	defer sendRes.Body.Close()
 
-	if sendRes.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(sendRes.Body)
-		t.Fatalf("stream message: want 200 got %d body=%s", sendRes.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, sendRes, http.StatusOK)
 
-	if ct := sendRes.Header.Get("Content-Type"); ct != "text/event-stream" {
-		t.Fatalf("expected text/event-stream, got %s", ct)
-	}
+	testutil.RequireEqual(t, sendRes.Header.Get("Content-Type"), "text/event-stream")
 
 	// Read SSE events
 	scanner := bufio.NewScanner(sendRes.Body)
@@ -110,9 +105,7 @@ func TestSendStreamMessage(t *testing.T) {
 		}
 		content.WriteString(event.Content)
 	}
-	if content.String() != "Hello from AI" {
-		t.Fatalf("expected 'Hello from AI', got '%s'", content.String())
-	}
+	testutil.RequireEqual(t, content.String(), "Hello from AI")
 
 	// Verify the AI message was saved to DB
 	msgsRes := f.Do(t, "GET", "/api/chats/"+chat.ID+"/messages?limit=10", alice.AccessToken, nil)
@@ -129,14 +122,10 @@ func TestSendStreamMessage(t *testing.T) {
 	for _, m := range listResp.Messages {
 		if m.Type == "stream" && m.UserID == alice.UserID {
 			found = true
-			if m.Content != "Hello from AI" {
-				t.Fatalf("saved content: want 'Hello from AI', got '%s'", m.Content)
-			}
+			testutil.RequireEqual(t, m.Content, "Hello from AI")
 		}
 	}
-	if !found {
-		t.Fatal("AI message not saved to DB")
-	}
+	testutil.RequireTrue(t, found, "AI message not saved to DB")
 }
 
 func TestSendStreamMessage_NonStreamingResponse(t *testing.T) {
@@ -172,10 +161,7 @@ func TestSendStreamMessage_NonStreamingResponse(t *testing.T) {
 		},
 	})
 	defer sendRes.Body.Close()
-	if sendRes.StatusCode != 200 {
-		b, _ := io.ReadAll(sendRes.Body)
-		t.Fatalf("want 200 got %d body=%s", sendRes.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, sendRes, 200)
 
 	var got strings.Builder
 	scanner := bufio.NewScanner(sendRes.Body)
@@ -192,9 +178,7 @@ func TestSendStreamMessage_NonStreamingResponse(t *testing.T) {
 		json.Unmarshal([]byte(p), &ev)
 		got.WriteString(ev.Content)
 	}
-	if got.String() != "Non-stream reply" {
-		t.Fatalf("want 'Non-stream reply', got '%s'", got.String())
-	}
+	testutil.RequireEqual(t, got.String(), "Non-stream reply")
 }
 
 func TestSendStreamMessage_MissingSource(t *testing.T) {
@@ -215,10 +199,7 @@ func TestSendStreamMessage_MissingSource(t *testing.T) {
 		"content": "",
 	})
 	defer sendRes.Body.Close()
-	if sendRes.StatusCode != 400 {
-		b, _ := io.ReadAll(sendRes.Body)
-		t.Fatalf("missing source: want 400 got %d body=%s", sendRes.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, sendRes, 400)
 }
 
 func TestSendStreamMessage_NilSource(t *testing.T) {
@@ -239,10 +220,7 @@ func TestSendStreamMessage_NilSource(t *testing.T) {
 		"source": nil,
 	})
 	defer sendRes.Body.Close()
-	if sendRes.StatusCode != 400 {
-		b, _ := io.ReadAll(sendRes.Body)
-		t.Fatalf("nil source: want 400 got %d body=%s", sendRes.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, sendRes, 400)
 }
 
 func TestSendStreamMessage_NonMember(t *testing.T) {
@@ -272,10 +250,7 @@ func TestSendStreamMessage_NonMember(t *testing.T) {
 		},
 	})
 	defer sendRes.Body.Close()
-	if sendRes.StatusCode != 403 {
-		b, _ := io.ReadAll(sendRes.Body)
-		t.Fatalf("non-member: want 403 got %d body=%s", sendRes.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, sendRes, 403)
 }
 
 func TestSendStreamMessage_EndpointConfig(t *testing.T) {
@@ -305,10 +280,7 @@ func TestSendStreamMessage_EndpointConfig(t *testing.T) {
 		},
 	})
 	defer sendRes.Body.Close()
-	if sendRes.StatusCode != 200 {
-		b, _ := io.ReadAll(sendRes.Body)
-		t.Fatalf("config test: want 200 got %d body=%s", sendRes.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, sendRes, 200)
 }
 
 func TestSSEReplay_AfterStreamComplete(t *testing.T) {
@@ -344,19 +316,13 @@ func TestSSEReplay_AfterStreamComplete(t *testing.T) {
 	})
 	io.Copy(io.Discard, sendRes.Body)
 	sendRes.Body.Close()
-	if sendRes.StatusCode != 200 {
-		t.Fatalf("send: want 200 got %d", sendRes.StatusCode)
-	}
+	testutil.RequireStatus(t, sendRes, 200)
 
 	// StreamMessageContent should now replay the full content from live buffer
 	replayRes := f.Do(t, "GET", "/api/chats/"+chat.ID+"/messages/"+msgID+"/stream", alice.AccessToken, nil)
 	defer replayRes.Body.Close()
-	if replayRes.StatusCode != 200 {
-		t.Fatalf("replay: want 200 got %d", replayRes.StatusCode)
-	}
-	if ct := replayRes.Header.Get("Content-Type"); ct != "text/event-stream" {
-		t.Fatalf("want text/event-stream, got %s", ct)
-	}
+	testutil.RequireStatus(t, replayRes, 200)
+	testutil.RequireEqual(t, replayRes.Header.Get("Content-Type"), "text/event-stream")
 
 	scanner := bufio.NewScanner(replayRes.Body)
 	var content strings.Builder
@@ -375,9 +341,7 @@ func TestSSEReplay_AfterStreamComplete(t *testing.T) {
 		}
 		content.WriteString(ev.Content)
 	}
-	if content.String() != "Hello from AI" {
-		t.Fatalf("replay content: want 'Hello from AI', got '%s'", content.String())
-	}
+	testutil.RequireEqual(t, content.String(), "Hello from AI")
 
 	// saved to DB
 	msgsRes := f.Do(t, "GET", "/api/chats/"+chat.ID+"/messages?limit=10", alice.AccessToken, nil)
@@ -393,14 +357,10 @@ func TestSSEReplay_AfterStreamComplete(t *testing.T) {
 	for _, m := range listResp.Messages {
 		if m.ID == msgID {
 			found = true
-			if m.Content != "Hello from AI" {
-				t.Fatalf("DB content: want 'Hello from AI', got '%s'", m.Content)
-			}
+			testutil.RequireEqual(t, m.Content, "Hello from AI")
 		}
 	}
-	if !found {
-		t.Fatal("message not found in DB")
-	}
+	testutil.RequireTrue(t, found, "message not found in DB")
 }
 
 func TestSendStreamMessage_ReplayAfterCleanup(t *testing.T) {
@@ -435,9 +395,7 @@ func TestSendStreamMessage_ReplayAfterCleanup(t *testing.T) {
 	})
 	io.Copy(io.Discard, sendRes.Body)
 	sendRes.Body.Close()
-	if sendRes.StatusCode != 200 {
-		t.Fatalf("send: want 200 got %d", sendRes.StatusCode)
-	}
+	testutil.RequireStatus(t, sendRes, 200)
 
 	// verify DB has it
 	msgsRes := f.Do(t, "GET", "/api/chats/"+chat.ID+"/messages?limit=10", alice.AccessToken, nil)
@@ -453,9 +411,7 @@ func TestSendStreamMessage_ReplayAfterCleanup(t *testing.T) {
 	// replay should work from live buffer (no cleanup yet)
 	replayRes := f.Do(t, "GET", "/api/chats/"+chat.ID+"/messages/"+msgID+"/stream", alice.AccessToken, nil)
 	defer replayRes.Body.Close()
-	if replayRes.StatusCode != 200 {
-		t.Fatalf("replay: want 200 got %d", replayRes.StatusCode)
-	}
+	testutil.RequireStatus(t, replayRes, 200)
 	scanner := bufio.NewScanner(replayRes.Body)
 	var content strings.Builder
 	for scanner.Scan() {
@@ -471,9 +427,7 @@ func TestSendStreamMessage_ReplayAfterCleanup(t *testing.T) {
 		json.Unmarshal([]byte(p), &ev)
 		content.WriteString(ev.Content)
 	}
-	if content.String() != "Hello from AI" {
-		t.Fatalf("live buffer: want 'Hello from AI', got '%s'", content.String())
-	}
+	testutil.RequireEqual(t, content.String(), "Hello from AI")
 }
 
 func TestSendStreamMessage_ReplayNonexistentMessage(t *testing.T) {
@@ -492,9 +446,7 @@ func TestSendStreamMessage_ReplayNonexistentMessage(t *testing.T) {
 	// replay a nonexistent message — should 404 (message not found)
 	replayRes := f.Do(t, "GET", "/api/chats/"+chat.ID+"/messages/nonexistent-msg/stream", alice.AccessToken, nil)
 	defer replayRes.Body.Close()
-	if replayRes.StatusCode != 404 {
-		t.Fatalf("replay: want 404 got %d", replayRes.StatusCode)
-	}
+	testutil.RequireStatus(t, replayRes, 404)
 }
 
 func TestSendStreamMessage_ReplayNonMember(t *testing.T) {
@@ -514,10 +466,7 @@ func TestSendStreamMessage_ReplayNonMember(t *testing.T) {
 	// bob is not a member
 	replayRes := f.Do(t, "GET", "/api/chats/"+chat.ID+"/messages/some-msg/stream", bob.AccessToken, nil)
 	defer replayRes.Body.Close()
-	if replayRes.StatusCode != 403 {
-		b, _ := io.ReadAll(replayRes.Body)
-		t.Fatalf("non-member: want 403 got %d body=%s", replayRes.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, replayRes, 403)
 }
 
 func TestSendStreamMessage_UpstreamError(t *testing.T) {
@@ -550,10 +499,7 @@ func TestSendStreamMessage_UpstreamError(t *testing.T) {
 		},
 	})
 	defer sendRes.Body.Close()
-	if sendRes.StatusCode != http.StatusBadGateway {
-		b, _ := io.ReadAll(sendRes.Body)
-		t.Fatalf("upstream error: want 502 got %d body=%s", sendRes.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, sendRes, http.StatusBadGateway)
 }
 
 func TestSendStreamMessage_UpstreamTransportError(t *testing.T) {
@@ -579,10 +525,7 @@ func TestSendStreamMessage_UpstreamTransportError(t *testing.T) {
 		},
 	})
 	defer sendRes.Body.Close()
-	if sendRes.StatusCode != http.StatusBadGateway {
-		b, _ := io.ReadAll(sendRes.Body)
-		t.Fatalf("transport error: want 502 got %d body=%s", sendRes.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, sendRes, http.StatusBadGateway)
 }
 
 func TestSendStreamMessage_ResponseHeaders(t *testing.T) {
@@ -609,18 +552,10 @@ func TestSendStreamMessage_ResponseHeaders(t *testing.T) {
 		},
 	})
 	defer sendRes.Body.Close()
-	if sendRes.StatusCode != 200 {
-		t.Fatalf("want 200 got %d", sendRes.StatusCode)
-	}
-	if ct := sendRes.Header.Get("Content-Type"); ct != "text/event-stream" {
-		t.Fatalf("Content-Type: want text/event-stream, got %s", ct)
-	}
-	if cc := sendRes.Header.Get("Cache-Control"); cc != "no-cache" {
-		t.Fatalf("Cache-Control: want no-cache, got %s", cc)
-	}
-	if xa := sendRes.Header.Get("X-Accel-Buffering"); xa != "no" {
-		t.Fatalf("X-Accel-Buffering: want no, got %s", xa)
-	}
+	testutil.RequireStatus(t, sendRes, 200)
+	testutil.RequireEqual(t, sendRes.Header.Get("Content-Type"), "text/event-stream")
+	testutil.RequireEqual(t, sendRes.Header.Get("Cache-Control"), "no-cache")
+	testutil.RequireEqual(t, sendRes.Header.Get("X-Accel-Buffering"), "no")
 	io.Copy(io.Discard, sendRes.Body)
 }
 
@@ -667,16 +602,12 @@ func TestSendStreamMessage_ReplayLiveWithNotification(t *testing.T) {
 	})
 	io.Copy(io.Discard, sendRes.Body)
 	sendRes.Body.Close()
-	if sendRes.StatusCode != 200 {
-		t.Fatalf("send: want 200 got %d", sendRes.StatusCode)
-	}
+	testutil.RequireStatus(t, sendRes, 200)
 
 	// now replay — should get full content
 	replayRes := f.Do(t, "GET", "/api/chats/"+chat.ID+"/messages/"+msgID+"/stream", alice.AccessToken, nil)
 	defer replayRes.Body.Close()
-	if replayRes.StatusCode != 200 {
-		t.Fatalf("replay: want 200 got %d", replayRes.StatusCode)
-	}
+	testutil.RequireStatus(t, replayRes, 200)
 	scanner := bufio.NewScanner(replayRes.Body)
 	var content strings.Builder
 	for scanner.Scan() {
@@ -693,9 +624,7 @@ func TestSendStreamMessage_ReplayLiveWithNotification(t *testing.T) {
 		content.WriteString(ev.Content)
 	}
 	expected := "chunk0chunk1chunk2chunk3chunk4"
-	if content.String() != expected {
-		t.Fatalf("replay content: want %q, got %q", expected, content.String())
-	}
+	testutil.RequireEqual(t, content.String(), expected)
 }
 
 func TestSendStreamMessage_ReplayNonStreamMessage(t *testing.T) {
@@ -725,10 +654,7 @@ func TestSendStreamMessage_ReplayNonStreamMessage(t *testing.T) {
 	// replay non-stream message — stream endpoint should return [DONE] only
 	replayRes := f.Do(t, "GET", "/api/chats/"+chat.ID+"/messages/"+msg.ID+"/stream", alice.AccessToken, nil)
 	defer replayRes.Body.Close()
-	if replayRes.StatusCode != 200 {
-		b, _ := io.ReadAll(replayRes.Body)
-		t.Fatalf("replay: want 200 got %d body=%s", replayRes.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, replayRes, 200)
 	scanner := bufio.NewScanner(replayRes.Body)
 	foundDone := false
 	for scanner.Scan() {
@@ -738,9 +664,7 @@ func TestSendStreamMessage_ReplayNonStreamMessage(t *testing.T) {
 			break
 		}
 	}
-	if !foundDone {
-		t.Fatal("expected [DONE] for non-stream message replay")
-	}
+	testutil.RequireTrue(t, foundDone, "expected [DONE] for non-stream message replay")
 }
 
 func TestSendStreamMessage_ReasoningContent(t *testing.T) {
@@ -776,10 +700,7 @@ func TestSendStreamMessage_ReasoningContent(t *testing.T) {
 		},
 	})
 	defer sendRes.Body.Close()
-	if sendRes.StatusCode != 200 {
-		b, _ := io.ReadAll(sendRes.Body)
-		t.Fatalf("want 200 got %d body=%s", sendRes.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, sendRes, 200)
 
 	scanner := bufio.NewScanner(sendRes.Body)
 	var content strings.Builder
@@ -797,9 +718,7 @@ func TestSendStreamMessage_ReasoningContent(t *testing.T) {
 		content.WriteString(ev.Content)
 	}
 	expected := "thinkinganswer"
-	if content.String() != expected {
-		t.Fatalf("want %q, got %q", expected, content.String())
-	}
+	testutil.RequireEqual(t, content.String(), expected)
 }
 
 func TestSendStreamMessage_EmptySourceBody(t *testing.T) {
@@ -833,10 +752,7 @@ func TestSendStreamMessage_EmptySourceBody(t *testing.T) {
 		},
 	})
 	defer sendRes.Body.Close()
-	if sendRes.StatusCode != 200 {
-		b, _ := io.ReadAll(sendRes.Body)
-		t.Fatalf("empty body: want 200 got %d body=%s", sendRes.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, sendRes, 200)
 	io.Copy(io.Discard, sendRes.Body)
 }
 
@@ -862,10 +778,7 @@ func TestSendStreamMessage_SourceWithoutBody(t *testing.T) {
 		},
 	})
 	defer sendRes.Body.Close()
-	if sendRes.StatusCode != 400 {
-		b, _ := io.ReadAll(sendRes.Body)
-		t.Fatalf("no body: want 400 got %d body=%s", sendRes.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, sendRes, 400)
 }
 
 func TestSendStreamMessage_EmptyEndpoint(t *testing.T) {
@@ -890,10 +803,7 @@ func TestSendStreamMessage_EmptyEndpoint(t *testing.T) {
 		},
 	})
 	defer sendRes.Body.Close()
-	if sendRes.StatusCode != 400 {
-		b, _ := io.ReadAll(sendRes.Body)
-		t.Fatalf("empty endpoint: want 400 got %d body=%s", sendRes.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, sendRes, 400)
 }
 
 func TestSendStreamMessage_EmptyAuthKey(t *testing.T) {
@@ -918,10 +828,7 @@ func TestSendStreamMessage_EmptyAuthKey(t *testing.T) {
 		},
 	})
 	defer sendRes.Body.Close()
-	if sendRes.StatusCode != 400 {
-		b, _ := io.ReadAll(sendRes.Body)
-		t.Fatalf("empty auth_key: want 400 got %d body=%s", sendRes.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, sendRes, 400)
 }
 
 func TestSendStreamMessage_MissingMsgID(t *testing.T) {
@@ -949,10 +856,7 @@ func TestSendStreamMessage_MissingMsgID(t *testing.T) {
 		},
 	})
 	defer sendRes.Body.Close()
-	if sendRes.StatusCode != 200 {
-		b, _ := io.ReadAll(sendRes.Body)
-		t.Fatalf("auto msg_id: want 200 got %d body=%s", sendRes.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, sendRes, 200)
 	io.Copy(io.Discard, sendRes.Body)
 }
 
@@ -996,9 +900,7 @@ func TestSendStreamMessage_ReplayWithEmptyLiveBuffer(t *testing.T) {
 	// replay — should get [DONE] directly (no content, but done is true)
 	replayRes := f.Do(t, "GET", "/api/chats/"+chat.ID+"/messages/"+msgID+"/stream", alice.AccessToken, nil)
 	defer replayRes.Body.Close()
-	if replayRes.StatusCode != 200 {
-		t.Fatalf("replay: want 200 got %d", replayRes.StatusCode)
-	}
+	testutil.RequireStatus(t, replayRes, 200)
 	scanner := bufio.NewScanner(replayRes.Body)
 	foundDone := false
 	for scanner.Scan() {
@@ -1008,9 +910,7 @@ func TestSendStreamMessage_ReplayWithEmptyLiveBuffer(t *testing.T) {
 			break
 		}
 	}
-	if !foundDone {
-		t.Fatal("expected [DONE] for empty stream replay")
-	}
+	testutil.RequireTrue(t, foundDone, "expected [DONE] for empty stream replay")
 }
 
 // TestSendStreamMessage_SlowAI 用慢速 mock AI（每 500ms 发一个 chunk，持续 15s）
@@ -1056,10 +956,7 @@ func TestSendStreamMessage_SlowAI(t *testing.T) {
 		},
 	})
 	defer sendRes.Body.Close()
-	if sendRes.StatusCode != 200 {
-		b, _ := io.ReadAll(sendRes.Body)
-		t.Fatalf("slow AI: want 200 got %d body=%s", sendRes.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, sendRes, 200)
 
 	// 读 SSE，记录持续时间和 chunk 数
 	scanner := bufio.NewScanner(sendRes.Body)
@@ -1125,11 +1022,7 @@ func TestRealAIEndpoint(t *testing.T) {
 			},
 		},
 	})
-	if sendRes.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(sendRes.Body)
-		sendRes.Body.Close()
-		t.Fatalf("stream message: want 200 got %d body=%s", sendRes.StatusCode, string(body))
-	}
+	testutil.RequireStatus(t, sendRes, http.StatusOK)
 
 	// 读取 SSE，记录时间和数据量
 	defer sendRes.Body.Close()

@@ -83,7 +83,7 @@ test('register form renders correctly', async ({ page }) => {
 test('full auth flow', async ({ page }) => {
   const stamp = Date.now();
   const email = `test${stamp}@e2e.dev`;
-  // UI 注册也可能撞 register 限流(5/分钟/IP):失败则等 10s 重填重试。
+  // UI 注册也可能撞 register 限流(5/分钟/IP):失败则按 Retry-After 退避重填。
   for (let attempt = 0; ; attempt++) {
     await page.goto('/register');
     await page.fill('input[type="email"]', email);
@@ -109,8 +109,7 @@ test('create group chat', async ({ page }) => {
   const groupName = `E2E Group ${stamp}`;
   await page.fill('input[placeholder="Group name..."]', groupName);
   await page.click('button:has-text("Create")');
-  await page.waitForSelector('.chat-header');
-  await expect(page.locator('.chat-header')).toContainText(groupName);
+  await expect(page.locator('.chat-header')).toContainText(groupName, { timeout: 10000 });
 });
 
 test('send and receive message', async ({ page }) => {
@@ -141,24 +140,23 @@ test('notice board functionality as owner', async ({ page }) => {
   await page.click('button[title="Create Group"]');
   await page.fill('input[placeholder="Group name..."]', `Notice Group ${stamp}`);
   await page.click('button:has-text("Create")');
-  await page.waitForSelector('.chat-header');
+  await expect(page.locator('.chat-header')).toBeVisible({ timeout: 10000 });
 
-  const noticeBtn = page.locator('text=+ Set Notice');
-  if (await noticeBtn.isVisible()) {
-    await noticeBtn.click();
-    await page.fill('input.input-field', 'This is a pinned notice!');
-    await page.click('button:has-text("Save")');
-    await expect(page.locator('text=📌 Notice:')).toBeVisible();
-    await expect(page.locator('text=This is a pinned notice!')).toBeVisible();
+  const noticeBtn = page.locator('button[title="Set announcement"]');
+  await expect(noticeBtn).toBeVisible({ timeout: 5000 });
+  await noticeBtn.click();
+  await page.fill('input.input-field', 'This is a pinned notice!');
+  await page.click('button:has-text("Save")');
+  await expect(page.locator('text=📢 公告')).toBeVisible();
+  await expect(page.locator('text=This is a pinned notice!')).toBeVisible();
 
-    await page.click('button:has-text("Edit")');
-    await page.fill('input.input-field', 'Updated notice!');
-    await page.click('button:has-text("Save")');
-    await expect(page.locator('text=Updated notice!')).toBeVisible();
+  await page.click('button:has-text("Edit")');
+  await page.fill('input.input-field', 'Updated notice!');
+  await page.click('button:has-text("Save")');
+  await expect(page.locator('text=Updated notice!')).toBeVisible();
 
-    await page.click('button:has-text("Clear")');
-    await expect(page.locator('text=📌 Notice:')).not.toBeVisible();
-  }
+  await page.click('button:has-text("Clear")');
+  await expect(page.locator('text=📢 公告')).not.toBeVisible();
 });
 
 // ── 边界场景(从 boundary.spec.mjs 迁移,改为真实后端 API 断言)──

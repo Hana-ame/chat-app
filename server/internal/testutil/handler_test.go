@@ -8,7 +8,6 @@ package testutil_test
 import (
 	"bufio"
 	"encoding/json"
-	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -26,62 +25,42 @@ func TestCreateGroupChatAndSendMessage(t *testing.T) {
 		"type": "group", "name": "Dev Team", "member_ids": []string{bob.UserID},
 	})
 	defer res.Body.Close()
-	if res.StatusCode != 201 {
-		b, _ := io.ReadAll(res.Body)
-		t.Fatalf("create chat: %d %s", res.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, res, 201)
 	var chat struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
 		Type string `json:"type"`
 	}
-	if err := json.NewDecoder(res.Body).Decode(&chat); err != nil {
-		t.Fatal(err)
-	}
-	if chat.Name != "Dev Team" || chat.Type != "group" {
-		t.Fatal("chat wrong")
-	}
+	testutil.RequireNoError(t, json.NewDecoder(res.Body).Decode(&chat))
+	testutil.RequireTrue(t, chat.Name == "Dev Team" && chat.Type == "group", "chat wrong")
 
 	sendRes := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", alice.AccessToken, map[string]string{
 		"content": "hello team!",
 	})
 	defer sendRes.Body.Close()
-	if sendRes.StatusCode != 201 {
-		b, _ := io.ReadAll(sendRes.Body)
-		t.Fatalf("send msg: %d %s", sendRes.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, sendRes, 201)
 	var msg struct {
 		ID      string `json:"id"`
 		Content string `json:"content"`
 		ChatID  string `json:"chat_id"`
 	}
-	if err := json.NewDecoder(sendRes.Body).Decode(&msg); err != nil {
-		t.Fatal(err)
-	}
-	if msg.Content != "hello team!" {
-		t.Fatal("content mismatch")
-	}
+	testutil.RequireNoError(t, json.NewDecoder(sendRes.Body).Decode(&msg))
+	testutil.RequireEqual(t, msg.Content, "hello team!")
 
 	listRes := f.Do(t, "GET", "/api/chats/"+chat.ID+"/messages?limit=50", alice.AccessToken, nil)
 	defer listRes.Body.Close()
-	if listRes.StatusCode != 200 {
-		t.Fatal("list messages failed")
-	}
+	testutil.RequireStatus(t, listRes, 200)
 	var listResp struct {
 		Messages []map[string]any `json:"messages"`
 	}
 	json.NewDecoder(listRes.Body).Decode(&listResp)
-	if len(listResp.Messages) != 1 {
-		t.Fatalf("want 1 message, got %d", len(listResp.Messages))
-	}
+	testutil.RequireEqual(t, len(listResp.Messages), 1)
 
 	editRes := f.Do(t, "PATCH", "/api/chats/"+chat.ID+"/messages/"+msg.ID, alice.AccessToken, map[string]string{
 		"content": "edited hello!",
 	})
 	defer editRes.Body.Close()
-	if editRes.StatusCode != 200 {
-		t.Fatal("edit failed")
-	}
+	testutil.RequireStatus(t, editRes, 200)
 }
 
 func TestCreateDM(t *testing.T) {
@@ -93,26 +72,19 @@ func TestCreateDM(t *testing.T) {
 		"user_id": bob.UserID,
 	})
 	defer res.Body.Close()
-	if res.StatusCode != 201 && res.StatusCode != 200 {
-		b, _ := io.ReadAll(res.Body)
-		t.Fatalf("create dm: %d %s", res.StatusCode, string(b))
-	}
+	testutil.RequireStatusAny(t, res, 201, 200)
 
 	res2 := f.Do(t, "POST", "/api/dms", alice.AccessToken, map[string]string{
 		"user_id": bob.UserID,
 	})
 	defer res2.Body.Close()
-	if res2.StatusCode != 200 {
-		t.Fatal("second DM create should return existing")
-	}
+	testutil.RequireStatus(t, res2, 200)
 
 	res3 := f.Do(t, "POST", "/api/dms", alice.AccessToken, map[string]string{
 		"user_id": alice.UserID,
 	})
 	defer res3.Body.Close()
-	if res3.StatusCode == 201 || res3.StatusCode == 200 {
-		t.Fatal("self dm should fail")
-	}
+	testutil.RequireTrue(t, res3.StatusCode != 201 && res3.StatusCode != 200, "self dm should fail")
 }
 
 func TestAddRemoveMembers(t *testing.T) {
@@ -136,10 +108,7 @@ func TestAddRemoveMembers(t *testing.T) {
 		"user_id": carol.UserID,
 	})
 	defer addRes.Body.Close()
-	if addRes.StatusCode != 200 {
-		b, _ := io.ReadAll(addRes.Body)
-		t.Fatalf("add member: %d %s", addRes.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, addRes, 200)
 
 	membersRes := f.Do(t, "GET", "/api/chats/"+chatID+"/members", alice.AccessToken, nil)
 	defer membersRes.Body.Close()
@@ -147,22 +116,16 @@ func TestAddRemoveMembers(t *testing.T) {
 		Members []map[string]any `json:"members"`
 	}
 	json.NewDecoder(membersRes.Body).Decode(&membersResp)
-	if len(membersResp.Members) != 3 {
-		t.Fatalf("want 3 members, got %d", len(membersResp.Members))
-	}
+	testutil.RequireEqual(t, len(membersResp.Members), 3)
 
 	removeRes := f.Do(t, "DELETE", "/api/chats/"+chatID+"/members/"+carol.UserID, alice.AccessToken, nil)
 	defer removeRes.Body.Close()
-	if removeRes.StatusCode != 200 {
-		t.Fatal("remove member failed")
-	}
+	testutil.RequireStatus(t, removeRes, 200)
 
 	membersRes = f.Do(t, "GET", "/api/chats/"+chatID+"/members", alice.AccessToken, nil)
 	defer membersRes.Body.Close()
 	json.NewDecoder(membersRes.Body).Decode(&membersResp)
-	if len(membersResp.Members) != 2 {
-		t.Fatalf("after remove: want 2, got %d", len(membersResp.Members))
-	}
+	testutil.RequireEqual(t, len(membersResp.Members), 2)
 }
 
 func TestReactionsFlow(t *testing.T) {
@@ -191,21 +154,15 @@ func TestReactionsFlow(t *testing.T) {
 
 	addRes := f.Do(t, "PUT", "/api/chats/"+chatID+"/messages/"+msgID+"/reactions/%F0%9F%91%8D", alice.AccessToken, nil)
 	addRes.Body.Close()
-	if addRes.StatusCode != 200 {
-		t.Fatalf("add reaction: %d", addRes.StatusCode)
-	}
+	testutil.RequireStatus(t, addRes, 200)
 
 	addRes2 := f.Do(t, "PUT", "/api/chats/"+chatID+"/messages/"+msgID+"/reactions/%F0%9F%91%8D", bob.AccessToken, nil)
 	addRes2.Body.Close()
-	if addRes2.StatusCode != 200 {
-		t.Fatalf("bob add reaction: %d", addRes2.StatusCode)
-	}
+	testutil.RequireStatus(t, addRes2, 200)
 
 	delRes := f.Do(t, "DELETE", "/api/chats/"+chatID+"/messages/"+msgID+"/reactions/%F0%9F%91%8D", alice.AccessToken, nil)
 	delRes.Body.Close()
-	if delRes.StatusCode != 200 {
-		t.Fatalf("remove reaction: %d", delRes.StatusCode)
-	}
+	testutil.RequireStatus(t, delRes, 200)
 
 	listRes := f.Do(t, "GET", "/api/chats/"+chatID+"/messages?limit=5", alice.AccessToken, nil)
 	defer listRes.Body.Close()
@@ -218,12 +175,8 @@ func TestReactionsFlow(t *testing.T) {
 		} `json:"messages"`
 	}
 	json.NewDecoder(listRes.Body).Decode(&listResp)
-	if len(listResp.Messages) != 1 || len(listResp.Messages[0].Reactions) != 1 {
-		t.Fatalf("want 1 reaction group, got %d", len(listResp.Messages[0].Reactions))
-	}
-	if listResp.Messages[0].Reactions[0].Count != 1 {
-		t.Fatalf("want 1 count after remove, got %d", listResp.Messages[0].Reactions[0].Count)
-	}
+	testutil.RequireTrue(t, len(listResp.Messages) == 1 && len(listResp.Messages[0].Reactions) == 1, "want 1 reaction group, got %d", len(listResp.Messages[0].Reactions))
+	testutil.RequireEqual(t, listResp.Messages[0].Reactions[0].Count, 1)
 }
 
 func TestUpdateProfile(t *testing.T) {
@@ -234,14 +187,10 @@ func TestUpdateProfile(t *testing.T) {
 		"username": "NewProfUser",
 	})
 	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		t.Fatal("update profile failed")
-	}
+	testutil.RequireStatus(t, res, 200)
 	var u map[string]any
 	json.NewDecoder(res.Body).Decode(&u)
-	if u["username"] != "NewProfUser" {
-		t.Fatal("username not updated")
-	}
+	testutil.RequireEqual(t, u["username"], "NewProfUser")
 }
 
 func TestSearchUsers(t *testing.T) {
@@ -262,13 +211,9 @@ func TestSearchUsers(t *testing.T) {
 			found = true
 		}
 	}
-	if !found {
-		t.Fatal("search didn't find target user")
-	}
+	testutil.RequireTrue(t, found, "search didn't find target user")
 	for _, u := range resp.Users {
-		if u["id"] == alice.UserID {
-			t.Fatal("search returned self")
-		}
+		testutil.RequireNotEqual(t, u["id"], alice.UserID)
 	}
 }
 
@@ -295,9 +240,7 @@ func TestDeleteMessageAsAdmin(t *testing.T) {
 
 	delRes := f.Do(t, "DELETE", "/api/chats/"+chatID+"/messages/"+msgID, alice.AccessToken, nil)
 	defer delRes.Body.Close()
-	if delRes.StatusCode != 200 {
-		t.Fatalf("owner should be able to delete any message: %d", delRes.StatusCode)
-	}
+	testutil.RequireStatus(t, delRes, 200)
 }
 
 func TestLeaveGroupChat(t *testing.T) {
@@ -315,15 +258,11 @@ func TestLeaveGroupChat(t *testing.T) {
 
 	leaveRes := f.Do(t, "DELETE", "/api/chats/"+chatID+"/members/"+alice.UserID, alice.AccessToken, nil)
 	defer leaveRes.Body.Close()
-	if leaveRes.StatusCode != 200 {
-		t.Fatalf("self-leave: %d", leaveRes.StatusCode)
-	}
+	testutil.RequireStatus(t, leaveRes, 200)
 
 	accessRes := f.Do(t, "GET", "/api/chats/"+chatID+"/messages?limit=1", alice.AccessToken, nil)
 	defer accessRes.Body.Close()
-	if accessRes.StatusCode != 403 {
-		t.Fatalf("should be forbidden after leaving: %d", accessRes.StatusCode)
-	}
+	testutil.RequireStatus(t, accessRes, 403)
 }
 
 func TestAuthEndpoints(t *testing.T) {
@@ -334,9 +273,7 @@ func TestAuthEndpoints(t *testing.T) {
 			"email": "not-an-email", "username": "a", "password": "password123",
 		})
 		res.Body.Close()
-		if res.StatusCode != 200 {
-			t.Fatalf("want 200 got %d", res.StatusCode)
-		}
+		testutil.RequireStatus(t, res, 200)
 	})
 
 	t.Run("login with wrong password", func(t *testing.T) {
@@ -345,31 +282,23 @@ func TestAuthEndpoints(t *testing.T) {
 			"email": "wrongpw@t.com", "password": "badbadbad",
 		})
 		res.Body.Close()
-		if res.StatusCode != 401 {
-			t.Fatalf("want 401, got %d", res.StatusCode)
-		}
+		testutil.RequireStatus(t, res, 401)
 	})
 
 	t.Run("refresh with garbage token", func(t *testing.T) {
 		res := f.DoWithCookie(t, "POST", "/api/auth/refresh", "", "refresh_token", "not-a-real-token", nil)
 		res.Body.Close()
-		if res.StatusCode != 401 {
-			t.Fatalf("want 401 for invalid refresh, got %d", res.StatusCode)
-		}
+		testutil.RequireStatus(t, res, 401)
 	})
 
 	t.Run("logout cleans up refresh token", func(t *testing.T) {
 		s := f.Register(t, "logout@t.com", "LogoutUser", "testtest123")
 		res := f.Do(t, "POST", "/api/auth/logout", s.AccessToken, nil)
 		res.Body.Close()
-		if res.StatusCode != 200 {
-			t.Fatalf("logout: %d", res.StatusCode)
-		}
+		testutil.RequireStatus(t, res, 200)
 		refreshRes := f.DoWithCookie(t, "POST", "/api/auth/refresh", "", "refresh_token", s.RefreshToken, nil)
 		refreshRes.Body.Close()
-		if refreshRes.StatusCode != 401 {
-			t.Fatal("refresh should fail after logout")
-		}
+		testutil.RequireStatus(t, refreshRes, 401)
 	})
 
 	t.Run("get me returns user", func(t *testing.T) {
@@ -378,9 +307,7 @@ func TestAuthEndpoints(t *testing.T) {
 		defer res.Body.Close()
 		var u map[string]any
 		json.NewDecoder(res.Body).Decode(&u)
-		if u["username"] != "MeUser" {
-			t.Fatalf("wrong user: %v", u)
-		}
+		testutil.RequireEqual(t, u["username"], "MeUser")
 	})
 }
 
@@ -406,9 +333,7 @@ func TestListChatsWithUnreads(t *testing.T) {
 
 	listRes := f.Do(t, "GET", "/api/chats/my", alice.AccessToken, nil)
 	defer listRes.Body.Close()
-	if listRes.StatusCode != 200 {
-		t.Fatal("list chats failed")
-	}
+	testutil.RequireStatus(t, listRes, 200)
 	var listResp struct {
 		Chats []struct {
 			Name        string `json:"name"`
@@ -419,9 +344,7 @@ func TestListChatsWithUnreads(t *testing.T) {
 		} `json:"chats"`
 	}
 	json.NewDecoder(listRes.Body).Decode(&listResp)
-	if len(listResp.Chats) < 1 {
-		t.Fatal("no chats returned")
-	}
+	testutil.RequireTrue(t, len(listResp.Chats) >= 1, "no chats returned")
 	for _, c := range listResp.Chats {
 		if c.Name == "Chat A" {
 			if c.LastMessage != nil && c.LastMessage.Content == "hello from bob" {
@@ -454,17 +377,13 @@ func TestRenameChatOnlyOwner(t *testing.T) {
 		"name": "Hacked",
 	})
 	renameRes.Body.Close()
-	if renameRes.StatusCode != 403 {
-		t.Fatalf("non-owner rename: want 403 got %d", renameRes.StatusCode)
-	}
+	testutil.RequireStatus(t, renameRes, 403)
 
 	renameRes2 := f.Do(t, "PATCH", "/api/chats/"+chatID, alice.AccessToken, map[string]string{
 		"name": "Renamed",
 	})
 	renameRes2.Body.Close()
-	if renameRes2.StatusCode != 200 {
-		t.Fatalf("owner rename: want 200 got %d", renameRes2.StatusCode)
-	}
+	testutil.RequireStatus(t, renameRes2, 200)
 }
 
 func TestChatForbidden(t *testing.T) {
@@ -487,9 +406,7 @@ func TestChatForbidden(t *testing.T) {
 		"content": "interloper",
 	})
 	sendRes.Body.Close()
-	if sendRes.StatusCode != 403 {
-		t.Fatalf("non-member send: want 403 got %d", sendRes.StatusCode)
-	}
+	testutil.RequireStatus(t, sendRes, 403)
 }
 
 func TestMarkRead(t *testing.T) {
@@ -515,9 +432,7 @@ func TestMarkRead(t *testing.T) {
 		"message_id": m["id"].(string),
 	})
 	readRes.Body.Close()
-	if readRes.StatusCode != 200 {
-		t.Fatalf("mark read: %d", readRes.StatusCode)
-	}
+	testutil.RequireStatus(t, readRes, 200)
 }
 
 func TestDeleteChatOnlyOwner(t *testing.T) {
@@ -538,14 +453,10 @@ func TestDeleteChatOnlyOwner(t *testing.T) {
 
 	delRes := f.Do(t, "DELETE", "/api/chats/"+chatID, bob.AccessToken, nil)
 	delRes.Body.Close()
-	if delRes.StatusCode != 403 {
-		t.Fatalf("non-owner delete: want 403 got %d", delRes.StatusCode)
-	}
+	testutil.RequireStatus(t, delRes, 403)
 	delRes2 := f.Do(t, "DELETE", "/api/chats/"+chatID, alice.AccessToken, nil)
 	delRes2.Body.Close()
-	if delRes2.StatusCode != 200 {
-		t.Fatalf("owner delete: want 200 got %d", delRes2.StatusCode)
-	}
+	testutil.RequireStatus(t, delRes2, 200)
 }
 
 func TestConcurrentRegister(t *testing.T) {
@@ -580,9 +491,7 @@ func TestConcurrentRegister(t *testing.T) {
 			t.Fatal("timeout waiting for concurrent register")
 		}
 	}
-	if ok != 1 {
-		t.Fatalf("exactly 1 should succeed, got %d (conflict=%d other=%d)", ok, conflict, other)
-	}
+	testutil.RequireEqual(t, ok, 1)
 }
 
 func TestHealthz(t *testing.T) {
@@ -590,23 +499,13 @@ func TestHealthz(t *testing.T) {
 	// Send a header so the echo can be verified
 	res := f.Do(t, "GET", "/healthz", "", nil)
 	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		t.Fatalf("healthz: %d", res.StatusCode)
-	}
+	testutil.RequireStatus(t, res, http.StatusOK)
 	var body map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
-		t.Fatalf("decode body: %v", err)
-	}
-	if body["status"] != "ok" {
-		t.Fatalf("expected status ok, got %v", body["status"])
-	}
+	testutil.RequireNoError(t, json.NewDecoder(res.Body).Decode(&body))
+	testutil.RequireEqual(t, body["status"], "ok")
 	echo, ok := body["echo"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected echo object, got %T", body["echo"])
-	}
-	if len(echo) == 0 {
-		t.Fatalf("expected non-empty echo object")
-	}
+	testutil.RequireTrue(t, ok, "expected echo object, got %T", body["echo"])
+	testutil.RequireTrue(t, len(echo) > 0, "expected non-empty echo object")
 }
 
 func TestUpdateMeUsernameConflict(t *testing.T) {
@@ -618,26 +517,18 @@ func TestUpdateMeUsernameConflict(t *testing.T) {
 		"username": "UserA",
 	})
 	defer res.Body.Close()
-	if res.StatusCode != 409 {
-		b, _ := io.ReadAll(res.Body)
-		t.Fatalf("username conflict: want 409 got %d body=%s", res.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, res, 409)
 
 	res2 := f.Do(t, "PATCH", "/api/users/me", b.AccessToken, map[string]string{
 		"username": "UserB-renamed",
 	})
 	defer res2.Body.Close()
-	if res2.StatusCode != 200 {
-		b, _ := io.ReadAll(res2.Body)
-		t.Fatalf("rename: want 200 got %d body=%s", res2.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, res2, 200)
 	var u struct {
 		Username string `json:"username"`
 	}
 	json.NewDecoder(res2.Body).Decode(&u)
-	if u.Username != "UserB-renamed" {
-		t.Fatalf("want UserB-renamed got %s", u.Username)
-	}
+	testutil.RequireEqual(t, u.Username, "UserB-renamed")
 }
 
 func TestCreateChatInvalidInput(t *testing.T) {
@@ -648,10 +539,7 @@ func TestCreateChatInvalidInput(t *testing.T) {
 		"type": "invalid-type", "name": "Test", "member_ids": []string{},
 	})
 	defer res.Body.Close()
-	if res.StatusCode != 400 {
-		b, _ := io.ReadAll(res.Body)
-		t.Fatalf("invalid chat type: want 400 got %d body=%s", res.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, res, 400)
 }
 
 func TestSendMessageNonMember(t *testing.T) {
@@ -672,10 +560,7 @@ func TestSendMessageNonMember(t *testing.T) {
 		"content": "interloper message",
 	})
 	defer sendRes.Body.Close()
-	if sendRes.StatusCode != 403 {
-		b, _ := io.ReadAll(sendRes.Body)
-		t.Fatalf("non-member send: want 403 got %d body=%s", sendRes.StatusCode, string(b))
-	}
+	testutil.RequireStatus(t, sendRes, 403)
 }
 
 func TestSearchUsersEmptyQuery(t *testing.T) {
@@ -688,9 +573,7 @@ func TestSearchUsersEmptyQuery(t *testing.T) {
 		Users []map[string]any `json:"users"`
 	}
 	json.NewDecoder(res.Body).Decode(&resp)
-	if len(resp.Users) != 0 {
-		t.Fatalf("empty query: want 0 users got %d", len(resp.Users))
-	}
+	testutil.RequireEqual(t, len(resp.Users), 0)
 }
 
 func TestSearchUsersExcludesSelf(t *testing.T) {
@@ -704,9 +587,7 @@ func TestSearchUsersExcludesSelf(t *testing.T) {
 	}
 	json.NewDecoder(res.Body).Decode(&resp)
 	for _, u := range resp.Users {
-		if u["id"] == s.UserID {
-			t.Fatal("search returned self")
-		}
+		testutil.RequireNotEqual(t, u["id"], s.UserID)
 	}
 }
 
@@ -740,9 +621,7 @@ func TestEditMessageNonAuthor(t *testing.T) {
 			"content": "bob edit",
 		})
 		defer res.Body.Close()
-		if res.StatusCode != 404 {
-			t.Fatalf("non-author edit: want 404 got %d", res.StatusCode)
-		}
+		testutil.RequireStatus(t, res, 404)
 	})
 
 	t.Run("message not found", func(t *testing.T) {
@@ -750,9 +629,7 @@ func TestEditMessageNonAuthor(t *testing.T) {
 			"content": "edited",
 		})
 		defer res.Body.Close()
-		if res.StatusCode != 404 {
-			t.Fatalf("edit nonexistent: want 404 got %d", res.StatusCode)
-		}
+		testutil.RequireStatus(t, res, 404)
 	})
 
 	t.Run("chat mismatch", func(t *testing.T) {
@@ -767,9 +644,7 @@ func TestEditMessageNonAuthor(t *testing.T) {
 			"content": "wrong chat",
 		})
 		defer res2.Body.Close()
-		if res2.StatusCode != 400 {
-			t.Fatalf("chat mismatch: want 400 got %d", res2.StatusCode)
-		}
+		testutil.RequireStatus(t, res2, 400)
 	})
 }
 
@@ -794,9 +669,7 @@ func TestSendMessageWithAttachments(t *testing.T) {
 			},
 		})
 		defer res.Body.Close()
-		if res.StatusCode != 400 {
-			t.Fatalf("missing url: want 400 got %d", res.StatusCode)
-		}
+		testutil.RequireStatus(t, res, 400)
 	})
 
 	t.Run("attachment missing filename", func(t *testing.T) {
@@ -807,9 +680,7 @@ func TestSendMessageWithAttachments(t *testing.T) {
 			},
 		})
 		defer res.Body.Close()
-		if res.StatusCode != 400 {
-			t.Fatalf("missing filename: want 400 got %d", res.StatusCode)
-		}
+		testutil.RequireStatus(t, res, 400)
 	})
 
 	t.Run("attachment invalid url prefix", func(t *testing.T) {
@@ -820,9 +691,7 @@ func TestSendMessageWithAttachments(t *testing.T) {
 			},
 		})
 		defer res.Body.Close()
-		if res.StatusCode != 400 {
-			t.Fatalf("invalid url: want 400 got %d", res.StatusCode)
-		}
+		testutil.RequireStatus(t, res, 400)
 	})
 
 	t.Run("attachment mime auto-filled", func(t *testing.T) {
@@ -833,10 +702,7 @@ func TestSendMessageWithAttachments(t *testing.T) {
 			},
 		})
 		defer res.Body.Close()
-		if res.StatusCode != 201 {
-			b, _ := io.ReadAll(res.Body)
-			t.Fatalf("send with attach: want 201 got %d body=%s", res.StatusCode, string(b))
-		}
+		testutil.RequireStatus(t, res, 201)
 	})
 }
 
@@ -858,16 +724,12 @@ func TestMessageContentTooLong(t *testing.T) {
 		"content": longContent,
 	})
 	defer res2.Body.Close()
-	if res2.StatusCode != 413 {
-		t.Fatalf("long content: want 413 got %d", res2.StatusCode)
-	}
+	testutil.RequireStatus(t, res2, 413)
 	var errResp struct {
 		Error string `json:"error"`
 	}
 	json.NewDecoder(res2.Body).Decode(&errResp)
-	if errResp.Error != "content_too_long" {
-		t.Fatalf("want error='content_too_long' got '%s'", errResp.Error)
-	}
+	testutil.RequireEqual(t, errResp.Error, "content_too_long")
 }
 
 func TestPinMessage(t *testing.T) {
@@ -892,10 +754,7 @@ func TestPinMessage(t *testing.T) {
 			"content": "pinned message",
 		})
 		defer res.Body.Close()
-		if res.StatusCode != 200 {
-			b, _ := io.ReadAll(res.Body)
-			t.Fatalf("owner pin: want 200 got %d body=%s", res.StatusCode, string(b))
-		}
+		testutil.RequireStatus(t, res, 200)
 	})
 
 	t.Run("non-owner cannot pin", func(t *testing.T) {
@@ -903,9 +762,7 @@ func TestPinMessage(t *testing.T) {
 			"content": "non-owner pin",
 		})
 		defer res.Body.Close()
-		if res.StatusCode != 403 {
-			t.Fatalf("non-owner pin: want 403 got %d", res.StatusCode)
-		}
+		testutil.RequireStatus(t, res, 403)
 	})
 
 	t.Run("small group can pin", func(t *testing.T) {
@@ -922,9 +779,7 @@ func TestPinMessage(t *testing.T) {
 			"content": "should succeed",
 		})
 		defer res2.Body.Close()
-		if res2.StatusCode != 200 {
-			t.Fatalf("small group pin: want 200 got %d", res2.StatusCode)
-		}
+		testutil.RequireStatus(t, res2, 200)
 	})
 }
 
@@ -949,9 +804,7 @@ func TestDeletePinnedChat(t *testing.T) {
 	t.Run("owner can clear pin", func(t *testing.T) {
 		res2 := f.Do(t, "DELETE", "/api/chats/"+chatID+"/announcement", alice.AccessToken, nil)
 		defer res2.Body.Close()
-		if res2.StatusCode != 200 {
-			t.Fatalf("owner clear pin: want 200 got %d", res2.StatusCode)
-		}
+		testutil.RequireStatus(t, res2, 200)
 	})
 
 	f.Do(t, "POST", "/api/chats/"+chatID+"/announcement", alice.AccessToken, map[string]string{
@@ -962,17 +815,13 @@ func TestDeletePinnedChat(t *testing.T) {
 		dave := f.Register(t, "delpin@d.t", "DelPinD", "password123")
 		res3 := f.Do(t, "DELETE", "/api/chats/"+chatID+"/announcement", dave.AccessToken, nil)
 		defer res3.Body.Close()
-		if res3.StatusCode != 403 {
-			t.Fatalf("non-member clear pin: want 403 got %d", res3.StatusCode)
-		}
+		testutil.RequireStatus(t, res3, 403)
 	})
 
 	t.Run("regular member cannot clear pin", func(t *testing.T) {
 		res4 := f.Do(t, "DELETE", "/api/chats/"+chatID+"/announcement", bob.AccessToken, nil)
 		defer res4.Body.Close()
-		if res4.StatusCode != 403 {
-			t.Fatalf("member clear pin: want 403 got %d", res4.StatusCode)
-		}
+		testutil.RequireStatus(t, res4, 403)
 	})
 }
 
@@ -1011,9 +860,7 @@ func TestChatVisibilityAndPublicList(t *testing.T) {
 
 	publicRes := f.Do(t, "GET", "/api/chats/public", alice.AccessToken, nil)
 	defer publicRes.Body.Close()
-	if publicRes.StatusCode != 200 {
-		t.Fatalf("public list: want 200 got %d", publicRes.StatusCode)
-	}
+	testutil.RequireStatus(t, publicRes, 200)
 	var listResp struct {
 		Chats []struct {
 			ID         string `json:"id"`
@@ -1032,12 +879,8 @@ func TestChatVisibilityAndPublicList(t *testing.T) {
 			foundPrivate = true
 		}
 	}
-	if !foundPublic {
-		t.Fatal("public chat not in public list")
-	}
-	if foundPrivate {
-		t.Fatal("private chat should not be in public list")
-	}
+	testutil.RequireTrue(t, foundPublic, "public chat not in public list")
+	testutil.RequireFalse(t, foundPrivate, "private chat should not be in public list")
 }
 
 func TestJoinPublicChat(t *testing.T) {
@@ -1059,18 +902,13 @@ func TestJoinPublicChat(t *testing.T) {
 	t.Run("join public chat", func(t *testing.T) {
 		res := f.Do(t, "POST", "/api/chats/"+publicChatID+"/join", bob.AccessToken, nil)
 		defer res.Body.Close()
-		if res.StatusCode != 200 {
-			b, _ := io.ReadAll(res.Body)
-			t.Fatalf("join public: want 200 got %d body=%s", res.StatusCode, string(b))
-		}
+		testutil.RequireStatus(t, res, 200)
 	})
 
 	t.Run("appears in member list after join", func(t *testing.T) {
 		memRes := f.Do(t, "GET", "/api/chats/"+publicChatID+"/members", bob.AccessToken, nil)
 		defer memRes.Body.Close()
-		if memRes.StatusCode != 200 {
-			t.Fatal("list members after join failed")
-		}
+		testutil.RequireStatus(t, memRes, 200)
 		var memResp struct {
 			Members []map[string]any `json:"members"`
 		}
@@ -1081,9 +919,7 @@ func TestJoinPublicChat(t *testing.T) {
 				found = true
 			}
 		}
-		if !found {
-			t.Fatal("bob not in member list after join")
-		}
+		testutil.RequireTrue(t, found, "bob not in member list after join")
 	})
 }
 
@@ -1114,26 +950,20 @@ func TestReactionErrors(t *testing.T) {
 	t.Run("reaction on nonexistent message", func(t *testing.T) {
 		res := f.Do(t, "PUT", "/api/chats/"+chatID+"/messages/nonexistent-id/reactions/%F0%9F%91%8D", alice.AccessToken, nil)
 		defer res.Body.Close()
-		if res.StatusCode != 404 {
-			t.Fatalf("reaction on missing msg: want 404 got %d", res.StatusCode)
-		}
+		testutil.RequireStatus(t, res, 404)
 	})
 
 	t.Run("non-member cannot react", func(t *testing.T) {
 		carol := f.Register(t, "rxerr@c.t", "RxCarol", "password123")
 		res := f.Do(t, "PUT", "/api/chats/"+chatID+"/messages/"+msgID+"/reactions/%F0%9F%91%8D", carol.AccessToken, nil)
 		defer res.Body.Close()
-		if res.StatusCode != 403 {
-			t.Fatalf("non-member react: want 403 got %d", res.StatusCode)
-		}
+		testutil.RequireStatus(t, res, 403)
 	})
 
 	t.Run("remove nonexistent reaction", func(t *testing.T) {
 		res := f.Do(t, "DELETE", "/api/chats/"+chatID+"/messages/"+msgID+"/reactions/%E2%9D%A4", alice.AccessToken, nil)
 		defer res.Body.Close()
-		if res.StatusCode != 200 && res.StatusCode != 400 && res.StatusCode != 404 {
-			t.Fatalf("remove nonexistent reaction: unexpected %d", res.StatusCode)
-		}
+		testutil.RequireStatusAny(t, res, 200, 400, 404)
 	})
 }
 
@@ -1144,16 +974,10 @@ func TestSSEConnection(t *testing.T) {
 	req, _ := http.NewRequest("GET", f.HTTP.URL+"/api/events", nil)
 	req.Header.Set("Authorization", "Bearer "+alice.AccessToken)
 	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("sse connect: %v", err)
-	}
+	testutil.RequireNoError(t, err)
 	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		t.Fatalf("sse: want 200 got %d", res.StatusCode)
-	}
-	if ct := res.Header.Get("Content-Type"); ct != "text/event-stream" {
-		t.Fatalf("expected text/event-stream, got %s", ct)
-	}
+	testutil.RequireStatus(t, res, 200)
+	testutil.RequireEqual(t, res.Header.Get("Content-Type"), "text/event-stream")
 
 	scanner := bufio.NewScanner(res.Body)
 	gotReady := false
@@ -1167,9 +991,7 @@ func TestSSEConnection(t *testing.T) {
 			break
 		}
 	}
-	if !gotReady {
-		t.Fatal("did not receive ready event")
-	}
+	testutil.RequireTrue(t, gotReady, "did not receive ready event")
 }
 
 func TestSSEInvalidToken(t *testing.T) {
@@ -1177,9 +999,7 @@ func TestSSEInvalidToken(t *testing.T) {
 
 	res := f.Do(t, "GET", "/api/events", "invalid-jwt", nil)
 	defer res.Body.Close()
-	if res.StatusCode != 401 {
-		t.Fatalf("sse invalid token: want 401 got %d", res.StatusCode)
-	}
+	testutil.RequireStatus(t, res, 401)
 }
 
 func TestSSEMissingToken(t *testing.T) {
@@ -1187,9 +1007,7 @@ func TestSSEMissingToken(t *testing.T) {
 
 	res := f.Do(t, "GET", "/api/events", "", nil)
 	defer res.Body.Close()
-	if res.StatusCode != 401 {
-		t.Fatalf("sse no token: want 401 got %d", res.StatusCode)
-	}
+	testutil.RequireStatus(t, res, 401)
 }
 
 func TestCreateOrGetDM(t *testing.T) {
@@ -1201,26 +1019,19 @@ func TestCreateOrGetDM(t *testing.T) {
 		"user_id": b.UserID,
 	})
 	defer res.Body.Close()
-	if res.StatusCode != 201 && res.StatusCode != 200 {
-		b, _ := io.ReadAll(res.Body)
-		t.Fatalf("create dm: %d %s", res.StatusCode, string(b))
-	}
+	testutil.RequireStatusAny(t, res, 201, 200)
 
 	res2 := f.Do(t, "POST", "/api/dms", a.AccessToken, map[string]string{
 		"user_id": b.UserID,
 	})
 	defer res2.Body.Close()
-	if res2.StatusCode != 200 {
-		t.Fatal("second DM create should return existing")
-	}
+	testutil.RequireStatus(t, res2, 200)
 
 	res3 := f.Do(t, "POST", "/api/dms", a.AccessToken, map[string]string{
 		"user_id": a.UserID,
 	})
 	defer res3.Body.Close()
-	if res3.StatusCode == 201 || res3.StatusCode == 200 {
-		t.Fatal("self dm should fail")
-	}
+	testutil.RequireTrue(t, res3.StatusCode != 201 && res3.StatusCode != 200, "self dm should fail")
 }
 
 func TestGetChat_AsMemberAndNonMember(t *testing.T) {
@@ -1239,15 +1050,11 @@ func TestGetChat_AsMemberAndNonMember(t *testing.T) {
 
 	getRes := f.Do(t, "GET", "/api/chats/"+chat.ID, alice.AccessToken, nil)
 	defer getRes.Body.Close()
-	if getRes.StatusCode != 200 {
-		t.Fatalf("member get chat: want 200 got %d", getRes.StatusCode)
-	}
+	testutil.RequireStatus(t, getRes, 200)
 
 	getRes2 := f.Do(t, "GET", "/api/chats/"+chat.ID, bob.AccessToken, nil)
 	defer getRes2.Body.Close()
-	if getRes2.StatusCode != 403 {
-		t.Fatalf("non-member get chat: want 403 got %d", getRes2.StatusCode)
-	}
+	testutil.RequireStatus(t, getRes2, 403)
 }
 
 func TestGetChat_NotFound(t *testing.T) {
@@ -1255,9 +1062,7 @@ func TestGetChat_NotFound(t *testing.T) {
 	alice := f.Register(t, "gcnf@t.t", "GCNF", "password123")
 	res := f.Do(t, "GET", "/api/chats/nonexistent", alice.AccessToken, nil)
 	defer res.Body.Close()
-	if res.StatusCode != 403 {
-		t.Fatalf("nonexistent chat: want 403 got %d (IsChatMember returns false)", res.StatusCode)
-	}
+	testutil.RequireStatus(t, res, 403)
 }
 
 func TestRenameDelete_DMNotAllowed(t *testing.T) {
@@ -1279,17 +1084,13 @@ func TestRenameDelete_DMNotAllowed(t *testing.T) {
 			"name": "new name",
 		})
 		defer res2.Body.Close()
-		if res2.StatusCode != 400 {
-			t.Fatalf("rename dm: want 400 got %d", res2.StatusCode)
-		}
+		testutil.RequireStatus(t, res2, 400)
 	})
 
 	t.Run("delete dm → 400", func(t *testing.T) {
 		res2 := f.Do(t, "DELETE", "/api/chats/"+dm.ID, alice.AccessToken, nil)
 		defer res2.Body.Close()
-		if res2.StatusCode != 400 {
-			t.Fatalf("delete dm: want 400 got %d", res2.StatusCode)
-		}
+		testutil.RequireStatus(t, res2, 400)
 	})
 }
 
@@ -1325,9 +1126,7 @@ func TestDeleteMessage_NonAuthor(t *testing.T) {
 
 		delRes := f.Do(t, "DELETE", "/api/chats/"+chat.ID+"/messages/"+msg.ID, carol.AccessToken, nil)
 		defer delRes.Body.Close()
-		if delRes.StatusCode != 403 {
-			t.Fatalf("non-owner delete others msg: want 403 got %d", delRes.StatusCode)
-		}
+		testutil.RequireStatus(t, delRes, 403)
 	})
 
 	t.Run("chat mismatch → 400", func(t *testing.T) {
@@ -1342,9 +1141,7 @@ func TestDeleteMessage_NonAuthor(t *testing.T) {
 
 		delRes := f.Do(t, "DELETE", "/api/chats/"+otherChat.ID+"/messages/"+msg.ID, alice.AccessToken, nil)
 		defer delRes.Body.Close()
-		if delRes.StatusCode != 400 {
-			t.Fatalf("chat mismatch: want 400 got %d", delRes.StatusCode)
-		}
+		testutil.RequireStatus(t, delRes, 400)
 	})
 }
 
@@ -1364,9 +1161,7 @@ func TestListMembers_NonMember(t *testing.T) {
 
 	memRes := f.Do(t, "GET", "/api/chats/"+chat.ID+"/members", bob.AccessToken, nil)
 	defer memRes.Body.Close()
-	if memRes.StatusCode != 403 {
-		t.Fatalf("non-member list members: want 403 got %d", memRes.StatusCode)
-	}
+	testutil.RequireStatus(t, memRes, 403)
 }
 
 func TestAddMember_DMAndDuplicate(t *testing.T) {
@@ -1389,9 +1184,7 @@ func TestAddMember_DMAndDuplicate(t *testing.T) {
 			"user_id": carol.UserID,
 		})
 		defer res2.Body.Close()
-		if res2.StatusCode != 400 {
-			t.Fatalf("add to dm: want 400 got %d", res2.StatusCode)
-		}
+		testutil.RequireStatus(t, res2, 400)
 	})
 
 	t.Run("add already member → 409", func(t *testing.T) {
@@ -1408,9 +1201,7 @@ func TestAddMember_DMAndDuplicate(t *testing.T) {
 			"user_id": bob.UserID,
 		})
 		defer res4.Body.Close()
-		if res4.StatusCode != 409 {
-			t.Fatalf("add already member: want 409 got %d", res4.StatusCode)
-		}
+		testutil.RequireStatus(t, res4, 409)
 	})
 
 	t.Run("add nonexistent user → 404", func(t *testing.T) {
@@ -1427,9 +1218,7 @@ func TestAddMember_DMAndDuplicate(t *testing.T) {
 			"user_id": "nonexistent-user-id",
 		})
 		defer res6.Body.Close()
-		if res6.StatusCode != 404 {
-			t.Fatalf("add nonexistent user: want 404 got %d", res6.StatusCode)
-		}
+		testutil.RequireStatus(t, res6, 404)
 	})
 }
 
@@ -1451,9 +1240,7 @@ func TestRemoveMember_DMAndOwner(t *testing.T) {
 	t.Run("remove from dm → 400", func(t *testing.T) {
 		res2 := f.Do(t, "DELETE", "/api/chats/"+dm.ID+"/members/"+bob.UserID, alice.AccessToken, nil)
 		defer res2.Body.Close()
-		if res2.StatusCode != 400 {
-			t.Fatalf("remove from dm: want 400 got %d", res2.StatusCode)
-		}
+		testutil.RequireStatus(t, res2, 400)
 	})
 
 	t.Run("non-admin kick owner → 403", func(t *testing.T) {
@@ -1468,9 +1255,7 @@ func TestRemoveMember_DMAndOwner(t *testing.T) {
 
 		res4 := f.Do(t, "DELETE", "/api/chats/"+c.ID+"/members/"+alice.UserID, bob.AccessToken, nil)
 		defer res4.Body.Close()
-		if res4.StatusCode != 403 {
-			t.Fatalf("kick owner: want 403 got %d", res4.StatusCode)
-		}
+		testutil.RequireStatus(t, res4, 403)
 	})
 }
 
@@ -1491,13 +1276,9 @@ func TestSendMessage_BadJSON(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+alice.AccessToken)
 	res2, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testutil.RequireNoError(t, err)
 	defer res2.Body.Close()
-	if res2.StatusCode != 400 {
-		t.Fatalf("bad json: want 400 got %d", res2.StatusCode)
-	}
+	testutil.RequireStatus(t, res2, 400)
 }
 
 func TestMarkRead_NoBody(t *testing.T) {
@@ -1515,9 +1296,7 @@ func TestMarkRead_NoBody(t *testing.T) {
 
 	readRes := f.Do(t, "POST", "/api/chats/"+chat.ID+"/read", alice.AccessToken, nil)
 	defer readRes.Body.Close()
-	if readRes.StatusCode != 200 {
-		t.Fatalf("mark read without body: want 200 got %d", readRes.StatusCode)
-	}
+	testutil.RequireStatus(t, readRes, 200)
 }
 
 func TestUpdateMe_EmptyBody(t *testing.T) {
@@ -1528,13 +1307,9 @@ func TestUpdateMe_EmptyBody(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+alice.AccessToken)
 	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testutil.RequireNoError(t, err)
 	defer res.Body.Close()
-	if res.StatusCode != 400 {
-		t.Fatalf("bad json: want 400 got %d", res.StatusCode)
-	}
+	testutil.RequireStatus(t, res, 400)
 }
 
 func TestSendMessage_EmptyContentNoAttachments(t *testing.T) {
@@ -1554,7 +1329,5 @@ func TestSendMessage_EmptyContentNoAttachments(t *testing.T) {
 		"content": "",
 	})
 	defer res2.Body.Close()
-	if res2.StatusCode != 400 {
-		t.Fatalf("empty msg no attach: want 400 got %d", res2.StatusCode)
-	}
+	testutil.RequireStatus(t, res2, 400)
 }

@@ -1,27 +1,50 @@
 // real-time.spec.mjs — Mock 传输层实时事件测试(mock project)。
 //
 // 走 __mockLogin 进入应用内 Mock API 模式(mock transport 每 500ms 轮询),
-// 验证消息增删改、反应、聊天增删、未读数等事件驱动的 UI 行为。
+// 验证消息增删改、反应、聊天增删、公告等事件驱动的 UI 行为。
 // 不依赖 Go 后端;详见 docs/mock-strategy.md。
+//
+// 可靠性约定(第 29 轮起,消灭"条件跳过"假绿):
+//   - 需要权限的操作(公告/删除聊天)先通过 UI 创建新群:mock 中创建者必为
+//     owner,相关按钮必然出现,不再用 if(isVisible) 静默跳过
+//   - 编辑/删除消息作用于"刚发送的消息"(作者必为自己)
+//   - 原生 confirm 弹窗用 page.on('dialog') 处理(Playwright 无法点击原生弹窗)
+//   - 断言一律硬断言;UI 轮询类等待用固定轮询周期(500ms)推导
 //
 // 运行: cd client && npm run test:e2e:mock
 import { test, expect } from '@playwright/test';
 
+async function mockLogin(page) {
+  await page.addInitScript(() => localStorage.clear());
+  await page.goto('/login');
+  await page.waitForSelector('.form-box');
+  await page.evaluate(() => window.__mockLogin());
+  await page.waitForSelector('.sidebar');
+}
+
+async function openFirstChat(page) {
+  await mockLogin(page);
+  await page.waitForSelector('.chat-item', { timeout: 5000 });
+  await page.locator('.chat-item').nth(1).click();
+  await page.waitForSelector('[data-testid="chat-input"]', { timeout: 5000 });
+}
+
+async function createGroup(page, name) {
+  await page.click('button[title="Create Group"]');
+  await page.fill('input[placeholder="Group name..."]', name);
+  await page.click('button:has-text("Create")');
+  await page.waitForSelector('.chat-header', { timeout: 5000 });
+}
+
+async function sendMessage(page, text) {
+  await page.fill('[data-testid="chat-input"]', text);
+  await page.click('button[title="Send"]');
+  const msg = page.locator('.msg-content', { hasText: text });
+  await expect(msg.first()).toBeVisible({ timeout: 5000 });
+  return msg.first();
+}
+
 test.describe('Real-time Events (WS / SSE / Polling)', () => {
-
-  async function mockLogin(page) {
-    await page.addInitScript(() => localStorage.clear());
-    await page.goto('/login');
-    await page.waitForSelector('.form-box');
-    await page.evaluate(() => window.__mockLogin());
-    await page.waitForSelector('.sidebar');
-  }
-
-  async function openFirstChat(page) {
-    await mockLogin(page);
-    await page.waitForSelector('.chat-item', { timeout: 5000 });
-    await page.locator('.chat-item').nth(1).click();
-  }
 
   test('WS ready event populates chat list', async ({ page }) => {
     await mockLogin(page);
@@ -29,135 +52,118 @@ test.describe('Real-time Events (WS / SSE / Polling)', () => {
     expect(items).toBeGreaterThanOrEqual(1);
   });
 
-  test('polling mode updates chat list periodically', async ({ page }) => {
+  test('polling mode keeps chat list stable', async ({ page }) => {
+    // mock transport 每 500ms 轮询 listChats;种子数据固定,count 不应漂移。
     await mockLogin(page);
     await page.waitForSelector('.chat-item', { timeout: 5000 });
     const before = await page.locator('.chat-item').count();
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1500);
     const after = await page.locator('.chat-item').count();
-    expect(after).toBeGreaterThanOrEqual(before - 1);
+    expect(after).toBe(before);
   });
 
   test('sending message triggers onMessageCreate', async ({ page }) => {
     await openFirstChat(page);
-    await page.waitForSelector('[data-testid="chat-input"]', { timeout: 5000 });
-    await page.fill('[data-testid="chat-input"]', 'Real-time test message');
-    await page.click('button[title="Send"]');
-    await expect(page.locator('.msg-content', { hasText: 'Real-time test message' }).first()).toBeVisible({ timeout: 5000 });
+    await sendMessage(page, 'Real-time test message');
   });
 
   test('editing message triggers onMessageUpdate', async ({ page }) => {
     await openFirstChat(page);
-    await page.waitForSelector('.msg-content', { timeout: 5000 });
-    const editBtn = page.locator('.msg-actions button:has-text("Edit")').first();
-    if (await editBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await editBtn.click();
-      const editInput = page.locator('.msg-edit-input').first();
-      if (await editInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await editInput.fill('Updated via onMessageUpdate');
-        await page.locator('.msg-actions button:has-text("Save")').first().click();
-        await expect(page.locator('text=Updated via onMessageUpdate').first()).toBeVisible({ timeout: 3000 });
-      }
-    }
+    const msg = await sendMessage(page, 'Edit me via onMessageUpdate');
+    await msg.hover();
+    await page.locator('.msg-actions button:has-text("Edit")').first().click();
+    await page.fill('textarea.input-field', 'Updated via onMessageUpdate');
+    await page.locator('.msg-actions button:has-text("Save")').first().click();
+    await expect(
+      page.locator('.msg-content', { hasText: 'Updated via onMessageUpdate' }).first()
+    ).toBeVisible({ timeout: 5000 });
   });
 
   test('deleting message triggers onMessageDelete', async ({ page }) => {
     await openFirstChat(page);
-    await page.waitForSelector('.msg-content', { timeout: 5000 });
-    const deleteBtn = page.locator('.msg-actions button:has-text("Delete")').first();
-    if (await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await deleteBtn.click();
-      await page.waitForTimeout(500);
-      const confirmBtn = page.locator('button:has-text("Confirm"), button:has-text("Delete")').first();
-      if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await confirmBtn.click();
-      }
-    }
+    const msg = await sendMessage(page, 'Delete me via onMessageDelete');
+    await msg.hover();
+    page.once('dialog', d => d.accept());
+    await page.locator('.msg-actions button:has-text("Delete")').first().click();
+    await expect(page.locator('.msg-deleted', { hasText: 'message deleted' }).first())
+      .toBeVisible({ timeout: 5000 });
   });
 
   test('adding reaction updates UI', async ({ page }) => {
     await openFirstChat(page);
-    await page.waitForSelector('.msg-content', { timeout: 5000 });
-    const msgContent = page.locator('.msg-content').first();
-    await msgContent.hover();
-    const reactionBtn = page.locator('button.msg-btn:has-text("😀")').first();
-    await expect(reactionBtn).toBeVisible({ timeout: 5000 });
+    const msg = await sendMessage(page, 'React to me');
+    await msg.hover();
+    // 点开 emoji picker,选 👍 → 该消息出现 reaction chip。
+    await page.locator('.msg-actions button:has-text("😀")').first().click();
+    await page.locator('.emoji-btn:has-text("👍")').first().click();
+    await expect(page.locator('.reaction-chip', { hasText: '👍' }).first())
+      .toBeVisible({ timeout: 5000 });
   });
 
   test('chat create event adds new chat to list', async ({ page }) => {
     await mockLogin(page);
     await page.waitForSelector('.chat-item', { timeout: 5000 });
     const before = await page.locator('.chat-item').count();
-    await page.click('button[title="Create Group"]');
-    await page.fill('input[placeholder="Group name..."]', 'New Chat from Event');
-    await page.click('button:has-text("Create")');
-    await page.waitForSelector('.chat-header', { timeout: 5000 });
+    await createGroup(page, 'New Chat from Event');
     const after = await page.locator('.chat-item').count();
-    expect(after).toBeGreaterThan(before);
+    expect(after).toBe(before + 1);
   });
 
-  test('pinned notice persists across mode switch', async ({ page }) => {
-    await openFirstChat(page);
-    await page.waitForSelector('.chat-header', { timeout: 5000 });
-    const setBtn = page.locator('text=+ Set Notice');
-    if (await setBtn.isVisible()) {
-      await setBtn.click();
-      await page.fill('input.input-field', 'Mode switch test notice');
-      await page.click('button:has-text("Save")');
-      await expect(page.locator('text=📌 Notice:')).toBeVisible();
-      await expect(page.locator('text=Mode switch test notice')).toBeVisible();
-      await page.click('button:has-text("Clear")');
-      await expect(page.locator('text=📌 Notice:')).not.toBeVisible();
-    }
+  test('notice board: set, edit, clear as creator', async ({ page }) => {
+    // mock 中新建群 owner 必为自己 → Set announcement 必然出现。
+    await mockLogin(page);
+    await createGroup(page, 'Notice Test Chat');
+    await page.click('button[title="Set announcement"]');
+    await page.fill('input.input-field', 'Mode switch test notice');
+    await page.click('button:has-text("Save")');
+    await expect(page.locator('text=📢 公告')).toBeVisible();
+    await expect(page.locator('text=Mode switch test notice')).toBeVisible();
+
+    await page.click('button:has-text("Edit")');
+    await page.fill('input.input-field', 'Edited notice text');
+    await page.click('button:has-text("Save")');
+    await expect(page.locator('text=Edited notice text')).toBeVisible();
+
+    await page.click('button:has-text("Clear")');
+    await expect(page.locator('text=📢 公告')).not.toBeVisible();
   });
 
-  test('unread count updates on new message event', async ({ page }) => {
+  test('unread badges visible for unread chats', async ({ page }) => {
+    // 种子数据 chats[1].unread_count=4,mock 无 mark-read API 不清零。
     await mockLogin(page);
     await page.waitForSelector('.chat-item', { timeout: 5000 });
-    await page.locator('.chat-item').nth(1).click();
-    await page.waitForSelector('.msg-content', { timeout: 5000 });
-    const unreadBadges = page.locator('.unread-badge');
-    const count = await unreadBadges.count();
-    expect(count).toBeGreaterThanOrEqual(0);
+    await expect(page.locator('.unread-badge').first()).toBeVisible();
   });
 
   test('member count visible in chat header', async ({ page }) => {
     await openFirstChat(page);
-    await page.waitForSelector('.chat-header', { timeout: 5000 });
     const header = page.locator('.chat-header');
     await expect(header).toBeVisible();
+    await expect(header).toContainText(/[0-9]/);
   });
 
   test('chat delete event removes chat from list', async ({ page }) => {
+    // 创建自己的群再删除:右键菜单必然出现(owner),count 确定 -1。
     await mockLogin(page);
     await page.waitForSelector('.chat-item', { timeout: 5000 });
     const before = await page.locator('.chat-item').count();
+    await createGroup(page, 'To Be Deleted');
     await page.locator('.chat-item').first().click({ button: 'right' });
-    const deleteOpt = page.locator('[role="menuitem"]:has-text("Delete"), .context-menu button:has-text("Delete")').first();
-    if (await deleteOpt.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await deleteOpt.click();
-      await page.waitForTimeout(500);
-      const after = await page.locator('.chat-item').count();
-      expect(after).toBeLessThan(before);
-    }
+    page.once('dialog', d => d.accept());
+    await page.locator('.context-menu button:has-text("Delete")').first().click();
+    await expect
+      .poll(async () => page.locator('.chat-item').count(), { timeout: 5000 })
+      .toBe(before);
   });
 
-  test('SSE mode can be entered and renders chats', async ({ page }) => {
-    const wsBtn = page.locator('button:has-text("WS"), button:has-text("SSE"), button:has-text("POLL")');
-    if (await wsBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      const currentText = await wsBtn.textContent();
-      if (currentText === 'WS') {
-        await wsBtn.click();
-        await page.waitForTimeout(300);
-        const nextText = await wsBtn.textContent();
-        expect(['SSE', 'POLL']).toContain(nextText);
-      }
-    }
-  });
-
-  test('disconnect stops updates', async ({ page }) => {
+  test('transport mode button cycles WS/SSE/Poll', async ({ page }) => {
+    // mock 模式下 transport 恒为 mock;这里只验证 UI 模式切换器行为。
     await mockLogin(page);
-    await page.waitForSelector('.chat-item', { timeout: 5000 });
+    const btn = page.locator('button[title^="Click to switch"]');
+    await expect(btn).toBeVisible();
+    const first = await btn.textContent();
+    await btn.click();
+    const second = await btn.textContent();
+    expect(second).not.toBe(first);
   });
-
 });

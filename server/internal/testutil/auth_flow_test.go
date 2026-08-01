@@ -6,7 +6,6 @@ package testutil_test
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"sync"
 	"testing"
@@ -18,31 +17,17 @@ func TestRegisterLoginRefresh(t *testing.T) {
 	f := testutil.New(t)
 
 	s1 := f.Register(t, "flow@test.dev", "FlowUser", "securePass1!")
-	if s1.AccessToken == "" {
-		t.Fatal("register: missing access_token")
-	}
-	if s1.RefreshToken == "" {
-		t.Fatal("register: missing refresh_token cookie")
-	}
-	if s1.UserID == "" {
-		t.Fatal("register: missing user id")
-	}
+	testutil.RequireTrue(t, s1.AccessToken != "", "register: missing access_token")
+	testutil.RequireTrue(t, s1.RefreshToken != "", "register: missing refresh_token cookie")
+	testutil.RequireTrue(t, s1.UserID != "", "register: missing user id")
 
 	s2 := f.Login(t, "flow@test.dev", "securePass1!")
-	if s2.UserID != s1.UserID {
-		t.Fatal("login: user mismatch with register")
-	}
-	if s2.RefreshToken == "" {
-		t.Fatal("login: missing refresh_token cookie")
-	}
+	testutil.RequireEqual(t, s2.UserID, s1.UserID)
+	testutil.RequireTrue(t, s2.RefreshToken != "", "login: missing refresh_token cookie")
 
 	s3 := f.Refresh(t, s2.RefreshToken)
-	if s3.UserID != s1.UserID {
-		t.Fatal("refresh: user mismatch")
-	}
-	if s3.RefreshToken == "" {
-		t.Fatal("refresh: missing new refresh_token cookie")
-	}
+	testutil.RequireEqual(t, s3.UserID, s1.UserID)
+	testutil.RequireTrue(t, s3.RefreshToken != "", "refresh: missing new refresh_token cookie")
 }
 
 func TestAccessDeniedWithoutToken(t *testing.T) {
@@ -62,11 +47,8 @@ func TestAccessDeniedWithoutToken(t *testing.T) {
 	}
 	for _, ep := range endpoints {
 		res := f.Do(t, ep.method, ep.path, "", nil)
-		body, _ := io.ReadAll(res.Body)
 		res.Body.Close()
-		if res.StatusCode != 401 {
-			t.Fatalf("%s %s: want 401 got %d body=%s", ep.method, ep.path, res.StatusCode, string(body))
-		}
+		testutil.RequireStatus(t, res, 401)
 	}
 }
 
@@ -75,21 +57,15 @@ func TestInvalidAccessToken(t *testing.T) {
 
 	res := f.Do(t, "GET", "/api/users/me", "this.is.not.a.jwt", nil)
 	defer res.Body.Close()
-	if res.StatusCode != 401 {
-		t.Fatalf("invalid jwt: want 401 got %d", res.StatusCode)
-	}
+	testutil.RequireStatus(t, res, 401)
 
 	res = f.Do(t, "GET", "/api/users/me", "Bearer .", nil)
 	defer res.Body.Close()
-	if res.StatusCode != 401 {
-		t.Fatalf("malformed bearer: want 401 got %d", res.StatusCode)
-	}
+	testutil.RequireStatus(t, res, 401)
 
 	res = f.Do(t, "GET", "/api/users/me", "", nil)
 	defer res.Body.Close()
-	if res.StatusCode != 401 {
-		t.Fatalf("empty token: want 401 got %d", res.StatusCode)
-	}
+	testutil.RequireStatus(t, res, 401)
 }
 
 func TestTamperedRefreshToken(t *testing.T) {
@@ -98,17 +74,13 @@ func TestTamperedRefreshToken(t *testing.T) {
 	t.Run("totally random string", func(t *testing.T) {
 		res := f.DoWithCookie(t, "POST", "/api/auth/refresh", "", "refresh_token", "i-am-not-a-real-token", nil)
 		defer res.Body.Close()
-		if res.StatusCode != 401 {
-			t.Fatalf("want 401 got %d", res.StatusCode)
-		}
+		testutil.RequireStatus(t, res, 401)
 	})
 
 	t.Run("empty cookie value", func(t *testing.T) {
 		res := f.DoWithCookie(t, "POST", "/api/auth/refresh", "", "refresh_token", "", nil)
 		defer res.Body.Close()
-		if res.StatusCode != 401 {
-			t.Fatalf("want 401 got %d", res.StatusCode)
-		}
+		testutil.RequireStatus(t, res, 401)
 	})
 
 	t.Run("valid format but unknown hash", func(t *testing.T) {
@@ -116,9 +88,7 @@ func TestTamperedRefreshToken(t *testing.T) {
 		// A syntactically valid token format but unknown hash should 401.
 		res := f.DoWithCookie(t, "POST", "/api/auth/refresh", "", "refresh_token", "aabbccdd00112233445566778899aabbccdd00112233445566778899aabbccdd", nil)
 		defer res.Body.Close()
-		if res.StatusCode != 401 {
-			t.Fatalf("want 401 got %d", res.StatusCode)
-		}
+		testutil.RequireStatus(t, res, 401)
 	})
 }
 
@@ -129,16 +99,12 @@ func TestRefreshTokenRotation(t *testing.T) {
 	oldRefresh := s.RefreshToken
 
 	s2 := f.Refresh(t, oldRefresh)
-	if s2.RefreshToken == oldRefresh {
-		t.Fatal("refresh should rotate the token")
-	}
+	testutil.RequireNotEqual(t, s2.RefreshToken, oldRefresh)
 
 	// Reuse the old (already consumed) refresh token
 	res := f.DoWithCookie(t, "POST", "/api/auth/refresh", "", "refresh_token", oldRefresh, nil)
 	defer res.Body.Close()
-	if res.StatusCode != 401 {
-		t.Fatalf("reused old refresh token: want 401 got %d", res.StatusCode)
-	}
+	testutil.RequireStatus(t, res, 401)
 
 	// New token should still work
 	_ = f.Refresh(t, s2.RefreshToken)
@@ -149,20 +115,13 @@ func TestRefreshWithoutCookie(t *testing.T) {
 
 	res := f.Do(t, "POST", "/api/auth/refresh", "", nil)
 	defer res.Body.Close()
-	if res.StatusCode != 400 {
-		t.Fatalf("no cookie: want 400 got %d", res.StatusCode)
-	}
-
+	testutil.RequireStatus(t, res, 400)
 	var errResp struct {
 		Error   string `json:"error"`
 		Message string `json:"message"`
 	}
-	if err := json.NewDecoder(res.Body).Decode(&errResp); err != nil {
-		t.Fatal("expected JSON error response")
-	}
-	if errResp.Error != "bad_request" {
-		t.Fatalf("want error='bad_request' got '%s'", errResp.Error)
-	}
+	testutil.RequireNoError(t, json.NewDecoder(res.Body).Decode(&errResp))
+	testutil.RequireEqual(t, errResp.Error, "bad_request")
 }
 
 func TestRegisterDuplicateEmail(t *testing.T) {
@@ -173,9 +132,7 @@ func TestRegisterDuplicateEmail(t *testing.T) {
 		"email": "dup@test.dev", "username": "SecondUser", "password": "testPass1!",
 	})
 	defer res.Body.Close()
-	if res.StatusCode != 409 {
-		t.Fatalf("duplicate email: want 409 got %d", res.StatusCode)
-	}
+	testutil.RequireStatus(t, res, 409)
 }
 
 func TestRegisterDuplicateUsername(t *testing.T) {
@@ -186,9 +143,7 @@ func TestRegisterDuplicateUsername(t *testing.T) {
 		"email": "dupname2@test.dev", "username": "DupName", "password": "testPass1!",
 	})
 	defer res.Body.Close()
-	if res.StatusCode != 409 {
-		t.Fatalf("duplicate username: want 409 got %d", res.StatusCode)
-	}
+	testutil.RequireStatus(t, res, 409)
 }
 
 func TestLoginWrongPassword(t *testing.T) {
@@ -199,19 +154,12 @@ func TestLoginWrongPassword(t *testing.T) {
 		"email": "wrongpw@test.dev", "password": "battery_staple",
 	})
 	defer res.Body.Close()
-	if res.StatusCode != 401 {
-		t.Fatalf("wrong password: want 401 got %d", res.StatusCode)
-	}
-
+	testutil.RequireStatus(t, res, 401)
 	var errResp struct {
 		Error string `json:"error"`
 	}
-	if err := json.NewDecoder(res.Body).Decode(&errResp); err != nil {
-		t.Fatal("expected JSON error")
-	}
-	if errResp.Error != "invalid_credentials" {
-		t.Fatalf("want 'invalid_credentials' got '%s'", errResp.Error)
-	}
+	testutil.RequireNoError(t, json.NewDecoder(res.Body).Decode(&errResp))
+	testutil.RequireEqual(t, errResp.Error, "invalid_credentials")
 }
 
 func TestConcurrentRefreshRotation(t *testing.T) {
@@ -241,12 +189,8 @@ func TestConcurrentRefreshRotation(t *testing.T) {
 	}
 	wg.Wait()
 
-	if okCount != 1 {
-		t.Fatalf("concurrent refresh: want exactly 1 success, got %d (failures=%d)", okCount, errCount)
-	}
-	if errCount != N-1 {
-		t.Fatalf("concurrent refresh: want %d failures, got %d", N-1, errCount)
-	}
+	testutil.RequireEqual(t, okCount, 1)
+	testutil.RequireEqual(t, errCount, N-1)
 }
 
 func TestLogoutInvalidatesTokens(t *testing.T) {
@@ -255,23 +199,17 @@ func TestLogoutInvalidatesTokens(t *testing.T) {
 
 	res := f.Do(t, "POST", "/api/auth/logout", s.AccessToken, nil)
 	res.Body.Close()
-	if res.StatusCode != 200 {
-		t.Fatalf("logout: want 200 got %d", res.StatusCode)
-	}
+	testutil.RequireStatus(t, res, 200)
 
 	// JWT is stateless — access token remains valid until expiry.
 	// Logout only kills the refresh token chain.
 	res2 := f.Do(t, "GET", "/api/users/me", s.AccessToken, nil)
 	res2.Body.Close()
-	if res2.StatusCode != 200 {
-		t.Fatalf("access token should still work (stateless JWT): want 200 got %d", res2.StatusCode)
-	}
+	testutil.RequireStatus(t, res2, 200)
 
 	res3 := f.DoWithCookie(t, "POST", "/api/auth/refresh", "", "refresh_token", s.RefreshToken, nil)
 	res3.Body.Close()
-	if res3.StatusCode != 401 {
-		t.Fatalf("old refresh token after logout: want 401 got %d", res3.StatusCode)
-	}
+	testutil.RequireStatus(t, res3, 401)
 }
 
 func TestCookieSecurityAttributes(t *testing.T) {
@@ -280,14 +218,9 @@ func TestCookieSecurityAttributes(t *testing.T) {
 		"email": "cookie@test.dev", "username": "CookieUser", "password": "testPass1!",
 	})
 	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		t.Fatal("register failed")
-	}
-
+	testutil.RequireStatus(t, res, 200)
 	c := testutil.ResponseCookie(res, "refresh_token")
-	if c == nil {
-		t.Fatal("refresh_token cookie not set")
-	}
+	testutil.RequireNotNil(t, c)
 	if !c.HttpOnly {
 		t.Error("cookie missing HttpOnly flag")
 	}
@@ -302,34 +235,24 @@ func TestMultiDeviceRefreshIsolation(t *testing.T) {
 	_ = f.Register(t, "multi@test.dev", "MultiUser", "testPass1!")
 	devA := f.Login(t, "multi@test.dev", "testPass1!")
 	devB := f.Login(t, "multi@test.dev", "testPass1!")
-	if devA.RefreshToken == devB.RefreshToken {
-		t.Fatal("two logins should produce different refresh tokens")
-	}
+	testutil.RequireNotEqual(t, devA.RefreshToken, devB.RefreshToken)
 
 	devA2 := f.Refresh(t, devA.RefreshToken)
 	devB2 := f.Refresh(t, devB.RefreshToken)
 
 	resA := f.DoWithCookie(t, "POST", "/api/auth/refresh", "", "refresh_token", devA.RefreshToken, nil)
 	defer resA.Body.Close()
-	if resA.StatusCode != 401 {
-		t.Fatalf("reused devA old refresh: want 401 got %d", resA.StatusCode)
-	}
+	testutil.RequireStatus(t, resA, 401)
 
 	resB := f.DoWithCookie(t, "POST", "/api/auth/refresh", "", "refresh_token", devB.RefreshToken, nil)
 	defer resB.Body.Close()
-	if resB.StatusCode != 401 {
-		t.Fatalf("reused devB old refresh: want 401 got %d", resB.StatusCode)
-	}
+	testutil.RequireStatus(t, resB, 401)
 
 	devA3 := f.Refresh(t, devA2.RefreshToken)
-	if devA3.UserID != devA2.UserID {
-		t.Fatal("devA chain broken")
-	}
+	testutil.RequireEqual(t, devA3.UserID, devA2.UserID)
 
 	devB3 := f.Refresh(t, devB2.RefreshToken)
-	if devB3.UserID != devB2.UserID {
-		t.Fatal("devB chain broken")
-	}
+	testutil.RequireEqual(t, devB3.UserID, devB2.UserID)
 }
 
 func TestRegisterNoValidation(t *testing.T) {
@@ -351,9 +274,7 @@ func TestRegisterNoValidation(t *testing.T) {
 				"email": tt.email, "username": tt.username, "password": tt.password,
 			})
 			res.Body.Close()
-			if res.StatusCode != 200 {
-				t.Fatalf("want 200 got %d", res.StatusCode)
-			}
+			testutil.RequireStatus(t, res, 200)
 		})
 	}
 	// empty email should error at DB layer
@@ -361,7 +282,5 @@ func TestRegisterNoValidation(t *testing.T) {
 		"email": "", "username": "UserC", "password": "password123",
 	})
 	res.Body.Close()
-	if res.StatusCode != 500 {
-		t.Fatalf("want 500 got %d", res.StatusCode)
-	}
+	testutil.RequireStatus(t, res, 500)
 }

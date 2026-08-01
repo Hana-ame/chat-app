@@ -13,19 +13,26 @@ import (
 	"github.com/Hana-ame/chat-app/server/internal/testkit"
 )
 
-func RequireNoError(t *testing.T, err error)                { testkit.RequireNoError(t, err) }
-func RequireError(t *testing.T, err error)                  { testkit.RequireError(t, err) }
+func RequireNoError(t *testing.T, err error) { testkit.RequireNoError(t, err) }
+func RequireError(t *testing.T, err error)   { testkit.RequireError(t, err) }
 func RequireErrorContains(t *testing.T, err error, substr string) {
 	testkit.RequireErrorContains(t, err, substr)
 }
-func RequireEqual(t *testing.T, got, want any)              { testkit.RequireEqual(t, got, want) }
-func RequireNotEqual(t *testing.T, got, notWant any)        { testkit.RequireNotEqual(t, got, notWant) }
-func RequireTrue(t *testing.T, cond bool, msg string)       { testkit.RequireTrue(t, cond, msg) }
-func RequireFalse(t *testing.T, cond bool, msg string)      { testkit.RequireFalse(t, cond, msg) }
-func RequireNil(t *testing.T, v any)                        { testkit.RequireNil(t, v) }
-func RequireNotNil(t *testing.T, v any)                     { testkit.RequireNotNil(t, v) }
+func RequireEqual(t *testing.T, got, want any)       { testkit.RequireEqual(t, got, want) }
+func RequireNotEqual(t *testing.T, got, notWant any) { testkit.RequireNotEqual(t, got, notWant) }
+func RequireTrue(t *testing.T, cond bool, msgAndArgs ...interface{}) {
+	testkit.RequireTrue(t, cond, msgAndArgs...)
+}
+func RequireFalse(t *testing.T, cond bool, msgAndArgs ...interface{}) {
+	testkit.RequireFalse(t, cond, msgAndArgs...)
+}
+func RequireNil(t *testing.T, v any)    { testkit.RequireNil(t, v) }
+func RequireNotNil(t *testing.T, v any) { testkit.RequireNotNil(t, v) }
 func RequireStatus(t *testing.T, res *http.Response, want int) {
 	testkit.RequireStatus(t, res, want)
+}
+func RequireStatusAny(t *testing.T, res *http.Response, wants ...int) {
+	testkit.RequireStatusAny(t, res, wants...)
 }
 func RequireJSONBody(t *testing.T, res *http.Response, into any) {
 	testkit.RequireJSONBody(t, res, into)

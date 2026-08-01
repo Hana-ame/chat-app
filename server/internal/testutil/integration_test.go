@@ -12,21 +12,19 @@ import (
 
 func TestFixtureSetup(t *testing.T) {
 	f := testutil.New(t)
-	if f.DB == nil || f.Auth == nil || f.Hub == nil || f.Server == nil || f.HTTP == nil {
-		t.Fatal("fixture incomplete")
-	}
+	testutil.RequireNotNil(t, f.DB)
+	testutil.RequireNotNil(t, f.Auth)
+	testutil.RequireNotNil(t, f.Hub)
+	testutil.RequireNotNil(t, f.Server)
+	testutil.RequireNotNil(t, f.HTTP)
 }
 
 func TestUserRegisterLogin(t *testing.T) {
 	f := testutil.New(t)
 	s1 := f.Register(t, "alice@test.dev", "alice", "password123")
-	if s1.AccessToken == "" || s1.RefreshToken == "" || s1.UserID == "" {
-		t.Fatal("register response incomplete")
-	}
+	testutil.RequireTrue(t, s1.AccessToken != "" && s1.RefreshToken != "" && s1.UserID != "", "register response incomplete")
 	s2 := f.Login(t, "alice@test.dev", "password123")
-	if s2.UserID != s1.UserID {
-		t.Fatal("login returned different user")
-	}
+	testutil.RequireEqual(t, s2.UserID, s1.UserID)
 }
 
 func TestDuplicateEmail(t *testing.T) {
@@ -36,35 +34,25 @@ func TestDuplicateEmail(t *testing.T) {
 		"email": "bob@test.dev", "username": "bob2", "password": "password123",
 	})
 	defer res.Body.Close()
-	if res.StatusCode != 409 {
-		t.Fatalf("duplicate email: want 409 got %d", res.StatusCode)
-	}
+	testutil.RequireStatus(t, res, 409)
 }
 
 func TestUnauthorizedAccess(t *testing.T) {
 	f := testutil.New(t)
 	res := f.Do(t, "GET", "/api/users/me", "", nil)
 	defer res.Body.Close()
-	if res.StatusCode != 401 {
-		t.Fatalf("want 401 got %d", res.StatusCode)
-	}
+	testutil.RequireStatus(t, res, 401)
 	res = f.Do(t, "GET", "/api/chats/my", "", nil)
 	defer res.Body.Close()
-	if res.StatusCode != 401 {
-		t.Fatalf("want 401 got %d", res.StatusCode)
-	}
+	testutil.RequireStatus(t, res, 401)
 }
 
 func TestRefreshTokenFlow(t *testing.T) {
 	f := testutil.New(t)
 	s := f.Register(t, "refresh@test.dev", "refresher", "password123")
 	s2 := f.Refresh(t, s.RefreshToken)
-	if s2.UserID != s.UserID {
-		t.Fatal("refresh returned different user")
-	}
+	testutil.RequireEqual(t, s2.UserID, s.UserID)
 	res2 := f.DoWithCookie(t, "POST", "/api/auth/refresh", "", "refresh_token", s.RefreshToken, nil)
 	defer res2.Body.Close()
-	if res2.StatusCode != 401 {
-		t.Fatalf("reused refresh token: want 401 got %d", res2.StatusCode)
-	}
+	testutil.RequireStatus(t, res2, 401)
 }

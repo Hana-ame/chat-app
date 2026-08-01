@@ -340,3 +340,42 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
 ### 验证
 - `go vet ./...` + `go build ./...`：✅（doc.go 纯注释无行为变化）
 - CI 待跑
+
+## 2026-08-01 测试结构化与可靠性:Playwright 假绿根治 / 断言统一 / 大文件拆分（第 30 轮）
+
+### P0:Playwright 假绿根治(3 个 spec)
+- `real-time.spec.mjs` 重写:条件跳过全改硬断言;自建群/自发消息保证 owner 权限
+  (mock 种子数据随机是历史条件跳过根因);原生 confirm 改 `page.once('dialog')`;
+  `📢 公告`/`title="Set announcement"`/mode 按钮 `title^="Click to switch"` 等
+  UI 事实对齐;新增 11 个确定性用例(公告/删聊天/反应/模式切换等)
+- `ci.spec.mjs` 重写:`↪` 登出按钮(无文本)、`aria-label="Settings"` 弹窗、
+  Public Channels 仅搜索框 focus 时显示(输入关键词后隐藏)、file/avatar 上传
+  用 filechooser 注入
+- `e2e.spec.mjs`:create group/notice 用例改为 UI 建群(owner 必现按钮),
+  删 10s 硬等待改 `expect(timeout)`;仅保留 2 处合理 waitForTimeout
+  (限流退避重试 10s / 轮询稳定性 1500ms)
+
+### P1:Go 断言统一(手写 if/Fatalf → testkit.Require*,464 → 13 处)
+- `testkit/assert.go` 新增:RequireContains/RequireLen/RequireStatusAny/
+  RequireJSONError;RequireTrue/RequireFalse 支持 msgAndArgs 格式串;
+  RequireNil/RequireNotNil 改用 reflect 判断(修类型化 nil 指针漏判);
+  testutil 薄转发层同步
+- `service_test.go` 262 处、`handler_test.go` 108 处、`ai_stream_test.go` 48 处、
+  `auth_flow_test.go` 38 处、`integration_test.go` 8 处全部迁移;
+  迁移工具为 edit 工具精确块替换(废弃正则脚本方案:两次损坏文件)
+- 保留的 13 处均为结构性断言(通道超时/阻塞检测、慢流计时、mock handler
+  内校验),非简单比较
+
+### P1:service_test.go 大文件拆分(2742 → 7 文件)
+- `helpers_test.go`(通用+createTestUser/Chat/DM)、`chat_test.go`、
+  `message_test.go`、`member_test.go`、`user_test.go`(+Authz)、
+  `reaction_test.go`、`stream_test.go`;imports 按实际使用裁剪
+
+### 事故修复
+- 修复历史正则脚本事故遗留:chat.go 重复 package/import 块;
+  chat_announcement/chat_media/chat_prefs 缺 chi import(3 个文件为
+  未提交的存量功能文件,本次一并补齐并 gofmt)
+
+### 验证
+- `go build ./...` + `go vet ./...` + `go test ./... -count=1`:✅ 11 包全绿
+- Playwright mock 套件未本地跑(按 AGENTS.md 以 CI 为准),待 push 后 `gh run watch`
