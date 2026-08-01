@@ -196,3 +196,9 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
 - `npm test`(vitest):✅ 55 passed;`npm run build`:✅
 - CI(30694170559/30694170541):unit-test / mock-test / full-e2e / go-test /
   frontend-build 全部 ✅
+
+## 2026-08-01 文档清理:development.md 去除"需手动起 Vite"过时说明（第 26 轮）
+
+- docs/guide/development.md:test:e2e:mock 注释去掉"需 Vite :5173"
+  (第 25 轮起由 playwright.config.js webServer 托管,无需手工起),
+  并补充 test:e2e:full 与 webServer 托管说明。

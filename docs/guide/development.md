@@ -8,9 +8,13 @@
 ```bash
 cd server && go vet ./... && go test ./... -count=1   # Go 全量(含 WS)
 cd client && npm test                                  # vitest 单元测试
-cd client && npm run test:e2e:mock                     # Playwright mock 模式(需 Vite :5173)
+cd client && npm run test:e2e:mock                     # Playwright mock 模式(无需后端)
+cd client && npm run test:e2e:full                     # 真实后端(需后端 :8080)
 cd client && npm run build                             # tsc --noEmit + vite build
 ```
+
+Vite dev server 由 playwright.config.js 的 `webServer` 托管(已有则复用、
+缺失自动拉起并回收),无需手工起 vite;e2e 项目需要真实 Go 后端 :8080。
 
 - Go 断言一律用 `testkit.Require*`(handlers 内部测试)或 `testutil.Require*`(转发)。
 - 单元测试(Go)放包内 `*_test.go`;集成测试放 `internal/testutil/`;
