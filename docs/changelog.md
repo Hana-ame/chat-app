@@ -266,3 +266,23 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
 - `go vet ./... && go test ./... -count=1`:✅ 全绿
 - `npm test`(vitest):✅ 65 passed(新增 opHandlers 10 例)
 - `npm run build`:✅;Playwright mock + e2e:✅ 44/44(新二进制后端下 e2e 10/10)
+
+## 2026-08-01 文件结构 Agent 友好化:去双源入口/根目录噪声/冗余上下文（第 28 轮）
+
+### 删除（git 历史均可恢复）
+- `Makefile`：过时且有 bug（test target `-timeout 60s` 会误杀 35s+ 的集成测试），构建入口统一为 `scripts/deploy_local.py`
+- `.claude/AGENT.md`：双 agent 上下文必漂移（825e178 刚修过一次），统一到根 `AGENTS.md`
+- `opencode.sh`：旧会话恢复残留（未被 git 跟踪，仅物理删除）
+- `scripts/gen_ppt.py`（492 行，无引用）、`server/start.sh`（与 deploy_local.py 功能重复）、空目录 `server/docs/`
+- 根目录孤儿 linux 二进制 `chatd`、无消费者的 `.last_upload_url`
+
+### 保留（deploy_local.py 强耦合根目录 cwd）
+- `chatd.exe`/`chat.db`/`server.log` 仍留根目录——脚本路径写死（BINARY_PATH/LOG_FILE/ENV_FILE），且均已 gitignore，agent 可忽略（AGENTS.md 已注明）
+
+### 文档
+- `AGENTS.md` 重写为"索引 + 会话仪式"：首轮必读路径（README → docs/README → changelog 末尾 3 条）、构建/测试命令、grep 原则、changelog 锚定规则；删除重复表述
+- `docs/README.md`：新增"Agent 首轮会话路径"小节；删 `.claude/AGENT.md` 引用；"其他"小节去重（testing/mock-strategy 已在测试小节）
+
+### 验证
+- `go vet ./...` + `go test ./... -count=1`：✅
+- `npm test`（vitest 55）+ `npm run build`：✅

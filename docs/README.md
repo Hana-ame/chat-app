@@ -2,6 +2,13 @@
 
 本文档树是唯一权威文档来源。旧版文档（v0.9.4 之前）已归档至 `archive/legacy-20260731/`，不再维护。
 
+## Agent 首轮会话路径
+
+1. 读根目录 `README.md`（产品概览）
+2. 读本文档（索引，唯一权威入口）
+3. 读 `changelog.md` 末尾 3 条（最近改动，避免重做）
+4. 按需深入：`architecture/` → `api/` → `testing.md` / `mock-strategy.md`
+
 ## 指南（Guide）
 
 | 文档 | 内容 |
@@ -40,14 +47,11 @@
 | 文档 | 内容 |
 |---|---|
 | [security.md](security.md) | 安全：CSP、CORS、JWT、Cookie、真实 IP |
-| [testing.md](testing.md) | 测试体系总纲（金字塔、命令、断言规范） |
-| [mock-strategy.md](mock-strategy.md) | Mock 三层体系与边界 |
 | [changelog.md](changelog.md) | 修改日志（从 v0.9.4 起，末尾追加） |
 
 ## Agent 上下文
 
-- 根目录 `AGENTS.md` — AI 代理项目约定（构建/测试/CI/CD）
-- `.claude/AGENT.md` — 英文快速指南（结构 + 链接同上）
+- 根目录 `AGENTS.md` — AI 代理项目约定（唯一来源：会话仪式/构建/测试/CI/CD）
 
 ## 变更日志规则
 
