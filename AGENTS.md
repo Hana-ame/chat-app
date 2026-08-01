@@ -12,6 +12,8 @@ Go 后端（chi + SQLite + WS/SSE）+ React 前端（Vite + Zustand）的实时�
 ## 关键路径
 
 - `server/` — Go 后端（`internal/handlers` HTTP 层 → `internal/service` 业务/权限/广播 → `internal/db` 数据访问 → `internal/ws` hub+gateway；另有 `ai`/`auth`/`config`/`storage`/`models`/`logutil`）
+- 路由注册真相在 `server/internal/handlers/router.go`；改 API 端点必须同步 `server/internal/handlers/swagger.json`
+- 前端字段契约：后端 `models`（JSON）↔ `client/src/api/schemas.ts`（zod 校验）↔ `client/src/api/mock.js` + `dev/dummy.js`（mock 数据）三方同步
 - `client/` — React 前端（`src/api` 请求层 + zod schema → `src/store` Zustand → `src/components` → `src/realtime` 四传输协调器）
 - 文档：`README.md` + `docs/`（索引 `docs/README.md`；旧文档 `docs/archive/legacy-20260731/`，只进不出）
 - 根目录运行产物（`chatd.exe`/`chat.db`/`server.log` 等）已 gitignore，可忽略
@@ -20,7 +22,7 @@ Go 后端（chi + SQLite + WS/SSE）+ React 前端（Vite + Zustand）的实时�
 
 - 一键全流程: `python scripts/deploy_local.py all`（另: build/start/kill/restart）
 - 手动前端: `cd client && npm ci && npm run build`；手动后端: `cd server && go build -ldflags="-s -w -X main.Version=dev" -o ../chatd.exe ./cmd/chatd/`
-- 启动: `./chatd.exe`（需 `.env`，模板 `server/.env.example` 与根 `.env.example`，以 `server/internal/config/config.go` 为准）
+- 启动: `./chatd.exe`（需 `.env`，模板 `.env.example`，以 `server/internal/config/config.go` 为准）
 - 日志: `server.log`
 
 ## 测试（权威: docs/testing.md）

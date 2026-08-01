@@ -17,7 +17,7 @@
 |---|---|
 | 后端 | Go（chi 路由、SQLite/WAL、gorilla/websocket、SSE） |
 | 前端 | React 19、Vite 6、Zustand、React Router 7 |
-| 测试 | Go 单测（10 包）、Playwright（mock 模式 27 例 + e2e） |
+| 测试 | Go 单测（12 包）、vitest（55 例）、Playwright（mock 模式 34 例 + e2e） |
 | 部署 | 后端二进制 + 静态托管（Cloudflare Pages） |
 
 ## 快速开始

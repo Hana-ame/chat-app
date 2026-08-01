@@ -313,3 +313,30 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
 
 ### 验证
 - `go vet ./...` + `go test ./internal/{ws,config,service,handlers}/ -count=1`：✅ 全绿
+
+## 2026-08-01 文件结构 Agent 友好化（二）:代码层可读性（第 29 轮）
+
+### Go 包级文档
+- 新增 10 个 `doc.go`（auth/config/db/handlers/logutil/models/service/storage/
+  storage-local/ws）：每包 3-5 行职责 + 依赖方向，`go doc` 与 agent 可直接读；
+  ai/testkit/testutil 已有包注释不动
+
+### 前端结构文档
+- `client/src/README.md` 重写：新增"目录速查表"（9 个子目录 × 职责 × 关键文件）、
+  组件表补全 19 个组件、修正已删文件（ImagePreviewModal/stream-source）、
+  新增"改 API 字段三方同步"提醒
+
+### 文档同步
+- 根 `README.md` 修漂移：测试数 10 包/27 例 → 12 包/55 vitest/34 mock 例
+- `docs/README.md` 索引表格全部加"何时读"列（agent 导航效率）
+- changelog 滚动归档规则：每满 30 轮移旧轮入 archive/（保持主文件可读）
+
+### 配置
+- 删除 `server/.env.example`（deploy 只读根 `.env`，双份示例必漂移）；
+  AGENTS.md 模板引用改为根 `.env.example`
+- AGENTS.md 关键路径补两条高频事实：路由真相在 router.go（改 API 同步
+  swagger.json）、字段契约三方同步（models ↔ schemas.ts ↔ mock.js/dummy.js）
+
+### 验证
+- `go vet ./...` + `go build ./...`：✅（doc.go 纯注释无行为变化）
+- CI 待跑
