@@ -60,6 +60,17 @@ func (s *Server) VersionHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"version": s.Version})
 }
 
+// corsAllowedOrigin 判断来源是否允许跨域:配置含 "*" 时全放行(需配合
+// AllowOriginFunc 回显 Origin,见 router.go),否则精确匹配白名单。
+func (s *Server) corsAllowedOrigin(origin string) bool {
+	for _, o := range s.Cfg.AllowOrigins {
+		if o == "*" || strings.EqualFold(o, origin) {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Server) logStaticInfo() {
 	logutil.Info("static dir: %s", s.Cfg.StaticDir)
 	if info, err := os.Stat(s.Cfg.StaticDir); err != nil {

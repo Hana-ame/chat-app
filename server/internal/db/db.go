@@ -25,17 +25,13 @@ type goMigration struct {
 	fn      func(ctx context.Context, d *DB) error
 }
 
+// goMigrations 只保留"一次性结构变更"(不能幂等重跑的操作)。
+// 列补齐不再走版本记录:requiredColumns 是无条件幂等操作(ensureColumn
+// 检查列存在),每次启动都执行一遍,杜绝"旧库把迁移记录为已应用后新列
+// 永远不补"的整类故障(历史教训:v3/v4 因 requiredColumns 扩充而反复
+// 被迫新增迁移版本)。往 requiredColumns 加列不再需要新版本。
 var goMigrations = []goMigration{
-	{1, migrateV1EnsureColumns},
 	{2, migrateV2DropChatTypeCheck},
-	// v3: v1 的列清单后来新增过 unread_count 等列,但旧版本已经把 v1 记录为
-	// "已应用",导致升级后这些列永远不会补齐(实际报错:no such column)。
-	// v3 幂等重跑整个列清单,让任何旧库自愈。
-	{3, migrateV3EnsureRequiredColumns},
-	// v4: v3 发布后 requiredColumns 又补了 chats.last_message_*(曾由已删除的
-	// SQL 003 提供)。任何"已记录 1003 的库"都不会重跑 v3,因此每次往
-	// requiredColumns 加列都必须新增一个迁移版本,否则新列对旧库永远缺失。
-	{4, migrateV4EnsureRequiredColumns},
 }
 
 // requiredColumns 是所有历史版本缺失过、需要幂等确保存在的列集合。
@@ -66,24 +62,10 @@ func ensureRequiredColumns(ctx context.Context, d *DB) error {
 	return nil
 }
 
-func migrateV1EnsureColumns(ctx context.Context, d *DB) error {
-	if err := d.ensureLastActiveColumn(ctx); err != nil {
-		return err
-	}
-	return ensureRequiredColumns(ctx, d)
-}
-
-func migrateV3EnsureRequiredColumns(ctx context.Context, d *DB) error {
-	// 与 v1 相同:last_active_at 改名逻辑也必须保留,保证最老一批库能自愈。
-	if err := d.ensureLastActiveColumn(ctx); err != nil {
-		return err
-	}
-	return ensureRequiredColumns(ctx, d)
-}
-
-// migrateV4EnsureRequiredColumns 与 v3 逻辑相同,仅用于让"已记录 1003"的库
-// 也能补齐 v3 之后新增的列(见 goMigrations 注释)。
-func migrateV4EnsureRequiredColumns(ctx context.Context, d *DB) error {
+// ensureLastActiveColumn + ensureRequiredColumns 是幂等的列补齐,每次
+// 启动无条件执行(不依赖迁移版本记录),任何旧库都能自愈。
+func (d *DB) ensureSchemaColumns(ctx context.Context) error {
+	// 改名逻辑(last_visited_at → last_active_at)同样幂等:目标列已存在即跳过。
 	if err := d.ensureLastActiveColumn(ctx); err != nil {
 		return err
 	}
@@ -157,7 +139,7 @@ func (d *DB) Migrate() error {
 		current = next
 	}
 
-	// Go migrations (version 1000+)
+	// Go migrations (version 1000+) — 一次性结构变更
 	for _, gm := range goMigrations {
 		var exists int
 		if err := d.QueryRowContext(ctx,
@@ -175,6 +157,11 @@ func (d *DB) Migrate() error {
 			return fmt.Errorf("record go migration %d: %w", gm.version, err)
 		}
 		logutil.Info("applied go migration: %d", gm.version)
+	}
+
+	// 幂等列补齐:无条件执行,不依赖版本记录(见 goMigrations 注释)。
+	if err := d.ensureSchemaColumns(ctx); err != nil {
+		return fmt.Errorf("ensure schema columns: %w", err)
 	}
 
 	return nil

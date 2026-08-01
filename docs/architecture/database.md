@@ -14,7 +14,9 @@ SQLite（WAL 模式、`foreign_keys=ON`、`synchronous=NORMAL`）。schema 由�
 | `003__add_message_index.sql` | `(chat_id, created_at DESC, id DESC)` 复合索引 |
 | `004__add_reply_to_message.sql` | `messages.reply_to_message_id` + 索引 |
 
-另有运行时 `db_fixups.go` 动态补列（`ensureColumn`，幂等）：`chats.avatar_url / banner_url / background_url / banner_opacity`、`chat_members.notify_enabled / unread_count`、`messages.type`（与 001 重复定义，安全）、`users.notify_blocked`，以及 `last_visited_at → last_active_at` 改名。
+另有运行时 `db_fixups.go` 动态补列（`ensureColumn`，幂等）：`chats.avatar_url / banner_url / background_url / banner_opacity / last_message_*`、`chat_members.notify_enabled / unread_count`、`messages.type`（与 001 重复定义，安全）、`users.notify_blocked`，以及 `last_visited_at → last_active_at` 改名。
+
+**列补齐机制（v0.9.5+）**：`ensureSchemaColumns` 在**每次启动无条件执行**（不依赖迁移版本记录），任何旧库缺列都能自愈。历史教训：列补齐曾挂在 go 迁移版本（v3/v4）下，旧库记录"已应用"后新列永不补齐，线上报 `no such column`。往列清单加列不需要新增迁移版本；go 迁移只保留一次性结构变更（如 `chats` 表重建去掉 CHECK 约束）。
 
 ## 表结构
 

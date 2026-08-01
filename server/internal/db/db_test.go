@@ -612,17 +612,17 @@ func TestDBOpenAndMigrate(t *testing.T) {
 	}
 }
 
-// TestMigrateV3HealsMissingColumns 回归:旧版本代码把 go 迁移 v1/v2 记录为
-// "已应用"后,列清单才新增了 unread_count / last_message_* 等列 → 升级后
-// 这些列永远不会补齐(线上报错:no such column)。
-// 模拟"老库 + 无 1003 迁移记录 + 缺列",重跑 Migrate 后必须自愈。
+// TestMigrateV3HealsMissingColumns 回归:历史版本把 go 迁移 v1/v2 记录为
+// "已应用"后,列清单才新增了 unread_count / last_message_* 等列 → 旧机制下
+// 这些列永远不会补齐(线上报错:no such column)。现机制下列补齐无条件幂等
+// 执行(不依赖版本记录),任何缺列状态重跑 Migrate 必须自愈。
+// 模拟"老库缺列",重跑 Migrate 后必须补齐。
 func TestMigrateV3HealsMissingColumns(t *testing.T) {
 	f := testutil.New(t)
 	ctx := f.Ctx()
 
-	// 构造"被旧代码迁移过"的状态:去掉 v3/v4 记录并删掉缺失列(chat_members
-	// 与 chats 各取一个代表列;last_message_user_id 曾在 SQL 003 提供,删除后
-	// 由 v4 兜底)。
+	// 构造"被旧代码迁移过"的状态:删掉缺失列(chat_members 与 chats 各取
+	// 一个代表列;last_message_user_id 曾由已删除的 SQL 003 提供)。
 	_, err := f.DB.ExecContext(ctx, `DELETE FROM schema_migrations WHERE version IN (1003, 1004)`)
 	testutil.RequireNoError(t, err)
 	_, err = f.DB.ExecContext(ctx, `ALTER TABLE chat_members DROP COLUMN unread_count`)
@@ -638,7 +638,7 @@ func TestMigrateV3HealsMissingColumns(t *testing.T) {
 		`UPDATE chats SET last_message_user_id = 'u' WHERE id = 'x'`)
 	testutil.RequireError(t, err)
 
-	// 重跑迁移:v3 幂等补齐整个列清单。
+	// 重跑迁移:无条件幂等补齐整个列清单。
 	testutil.RequireNoError(t, f.DB.Migrate())
 
 	_, err = f.DB.ExecContext(ctx,

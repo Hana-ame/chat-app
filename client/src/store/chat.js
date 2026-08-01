@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
 import { getCoordinator } from '../realtime/coordinator';
+import { createOpHandlers } from '../realtime/opHandlers';
 import { useAuthStore } from './auth';
 import { fetchStream } from '../realtime/fetchStream';
 import { maybeNotifyMessage } from '../utils/notifyMessage';
@@ -19,53 +20,16 @@ function sortChats(a, b) {
   return +new Date(db) - +new Date(da);
 }
 
-coord.setHandlers({
-  onReady: ({ onlineUserIds, chats }) => {
-    set({ onlineUserIds, wsReady: true, sseReady: true });
-    get().setChats(chats || []);
-  },
-  onEvent: (op, payload) => {
-    const s = get();
-    switch (op) {
-      case 'message_create': s.onMessageCreate(payload); break;
-      case 'message_update': s.onMessageUpdate(payload); break;
-      case 'message_delete': s.onMessageDelete(payload); break;
-      case 'reaction_add': s.onReaction(payload, true); break;
-      case 'reaction_remove': s.onReaction(payload, false); break;
-      case 'chat_create': case 'chat_update': s.onChatUpdate(payload); break;
-      case 'chat_delete': s.onChatDelete(payload); break;
-      case 'chat_remove': s.onChatRemove(payload); break;
-      case 'presence_update': {
-        set(s => {
-          const ids = new Set(s.onlineUserIds);
-          if (payload.status === 'online') ids.add(payload.user_id);
-          else ids.delete(payload.user_id);
-          return { onlineUserIds: [...ids] };
-        });
-        break;
-      }
-      case 'user_update': {
-        set(s => ({
-          chats: s.chats.map(c => ({
-            ...c,
-            members: c.members?.map(m => m.id === payload.id ? { ...m, ...payload } : m),
-          })),
-          userUpdateVer: (s.userUpdateVer || 0) + 1,
-        }));
-        break;
-      }
-      case 'poll:chats': s.setChats(payload); break;
-      case 'poll:messages': set({ messages: (payload || []).map(m => get()._normalize(m)) }); break;
-    }
-  },
-  onClose: () => {
-    set({ wsReady: false, sseReady: false });
-  },
-  getActiveChatId: () => get().activeChatId,
-});
-
 const set = (fn) => useChatStore.setState(fn);
 const get = () => useChatStore.getState();
+
+// realtime 事件分发:op → store 动作的映射在 opHandlers.js(独立模块),
+// 这里只注入桥接对象。actions 惰性取 store 实例,避免模块级循环依赖。
+coord.setHandlers(createOpHandlers({
+  set,
+  get,
+  actions: () => useChatStore.getState(),
+}));
 
 function getAccessToken() {
   try { const a = JSON.parse(localStorage.getItem('auth') || '{}'); return a.accessToken; } catch { return null; }

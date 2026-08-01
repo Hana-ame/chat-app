@@ -237,3 +237,32 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
 - `go vet ./...` + `go test ./... -count=1`：全部 ✅（含 testutil 集成 35s）
 - `npm test`（vitest）：✅ 55 passed
 - `npm run build`：✅
+
+## 2026-08-01 架构改进四连:迁移去版本化 / 事件分发器 / hub 去重 / CORS 白名单（第 27 轮）
+
+### 后端
+- **迁移系统去版本化**(db.go):`ensureSchemaColumns`(改名 + 补列)改为每次
+  启动无条件幂等执行,不依赖 schema_migrations 版本记录;go 迁移只保留
+  一次性结构变更(migrateV2DropChatTypeCheck)。从此往 requiredColumns
+  加列不再需要新增迁移版本,消灭"旧库记录已应用后新列永不补齐"整类故障
+  (v3/v4 的踩坑历史见注释)。回归测试 TestMigrateV3HealsMissingColumns
+  更新为新机制语义。
+- **ws/hub 去重**:提取 `collectReceivers()`(WS clients + 无 WS 连接的 SSE
+  目标),BroadcastUserUpdate / broadcastPresence 共用;SSE channel 关闭
+  责任约定写入注释(close 只由注册方/Shutdown 持锁触发,写入方由
+  safeSSESend 兜底)。
+- **CORS 配置化**:新增 `CHAT_CORS_ORIGINS`(逗号分隔,默认 `*`),
+  `corsAllowedOrigin` 白名单判断;SSE 响应的 `Access-Control-Allow-Origin`
+  与全局白名单一致(原来写死 `*`,与配置脱节)。允许来源校验在
+  handlers/handler.go。
+
+### 前端
+- **realtime 事件分发器**:新建 `src/realtime/opHandlers.js`,把
+  `op + payload → store 动作` 的 switch 映射从 store 拆出;store 只注入
+  桥接对象 `{ set, get, actions }`(actions 惰性求值,无模块级循环依赖),
+  store 与 coordinator 的依赖单向化。新增 opHandlers.test.js(10 例)。
+
+### 验证
+- `go vet ./... && go test ./... -count=1`:✅ 全绿
+- `npm test`(vitest):✅ 65 passed(新增 opHandlers 10 例)
+- `npm run build`:✅;Playwright mock + e2e:✅ 44/44(新二进制后端下 e2e 10/10)

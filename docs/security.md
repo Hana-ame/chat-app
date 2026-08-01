@@ -19,9 +19,12 @@ font-src 'self' data:
 
 ## CORS
 
-- 任意 Origin 允许（`AllowOriginFunc` 回显请求 Origin），`AllowCredentials: true`
-- 实现上**不能**改成通配符 `*`（凭证 + 通配符违反 CORS 规范，见 router.go 注释）
-- 暴露全部请求头/响应头；预检缓存 300s
+- 来源白名单来自 `CHAT_CORS_ORIGINS`(逗号分隔),默认 `*`(任意 Origin,
+  `AllowOriginFunc` 回显请求 Origin);生产可配置为具体域名收紧
+- `AllowCredentials: true`——实现上**不能**改成通配符 `*`(凭证 + 通配符
+  违反 CORS 规范,见 router.go 注释);含 `*` 时必须用 AllowOriginFunc 回显
+- SSE 响应的 `Access-Control-Allow-Origin` 与同一白名单保持一致
+- 暴露全部请求头/响应头;预检缓存 300s
 
 ## 认证与 Cookie
 

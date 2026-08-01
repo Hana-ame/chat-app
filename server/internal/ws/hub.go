@@ -161,6 +161,27 @@ func (h *Hub) snapshotForUser(userID string) []*Client {
 	return out
 }
 
+// collectReceivers 收集所有在线 WS client 与"没有 WS 连接"的 SSE 目标
+// (同一用户既有 WS 又有 SSE 时只走 WS,避免双份投递)。
+func (h *Hub) collectReceivers() (clients []*Client, sseUserIDs []string) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	wsUserIDs := make(map[string]struct{}, len(h.clients))
+	for _, set := range h.clients {
+		for c := range set {
+			clients = append(clients, c)
+			wsUserIDs[c.userID] = struct{}{}
+		}
+	}
+	sseUserIDs = make([]string, 0, len(h.sseClients))
+	for uid := range h.sseClients {
+		if _, ok := wsUserIDs[uid]; !ok {
+			sseUserIDs = append(sseUserIDs, uid)
+		}
+	}
+	return
+}
+
 func (h *Hub) sendToUser(userID string, env Envelope) {
 	clients := h.snapshotForUser(userID)
 	for _, c := range clients {
@@ -299,23 +320,8 @@ func (h *Hub) BroadcastUserUpdate(u *models.User) {
 	redacted := *u
 	redacted.Email = ""
 	env := envelope(OpUserUpdate, &redacted)
-	h.mu.RLock()
-	all := make([]*Client, 0)
-	wsUserIDs := make(map[string]struct{})
-	for _, set := range h.clients {
-		for c := range set {
-			all = append(all, c)
-			wsUserIDs[c.userID] = struct{}{}
-		}
-	}
-	sseUserIDs := make([]string, 0, len(h.sseClients))
-	for uid := range h.sseClients {
-		if _, ok := wsUserIDs[uid]; !ok {
-			sseUserIDs = append(sseUserIDs, uid)
-		}
-	}
-	h.mu.RUnlock()
-	for _, c := range all {
+	clients, sseUserIDs := h.collectReceivers()
+	for _, c := range clients {
 		c.queue(env)
 	}
 	b, err := json.Marshal(env)
@@ -344,23 +350,8 @@ func (h *Hub) broadcastPresence(userID, status string) {
 	env := envelope(OpPresenceUpdate, map[string]string{
 		"user_id": userID, "status": status,
 	})
-	h.mu.RLock()
-	all := make([]*Client, 0)
-	wsUserIDs := make(map[string]struct{})
-	for _, set := range h.clients {
-		for c := range set {
-			all = append(all, c)
-			wsUserIDs[c.userID] = struct{}{}
-		}
-	}
-	sseUserIDs := make([]string, 0, len(h.sseClients))
-	for uid := range h.sseClients {
-		if _, ok := wsUserIDs[uid]; !ok {
-			sseUserIDs = append(sseUserIDs, uid)
-		}
-	}
-	h.mu.RUnlock()
-	for _, c := range all {
+	clients, sseUserIDs := h.collectReceivers()
+	for _, c := range clients {
 		c.queue(env)
 	}
 	b, err := json.Marshal(env)
@@ -381,6 +372,11 @@ func (h *Hub) BroadcastTyping(chatID, userID string) {
 	}), userID)
 }
 
+// SSERegister 注册一个 SSE 投递 channel。
+// channel 生命周期约定:close 只由注册方(handlers.SSE 的 defer)或
+// Shutdown 触发,均在持锁状态下从 map 删除后再 close → 不会重复 close;
+// 写入方(sseSend)必须容忍"写入已关闭 channel"(safeSSESend 兜底),
+// 因为关闭发生在注册方退出路径,与在途写入天然竞态。
 func (h *Hub) SSERegister(userID string, ch chan []byte) {
 	h.mu.Lock()
 	h.sseClients[userID] = append(h.sseClients[userID], ch)

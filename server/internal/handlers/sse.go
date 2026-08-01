@@ -55,7 +55,13 @@ func (s *Server) SSE(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	// 与全局 CORS 白名单保持一致:同源请求不读该头;跨域请求仅允许白名单
+	// 来源拿到数据。原来写死 "*",与 CHAT_CORS_ORIGINS 配置脱节。
+	if origin := r.Header.Get("Origin"); origin != "" && s.corsAllowedOrigin(origin) {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+	} else if origin == "" {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+	}
 	if xErr != "" {
 		w.Header().Set("X-Error", xErr)
 	}

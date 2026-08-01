@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
@@ -83,6 +84,18 @@ func getenvBool(key string, def bool) bool {
 	return b
 }
 
+// splitCSV 按逗号拆分配置值并去除空白项(如 "https://a.com, https://b.com")。
+func splitCSV(v string) []string {
+	var out []string
+	for _, part := range strings.Split(v, ",") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
 func randomHex(n int) string {
 	b := make([]byte, n)
 	_, _ = rand.Read(b)
@@ -120,8 +133,11 @@ func Load() *Config {
 		MaxUploadBytes:  getenvInt64("CHAT_MAX_UPLOAD", 20<<20),
 		UploadSalt:      uploadSalt,
 
-		StaticDir:     getenv("CHAT_STATIC_DIR", "../client/dist"),
-		AllowOrigins:  []string{"*"},
+		StaticDir: getenv("CHAT_STATIC_DIR", "../client/dist"),
+		// CHAT_CORS_ORIGINS:逗号分隔的允许跨域来源;默认 "*"(开发/单域部署
+		// 兼容)。含 "*" 时放行所有来源(配合 credentials 时由 router 回显
+		// Origin,见 router.go 注释)。
+		AllowOrigins:  splitCSV(getenv("CHAT_CORS_ORIGINS", "*")),
 		CSPConnectSrc: getenv("CHAT_CSP_CONNECT_SRC", "'self' wss://wsl-8080.moonchan.xyz"),
 
 		MaxMessageContentLength: int(getenvInt64("CHAT_MAX_MESSAGE_LENGTH", 4000)),

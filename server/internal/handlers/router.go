@@ -55,8 +55,9 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 	// NOTE: AllowCredentials with AllowOriginFunc (not "*") works because chi
 	// echoes the request Origin, avoiding the CORS spec violation of
 	// credentials + wildcard origin. Keep AllowOriginFunc; don't swap to "*".
+	// 来源白名单来自 CHAT_CORS_ORIGINS(默认 "*" = 全放行,兼容单域部署)。
 	r.Use(cors.Handler(cors.Options{
-		AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
+		AllowOriginFunc:  func(r *http.Request, origin string) bool { return s.corsAllowedOrigin(origin) },
 		AllowedMethods:   []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"*"},
 		ExposedHeaders:   []string{"*"},
