@@ -145,17 +145,17 @@ test('notice board functionality as owner', async ({ page }) => {
   const noticeBtn = page.locator('button[title="Set announcement"]');
   await expect(noticeBtn).toBeVisible({ timeout: 5000 });
   await noticeBtn.click();
-  await page.fill('input.input-field', 'This is a pinned notice!');
-  await page.click('button:has-text("Save")');
+  await page.getByTestId('notice-input').fill('This is a pinned notice!');
+  await page.getByTestId('notice-save').click();
   await expect(page.locator('text=📢 公告')).toBeVisible();
   await expect(page.locator('text=This is a pinned notice!')).toBeVisible();
 
-  await page.click('button:has-text("Edit")');
-  await page.fill('input.input-field', 'Updated notice!');
-  await page.click('button:has-text("Save")');
+  await page.getByTestId('notice-edit').click();
+  await page.getByTestId('notice-input').fill('Updated notice!');
+  await page.getByTestId('notice-save').click();
   await expect(page.locator('text=Updated notice!')).toBeVisible();
 
-  await page.click('button:has-text("Clear")');
+  await page.getByTestId('notice-clear').click();
   await expect(page.locator('text=📢 公告')).not.toBeVisible();
 });
 
