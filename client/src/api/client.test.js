@@ -22,6 +22,7 @@ vi.mock('../store/auth', () => ({
   },
 }));
 
+import { UPLOAD_BASE } from '../config';
 import { api } from './client';
 
 /** 构造一个 fetch 可返回的 Response 形状(json 方法返回给定数据)。 */
@@ -128,8 +129,8 @@ describe('upload', () => {
   it('无 url 字段时回退 UPLOAD_BASE + path(去除前导斜杠,不产生双斜杠)', async () => {
     stubFetch(jsonRes(200, { id: 'h1', path: '/2026/a.bin' }));
     const out = await api.upload(new File(['x'], 'a.bin', { type: 'application/octet-stream' }));
-    // UPLOAD_BASE 来自 .env(测试环境为 https://upload.moonchan.xyz)。
-    expect(out.url).toBe('https://upload.moonchan.xyz/api/local/2026/a.bin');
+    // UPLOAD_BASE 来自运行时环境(CI 无 .env 时为空,本地/生产为绝对前缀)。
+    expect(out.url).toBe(UPLOAD_BASE + '/api/local/2026/a.bin');
     expect(out.url).not.toContain('//api');
   });
 
@@ -137,7 +138,7 @@ describe('upload', () => {
     stubFetch(jsonRes(200, { id: 'h1' }));
     const out = await api.upload(new File(['x'], 'a.bin', { type: 'application/octet-stream' }));
     expect(out.url).not.toContain('undefined');
-    expect(out.url).toBe('https://upload.moonchan.xyz/api/local/');
+    expect(out.url).toBe(UPLOAD_BASE + '/api/local/');
   });
 
   it('上传失败抛 Upload failed', async () => {
