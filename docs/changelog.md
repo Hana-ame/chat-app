@@ -160,3 +160,39 @@
 - `npm test`（vitest）：✅ 55 passed
 - `npm run test:e2e:mock`：✅ 34 passed
 - `npm run build`：✅
+
+## 2026-08-01 Playwright webServer 托管 Vite + e2e 用户池去限流化（第 25 轮）
+
+### 背景
+第 24 轮结束后发现后台 Vite 进程反复被杀(环境回收),e2e 依赖手工起
+vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,连续重跑
+撞 register 5 次/分钟/IP 限流,beforeAll 30s 超时。
+
+### 前端
+- playwright.config.js 新增 `webServer`(npx vite --port 5173)托管 Vite:
+  `reuseExistingServer: true` → CI 手动起的 vite 被复用,本地缺失时
+  Playwright 自动拉起并在跑完回收,不再依赖手工后台进程。
+- 健康检查 URL 用 127.0.0.1:Node 的 fetch 会把 localhost 解析为 IPv6 ::1,
+  vite 只监听 IPv4 → ECONNREFUSED(此前 curl 正常但 Playwright 连不上的根因)。
+- 配置内强制 `NO_PROXY=127.0.0.1,localhost`:本机导出 HTTP(S)_PROXY 时
+  Playwright 健康检查会把本机地址走代理,拿到 Privoxy 500 误判服务不可用。
+- e2e.spec.mjs 用户池改造:固定邮箱(ui/owner/member)登录优先、注册兜底
+  → 反复重跑几乎不消耗 register 限流;429 按 Retry-After 重试最多 12 次;
+  full auth flow 的 UI 注册也做 4 次 10s 重试。e2e project timeout 放宽到
+  180s(beforeAll 重试窗口)。
+- `waitForURL('/')` 字符串 glob 语义模糊,改为
+  `url => new URL(url).pathname === '/'` 函数匹配。
+
+### 后续修复(同轮)
+- webServer command 与 CI 手动启动命令统一加 `--host 127.0.0.1 --strictPort`:
+  GitHub Actions 上 vite 可能把 localhost 绑定为 ::1,健康检查连 127.0.0.1
+  失败 → Playwright 自起第二个 vite(无 strictPort 时换 5174 端口,仍等
+  5173)→ 120s 超时。CI 的 vite 启动命令与 curl 调试同步改用 127.0.0.1。
+
+### 验证
+- `npm run test:e2e:mock`:✅ 34 passed
+- `npm run test:e2e:full`:✅ 10 passed
+- mock + e2e 组合全跑:✅ 44 passed(vite 由 webServer 自动拉起/回收)
+- `npm test`(vitest):✅ 55 passed;`npm run build`:✅
+- CI(30694170559/30694170541):unit-test / mock-test / full-e2e / go-test /
+  frontend-build 全部 ✅

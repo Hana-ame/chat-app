@@ -35,11 +35,18 @@ go test ./internal/ws/ -v    # 单包
 ```bash
 cd client
 npm test                     # vitest 单元测试
-npm run test:e2e:mock        # Playwright mock 模式(无需后端,需 Vite :5173)
+npm run test:e2e:mock        # Playwright mock 模式(无需后端)
 npm run test:e2e:full        # Playwright 真实后端(需后端 :8080)
 npm run test:e2e             # 全部 E2E
 npm run build                # tsc --noEmit + vite build(构建前必跑)
 ```
+
+Vite dev server 由 `playwright.config.js` 的 `webServer` 托管:
+`reuseExistingServer: true` → 已有 vite 则复用,缺失则 Playwright 自动拉起
+并在跑完后回收(无需手工起 vite,也不用担心后台进程被杀后连不上)。
+CI 仍手动起 vite,配置与之兼容。另外配置内已强制 `NO_PROXY` 包含
+`127.0.0.1,localhost`:本机若导出 HTTP(S)_PROXY,Node 的 fetch 会把本机
+地址也代理出去,导致 webServer 健康检查拿到代理 500 而误判。
 
 CI 中每个 job 只跑自己负责的层,详见 `.github/workflows/`(ci.yml =
 Go 测试 + 前端构建 + vitest;frontend-ci.yml = 单测 / mock E2E / full E2E)。
@@ -114,9 +121,11 @@ JS 测试文件同理(第一行块注释写范围 + 运行命令)。
 ## 已知边界
 
 - 后端有硬编码 IP 限流(router.go):`/auth/register` 5 次/分钟、`/auth/login`
-  10 次/分钟、全局 120 次/分钟。e2e 因此用 beforeAll 注册共享用户池
-  (workers:1 串行,每轮注册数 ≤ 4),并对 429 做短暂重试;429 路径本身
+  10 次/分钟、全局 120 次/分钟。e2e 因此用 beforeAll 建立**固定邮箱**用户池
+  (ui/owner/member):先登录复用、不存在才注册 → 反复重跑几乎不再消耗
+  register 窗口;429 仍按 Retry-After 自动重试(最多 12 次)。429 路径本身
   不做断言(触发它会耗尽限流窗口,连累其他用例)。
+- 固定邮箱在 CI 每次全新后端上首次跑时会注册,重复跑时登录复用,幂等。
 - `/auth/register` 返回 200(而非 201);已删除聊天的 `GET /chats/{id}`
   返回 403(防探测设计:MustBeMember 先于存在性检查)。e2e 断言据此编写。
 - `e2e.spec.mjs` 用 Playwright `request` fixture 直连 API 断言错误码,
