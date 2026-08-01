@@ -379,3 +379,19 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
 ### 验证
 - `go build ./...` + `go vet ./...` + `go test ./... -count=1`:✅ 11 包全绿
 - Playwright mock 套件未本地跑(按 AGENTS.md 以 CI 为准),待 push 后 `gh run watch`
+
+## 2026-08-02 fix: notify chat 每用户唯一(锁 + 唯一索引 + 冲突回退)
+
+- 问题:`CreateOrGetNotificationsChat` 是无锁 find-or-create,并发双 miss
+  会为同一用户创建多条 notify chat,`FindNotificationsChat` 的 `LIMIT 1`
+  掩盖问题,多余行成孤儿
+- `service/chat.go`:复用 `dmMu` 串行化 find-or-create(与 DM 同模式)
+- `db/db.go` + `db_fixups.go`:goMigration v3 清理历史重复行(保留最早,
+  级联删成员/消息)+ 部分唯一索引 `ux_chats_notify_owner(type='notify')`
+  数据层兜底
+- `db/chats.go`:`CreateNotificationsChat` 撞唯一索引时回退查找已有记录
+  (多副本兜底)
+- 测试 `service/chat_notify_test.go`:重复调用同 ID / 12 goroutine 并发仅
+  一条 / 不同用户互不干扰;本地 `go test` 3 例全过
+- 验证:go-test CI ✅ 4m1s(含 -race + govulncheck);mock-test 红为第 30 轮
+  spec 重写回归(5b5a28a 自证),交并行会话修复
