@@ -7,10 +7,11 @@
     "dev": "vite --host",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "playwright test tests/ci.spec.mjs tests/real-time.spec.mjs",
-    "test:rt": "playwright test tests/real-time.spec.mjs",
-    "test:full": "playwright test tests/e2e.spec.mjs",
-    "test:all": "playwright test"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:mock": "playwright test --project=mock",
+    "test:e2e:full": "playwright test --project=e2e"
   },
   "dependencies": {
     "react": "^19.0.0",
@@ -25,6 +26,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.4.0",
     "typescript": "^7.0.2",
-    "vite": "^6.0.0"
+    "vite": "^6.0.0",
+    "vitest": "^4.1.10"
   }
 }

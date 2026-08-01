@@ -1,3 +1,10 @@
+// real-time.spec.mjs — Mock 传输层实时事件测试(mock project)。
+//
+// 走 __mockLogin 进入应用内 Mock API 模式(mock transport 每 500ms 轮询),
+// 验证消息增删改、反应、聊天增删、未读数等事件驱动的 UI 行为。
+// 不依赖 Go 后端;详见 docs/mock-strategy.md。
+//
+// 运行: cd client && npm run test:e2e:mock
 import { test, expect } from '@playwright/test';
 
 test.describe('Real-time Events (WS / SSE / Polling)', () => {
@@ -33,8 +40,8 @@ test.describe('Real-time Events (WS / SSE / Polling)', () => {
 
   test('sending message triggers onMessageCreate', async ({ page }) => {
     await openFirstChat(page);
-    await page.waitForSelector('.chat-input textarea', { timeout: 5000 });
-    await page.fill('.chat-input textarea', 'Real-time test message');
+    await page.waitForSelector('[data-testid="chat-input"]', { timeout: 5000 });
+    await page.fill('[data-testid="chat-input"]', 'Real-time test message');
     await page.click('button[title="Send"]');
     await expect(page.locator('.msg-content', { hasText: 'Real-time test message' }).first()).toBeVisible({ timeout: 5000 });
   });

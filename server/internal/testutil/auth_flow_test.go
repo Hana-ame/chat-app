@@ -1,3 +1,7 @@
+// Package testutil_test 覆盖 HTTP 层认证流程:注册/登录/刷新、无 token 拒绝、
+// 篡改 refresh token、并发轮换、登出失效、Cookie 安全属性、多设备隔离。
+//
+// 运行方式: cd server && go test ./internal/testutil/
 package testutil_test
 
 import (

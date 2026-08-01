@@ -18,8 +18,9 @@ jobs:
       - uses: actions/setup-go@v5
         with: { go-version: '1.23' }
       - run: go vet ./...
-      # WS tests 为后续版本预备，当前版本不启用（需设置 WS_ENABLED=1）
-      - run: go test ./... -cover -coverprofile=coverage.out -count=1 -timeout 120s
+      # WS 测试默认启用(ws_test.go 已去掉 WS_ENABLED 门控);
+      # WS_ENABLED 仅是生产环境显式关闭 WS 的开关(gateway.go)。
+      - run: go test ./... -cover -coverprofile=coverage.out -count=1 -timeout 180s
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -36,11 +37,13 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '22' }
       - run: npm ci
-      - run: npx playwright install chromium --with-deps
       - run: npm run build
         env:
           APP_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.sha) }}
-      - run: npx playwright test --project=chromium || echo "E2E skipped"
+      # 单元测试(vitest,不依赖浏览器);E2E 由 frontend-ci.yml 专职负责,
+      # 这里不再重复跑(旧行 `npx playwright test --project=chromium || echo skipped`
+      # 依赖不存在的 project 且容错吞失败,已移除)。
+      - run: npm test
       - uses: actions/upload-artifact@v4
         with:
           name: client-dist

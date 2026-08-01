@@ -1,3 +1,8 @@
+// Package config_test 覆盖配置加载:默认值、环境变量覆盖、非法值报错、
+// JWT secret 自动生成。
+//
+// 运行方式: cd server && go test ./internal/config/
+// 说明:通过 t.Setenv 控制环境变量,不触碰真实 .env。
 package config_test
 
 import (

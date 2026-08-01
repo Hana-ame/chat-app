@@ -1,3 +1,8 @@
+// Package db_test 覆盖消息与用户资料的 DB 层:消息 CRUD、提及、附件、
+// 未读数、refresh token CRUD、空消息拒绝。
+//
+// 运行方式: cd server && go test ./internal/db/
+// 说明:与 db_test.go 同包,共享临时库构造约定。
 package db_test
 
 import (

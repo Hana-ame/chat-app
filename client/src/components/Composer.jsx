@@ -418,37 +418,37 @@ export default function Composer({ chatId, isNotification, replyTo, onCancelRepl
           {aiActive && (
             <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:'4px 8px',alignItems:'center'}}>
               <span style={labelStyle}>Endpoint</span>
-              <input style={inputStyle} value={settings.endpoint} onChange={e => setField('endpoint', e.target.value)} spellCheck={false} />
+              <input data-testid="ai-endpoint" style={inputStyle} value={settings.endpoint} onChange={e => setField('endpoint', e.target.value)} spellCheck={false} />
               <span style={labelStyle}>Key</span>
-              <input style={inputStyle} value={settings.authKey} onChange={e => setField('authKey', e.target.value)} type="password" spellCheck={false} />
+              <input data-testid="ai-key" style={inputStyle} value={settings.authKey} onChange={e => setField('authKey', e.target.value)} type="password" spellCheck={false} />
               <div style={{gridColumn:'1/-1',display:'flex',gap:6}}>
-                <button className="btn-ghost" style={{fontSize:13,padding:'2px 6px',fontWeight:settings.mode==='basic'?600:400,color:settings.mode==='basic'?'var(--accent)':'var(--text-muted)'}}
+                <button data-testid="ai-mode-basic" className="btn-ghost" style={{fontSize:13,padding:'2px 6px',fontWeight:settings.mode==='basic'?600:400,color:settings.mode==='basic'?'var(--accent)':'var(--text-muted)'}}
                   onClick={() => setMode('basic')}>Basic</button>
-                <button className="btn-ghost" style={{fontSize:13,padding:'2px 6px',fontWeight:settings.mode==='json'?600:400,color:settings.mode==='json'?'var(--accent)':'var(--text-muted)'}}
+                <button data-testid="ai-mode-json" className="btn-ghost" style={{fontSize:13,padding:'2px 6px',fontWeight:settings.mode==='json'?600:400,color:settings.mode==='json'?'var(--accent)':'var(--text-muted)'}}
                   onClick={() => setMode('json')}>JSON</button>
               </div>
               {settings.mode==='basic' ? (
                 <>
                   <span style={labelStyle}>Model</span>
-                  <input style={inputStyle} value={settings.model} onChange={e => setField('model', e.target.value)} spellCheck={false} />
+                  <input data-testid="ai-model" style={inputStyle} value={settings.model} onChange={e => setField('model', e.target.value)} spellCheck={false} />
                   <div style={{gridColumn:'1/-1',display:'flex',gap:6,flexWrap:'wrap'}}>
                     <label style={{...labelStyle,display:'flex',alignItems:'center',gap:3}}>
                       Temperature
-                      <input style={{width:60,padding:'3px 5px',fontSize:13,background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)'}}
+                      <input data-testid="ai-temperature" style={{width:60,padding:'3px 5px',fontSize:13,background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)'}}
                         value={settings.temperature} onChange={e => setField('temperature',e.target.value)} type="number" step="0.1" min="0" max="2" />
                     </label>
                     <label style={{...labelStyle,display:'flex',alignItems:'center',gap:3}}>
                       Top P
-                      <input style={{width:60,padding:'3px 5px',fontSize:13,background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)'}}
+                      <input data-testid="ai-top-p" style={{width:60,padding:'3px 5px',fontSize:13,background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)'}}
                         value={settings.topP} onChange={e => setField('topP',e.target.value)} type="number" step="0.05" min="0" max="1" />
                     </label>
                     <label style={{...labelStyle,display:'flex',alignItems:'center',gap:3}}>
                       Max Tokens
-                      <input style={{width:70,padding:'3px 5px',fontSize:13,background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)'}}
+                      <input data-testid="ai-max-tokens" style={{width:70,padding:'3px 5px',fontSize:13,background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)'}}
                         value={settings.maxTokens} onChange={e => setField('maxTokens',e.target.value)} type="number" step="1" min="1" />
                     </label>
                     <label style={{...labelStyle,display:'flex',alignItems:'center',gap:6}}>
-                      <input type="range" min="0" max="100" step="1"
+                      <input data-testid="ai-context-limit" type="range" min="0" max="100" step="1"
                         value={settings.contextLimit}
                         onChange={e => setField('contextLimit', Number(e.target.value))}
                         style={{width:80,height:4,accentColor:'var(--accent)',cursor:'pointer'}} />
@@ -459,7 +459,7 @@ export default function Composer({ chatId, isNotification, replyTo, onCancelRepl
                   </div>
                 </>
               ) : (
-                <textarea style={{gridColumn:'1/-1',width:'100%',padding:'4px 6px',fontSize:13,fontFamily:'monospace',background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)',resize:'vertical',boxSizing:'border-box'}}
+                <textarea data-testid="ai-json-body" style={{gridColumn:'1/-1',width:'100%',padding:'4px 6px',fontSize:13,fontFamily:'monospace',background:'var(--bg-primary)',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-primary)',resize:'vertical',boxSizing:'border-box'}}
                   value={settings.jsonBody} onChange={e => setField('jsonBody',e.target.value)} rows={3} spellCheck={false} />
               )}
             </div>
@@ -476,7 +476,7 @@ export default function Composer({ chatId, isNotification, replyTo, onCancelRepl
             </div>
           )}
           <div style={{display:'flex',gap:6,alignItems:'stretch'}}>
-            <textarea rows={1} placeholder={aiActive ? 'Ask AI...' : 'Message #chat'} value={text}
+            <textarea data-testid="chat-input" rows={1} placeholder={aiActive ? 'Ask AI...' : 'Message #chat'} value={text}
               ref={textRef}
               onChange={handleTextChange}
               onKeyDown={handleKey}
@@ -484,7 +484,7 @@ export default function Composer({ chatId, isNotification, replyTo, onCancelRepl
               style={{flex:1,resize:'none',minHeight:36}} />
             <input type="file" ref={fileInput} onChange={handleFile} style={{display:'none'}} multiple />
             <button className="btn-ghost" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:18,padding:'4px 6px'}} onClick={() => fileInput.current?.click()} title="Attach file">📎</button>
-            <button className={'btn-ghost' + (aiActive ? ' active' : '')}
+            <button data-testid="ai-toggle" className={'btn-ghost' + (aiActive ? ' active' : '')}
               style={{display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:13,padding:'4px 8px',fontWeight:aiActive?600:400,color:aiActive?'var(--accent)':'var(--text-muted)'}}
               onClick={() => setAiActive(!aiActive)} disabled={aiLoading} title={aiActive?'Disable AI':'Enable AI'}>
               🤖 AI

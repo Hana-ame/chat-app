@@ -33,8 +33,8 @@ test.describe('Mock API Mode (CI)', () => {
 
   test('mock send message', async ({ page }) => {
     await openFirstChat(page);
-    await page.waitForSelector('.chat-input textarea', { timeout: 5000 });
-    await page.fill('.chat-input textarea', 'Hello from CI!');
+    await page.waitForSelector('[data-testid="chat-input"]', { timeout: 5000 });
+    await page.fill('[data-testid="chat-input"]', 'Hello from CI!');
     await page.click('button[title="Send"]');
     const sentMsg = page.locator('.msg-content', { hasText: 'Hello from CI!' });
     await expect(sentMsg.first()).toBeVisible({ timeout: 5000 });
@@ -84,10 +84,6 @@ test.describe('Mock API Mode (CI)', () => {
       await page.click('button:has-text("Save")');
       await expect(header).toContainText('RenamedGroup');
     }
-  });
-
-  test.skip('mock create DM via search', async ({ page }) => {
-    // button[title="New DM"] removed in UI refactor (5f951ba)
   });
 
   test('mock edit and delete message', async ({ page }) => {
@@ -161,7 +157,7 @@ test.describe('Mock API Mode (CI)', () => {
 
   test('mock upload file to composer', async ({ page }) => {
     await openFirstChat(page);
-    await page.waitForSelector('.chat-input textarea', { timeout: 5000 });
+    await page.waitForSelector('[data-testid="chat-input"]', { timeout: 5000 });
     const fileChooserPromise = page.waitForEvent('filechooser', { timeout: 5000 }).catch(() => null);
     await page.locator('button[title="Attach file"]').click();
     const fileChooser = await fileChooserPromise;

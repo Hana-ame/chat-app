@@ -1,3 +1,9 @@
+// Package ai 覆盖 AI 流式上游客户端(内部包,可直接测私有函数):
+// SSE 解析(空行/多事件 chunk/reasoning/[DONE]/非 JSON/断流)、
+// 重定向策略、ValidateEndpoint IP 校验、ensureStreamEnabled、scanner 边界。
+//
+// 运行方式: cd server && go test ./internal/ai/
+// 说明:用 httptest 假上游 server 模拟 OpenAI 风格 SSE。
 package ai
 
 import (

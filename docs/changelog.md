@@ -96,3 +96,67 @@
 
 ### 验证
 - 文档链接交叉验证（.claude/AGENT.md ↔ docs/ 各文件）：✅
+
+## 2026-08-01 修复 ai-panel E2E + 挖掘出真实迁移/限流缺陷（第 24 轮）
+
+### 背景
+第 23 轮把 Playwright mock project 跑绿后,发现 ai-panel.spec.mjs 8 例全挂
+—— AI 面板 UI 已重构(spec 严重过时),且 E2E e2e project 从未真正跑过
+(CI 里被 `|| echo skipped` 吞掉),一跑就暴露出多个真实缺陷。
+
+### 前端
+- AI 面板输入/按钮加 `data-testid`(ai-endpoint / ai-key / ai-model /
+  ai-temperature / ai-top-p / ai-max-tokens / ai-context-limit /
+  ai-json-body / ai-mode-basic / ai-mode-json / ai-toggle / chat-input),
+  重写 ai-panel.spec.mjs 对齐新 UI(Basic/JSON 按钮、上下文滑杆、大写标签)。
+- 修复 spec 逻辑缺陷:`openFirstChat` 原选 `.chat-item` first() = Notifications
+  聊天,AI 发送被 `isNotification` 守卫禁用,占位消息永不出现 → 改 nth(1);
+  JSON 模式下 `.chat-input textarea` 会命中两个 textarea → 统一用
+  data-testid="chat-input"。
+- `mockEmitStreamPlaceholder`(mock.js):mock 模式补发 AI 流式占位消息事件
+  (等价后端 WS `message_create`),SSE 请求仍走真实 fetch 由 page.route
+  注入;占位消息只进 store 不写数据层,避免轮询 reload 清空流式内容。
+  client.ts 的 buildMockProxy 对 sendStreamMessage 特判(见 mock-strategy.md)。
+- vite.config.js 加 `server.watch.usePolling`(WSL 挂载盘 inotify 不可靠,
+  HMR 失效导致 dev server 长期服务旧代码)。
+- 清理:删除调试脚本,testid 迁移到全部 4 个 spec 的聊天输入框定位。
+
+### 后端(真实缺陷)
+- **迁移系统缺陷**:go 迁移 v1/v2 被旧代码记录"已应用"后,列清单才新增
+  unread_count / chats.last_message_*(曾由已删除的 SQL 003 提供),升级后
+  这些列永远缺失 → 消息发送 500 `no such column`。新增 go 迁移 v3/v4
+  幂等重跑 requiredColumns,并加回归测试 TestMigrateV3HealsMissingColumns
+  (删列 + 删迁移记录 → Migrate 自愈)。教训:往 requiredColumns 加列必须
+  同时新增迁移版本(已写进 db.go 注释)。
+- 本地 chat.db 已自愈(versions 到 1004)。
+
+### E2E 基建
+- e2e project 设 `workers: 1`:真实后端 register 限流 5 次/分钟/IP,
+  Playwright 多 worker 会让 beforeAll 重复执行叠加注册次数。
+- e2e.spec.mjs 重构:beforeAll 注册共享用户池(ui/owner/member),UI 用例
+  改用登录复用账号,每轮注册数 ≤ 4(此前 6+ 必然 429);registerUser 对
+  429 做 10s 退避重试;用户名/群名统一 per-test stamp 变量消除毫秒级
+  Date.now() 竞态;修正 register 返回 200(非 201)断言;已删除聊天 GET
+  返回 403(防探测设计)改为断言 `[403, 404]`。
+- 修正第 23 轮错误结论:后端**有** 429 限流(router.go 硬编码,非 swagger
+  空谈),docs/testing.md 已更正并记录行为契约。
+
+### 验证
+- mock project:34 例全绿(ci 11 + real-time 15 + ai-panel 8)。
+- e2e project:10 例全绿(含迁移自愈后边界 413/403 断言)。
+- vitest 55/55;tsc --noEmit + npm run build 通过;go vet + go test 全绿。
+
+## 2026-08-01 测试体系重构收尾（testkit/vitest 落地 + 套件调整）
+
+### 变更
+- 新增零依赖 `server/internal/testkit`（`Require*` 断言 + `NewMockAIServer`），handlers 内部测试改用它，消除 testutil ↔ handlers import cycle；`testutil.Require*` 改为薄转发。
+- 新增 vitest 单元测试（`client/src/**/*.test.{js,ts}`，4 文件 55 例）：streamAI、schemas、chat store、api client；`npm test` 改为 `vitest run`。
+- Playwright 套件调整：删除 `boundary.spec.mjs`（骨架假绿）与 `boundary-runner.mjs`（孤儿），边界场景迁入 `e2e.spec.mjs` 真实断言；`ai-panel.spec.mjs` 启用为 mock project（page.route 注入真实 SSE）；`real-time.spec.mjs` 补成员数/删除聊天等用例；`--project=mock` / `--project=e2e` 划分。
+- 测试基建：`client/vitest.config.js`、`playwright.config.js` project 划分、tsconfig 适配；`local.go` MIME 类型小写规范化（附测试）。
+- 文档同步：`docs/testing.md`（测试总纲）、`docs/mock-strategy.md`（Mock 三层边界）为唯一权威；AGENTS.md 引用。
+
+### 验证
+- `go vet ./... && go test ./... -count=1`：✅ 13 包全绿
+- `npm test`（vitest）：✅ 55 passed
+- `npm run test:e2e:mock`：✅ 34 passed
+- `npm run build`：✅

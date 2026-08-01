@@ -1,3 +1,10 @@
+// Package service_test 覆盖业务逻辑层(最大的测试文件):全部 service 方法、
+// 权限(成员/所有者/管理员)、错误映射、context 取消传播、DB 错误注入
+// (WithTx 回滚)、StreamService 全生命周期、并发场景。
+//
+// 运行方式: cd server && go test ./internal/service/
+// 说明:AI 上游用 httptest 假 SSE server(见 startMockAIStream),DB 为真实
+// SQLite 临时库。
 package service_test
 
 import (
@@ -11,6 +18,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/Hana-ame/chat-app/server/internal/testkit"
 
 	"github.com/Hana-ame/chat-app/server/internal/ai"
 	"github.com/Hana-ame/chat-app/server/internal/db"
@@ -1783,26 +1792,10 @@ func TestReactionService_Add_CanceledContext(t *testing.T) {
 
 // ── StreamService ─────────────────────────────────────────────────────
 
+// startMockAIStream 是 testkit.NewMockAIServer 的本地别名,见 testkit/mockai.go。
 func startMockAIStream(t *testing.T, chunks ...string) *httptest.Server {
 	t.Helper()
-	mux := http.NewServeMux()
-	mux.HandleFunc("/v1/chat/completions", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			t.Fatal("expected POST")
-		}
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.WriteHeader(http.StatusOK)
-		for _, c := range chunks {
-			data, _ := json.Marshal(map[string]any{
-				"choices": []map[string]any{{
-					"delta": map[string]string{"content": c},
-				}},
-			})
-			w.Write([]byte("data: " + string(data) + "\n\n"))
-		}
-		w.Write([]byte("data: [DONE]\n\n"))
-	})
-	return httptest.NewServer(mux)
+	return testkit.NewMockAIServer(t, chunks...)
 }
 
 func TestStreamService_Lifecycle(t *testing.T) {

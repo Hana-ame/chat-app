@@ -1,3 +1,7 @@
+// Package logutil 覆盖日志工具:级别过滤、输出格式、caller 信息、
+// Init 各级别/大小写/非法值、Fatal 退出行为。
+//
+// 运行方式: cd server && go test ./internal/logutil/
 package logutil
 
 import (

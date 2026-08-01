@@ -118,7 +118,8 @@ func (d *Driver) Head(path string) (int64, string, error) {
 // them on the same origin (stored XSS). The second return value reports
 // whether the type is safe for inline rendering.
 func SafeContentType(ct string) (string, bool) {
-	ct = strings.TrimSpace(strings.SplitN(ct, ";", 2)[0])
+	// MIME 类型大小写不敏感,统一小写后再比对白名单/黑名单。
+	ct = strings.ToLower(strings.TrimSpace(strings.SplitN(ct, ";", 2)[0]))
 	if ct == "" {
 		return "application/octet-stream", false
 	}

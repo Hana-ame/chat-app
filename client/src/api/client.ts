@@ -9,6 +9,7 @@ import {
   mockUpload, mockUploadAvatar,
 	mockPinChat, mockUnpinChat, mockMarkAnnouncementRead, mockUpdateChatAvatar, mockUpdateChatBanner, mockUpdateChatBackground,
 	mockGetNotifyChat, mockNotificationsList, mockNotifySend, mockNotifyMarkRead, mockNotifyDelete,
+	mockEmitStreamPlaceholder,
 	resetMockData,
 } from './mock';
 import { useAuthStore } from '../store/auth';
@@ -17,8 +18,13 @@ import { AuthResponseSchema, validate } from '../schemas';
 import type { User, Chat, Message, Attachment } from '../schemas';
 validateEnv();
 
+// buildUploadUrl 构建上传文件的可访问 URL:优先使用服务端返回的绝对 url;
+// 兜底路径从 path 拼接,去掉前导斜杠避免双斜杠(UPLOAD_BASE + '/api/local/'
+// 已自带斜杠),path 缺失时不再拼出 "undefined" 字符串。
 function buildUploadUrl(data: Record<string, unknown>): string {
-  return (data.url as string) || (UPLOAD_BASE + '/api/local/' + (data.path as string));
+  if (data.url) return data.url as string;
+  const p = String(data.path || '').replace(/^\/+/, '');
+  return UPLOAD_BASE + '/api/local/' + p;
 }
 
 interface ApiError {
@@ -256,6 +262,14 @@ function buildMockProxy(target: typeof _apiMethods): ApiType {
           sendMessage: (token: string, content: string, attachments?: Attachment[]) => Promise.resolve(mockNotifySend(token, content, attachments)),
           deleteMessage: (token: string, msgId: string) => Promise.resolve(mockNotifyDelete(token, msgId)),
           markRead: () => Promise.resolve(mockNotifyMarkRead()),
+        };
+      }
+      if (mockEnabled && prop === 'sendStreamMessage') {
+        // AI 流式发送:mock 模式补发占位消息事件(等价后端 WS message_create),
+        // 但 SSE 请求本身仍走真实 fetch,测试用 page.route 拦截断言请求体。
+        return (token: string, chatId: string, content: string, source: Record<string, unknown>, msgId: string) => {
+          mockEmitStreamPlaceholder(chatId, msgId);
+          return _apiMethods.sendStreamMessage(token, chatId, content, source, msgId);
         };
       }
       if (mockEnabled && prop in mockHandlers) {

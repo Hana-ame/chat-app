@@ -1,3 +1,8 @@
+// Package auth_test 覆盖认证服务:密码哈希/校验、JWT 签发/解析/过期/篡改、
+// 邮箱与用户名规范化、refresh token 轮换。
+//
+// 运行方式: cd server && go test ./internal/auth/
+// 说明:纯单元测试,不依赖 DB;token 用内存 secret 构造。
 package auth_test
 
 import (

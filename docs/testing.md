@@ -113,7 +113,12 @@ JS 测试文件同理(第一行块注释写范围 + 运行命令)。
 
 ## 已知边界
 
-- 后端无 429 限流实现(swagger 提及但未落地),限流场景不做 E2E 断言。
+- 后端有硬编码 IP 限流(router.go):`/auth/register` 5 次/分钟、`/auth/login`
+  10 次/分钟、全局 120 次/分钟。e2e 因此用 beforeAll 注册共享用户池
+  (workers:1 串行,每轮注册数 ≤ 4),并对 429 做短暂重试;429 路径本身
+  不做断言(触发它会耗尽限流窗口,连累其他用例)。
+- `/auth/register` 返回 200(而非 201);已删除聊天的 `GET /chats/{id}`
+  返回 403(防探测设计:MustBeMember 先于存在性检查)。e2e 断言据此编写。
 - `e2e.spec.mjs` 用 Playwright `request` fixture 直连 API 断言错误码,
    比 UI 级断言稳定;UI 级断言仅用于正常流程。
 - WS 测试默认启用(已去 WS_ENABLED 门控);`WS_ENABLED` 环境变量仅作

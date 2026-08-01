@@ -39,6 +39,11 @@
   2. E2E mock project(ci/real-time/ai-panel spec 走它)。
 - 注意:`enableMock()` 里调用 `resetMockData()`(数据重置);mock 分支
   返回必须包 `Promise.resolve(...)`,否则调用方 `.then()` 崩溃。
+- **AI 流式发送**(`sendStreamMessage`):mock 模式不整函数替换 ——
+  代理只补发"占位消息"事件(`mockEmitStreamPlaceholder`,等价后端经 WS
+  广播的 `message_create`),真正的 SSE 请求仍走真实 `fetch`,由第 4 层
+  `page.route` 拦截注入。占位消息只进 store 不写 mock 数据层(轮询
+  reload 时 `_mergeMessages` 保留 store 已有消息,不会被清空)。
 - **禁止**:单元测试 `vi.mock('../api/client')` 时引用 mock.js 内部实现。
 
 ## 第 3 层:vitest 单元 mock

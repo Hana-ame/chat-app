@@ -1,3 +1,7 @@
+// Package testutil_test 覆盖基础冒烟:fixture 装配、注册登录、重复邮箱、
+// 未授权、refresh 流程。
+//
+// 运行方式: cd server && go test ./internal/testutil/
 package testutil_test
 
 import (

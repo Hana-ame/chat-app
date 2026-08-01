@@ -320,6 +320,39 @@ export function mockUpdateProfile(_token, data) {
 }
 
 /**
+ * AI 流式消息的占位事件(mock 模式)。
+ *
+ * 生产链路:客户端 POST /api/chats/:id/messages(type=stream)后,后端先通过
+ * WS 广播一条 id 为 msg_id、streaming=true 的 message_create 占位消息,再以
+ * SSE 流式返回正文;Composer 的 streamAI 把分片内容累积进同一条占位消息。
+ *
+ * mock 模式没有 WS,因此由这里补发等价的 onMessageCreate 事件,让 UI 先出现
+ * 占位气泡;真正的 SSE 请求体与流式正文仍由真实 fetch 完成(测试用
+ * page.route 拦截断言)。注意:占位消息只进 store,不写 d.messages ——
+ * 轮询 reload 时 _mergeMessages 会保留 store 已有消息,不会被清掉。
+ *
+ * @param {string} chatId
+ * @param {string} msgId
+ */
+export function mockEmitStreamPlaceholder(chatId, msgId) {
+  /** @type {Message} */
+  const placeholder = {
+    id: msgId,
+    chat_id: chatId,
+    content: '',
+    user_id: 'ai',
+    author: userById('ai'),
+    created_at: new Date().toISOString(),
+    edited_at: null,
+    deleted: false,
+    attachments: [],
+    reactions: [],
+    streaming: true,
+  };
+  if (_store) _store.getState().onMessageCreate(placeholder);
+}
+
+/**
  * @param {string} _token
  * @param {string} chatId
  * @param {string} content

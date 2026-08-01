@@ -1,3 +1,8 @@
+// Package db_test 覆盖数据访问层:在真实 SQLite 临时库上验证全量 CRUD、
+// 分页、未读数、公开聊天列表、DB open+migrate。
+//
+// 运行方式: cd server && go test ./internal/db/
+// 说明:每个用例独立 t.TempDir() 临时库,不触碰真实 chat.db。
 package db_test
 
 import (
@@ -598,17 +603,53 @@ func TestUserLastSeen_ZeroOnCreate(t *testing.T) {
 
 func TestDBOpenAndMigrate(t *testing.T) {
 	f := testutil.New(t)
-	if f.DB == nil {
-		t.Fatal("DB is nil")
-	}
+	testutil.RequireNotNil(t, f.DB)
 	ctx := f.Ctx()
 	u, err := f.DB.CreateUser(ctx, "test1@x.com", "test-user", "hash12345678")
-	if err != nil {
-		t.Fatal(err)
-	}
+	testutil.RequireNoError(t, err)
 	if u.ID == "" || u.Username != "test-user" || u.AvatarColor == "" {
 		t.Fatal("user creation incomplete")
 	}
+}
+
+// TestMigrateV3HealsMissingColumns 回归:旧版本代码把 go 迁移 v1/v2 记录为
+// "已应用"后,列清单才新增了 unread_count / last_message_* 等列 → 升级后
+// 这些列永远不会补齐(线上报错:no such column)。
+// 模拟"老库 + 无 1003 迁移记录 + 缺列",重跑 Migrate 后必须自愈。
+func TestMigrateV3HealsMissingColumns(t *testing.T) {
+	f := testutil.New(t)
+	ctx := f.Ctx()
+
+	// 构造"被旧代码迁移过"的状态:去掉 v3/v4 记录并删掉缺失列(chat_members
+	// 与 chats 各取一个代表列;last_message_user_id 曾在 SQL 003 提供,删除后
+	// 由 v4 兜底)。
+	_, err := f.DB.ExecContext(ctx, `DELETE FROM schema_migrations WHERE version IN (1003, 1004)`)
+	testutil.RequireNoError(t, err)
+	_, err = f.DB.ExecContext(ctx, `ALTER TABLE chat_members DROP COLUMN unread_count`)
+	testutil.RequireNoError(t, err)
+	_, err = f.DB.ExecContext(ctx, `ALTER TABLE chats DROP COLUMN last_message_user_id`)
+	testutil.RequireNoError(t, err)
+
+	// 缺列时相关 SQL 必然报错(模拟线上 no such column)。
+	_, err = f.DB.ExecContext(ctx,
+		`UPDATE chat_members SET unread_count = unread_count + 1 WHERE chat_id = 'x'`)
+	testutil.RequireError(t, err)
+	_, err = f.DB.ExecContext(ctx,
+		`UPDATE chats SET last_message_user_id = 'u' WHERE id = 'x'`)
+	testutil.RequireError(t, err)
+
+	// 重跑迁移:v3 幂等补齐整个列清单。
+	testutil.RequireNoError(t, f.DB.Migrate())
+
+	_, err = f.DB.ExecContext(ctx,
+		`UPDATE chat_members SET unread_count = unread_count + 1 WHERE chat_id = 'x'`)
+	testutil.RequireNoError(t, err)
+	_, err = f.DB.ExecContext(ctx,
+		`UPDATE chats SET last_message_user_id = 'u' WHERE id = 'x'`)
+	testutil.RequireNoError(t, err)
+
+	// 再跑一次必须幂等(迁移记录已存在,不会重复执行)。
+	testutil.RequireNoError(t, f.DB.Migrate())
 }
 
 func TestUserCreateDuplicateEmail(t *testing.T) {

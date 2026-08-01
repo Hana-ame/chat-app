@@ -1,11 +1,22 @@
+// Package ws_test 覆盖 WebSocket 网关的端到端行为。
+//
+// 测试范围:
+//   - 连接握手与 ready 事件(user 信息)
+//   - ping/pong 心跳
+//   - 订阅后实时接收消息(message_create)
+//   - typing 广播(仅发给聊天内其他成员,不含发送者)
+//   - 未授权连接被拒绝(401)
+//   - presence 在线状态广播
+//
+// 运行方式: cd server && go test ./internal/ws/
+// 说明:真实 WebSocket 拨号(gorilla/websocket),走 testutil 装配的完整
+// HTTP + Hub 栈,不 mock。CI 中默认启用,不再需要 WS_ENABLED 门控
+// (WS_ENABLED 仅作为生产环境显式关闭 WS 的开关,见 gateway.go)。
 package ws_test
 
 import (
-	"os"
-
 	"encoding/json"
 	"net/http"
-	"strings"
 	"testing"
 	"time"
 
@@ -13,27 +24,24 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// maybeSkipWS checks whether the WS_ENABLED environment variable is set.
-// If it is missing, the WebSocket related tests are skipped to avoid false failures
-// in environments where WebSockets are intentionally disabled.
-func maybeSkipWS(t *testing.T) {
-	if _, ok := os.LookupEnv("WS_ENABLED"); !ok {
-		t.Skip("WS tests skipped because WS_ENABLED not set")
-	}
-}
-
+// wsEnvelope 是服务端下发的统一消息信封:op 为操作类型,payload 为负载。
 type wsEnvelope struct {
 	Op      string          `json:"op"`
 	Payload json.RawMessage `json:"payload,omitempty"`
 }
 
+// wsClient 封装一条已连接的 WebSocket,提供带超时的读写辅助。
 type wsClient struct {
 	conn *websocket.Conn
 }
 
-func dialWS(t *testing.T, url string) *wsClient {
+// dialWS 建立 WebSocket 连接;401 视为测试失败(调用方若测未授权应直接拨号)。
+// token 通过 Authorization 头传递(WSURL 刻意不带 token,见 testutil/client.go)。
+func dialWS(t *testing.T, url, token string) *wsClient {
 	t.Helper()
-	conn, resp, err := websocket.DefaultDialer.Dial(url, nil)
+	header := http.Header{}
+	header.Set("Authorization", "Bearer "+token)
+	conn, resp, err := websocket.DefaultDialer.Dial(url, header)
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusUnauthorized {
 			t.Fatalf("unauthorized: %v", err)
@@ -45,6 +53,7 @@ func dialWS(t *testing.T, url string) *wsClient {
 
 func (c *wsClient) close() { c.conn.Close() }
 
+// read 读取一条消息,超时即失败。供 expectOp 内部使用。
 func (c *wsClient) read(t *testing.T, timeout time.Duration) wsEnvelope {
 	t.Helper()
 	c.conn.SetReadDeadline(time.Now().Add(timeout))
@@ -59,59 +68,25 @@ func (c *wsClient) read(t *testing.T, timeout time.Duration) wsEnvelope {
 	return env
 }
 
-func (c *wsClient) drain(t *testing.T) {
-	t.Helper()
-	c.conn.SetReadDeadline(time.Now().Add(3 * time.Second))
-	for {
-		_, raw, err := c.conn.ReadMessage()
-		if err != nil {
-			if websocket.IsCloseError(err, websocket.CloseNormalClosure) ||
-				strings.Contains(err.Error(), "i/o timeout") ||
-				strings.Contains(err.Error(), "deadline") {
-				break
-			}
-			break
-		}
-		var env wsEnvelope
-		json.Unmarshal(raw, &env)
-		switch env.Op {
-		case "ready", "presence_update", "pong":
-			continue
-		default:
-			t.Logf("drain unexpected: %v", env)
-		}
-	}
-}
-
+// expectOp 轮询读取,直到收到 ops 中任一操作类型;未知操作(如 presence_update)
+// 自动跳过,保证对事件顺序不敏感。超时(约 10 秒)则失败。
 func (c *wsClient) expectOp(t *testing.T, ops ...string) wsEnvelope {
 	t.Helper()
-	timeout := 5 * time.Second
 	for attempt := 0; attempt < 10; attempt++ {
-		env := c.read(t, timeout)
+		env := c.read(t, 5*time.Second)
 		for _, want := range ops {
 			if env.Op == want {
 				return env
 			}
 		}
 		if attempt > 8 {
-			t.Fatalf("expected %v, got %s", ops, env.Op)
+			t.Fatalf("expected one of %v, got %s", ops, env.Op)
 		}
 	}
 	return wsEnvelope{}
 }
 
-func (c *wsClient) skipRead(t *testing.T, timeout time.Duration) wsEnvelope {
-	t.Helper()
-	c.conn.SetReadDeadline(time.Now().Add(timeout))
-	_, raw, err := c.conn.ReadMessage()
-	if err != nil {
-		t.Fatalf("skip read: %v", err)
-	}
-	var env wsEnvelope
-	json.Unmarshal(raw, &env)
-	return env
-}
-
+// write 发送一条 JSON 信封(客户端 → 服务端方向)。
 func (c *wsClient) write(t *testing.T, v interface{}) {
 	t.Helper()
 	b, err := json.Marshal(v)
@@ -123,137 +98,169 @@ func (c *wsClient) write(t *testing.T, v interface{}) {
 	}
 }
 
+// createGroupChat 走 HTTP API 建群,返回 chatID。
+func createGroupChat(t *testing.T, f *testutil.Fixture, token string, name string, members []string) string {
+	t.Helper()
+	res := f.Do(t, "POST", "/api/chats", token, map[string]any{
+		"type": "group", "name": name, "member_ids": members,
+	})
+	testutil.RequireStatus(t, res, 201)
+	var c struct {
+		ID string `json:"id"`
+	}
+	testutil.RequireJSONBody(t, res, &c)
+	res.Body.Close()
+	testutil.RequireNotEqual(t, c.ID, "")
+	return c.ID
+}
+
 func TestWSConnectAndReady(t *testing.T) {
-	maybeSkipWS(t)
+	// 连接成功后应收到 ready,payload 里带当前用户信息。
 	f := testutil.New(t)
 	alice := f.Register(t, "ws1@w.t", "AliceWS", "testtest123")
-	ws := dialWS(t, f.WSURL(alice.AccessToken))
+
+	ws := dialWS(t, f.WSURL(alice.AccessToken), alice.AccessToken)
 	defer ws.close()
 
 	env := ws.expectOp(t, "ready")
 	var ready struct {
 		User map[string]any `json:"user"`
 	}
-	json.Unmarshal(env.Payload, &ready)
-	if ready.User["username"] != "AliceWS" {
-		t.Fatalf("wrong user: %v", ready.User)
-	}
+	testutil.RequireNoError(t, json.Unmarshal(env.Payload, &ready))
+	testutil.RequireEqual(t, ready.User["username"], "AliceWS")
 }
 
 func TestWSPingPong(t *testing.T) {
-	maybeSkipWS(t)
+	// 客户端发 ping,服务端必须回 pong(心跳保活链路)。
 	f := testutil.New(t)
 	alice := f.Register(t, "ping@w.t", "Pinger", "testtest123")
-	ws := dialWS(t, f.WSURL(alice.AccessToken))
-	defer ws.close()
 
+	ws := dialWS(t, f.WSURL(alice.AccessToken), alice.AccessToken)
+	defer ws.close()
 	ws.expectOp(t, "ready")
 
 	ws.write(t, map[string]string{"op": "ping"})
 	env := ws.expectOp(t, "pong")
-	if env.Op != "pong" {
-		t.Fatalf("expected pong, got %s", env.Op)
+	testutil.RequireEqual(t, env.Op, "pong")
+}
+
+// expectPresence 读取直到收到指定用户的 presence_update;自动跳过其他
+// presence_update(如自己上线广播),对事件顺序不敏感。
+func (c *wsClient) expectPresence(t *testing.T, wantUserID string) wsEnvelope {
+	t.Helper()
+	for attempt := 0; attempt < 10; attempt++ {
+		env := c.expectOp(t, "presence_update")
+		var pres struct {
+			UserID string `json:"user_id"`
+		}
+		if err := json.Unmarshal(env.Payload, &pres); err != nil {
+			continue
+		}
+		if pres.UserID == wantUserID {
+			return env
+		}
 	}
+	t.Fatalf("no presence_update for user %s", wantUserID)
+	return wsEnvelope{}
 }
 
 func TestWSSubscribeAndReceiveMessage(t *testing.T) {
-	maybeSkipWS(t)
+	// 订阅聊天后,其他成员发消息应实时收到 message_create。
+	// 注:网关在连接时已自动订阅用户的所有聊天,显式 subscribe 用于验证协议格式。
 	f := testutil.New(t)
 	alice := f.Register(t, "sub1@w.t", "SubAlice", "testtest123")
 	bob := f.Register(t, "sub2@w.t", "SubBob", "testtest123")
 
-	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
-		"type": "group", "name": "WS Chat", "member_ids": []string{bob.UserID},
-	})
-	var c map[string]any
-	json.NewDecoder(res.Body).Decode(&c)
-	res.Body.Close()
-	chatID := c["id"].(string)
+	chatID := createGroupChat(t, f, alice.AccessToken, "WS Chat", []string{bob.UserID})
 
-	ws := dialWS(t, f.WSURL(alice.AccessToken))
+	ws := dialWS(t, f.WSURL(alice.AccessToken), alice.AccessToken)
 	defer ws.close()
-
 	ws.expectOp(t, "ready")
 
-	ws.write(t, map[string]any{"op": "subscribe", "chat_id": chatID})
+	ws.write(t, map[string]any{"op": "subscribe", "payload": map[string]any{"chat_id": chatID}})
 	time.Sleep(50 * time.Millisecond)
 
 	sendRes := f.Do(t, "POST", "/api/chats/"+chatID+"/messages", bob.AccessToken, map[string]string{
 		"content": "ws test message",
 	})
 	defer sendRes.Body.Close()
-	if sendRes.StatusCode != 201 {
-		t.Fatalf("send msg: %d", sendRes.StatusCode)
-	}
+	testutil.RequireStatus(t, sendRes, 201)
 
 	env := ws.expectOp(t, "message_create", "presence_update")
 	if env.Op == "presence_update" {
 		env = ws.expectOp(t, "message_create")
 	}
-	if env.Op != "message_create" {
-		t.Fatalf("expected message_create, got %s", env.Op)
-	}
+	testutil.RequireEqual(t, env.Op, "message_create")
 	var msg struct {
 		Content string `json:"content"`
 	}
-	json.Unmarshal(env.Payload, &msg)
-	if msg.Content != "ws test message" {
-		t.Fatalf("wrong content: %s", msg.Content)
-	}
+	testutil.RequireNoError(t, json.Unmarshal(env.Payload, &msg))
+	testutil.RequireEqual(t, msg.Content, "ws test message")
 }
 
 func TestWSTyping(t *testing.T) {
-	maybeSkipWS(t)
+	// typing 广播只发给聊天内其他成员(实现上排除发送者自己)。
 	f := testutil.New(t)
 	alice := f.Register(t, "type1@w.t", "Typer", "testtest123")
 	bob := f.Register(t, "type2@w.t", "Typed", "testtest123")
 
-	res := f.Do(t, "POST", "/api/chats", alice.AccessToken, map[string]any{
-		"type": "group", "name": "Typing Chat", "member_ids": []string{bob.UserID},
-	})
-	var c map[string]any
-	json.NewDecoder(res.Body).Decode(&c)
-	res.Body.Close()
-	chatID := c["id"].(string)
+	chatID := createGroupChat(t, f, alice.AccessToken, "Typing Chat", []string{bob.UserID})
 
-	bobWS := dialWS(t, f.WSURL(bob.AccessToken))
+	aliceWS := dialWS(t, f.WSURL(alice.AccessToken), alice.AccessToken)
+	defer aliceWS.close()
+	aliceWS.expectOp(t, "ready")
+
+	bobWS := dialWS(t, f.WSURL(bob.AccessToken), bob.AccessToken)
 	defer bobWS.close()
 	bobWS.expectOp(t, "ready")
 
-	bobWS.write(t, map[string]any{"op": "typing", "chat_id": chatID})
-	// typing broadcast uses same sendToChat as messages, verified by TestWSSubscribeAndReceiveMessage
+	bobWS.write(t, map[string]any{"op": "typing", "payload": map[string]any{"chat_id": chatID}})
+
+	env := aliceWS.expectOp(t, "typing")
+	testutil.RequireEqual(t, env.Op, "typing")
+	var typing struct {
+		ChatID string `json:"chat_id"`
+		UserID string `json:"user_id"`
+	}
+	testutil.RequireNoError(t, json.Unmarshal(env.Payload, &typing))
+	testutil.RequireEqual(t, typing.ChatID, chatID)
+	testutil.RequireEqual(t, typing.UserID, bob.UserID)
 }
 
 func TestWSUnauthorized(t *testing.T) {
-	maybeSkipWS(t)
+	// 无效 token 必须被拒绝(HTTP 401),而不是升级成功。
 	f := testutil.New(t)
 	conn, resp, err := websocket.DefaultDialer.Dial(f.WSURL("bad-token"), nil)
 	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusUnauthorized {
-			return
-		}
-		t.Fatalf("expected unauthorized: %v", err)
+		testutil.RequireNotNil(t, resp)
+		testutil.RequireEqual(t, resp.StatusCode, http.StatusUnauthorized)
+		return
 	}
 	defer conn.Close()
 	t.Fatal("should have failed 401")
 }
 
 func TestWSPresence(t *testing.T) {
-	maybeSkipWS(t)
+	// 新用户上线时,已连接用户应收到 presence_update(online)。
 	f := testutil.New(t)
 	alice := f.Register(t, "pres1@w.t", "PresAlice", "testtest123")
 	bob := f.Register(t, "pres2@w.t", "PresBob", "testtest123")
 
-	aliceWS := dialWS(t, f.WSURL(alice.AccessToken))
+	aliceWS := dialWS(t, f.WSURL(alice.AccessToken), alice.AccessToken)
 	defer aliceWS.close()
 	aliceWS.expectOp(t, "ready")
 
-	bobWS := dialWS(t, f.WSURL(bob.AccessToken))
+	bobWS := dialWS(t, f.WSURL(bob.AccessToken), bob.AccessToken)
 	defer bobWS.close()
+	bobWS.expectOp(t, "ready")
 
-	env := bobWS.expectOp(t, "ready", "presence_update")
-	if env.Op == "ready" || env.Op == "presence_update" {
-		return
+	env := aliceWS.expectPresence(t, bob.UserID)
+	testutil.RequireEqual(t, env.Op, "presence_update")
+	var pres struct {
+		UserID string `json:"user_id"`
+		Status string `json:"status"`
 	}
-	t.Fatalf("expected ready or presence_update, got %s", env.Op)
+	testutil.RequireNoError(t, json.Unmarshal(env.Payload, &pres))
+	testutil.RequireEqual(t, pres.UserID, bob.UserID)
+	testutil.RequireEqual(t, pres.Status, "online")
 }

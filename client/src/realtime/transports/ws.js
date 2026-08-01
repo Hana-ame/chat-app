@@ -32,10 +32,11 @@ export function createWsTransport({ token, onReady, onEvent, onClose }) {
   return {
     disconnect() { ws.onclose = null; ws.close(); },
     sendTyping(chatId) {
-      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ op: 'typing', chat_id: chatId }));
+      // 注意:服务端 Envelope 协议要求参数嵌套在 payload 里,放顶层会被静默丢弃。
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ op: 'typing', payload: { chat_id: chatId } }));
     },
     subscribe(chatId) {
-      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ op: 'subscribe', chat_id: chatId }));
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ op: 'subscribe', payload: { chat_id: chatId } }));
     },
     wsRequest(op, payload) {
       return new Promise((resolve, reject) => {

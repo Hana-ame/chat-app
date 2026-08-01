@@ -1,3 +1,8 @@
+// Package testutil_test 覆盖 AI 流式消息端到端:发送、SSE 回放(完成前/后/
+// 清理后/不存在/非成员)、上游错误、reasoning、慢 AI、真实端点冒烟测试。
+//
+// 运行方式: cd server && go test ./internal/testutil/
+// 说明:TestRealAIEndpoint 需要 CHAT_AI_BASE_URL 等环境变量,未配置自动跳过。
 package testutil_test
 
 import (

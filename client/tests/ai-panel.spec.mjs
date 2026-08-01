@@ -1,5 +1,32 @@
+// ai-panel.spec.mjs — AI 面板与 SSE 流式请求测试(mock project)。
+//
+// 走 __mockLogin 进入 Mock 模式;其中 3 个用例用 page.route 拦截
+// /api/chats/*/messages 并返回真实格式的 SSE 响应,验证前端流式渲染与
+// 请求体构造。不依赖 Go 后端。
+//
+// 面板 UI 元素通过 data-testid 定位(见 src/components/Composer.jsx):
+//   ai-toggle        启用/停用 AI 面板的 🤖 按钮
+//   ai-endpoint / ai-key / ai-model      基本模式的输入框(Key 为 password)
+//   ai-temperature / ai-top-p / ai-max-tokens   数值输入
+//   ai-context-limit 上下文滑杆(0 = 不发送,>0 = 发送最近 N 条)
+//   ai-mode-basic / ai-mode-json          Basic/JSON 模式切换按钮
+//   ai-json-body      JSON 模式的请求体 textarea
+//
+// 运行: cd client && npm run test:e2e:mock
 // @ts-check
 import { test, expect } from '@playwright/test';
+
+const TESTID = (name) => `[data-testid="${name}"]`;
+
+// 对 React 受控的 range 输入设置值并派发 input 事件(Playwright 的 fill 不支持 range)。
+async function setRange(page, testid, value) {
+  await page.locator(TESTID(testid)).evaluate((el, v) => {
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+    setter.call(el, String(v));
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
+}
 
 test.describe('AI Panel', () => {
 
@@ -15,46 +42,70 @@ test.describe('AI Panel', () => {
   async function openFirstChat(page) {
     await mockLogin(page);
     await page.waitForSelector('.chat-item', { timeout: 5000 });
-    await page.locator('.chat-item').first().click();
-    await page.waitForSelector('.chat-input textarea', { timeout: 5000 });
+    // nth(0) 是 Notifications 聊天(AI 发送按设计被禁用),必须用普通聊天
+    await page.locator('.chat-item').nth(1).click();
+    await page.waitForSelector('[data-testid="chat-input"]', { timeout: 5000 });
+  }
+
+  // 拦截流式 POST,返回真实格式的 SSE 响应;并暴露 postData.source.body 供断言。
+  async function interceptStream(page, onCaptured) {
+    await page.route('**/api/chats/*/messages', async (route) => {
+      if (route.request().method() !== 'POST') {
+        await route.continue();
+        return;
+      }
+      const postData = JSON.parse(route.request().postData() || '{}');
+      if (postData.type !== 'stream') {
+        await route.continue();
+        return;
+      }
+      if (onCaptured) onCaptured(postData.source?.body);
+      await route.fulfill({
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+        body: `data: {"content":"Hello"}\n\ndata: {"content":","}\n\ndata: {"content":"world"}\n\ndata: {"content":"!"}\n\ndata: [DONE]\n\n`,
+      });
+    });
   }
 
   test('toggle AI panel open and closed', async ({ page }) => {
     await openFirstChat(page);
-    const aiBtn = page.locator('button:has-text("AI")');
-    await expect(aiBtn).toBeVisible();
+    const aiToggle = page.locator(TESTID('ai-toggle'));
+    await expect(aiToggle).toBeVisible();
 
-    // Open
-    await aiBtn.click();
-    await expect(page.locator('text=endpoint:')).toBeVisible();
-    await expect(page.locator('text=auth_key:')).toBeVisible();
+    // Open: 面板显示 Endpoint/Key 输入
+    await aiToggle.click();
+    await expect(page.locator(TESTID('ai-endpoint'))).toBeVisible();
+    await expect(page.locator(TESTID('ai-key'))).toBeVisible();
 
     // Close
-    await aiBtn.click();
-    await expect(page.locator('text=endpoint:')).not.toBeVisible();
+    await aiToggle.click();
+    await expect(page.locator(TESTID('ai-endpoint'))).not.toBeVisible();
   });
 
-  test('Simple mode: shows model/temperature/max_tokens/top_p/context checkbox', async ({ page }) => {
+  test('Basic mode: shows model/temperature/top_p/max_tokens/context slider', async ({ page }) => {
     await openFirstChat(page);
-    await page.locator('button:has-text("AI")').click();
+    await page.locator(TESTID('ai-toggle')).click();
 
-    await expect(page.locator('text=model:')).toBeVisible();
-    await expect(page.locator('text=temperature:')).toBeVisible();
-    await expect(page.locator('text=max_tokens:')).toBeVisible();
-    await expect(page.locator('text=top_p:')).toBeVisible();
-    await expect(page.locator('text=发送 50 条上下文')).toBeVisible();
+    await expect(page.locator(TESTID('ai-model'))).toBeVisible();
+    await expect(page.locator(TESTID('ai-temperature'))).toBeVisible();
+    await expect(page.locator(TESTID('ai-top-p'))).toBeVisible();
+    await expect(page.locator(TESTID('ai-max-tokens'))).toBeVisible();
+    await expect(page.locator(TESTID('ai-context-limit'))).toBeVisible();
+    // 上下文滑杆默认 50 → 显示"最近50条"
+    await expect(page.locator('text=最近50条')).toBeVisible();
 
-    // Simple radio is selected by default
-    await expect(page.locator('input[name="aiBodyMode"][value="simple"]')).toBeChecked();
+    // Basic 是默认模式,JSON 面板隐藏
+    await expect(page.locator(TESTID('ai-json-body'))).not.toBeVisible();
   });
 
-  test('Simple mode: fill and persist input values', async ({ page }) => {
+  test('Basic mode: fill and persist input values', async ({ page }) => {
     await openFirstChat(page);
-    await page.locator('button:has-text("AI")').click();
+    await page.locator(TESTID('ai-toggle')).click();
 
-    const endpointInput = page.locator('label:has-text("endpoint:") input');
-    const authKeyInput = page.locator('label:has-text("auth_key:") input');
-    const modelInput = page.locator('label:has-text("model:") input');
+    const endpointInput = page.locator(TESTID('ai-endpoint'));
+    const authKeyInput = page.locator(TESTID('ai-key'));
+    const modelInput = page.locator(TESTID('ai-model'));
 
     await endpointInput.fill('https://test.api/v1/chat/completions');
     await authKeyInput.fill('sk-test-key-12345');
@@ -64,125 +115,96 @@ test.describe('AI Panel', () => {
     await expect(authKeyInput).toHaveValue('sk-test-key-12345');
     await expect(modelInput).toHaveValue('test-model-v1');
 
-    // Auth key should be password type
+    // Auth key 应为 password 类型
     await expect(authKeyInput).toHaveAttribute('type', 'password');
   });
 
-  test('JSON mode: hides Simple fields, shows body textarea', async ({ page }) => {
+  test('JSON mode: hides Basic fields, shows body textarea', async ({ page }) => {
     await openFirstChat(page);
-    await page.locator('button:has-text("AI")').click();
+    await page.locator(TESTID('ai-toggle')).click();
 
-    // Switch to JSON mode
-    await page.locator('input[name="aiBodyMode"][value="json"]').click();
+    // 切到 JSON 模式
+    await page.locator(TESTID('ai-mode-json')).click();
 
-    await expect(page.locator('label:has-text("model:")')).not.toBeVisible();
-    await expect(page.locator('text=temperature:')).not.toBeVisible();
-    await expect(page.locator('text=body (JSON):')).toBeVisible();
-
-    const jsonTextarea = page.locator('label:has-text("body (JSON):") textarea');
+    await expect(page.locator(TESTID('ai-model'))).not.toBeVisible();
+    await expect(page.locator(TESTID('ai-temperature'))).not.toBeVisible();
+    const jsonTextarea = page.locator(TESTID('ai-json-body'));
     await expect(jsonTextarea).toBeVisible();
+
+    // 默认 body 包含 model/messages 字段
     const value = await jsonTextarea.inputValue();
     expect(value).toContain('"model"');
     expect(value).toContain('"messages"');
+
+    // 切回 Basic
+    await page.locator(TESTID('ai-mode-basic')).click();
+    await expect(page.locator(TESTID('ai-model'))).toBeVisible();
   });
 
-  test('context checkbox toggles on/off', async ({ page }) => {
+  test('context slider toggles on/off', async ({ page }) => {
     await openFirstChat(page);
-    await page.locator('button:has-text("AI")').click();
+    await page.locator(TESTID('ai-toggle')).click();
 
-    const checkbox = page.locator('input[type="checkbox"]');
-    await expect(checkbox).toBeChecked();
+    const context = page.locator(TESTID('ai-context-limit'));
+    await expect(context).toHaveValue('50');
+    await expect(page.locator('text=最近50条')).toBeVisible();
 
-    await checkbox.click();
-    await expect(checkbox).not.toBeChecked();
+    // 滑到 0 → 不发送上下文
+    await setRange(page, 'ai-context-limit', 0);
+    await expect(page.locator('text=不发送')).toBeVisible();
 
-    await checkbox.click();
-    await expect(checkbox).toBeChecked();
+    // 滑回 50 → 恢复
+    await setRange(page, 'ai-context-limit', 50);
+    await expect(page.locator('text=最近50条')).toBeVisible();
   });
 
   test('send stream message creates AI placeholder message', async ({ page }) => {
     await openFirstChat(page);
-    await page.locator('button:has-text("AI")').click();
+    await page.locator(TESTID('ai-toggle')).click();
 
-    // Fill AI config
-    await page.locator('label:has-text("endpoint:") input').fill('https://api.test/v1/chat/completions');
-    await page.locator('label:has-text("auth_key:") input').fill('sk-test');
+    // 填 AI 配置
+    await page.locator(TESTID('ai-endpoint')).fill('https://api.test/v1/chat/completions');
+    await page.locator(TESTID('ai-key')).fill('sk-test');
 
-    // Intercept the stream POST and return SSE chunks
-    await page.route('**/api/chats/*/messages', async (route) => {
-      if (route.request().method() !== 'POST') {
-        await route.continue();
-        return;
-      }
-      const postData = JSON.parse(route.request().postData() || '{}');
-      if (postData.type !== 'stream') {
-        await route.continue();
-        return;
-      }
-      const body = `data: {"content":"Hello"}\n\ndata: {"content":","}\n\ndata: {"content":"world"}\n\ndata: {"content":"!"}\n\ndata: [DONE]\n\n`;
-      await route.fulfill({
-        status: 200,
-        headers: { 'Content-Type': 'text/event-stream' },
-        body,
-      });
-    });
+    // 拦截流式 POST 并返回 SSE 分片
+    await interceptStream(page);
 
-    // Type message and send
-    await page.fill('.chat-input textarea', 'Test AI please');
+    // 发消息
+    await page.fill('[data-testid="chat-input"]', 'Test AI please');
     await page.click('button[title="Send + AI reply"]');
 
-    // Should show AI message with streaming content
+    // AI 消息应出现且内容随流式累积
     const aiMsg = page.locator('.msg-content');
-    // Wait for AI placeholder to appear and content to accumulate
     await expect(aiMsg.last()).toHaveText(/Hello/);
   });
 
   test('JSON mode sends raw body to server', async ({ page }) => {
     await openFirstChat(page);
-    await page.locator('button:has-text("AI")').click();
+    await page.locator(TESTID('ai-toggle')).click();
 
-    // Switch to JSON
-    await page.locator('input[name="aiBodyMode"][value="json"]').click();
+    // 切到 JSON
+    await page.locator(TESTID('ai-mode-json')).click();
 
-    // Fill endpoint/auth
-    await page.locator('label:has-text("endpoint:") input').fill('https://api.test/v1/chat/completions');
-    await page.locator('label:has-text("auth_key:") input').fill('sk-json-test');
+    // 填 endpoint/key
+    await page.locator(TESTID('ai-endpoint')).fill('https://api.test/v1/chat/completions');
+    await page.locator(TESTID('ai-key')).fill('sk-json-test');
 
-    // Fill JSON body
+    // 填 JSON body
     const jsonBody = JSON.stringify({
       model: 'custom-model',
       messages: [{ role: 'user', content: 'Hello from JSON' }],
       temperature: 0.5,
     }, null, 2);
-    await page.locator('label:has-text("body (JSON):") textarea').fill(jsonBody);
+    await page.locator(TESTID('ai-json-body')).fill(jsonBody);
 
-    // Intercept and capture the request body
+    // 拦截并捕获请求体
     let capturedBody = null;
-    await page.route('**/api/chats/*/messages', async (route) => {
-      if (route.request().method() !== 'POST') {
-        await route.continue();
-        return;
-      }
-      const postData = JSON.parse(route.request().postData() || '{}');
-      if (postData.type !== 'stream') {
-        await route.continue();
-        return;
-      }
-      capturedBody = postData.source?.body;
-      await route.fulfill({
-        status: 200,
-        headers: { 'Content-Type': 'text/event-stream' },
-        body: `data: {"content":"ok"}\n\ndata: [DONE]\n\n`,
-      });
-    });
+    await interceptStream(page, (body) => { capturedBody = body; });
 
-    // Enable AI mode to ensure button shows "Send + AI reply"
-    // Send message (needs chat input for the normal send, but AI send uses JSON body)
-    await page.fill('.chat-input textarea', 'any text');
+    await page.fill('[data-testid="chat-input"]', 'any text');
     await page.click('button[title="Send + AI reply"]');
 
-    // Wait briefly for the route handler
-    await page.waitForTimeout(1000);
+    await expect(page.locator('.msg-content').last()).toHaveText(/Hello/);
     expect(capturedBody).toBeTruthy();
     expect(capturedBody.model).toBe('custom-model');
     expect(capturedBody.messages[0].content).toBe('Hello from JSON');
@@ -191,42 +213,25 @@ test.describe('AI Panel', () => {
 
   test('AI send without context: only current message sent', async ({ page }) => {
     await openFirstChat(page);
-    await page.locator('button:has-text("AI")').click();
+    await page.locator(TESTID('ai-toggle')).click();
 
-    // Fill AI config
-    await page.locator('label:has-text("endpoint:") input').fill('https://api.test/v1/chat/completions');
-    await page.locator('label:has-text("auth_key:") input').fill('sk-test');
+    // 填 AI 配置
+    await page.locator(TESTID('ai-endpoint')).fill('https://api.test/v1/chat/completions');
+    await page.locator(TESTID('ai-key')).fill('sk-test');
 
-    // Uncheck context
-    const checkbox = page.locator('input[type="checkbox"]');
-    await checkbox.click();
-    await expect(checkbox).not.toBeChecked();
+    // 关闭上下文(滑杆到 0)
+    await setRange(page, 'ai-context-limit', 0);
+    await expect(page.locator('text=不发送')).toBeVisible();
 
     let capturedBody = null;
-    await page.route('**/api/chats/*/messages', async (route) => {
-      if (route.request().method() !== 'POST') {
-        await route.continue();
-        return;
-      }
-      const postData = JSON.parse(route.request().postData() || '{}');
-      if (postData.type !== 'stream') {
-        await route.continue();
-        return;
-      }
-      capturedBody = postData.source?.body;
-      await route.fulfill({
-        status: 200,
-        headers: { 'Content-Type': 'text/event-stream' },
-        body: `data: {"content":"ok"}\n\ndata: [DONE]\n\n`,
-      });
-    });
+    await interceptStream(page, (body) => { capturedBody = body; });
 
-    await page.fill('.chat-input textarea', 'No context');
+    await page.fill('[data-testid="chat-input"]', 'No context');
     await page.click('button[title="Send + AI reply"]');
-    await page.waitForTimeout(1000);
 
+    await expect(page.locator('.msg-content').last()).toHaveText(/Hello/);
     expect(capturedBody).toBeTruthy();
-    // messages should have only the current user message, no history
+    // messages 应只有当前用户消息,无历史
     expect(capturedBody.messages.length).toBe(1);
     expect(capturedBody.messages[0].role).toBe('user');
     expect(capturedBody.messages[0].content).toBe('No context');

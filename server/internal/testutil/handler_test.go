@@ -1,3 +1,8 @@
+// Package testutil_test 覆盖黑盒 HTTP 集成测试:通过 testutil.Fixture 装配
+// 完整服务栈(真实 SQLite + httptest server),验证建群/发消息/DM/成员管理/
+// 反应/置顶/公开聊天/SSE/上传附件及全部错误路径。
+//
+// 运行方式: cd server && go test ./internal/testutil/
 package testutil_test
 
 import (

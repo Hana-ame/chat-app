@@ -8,7 +8,21 @@ on:
     branches: [ main, dev ]
 
 jobs:
+  unit-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+
   mock-test:
+    needs: unit-test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -32,7 +46,7 @@ jobs:
           echo "=== Debug: fetch root ==="
           curl -s http://localhost:5173/ | head -30
           echo "=== Running tests ==="
-          npx playwright test tests/ci.spec.mjs tests/real-time.spec.mjs --reporter=list 2>&1
+          npm run test:e2e:mock 2>&1
 
   full-e2e:
     needs: mock-test
@@ -67,4 +81,4 @@ jobs:
             sleep 1
           done
           echo "starting tests..."
-          npx playwright test tests/e2e.spec.mjs --reporter=list 2>&1
+          npm run test:e2e:full 2>&1
