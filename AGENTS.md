@@ -33,6 +33,9 @@ Go 后端（chi + SQLite + WS/SSE）+ React 前端（Vite + Zustand）的实时�
   `gh run watch <run-id> --exit-status` 盯 CI(CI = Go 全量测试 + 前端构建 +
   vitest + mock/full E2E)直到 success。本地只允许用于编译/快速反馈
   (`go build`、`npx tsc --noEmit`),不做全量测试验证
+- **`go test -race` 同属本地不可靠范畴**:WSL 挂载盘上 SQLite + race 会偶发
+  `disk I/O error`/时序 flaky(单跑通过、全量偶挂、换包并行度换一批挂),
+  并非代码缺陷。CI 的 ext4 + 低并行环境下稳定;本地复现不出就推 CI 看结论
 - Go 断言一律 `testkit.Require*` 或 `testutil.Require*`，禁手写 `if x != y { t.Fatalf }`（存量增量迁移中）
 - 新增导出函数必须带测试；改 UI 元素/API 字段必须同步测试
 - Mock 三层边界: `docs/mock-strategy.md`

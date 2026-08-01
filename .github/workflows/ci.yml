@@ -20,7 +20,8 @@ jobs:
       - run: go vet ./...
       # WS 测试默认启用(ws_test.go 已去掉 WS_ENABLED 门控);
       # WS_ENABLED 仅是生产环境显式关闭 WS 的开关(gateway.go)。
-      - run: go test ./... -cover -coverprofile=coverage.out -count=1 -timeout 180s
+      # -race:ws hub/广播/事务是并发代码,本地不带 race 验证(仅编译反馈)。
+      - run: go test ./... -race -cover -coverprofile=coverage.out -count=1 -timeout 240s
       - uses: actions/upload-artifact@v4
         if: always()
         with:
