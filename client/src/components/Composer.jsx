@@ -6,6 +6,7 @@ import { notify } from '../store/notification';
 import { streamAI } from '../utils/ai';
 import { extractFirstUrl, fetchOgp } from '../utils/linkPreview';
 import LinkPreviewCard from './LinkPreviewCard';
+import { sortMentionCandidates } from '../utils/mentionRank';
 
 const CONTEXT_LIMIT = 50;
 const STORAGE_KEY = 'ai_settings';
@@ -195,7 +196,10 @@ export default function Composer({ chatId, isNotification, replyTo, onCancelRepl
     const chat = useChatStore.getState().chats.find(c => c.id === chatId);
     if (!chat?.members) return [];
     const q = mentionQuery.toLowerCase();
-    return chat.members.filter(m => m.id !== user.id && m.username.toLowerCase().includes(q)).slice(0, 10);
+    const filtered = chat.members.filter(m => m.id !== user.id && m.username.toLowerCase().includes(q));
+    // 【本地改动 2026-09-03】按最近互动排序（近期聊过的人优先），分数相同按字母序。
+    const msgs = useChatStore.getState().messages.filter(m => m.chat_id === chatId);
+    return sortMentionCandidates(filtered, msgs).slice(0, 10);
   })();
 
   const handleMentionSelect = (m) => {

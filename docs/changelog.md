@@ -866,3 +866,17 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
   - action 区新增 Copy 按钮（Reply 后；无内容时禁用；title="复制文本"）。
   - 成功/失败均 toast 提示（notify 支持 success 类型，Toast 已按 success 渲染绿色）。
 - 验证：`npx vitest run` 148 ✅；`npx tsc --noEmit` ✅；`npx vite build` ✅。
+
+## 2026-09-03 feat: @提及自动补全按最近互动排序
+
+- 背景：@提及候选原本只是字母序（includes 过滤 + slice 10）。对齐常见聊天体验：
+  近期聊过的人优先。纯前端，无后端改动，所有本地改动带【本地改动 2026-09-03】标记。
+- 实现：
+  - `client/src/utils/mentionRank.js`：`mentionScore`（按最近消息打分，指数衰减
+    新鲜度 + 出现次数，跳过自己/已删除/stream）+ `sortMentionCandidates`（分数降序、
+    同分字母序、不修改入参）。
+  - `client/src/components/Composer.jsx`：mentionMembers 过滤后经 sortMentionCandidates
+    排序再截断 10。
+- 测试：`client/src/utils/mentionRank.test.js` 8 用例（打分/次数/新鲜度/脏数据/排序/
+  字母序/空列表/不可变）。
+- 验证：`npx vitest run` 156 ✅（+8）；`npx tsc --noEmit` ✅；`npx vite build` ✅。
