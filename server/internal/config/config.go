@@ -40,9 +40,9 @@ type Config struct {
 	AIAllowPrivateIPs bool
 
 	// 【本地改动 2026-08-31】Web Push（VAPID）三件套：公钥/私钥/subject。
-	// 移植 chatto 的 PushConfig 语义（未配置 = Web Push 整体关闭，服务层
+	// Web Push 配置（未配置 = 整体关闭，服务层
 	// IsConfigured() 为 false，订阅端点返回 503，发送直接跳过）。私钥绝不
-	// 外传；subject 为运维联系邮箱（mailto:）或 URL。生成命令见 chatto
+	// 外传；subject 为运维联系邮箱（mailto:）或 URL
 	// 文档：openssl ecparam -genkey -name prime256v1 等。
 	PushVAPIDPublicKey  string
 	PushVAPIDPrivateKey string

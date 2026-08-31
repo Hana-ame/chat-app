@@ -7,7 +7,7 @@ import (
 	"github.com/Hana-ame/chat-app/server/internal/models"
 )
 
-// PushSubscription 相关 SQLite 访问层（移植 chatto 的 Web Push 订阅语义）：
+// PushSubscription 相关 SQLite 访问层（Web Push 订阅与离线投递）：
 //   - 每行 = 一个用户在某浏览器/设备上的一条订阅；endpoint 由浏览器
 //     PushManager 签发且全局唯一。
 //   - p256dh/auth 是浏览器订阅的加密密钥（RFC 8291），发送时用于加密

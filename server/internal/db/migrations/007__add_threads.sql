@@ -1,5 +1,5 @@
--- 【本地改动 2026-08-31】移植 chatto 线程：messages.thread_root_message_id 自引用
---（移植 chatto ThreadRootEventID/InReplyTo 语义），thread_follows 用户关注表，
+-- 【本地改动 2026-08-31】消息线程聚合：messages.thread_root_message_id 自引用
+--，thread_follows 用户关注表，
 -- thread_read_state 每个用户每线程的已读游标（用于 has_unread_replies 判断）。
 
 ALTER TABLE messages ADD COLUMN thread_root_message_id TEXT;

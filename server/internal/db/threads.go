@@ -11,7 +11,7 @@ import (
 )
 
 
-// ── Threads（【本地改动 2026-08-31】移植 chatto 线程）─────────────────
+// ── Threads（【本地改动 2026-08-31】实现消息线程聚合（root 消息 + reply_to 树）：）─────────────────
 // 线程模型：messages.thread_root_message_id 自引用。空串 = 顶层消息；
 // == id = 该消息即线程根（start_thread=true 时写入）；非空其他值 = 回复在该根
 // 下。reply_to_message_id 语义不变（父消息，用于线程内的嵌套回复）。
@@ -57,8 +57,8 @@ func (d *DB) IsFollowingThread(ctx context.Context, userID, threadRootMessageID 
 	return n > 0, nil
 }
 
-// ThreadFollowers 返回线程的所有关注者 ID。
-func (d *DB) ThreadFollowers(ctx context.Context, threadRootMessageID string) ([]string, error) {
+// ThreadWatchers 返回线程的所有关注者 ID。
+func (d *DB) ThreadWatchers(ctx context.Context, threadRootMessageID string) ([]string, error) {
 	rows, err := d.QueryContext(ctx,
 		`SELECT user_id FROM thread_follows WHERE thread_root_message_id = ?`,
 		threadRootMessageID,
@@ -125,10 +125,10 @@ func (d *DB) GetThreadReadCursor(ctx context.Context, userID, threadRootMessageI
 	return "", nil
 }
 
-// ListFollowedThreads 列出用户关注的线程摘要（含根消息、回复数、最新回复、has_unread）。
+// ListThreadSummarys 列出用户关注的线程摘要（含根消息、回复数、最新回复、has_unread）。
 // 返回的 Thread 结构包含根消息 + 聚合元数据；HasUnread 依据线程最新回复时间是否
 // 严格晚于用户已读游标对应的时间戳。limit<=0 或 >100 时默认 100。
-func (d *DB) ListFollowedThreads(ctx context.Context, userID string, before string, limit int) ([]models.ThreadSummary, error) {
+func (d *DB) ListThreadSummarys(ctx context.Context, userID string, before string, limit int) ([]models.ThreadSummary, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 100
 	}
@@ -322,8 +322,8 @@ func (d *DB) ListFollowedThreads(ctx context.Context, userID string, before stri
 	out := make([]models.ThreadSummary, len(infoList))
 	for i, it := range infoList {
 		out[i] = models.ThreadSummary{
+			ThreadMeta:  it.meta,
 			RootMessage: it.msg,
-			Meta:        it.meta,
 		}
 	}
 	return out, nil
@@ -380,7 +380,7 @@ func (d *DB) GetThreadSummary(ctx context.Context, chatID, userID, threadRootMes
 		IsFollowing:         following,
 		HasUnread:           hasUnread,
 	}
-	return &models.ThreadSummary{RootMessage: rootMsg, Meta: meta}, nil
+	return &models.ThreadSummary{ThreadMeta: meta, RootMessage: rootMsg}, nil
 }
 
 func (d *DB) LatestReplyIDForThread(ctx context.Context, threadRootMessageID string) (string, error) {

@@ -1,5 +1,5 @@
 -- 通知 occurrences：每用户每事件唯一的持久化通知存储。
--- 设计（移植 chatto FDR-012 的持久化通知机制到 SQLite 栈）：
+-- 设计（持久化通知机制到 SQLite 栈）：
 --   - 每行 = 一个用户的一条通知事件（mention/reply 等），(user_id, kind, chat_id,
 --     message_id) 唯一 → 同源事件重复触发不产生重复行（数据层兜底，无需应用锁）。
 --   - read 标记已读；expires_at 为 TTL，由启动时的定期 worker 清理（与 token 清理同款）。

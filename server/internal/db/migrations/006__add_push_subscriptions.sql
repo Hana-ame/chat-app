@@ -1,4 +1,4 @@
--- Web Push 订阅（移植 chatto 的 push subscription 语义到 SQLite 栈）。
+-- Web Push 订阅（Web Push 订阅到 SQLite 栈）。
 -- 设计：
 --   - 每行 = 一个用户在某浏览器/设备上的一条推送订阅（endpoint 由浏览器
 --     PushManager 签发，全局唯一）。

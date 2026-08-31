@@ -13,7 +13,7 @@ import (
 )
 
 // PushService 提供 Web Push（VAPID）的订阅管理、离线投递与失效清理，
-// 移植 chatto 的 push 机制到 SQLite 栈：
+// Web Push 机制落到 SQLite 栈：
 //   - 订阅：浏览器 PushManager 签发 endpoint（+p256dh/auth 加密密钥），
 //     前端登录后经 /api/push/subscribe 存入；endpoint 全局唯一，重复注册
 //     直接覆盖（数据层 UNIQUE 兜底）。
@@ -35,7 +35,7 @@ var ErrPushNotConfigured = errors.New("web push not configured")
 const pushPayloadTTLSeconds = 3600
 
 // IsConfigured 返回 VAPID 三件套是否齐全（公钥/私钥/subject 都非空）。
-// chatto 语义：未启用时不接触任何第三方推送服务（默认 opt-in）。
+// 未启用时不接触任何第三方推送服务（默认 opt-in）。
 func (s *PushService) IsConfigured() bool {
 	c := s.Cfg
 	return c.PushVAPIDPublicKey != "" && c.PushVAPIDPrivateKey != "" && c.PushVAPIDSubject != ""

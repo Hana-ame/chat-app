@@ -83,7 +83,7 @@ type Message struct {
 	Mentions        json.RawMessage `json:"mentions,omitempty"`
 	ReplyTo               string          `json:"reply_to,omitempty"`
 	RepliedTo             *Message        `json:"replied_to,omitempty"`
-	// 【本地改动 2026-08-31】移植 chatto ThreadRootEventID/InReplyTo：
+	// 【本地改动 2026-08-31】线程语义：thread_root_message_id / reply_to：
 	// thread_root_message_id 是自引用外键。空串 = 顶层消息；== id = 该消息
 	// 即线程根（start_thread=true 时写入）；其他非空 = 回复在该根下。
 	// reply_to_message_id 语义不变（父消息，用于线程内的嵌套回复）。
@@ -114,7 +114,7 @@ type RefreshToken struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// NotificationOccurrence 是持久化通知的一条记录（移植 chatto FDR-012 的
+// NotificationOccurrence 是持久化通知的一条记录（移植 持久化通知机制的
 // occurrence 语义）。行身份由 (user_id, kind, chat_id, message_id) 唯一，
 // 同源事件重复触发不重复插行；read 标记已读；expires_at 为 TTL 由清理
 // worker 删除。
@@ -132,7 +132,7 @@ type NotificationOccurrence struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
-// PushSubscription 是 Web Push 的一条浏览器订阅（移植 chatto 的 push
+// PushSubscription 是 Web Push 的一条浏览器订阅
 // subscription 语义）。endpoint 由浏览器的 PushManager 签发、全局唯一；
 // P256DH/Auth 为 RFC 8291 的订阅加密密钥，发送时用于加密 payload。订阅
 // 不设 TTL：失效由发送时的 404/410 响应即时清除，用户注销由 FK CASCADE
@@ -146,12 +146,12 @@ type PushSubscription struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// 【本地改动 2026-08-31】移植 chatto ThreadSummary 的紧凑模型。
-// RootMessage 是线程根消息（thread_root_message_id == id），
-// Meta 是该线程的聚合元数据（回复数、最新回复时间、关注者状态、未读标记）。
+// 【本地改动 2026-08-31】线程摘要紧凑模型。
+// ThreadMeta 以嵌入方式展平到 ThreadSummary 顶层，与根消息并列，
+// 避免客户端需要解一层嵌套结构。
 type ThreadSummary struct {
+	ThreadMeta
 	RootMessage *Message `json:"root_message,omitempty"`
-	Meta        ThreadMeta `json:"meta"`
 }
 
 type ThreadMeta struct {

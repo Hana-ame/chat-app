@@ -119,7 +119,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 				})
 				r.Route("/notifications", func(r chi.Router) {
 					// 【本地改动 2026-08-31】持久化通知 occurrence 端点（移植
-					// chatto FDR-012/013）：列表/未读计数/单条已读/全部已读/删除。
+					// ：列表/未读计数/单条已读/全部已读/删除。
 					r.Get("/", s.ListNotificationOccurrences)
 					r.Get("/unread-count", s.NotificationUnreadCount)
 					r.Post("/read-all", s.MarkAllNotificationsRead)
@@ -131,10 +131,10 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 					r.Post("/read", s.MarkNotificationsRead)
 				})
 				r.Route("/threads", func(r chi.Router) {
-					// 【本地改动 2026-08-31】移植 chatto 线程 API：关注列表、
+					// 【本地改动 2026-08-31】实现消息线程聚合（root 消息 + reply_to 树）： API：关注列表、
 					// 关注/取关、已读游标。线程内消息列表沿用 /chats/{id}/messages
 					// 的 in_thread 查询参数。
-					r.Get("/", s.ListFollowedThreads)
+					r.Get("/", s.ListThreadSummarys)
 					r.Post("/follow", s.FollowThread)
 					r.Delete("/follow", s.UnfollowThread)
 					r.Post("/read", s.MarkThreadRead)

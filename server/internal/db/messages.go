@@ -172,7 +172,7 @@ func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, 
 var errInvalidInput = errors.New("invalid input")
 
 // CreateMessageOpt 是 CreateMessage 的可选参数（【本地改动 2026-08-31】线程：
-// 传 reply_to 和 thread_root 分别对应 chatto 的 InReplyTo 与 ThreadRootEventID）。
+// 分别标识直接引用和线程归属的根 ID）。
 type CreateMessageOpt func(*struct { replyTo, threadRoot string })
 
 func WithReplyTo(replyTo string) CreateMessageOpt {

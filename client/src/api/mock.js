@@ -60,7 +60,7 @@ const AI_RESPONSES = [
  */
 let data = null;
 /**
- * 【本地改动 2026-08-31】线程 mock 状态（移植 chatto 线程 API）。
+ * 【本地改动 2026-08-31】线程 mock 状态。
  * @type {Map<string, Set<string>>}  thread_root_message_id -> Set(user_id)
  */
 let threadFollows = new Map();
@@ -889,7 +889,7 @@ export function mockNotifyDelete(_token, _msgId) {
   return { ok: true };
 }
 
-// ── 持久化通知 occurrence mock（【本地改动 2026-08-31】移植 chatto 通知机制）──
+// ── 持久化通知 occurrence mock（【本地改动 2026-08-31】持久化通知机制）──
 // 与后端 handlers/notification_occurrences.go 新端点一一对应。mock 数据保存在
 // mock 全局 state 的 notificationOccurrences 数组里（见 mockOccurrenceAdd 的
 // 写入），列表/未读/已读/删除都在内存里生效，方便前端单测与 mock E2E 断言。
@@ -939,7 +939,7 @@ export function mockOccurrenceDelete(_token, id) {
   return { ok: true };
 }
 
-// ── Web Push mock（【本地改动 2026-08-31】移植 chatto push 机制）──
+// ── Web Push mock（【本地改动 2026-08-31】Web Push 机制）──
 // 与后端 handlers/push.go 三端点一一对应。mock 状态下：
 //   - VAPID 公钥固定返回（未配置语义无法在纯前端 mock，固定给一把测试公钥，
 //     与后端 503 语义由调用方在真实端区分；mock 里都返回 200 便于单测）；
@@ -985,7 +985,7 @@ export function mockPushUnsubscribe(_token, endpoint) {
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// 【本地改动 2026-08-31】线程 mock（移植 chatto 线程 / ThreadFollow）。
+// 【本地改动 2026-08-31】线程 mock。
 // 状态：threadFollows  (threadRootID -> Set<userID>)、threadReadState (userID:rootID -> last-seen id)
 // ──────────────────────────────────────────────────────────────────────
 
@@ -1003,7 +1003,7 @@ function followSetFor(threadRootID) {
  * @param {string} _token
  * @param {string} chatId
  * @param {string} threadRootID
- * @returns {{ root_message: Message, meta: { thread_root_message_id: string, chat_id: string, reply_count: number, last_reply_at: string, latest_reply_id: string, is_following: boolean, has_unread: boolean } }}
+ * @returns {{ root_message: Message, thread_root_message_id: string, chat_id: string, reply_count: number, last_reply_at: string, latest_reply_id: string, is_following: boolean, has_unread: boolean }}
  */
 export function mockThreadGetSummary(_token, chatId, threadRootID) {
   const d = ensureData();
@@ -1020,15 +1020,13 @@ export function mockThreadGetSummary(_token, chatId, threadRootID) {
     : replies.length > 0;
   return {
     root_message: root,
-    meta: {
-      thread_root_message_id: threadRootID,
-      chat_id: chatId,
-      reply_count: replies.length,
-      last_reply_at: latest?.created_at || '',
-      latest_reply_id: latest?.id || '',
-      is_following: isFollowing,
-      has_unread: hasUnread,
-    },
+    thread_root_message_id: threadRootID,
+    chat_id: chatId,
+    reply_count: replies.length,
+    last_reply_at: latest?.created_at || '',
+    latest_reply_id: latest?.id || '',
+    is_following: isFollowing,
+    has_unread: hasUnread,
   };
 }
 
@@ -1040,22 +1038,23 @@ export function mockThreadGetSummary(_token, chatId, threadRootID) {
  */
 export function mockThreadsListFollowed(_token, before, limit) {
   const user = currentUser();
-  const summary = [];
+  const threads = [];
   for (const [rootID, followers] of threadFollows.entries()) {
     if (!followers.has(user.id)) continue;
     const d = ensureData();
     const msgs = d.messages.filter(m => m.thread_root_message_id === rootID || m.id === rootID);
     const root = msgs.find(m => m.id === rootID);
     if (!root) continue;
-    summary.push(mockThreadGetSummary(_token, root.chat_id, rootID));
+    const s = mockThreadGetSummary(_token, root.chat_id, rootID);
+    threads.push(s);
   }
-  summary.sort((a, b) => b.meta.last_reply_at.localeCompare(a.meta.last_reply_at));
+  threads.sort((a, b) => (b.last_reply_at || '').localeCompare(a.last_reply_at || ''));
   if (before) {
-    const idx = summary.findIndex(s => s.meta.thread_root_message_id === before);
-    if (idx > 0) summary.splice(0, idx);
+    const idx = threads.findIndex(t => t.thread_root_message_id === before);
+    if (idx > 0) threads.splice(0, idx);
   }
   const limitNum = limit || 50;
-  return { threads: summary.slice(0, limitNum) };
+  return { threads: threads.slice(0, limitNum) };
 }
 
 /**
@@ -1063,7 +1062,7 @@ export function mockThreadsListFollowed(_token, before, limit) {
  * @param {{ thread_root_message_id: string }} body
  * @returns {{ following: boolean }}
  */
-export function mockThreadFollow(_token, body) {
+export function mockThreadWatch(_token, body) {
   followSetFor(body.thread_root_message_id).add(currentUser().id);
   return { following: true };
 }

@@ -15,7 +15,7 @@ const (
 )
 
 // NotificationService 提供持久化通知（occurrence）的写入触发与读取命令，
-// 移植 chatto FDR-012 的通知机制到 SQLite 栈：
+// 移植 持久化通知机制到 SQLite 栈：
 //   - 写入：消息发送时按「提及 + 回复」触发，每个 (收件人, kind, chat, 源消息)
 //     由数据库唯一索引保证幂等（重复触发不重复插行、不重置已读）。
 //   - 投递：创建成功且收件人在线时立即经 ws.Hub 广播 `notification` 实时事件；
@@ -88,7 +88,7 @@ func (s *NotificationService) trigger(ctx context.Context, recipientID, kind, ch
 		return // 同源事件已存在，不重复插行、不重置已读
 	}
 	// 投递分流：在线 → 实时广播；离线 → Web Push（有订阅才发）。
-	// 移植 chatto 的「在线实时 / 离线推送」双通道语义；Push 未配置时
+	// 「在线实时 / 离线推送」双通道语义；Push 未配置时
 	// PushForOfflineUser 内部直接跳过，不影响在线广播。
 	if s.hub != nil && s.hub.IsOnline(recipientID) {
 		occ, err := s.db.GetNotificationOccurrenceByKey(ctx, recipientID, kind, chatID, messageID)

@@ -23,10 +23,10 @@ type Service struct {
 	Reaction *ReactionService
 	Stream   *StreamService
 	// 【本地改动 2026-08-31】持久化通知服务（occurrence 存储 + 触发 + 清理），
-	// 移植 chatto 的通知机制；Message 发送后经它触发提及/回复通知。
+	// 通知机制；Message 发送后经它触发提及/回复通知。
 	Notification *NotificationService
 	// 【本地改动 2026-08-31】Web Push 服务（VAPID 订阅 + 离线投递 + 失效清理），
-	// 移植 chatto 的 push 机制；通知触发时离线用户经它收到推送。
+	// push 机制；通知触发时离线用户经它收到推送。
 	Push *PushService
 }
 

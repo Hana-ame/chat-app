@@ -60,7 +60,7 @@ func (s *MessageService) Send(ctx context.Context, chatID, userID, content strin
 	}
 	mentions := extractMentions(content)
 
-	// 【本地改动 2026-08-31】线程根计算（移植 chatto ThreadRootEventID 语义）：
+	// 【本地改动 2026-08-31】线程根计算语义：
 	// startThread → 该消息自身为根；显式 thread_root → 使用给定值；reply_to
 	// 给定 → 继承父消息的 thread_root；父无根 → 该消息成新根。根 = 消息 ID
 	// 自身（自引用）；非根线程回复指向根消息。
@@ -102,10 +102,10 @@ func (s *MessageService) Send(ctx context.Context, chatID, userID, content strin
 			logutil.Warn("notification trigger: %v", err)
 		}
 		// 【本地改动 2026-08-31】线程回复通知：向该线程的所有关注者（除作者本人）
-		// 发 thread_reply 通知。与 chatto 的 ThreadFollowChangedEvent +
+		// 发 reply_in_thread 通知。
 		// thread notifications 语义对齐。尽力而为。
 		if msg.ThreadRootMessageID != "" {
-			if err := s.notifyThreadFollowers(ctx, chatID, userID, msg); err != nil {
+			if err := s.notifyThreadWatchers(ctx, chatID, userID, msg); err != nil {
 				logutil.Warn("thread follow notification: %v", err)
 			}
 		}
@@ -190,12 +190,12 @@ func extractMentions(content string) []string {
 }
 
 // 【本地改动 2026-08-31】线程回复通知触发：遍历线程关注者，除作者外每人触发一条
-// thread_reply 通知（含 Web Push 落库/离线投递，见 notification.trigger）。
-func (s *MessageService) notifyThreadFollowers(ctx context.Context, chatID, authorID string, msg *models.Message) error {
+// reply_in_thread 通知（含 Web Push 落库/离线投递，见 notification.trigger）。
+func (s *MessageService) notifyThreadWatchers(ctx context.Context, chatID, authorID string, msg *models.Message) error {
 	if s.db == nil || s.Notification == nil {
 		return nil
 	}
-	followers, err := s.db.ThreadFollowers(ctx, msg.ThreadRootMessageID)
+	followers, err := s.db.ThreadWatchers(ctx, msg.ThreadRootMessageID)
 	if err != nil {
 		return err
 	}
@@ -214,7 +214,7 @@ func (s *MessageService) notifyThreadFollowers(ctx context.Context, chatID, auth
 		rootSnippet := truncateString(root.Content, 30)
 		title := truncateString(msg.Content, 80)
 		body := "在 " + rootSnippet
-		s.Notification.trigger(ctx, followerID, "thread_reply", chatID, msg.ID, authorID, title, body)
+		s.Notification.trigger(ctx, followerID, "reply_in_thread", chatID, msg.ID, authorID, title, body)
 	}
 	return nil
 }

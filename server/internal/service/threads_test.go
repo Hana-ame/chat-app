@@ -7,17 +7,17 @@ import (
 )
 
 // 【本地改动 2026-08-31】线程移植回归测试。发现背景：chat-app 原本没有线程，
-// 用户的回复只能以「引用另一条消息」的扁平方式存在，没有线程聚合。移植 chatto
-// 的线程模型（ThreadRootEventID/InReplyTo + ThreadFollows + thread
+// 用户的回复只能以「引用另一条消息」的扁平方式存在，没有线程聚合。实现
+// 的线程模型（thread_root_message_id/reply_to + ThreadWatchs + thread
 // notifications）时新增本文件，覆盖：
 //   - StartThread=true 时发送的消息自引用 thread_root_message_id 成为线程根；
 //   - 对根消息的回复自动继承 thread_root_message_id，reply_to 保留为父消息；
 //   - 顶层消息（既非根也非回复）thread_root_message_id 为空；
 //   - 嵌套回复继承祖先的 thread_root，不指向父消息；
 //   - ListMessages?in_thread=X 只返回该线程内的消息（含根本身）；
-//   - Follow / Unfollow / ListFollowedThreads 端到端工作；
+//   - Follow / Unfollow / ListThreadSummarys 端到端工作；
 //   - MarkThreadRead 推进已读游标到最新回复；
-//   - 线程内新回复触发 thread_reply 通知给关注者（除作者本人）。
+//   - 线程内新回复触发 reply_in_thread 通知给关注者（除作者本人）。
 func threadsFixture(t *testing.T) *testutil.Fixture {
 	t.Helper()
 	return testutil.New(t)
@@ -167,7 +167,7 @@ func TestThreads_FollowUnfollow(t *testing.T) {
 	}
 }
 
-func TestThreads_ListFollowedThreads(t *testing.T) {
+func TestThreads_ListThreadSummarys(t *testing.T) {
 	f := threadsFixture(t)
 	chatID, a, _ := makeChatAndUsers(f, t)
 
@@ -182,7 +182,7 @@ func TestThreads_ListFollowedThreads(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	list, err := f.DB.ListFollowedThreads(f.Ctx(), a, "", 50)
+	list, err := f.DB.ListThreadSummarys(f.Ctx(), a, "", 50)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,13 +232,13 @@ func TestThreads_ReplyTriggersNotificationForFollower(t *testing.T) {
 	}
 	foundForB := false
 	for _, o := range occB {
-		if o.Kind == "thread_reply" && o.ChatID == chatID && o.ActorID == a {
+		if o.Kind == "reply_in_thread" && o.ChatID == chatID && o.ActorID == a {
 			foundForB = true
 			break
 		}
 	}
 	if !foundForB {
-		t.Fatalf("bob should have received a thread_reply notification")
+		t.Fatalf("bob should have received a reply_in_thread notification")
 	}
 
 	occA, err := f.Server.Services.Notification.List(f.Ctx(), a, "", 100)
@@ -246,8 +246,8 @@ func TestThreads_ReplyTriggersNotificationForFollower(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, o := range occA {
-		if o.Kind == "thread_reply" {
-			t.Fatalf("alice should not receive thread_reply for her own reply, got %v", o)
+		if o.Kind == "reply_in_thread" {
+			t.Fatalf("alice should not receive reply_in_thread for her own reply, got %v", o)
 		}
 	}
 }

@@ -23,7 +23,7 @@ type sendMsgReq struct {
 	Source           *ai.Source          `json:"source"`
 	MsgID            string              `json:"msg_id"`
 	ReplyTo          string              `json:"reply_to"`
-	// 【本地改动 2026-08-31】移植 chatto 线程：thread_root 显式指定根；
+	// 【本地改动 2026-08-31】实现消息线程聚合（root 消息 + reply_to 树）：：thread_root 显式指定根；
 	// start_thread=true 时该消息成为新线程根（自引用 thread_root_message_id）。
 	ThreadRoot string `json:"thread_root"`
 	StartThread bool `json:"start_thread"`

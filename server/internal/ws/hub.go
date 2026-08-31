@@ -27,7 +27,7 @@ const (
 	OpPresenceUpdate Op = "presence_update"
 	OpTyping         Op = "typing"
 	// 【本地改动 2026-08-31】OpNotification 承载持久化通知 occurrence 的实时投递
-	// （移植 chatto FDR-012/013 的通知机制）。payload 为完整
+	// （移植  的通知机制）。payload 为完整
 	// models.NotificationOccurrence。仅推给该用户自己的在线连接，不走聊天广播。
 	OpNotification Op = "notification"
 	OpPing         Op = "ping"

@@ -7,7 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// 【本地改动 2026-08-31】移植 chatto 线程 API。
+// 【本地改动 2026-08-31】实现消息线程聚合（root 消息 + reply_to 树）： API。
 type followThreadReq struct {
 	ThreadRootMessageID string `json:"thread_root_message_id"`
 }
@@ -15,7 +15,7 @@ type threadReadReq struct {
 	ThreadRootMessageID string `json:"thread_root_message_id"`
 }
 
-// ListFollowedThreads godoc
+// ListThreadSummarys godoc
 // @Summary      List threads the user is following
 // @Description  Paginated list of followed threads with metadata
 // @Tags         threads
@@ -25,13 +25,13 @@ type threadReadReq struct {
 // @Success      200    {object} map[string]any
 // @Failure      401    {object} map[string]any
 // @Router       /api/threads [get]
-func (s *Server) ListFollowedThreads(w http.ResponseWriter, r *http.Request) {
+func (s *Server) ListThreadSummarys(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	if limit <= 0 {
 		limit = 50
 	}
-	threads, err := s.DB.ListFollowedThreads(r.Context(), u.ID, r.URL.Query().Get("before"), limit)
+	threads, err := s.DB.ListThreadSummarys(r.Context(), u.ID, r.URL.Query().Get("before"), limit)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
 		return
@@ -41,7 +41,7 @@ func (s *Server) ListFollowedThreads(w http.ResponseWriter, r *http.Request) {
 
 // FollowThread godoc
 // @Summary      Follow a thread
-// @Description  Opt into thread_reply notifications for a thread root
+// @Description  Opt into reply_in_thread notifications for a thread root
 // @Tags         threads
 // @Security     BearerAuth
 // @Param        body body followThreadReq true "Thread root message ID"
@@ -68,7 +68,7 @@ func (s *Server) FollowThread(w http.ResponseWriter, r *http.Request) {
 
 // UnfollowThread godoc
 // @Summary      Unfollow a thread
-// @Description  Stop receiving thread_reply notifications for a thread root
+// @Description  Stop receiving reply_in_thread notifications for a thread root
 // @Tags         threads
 // @Security     BearerAuth
 // @Param        body body followThreadReq true "Thread root message ID"

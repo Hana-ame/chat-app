@@ -53,7 +53,7 @@ export const MessageSchema = z.object({
   thinking: z.string().optional(),
   stream_url: z.string().optional(),
   streaming: z.boolean().optional(),
-  // 【本地改动 2026-08-31】线程（移植 chatto ThreadRootEventID/InReplyTo）：
+  // 【本地改动 2026-08-31】线程语义：每条消息可选择自引用成为线程根，：
   // reply_to 为父消息 ID（可为空），thread_root_message_id 在 threaded 消息上
   // 指向线程根（自引用或祖先根），顶层消息（既非根也非回复）为空字符串。
   reply_to: z.string().optional(),
@@ -75,7 +75,13 @@ export const ThreadMetaSchema = z.object({
 
 export const ThreadSummarySchema = z.object({
   root_message: MessageSchema,
-  meta: ThreadMetaSchema,
+  thread_root_message_id: z.string(),
+  chat_id: z.string(),
+  reply_count: z.number(),
+  last_reply_at: z.string().optional(),
+  latest_reply_id: z.string().optional(),
+  is_following: z.boolean(),
+  has_unread: z.boolean(),
 });
 
 export type ThreadMeta = z.infer<typeof ThreadMetaSchema>;
@@ -130,7 +136,7 @@ export interface StreamSource {
 }
 
 // 【本地改动 2026-08-31】持久化通知 occurrence（后端 models.NotificationOccurrence
-// 的镜像；移植 chatto FDR-012 通知机制到前端契约）。与后端 JSON 字段一一对应。
+// 的镜像；持久化通知机制到前端契约）。与后端 JSON 字段一一对应。
 export const NotificationOccurrenceSchema = z.object({
   id: z.string(),
   user_id: z.string(),
@@ -148,7 +154,7 @@ export const NotificationOccurrenceSchema = z.object({
 export type NotificationOccurrence = z.infer<typeof NotificationOccurrenceSchema>;
 
 // 【本地改动 2026-08-31】Web Push 订阅（后端 models.PushSubscription 的镜像；
-// 移植 chatto 的 push 机制到前端契约）。endpoint/p256dh/auth 与浏览器
+// Web Push 机制到前端契约）。endpoint/p256dh/auth 与浏览器
 // PushSubscription.toJSON() 字段一一对应；created_at 为后端注册时间。
 export const PushSubscriptionSchema = z.object({
   id: z.string(),

@@ -11,7 +11,7 @@ import {
 	mockGetNotifyChat, mockNotificationsList, mockNotifySend, mockNotifyMarkRead, mockNotifyDelete,
 	mockOccurrenceList, mockOccurrenceUnreadCount, mockOccurrenceMarkRead, mockOccurrenceMarkAllRead, mockOccurrenceDelete,
 	mockPushGetVAPIDPublicKey, mockPushSubscribe, mockPushUnsubscribe,
-	mockThreadGetSummary, mockThreadsListFollowed, mockThreadFollow, mockThreadUnfollow, mockThreadMarkRead,
+	mockThreadGetSummary, mockThreadsListFollowed, mockThreadWatch, mockThreadUnfollow, mockThreadMarkRead,
 	mockEmitStreamPlaceholder,
 	resetMockData,
 } from './mock';
@@ -153,7 +153,7 @@ const _apiMethods = {
     request<ApiError>('DELETE', '/api/chats/' + chatId + '/members/' + userId, token),
 
   // ── Messages ──
-  // 【本地改动 2026-08-31】inThread 参数（移植 chatto 线程语义）：过滤返回
+  // 【本地改动 2026-08-31】inThread 参数：过滤返回
   // 属于该线程的消息（含根）。
   listMessages: (token: string, chatId: string, before?: string, limit?: number, inThread?: string) => {
     let url = '/api/chats/' + chatId + '/messages?limit=' + (limit || 50);
@@ -207,8 +207,8 @@ const _apiMethods = {
       request<ApiError>('DELETE', '/api/notifications/messages/' + msgId, token),
     markRead: (token: string) =>
       request<ApiError>('POST', '/api/notifications/read', token, {}),
-    // 【本地改动 2026-08-31】持久化通知 occurrence 端点（移植 chatto
-    // FDR-012；后端 handlers/notification_occurrences.go）。
+    // 【本地改动 2026-08-31】持久化通知 occurrence 端点
+    // 后端 handlers/notification_occurrences.go）。
     listOccurrences: (token: string, before?: string, limit?: number) => {
       let url = '/api/notifications?limit=' + (limit || 50);
       if (before) url += '&before=' + before;
@@ -225,7 +225,7 @@ const _apiMethods = {
   },
 
   // ── Threads ──
-  // 【本地改动 2026-08-31】线程 API（移植 chatto 线程 / ThreadFollow）：
+  // 【本地改动 2026-08-31】线程 API（关注列表 / 关注 / 取关 / 已读）：
   // 关注列表、关注/取关、单线程详情、标记已读。
   threads: {
     listFollowed: (token: string, before?: string, limit?: number) => {
@@ -245,7 +245,7 @@ const _apiMethods = {
 
   // ── Web Push ──
   push: {
-    // 【本地改动 2026-08-31】Web Push VAPID（移植 chatto push 机制；后端
+    // 【本地改动 2026-08-31】Web Push VAPID
     // handlers/push.go）。getVAPIDPublicKey 在未配置时返回 503 → 调用方
     // （SW 注册流程）捕获后静默跳过推送注册。
     getVAPIDPublicKey: (token: string) =>
@@ -341,12 +341,12 @@ function buildMockProxy(target: typeof _apiMethods): ApiType {
         };
       }
       if (mockEnabled && prop === 'threads') {
-        // 【本地改动 2026-08-31】线程 mock（移植 chatto 线程 API）。
+        // 【本地改动 2026-08-31】线程 mock。
         return {
           listFollowed: (token: string, before?: string, limit?: number) =>
             Promise.resolve(mockThreadsListFollowed(token, before, limit)),
           follow: (token: string, threadRootMessageId: string) =>
-            Promise.resolve(mockThreadFollow(token, { thread_root_message_id: threadRootMessageId })),
+            Promise.resolve(mockThreadWatch(token, { thread_root_message_id: threadRootMessageId })),
           unfollow: (token: string, threadRootMessageId: string) =>
             Promise.resolve(mockThreadUnfollow(token, { thread_root_message_id: threadRootMessageId })),
           getSummary: (token: string, chatId: string, threadRootMessageId: string) =>

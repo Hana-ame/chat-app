@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	// notificationOccurrenceTTL 是通知的存活期（移植 chatto 的 90 天 TTL 语义）。
+	// notificationOccurrenceTTL 是通知的存活期（默认 90 天，避免未读堆积）。
 	// 过期行由 chatd 启动的定期 worker 删除（见 cmd/chatd/main.go 的清理循环）。
 	notificationOccurrenceTTL = 90 * 24 * time.Hour
 )
