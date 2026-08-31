@@ -269,7 +269,7 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId, onReply
                   </div>
                 ) : (
                   <div className="msg-content" style={{whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
-                    {renderContent(msg.content, userMap)}
+                    {renderContent(msg.content, userMap, user?.id)}
                   </div>
                 )}
               </>

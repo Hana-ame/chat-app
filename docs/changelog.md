@@ -897,3 +897,18 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
 - 测试：`client/src/utils/unreadBoundary.test.js` 7 用例（无依据/空消息/严格大于/
   全已读/等于不算未读/跳过已删除/非法输入）。
 - 验证：`npx vitest run` 163 ✅（+7）；`npx tsc --noEmit` ✅；`npx vite build` ✅。
+
+## 2026-09-03 feat: 自我提及高亮（Self-mention highlight，对齐 FDR-006）
+
+- 背景：chatto FDR-006「self-mentions get additional styling」——@自己 的提及
+  应比普通提及更醒目。chat-app 此前所有提及统一渲染。纯前端，无后端改动，
+  所有本地改动带【本地改动 2026-09-03】标记。
+- 实现：
+  - `client/src/components/renderContent.jsx`：`renderContent(content, userMap, currentUserId)`
+    新增第三参数；命中 `<@{id}>` 且 id === currentUserId 时 span 追加 `mention-self` 类。
+  - 调用点传 user?.id：MessageItem（正文）、ChatView（公告）、PinnedMessages（置顶）。
+  - `client/src/styles/global.css`：`.mention-self { background: var(--accent); color: #fff; }`
+    （accent 实底白字，比普通提及的半透明底更醒目）。
+- 测试：`renderContent.test.js` +4（renderToStaticMarkup 验证 @自己 带类、@他人不带、
+  不传参数保持旧行为、混排只标自己）。
+- 验证：`npx vitest run` 167 ✅（+4）；`npx tsc --noEmit` ✅；`npx vite build` ✅。

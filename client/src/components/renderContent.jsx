@@ -169,7 +169,7 @@ function renderMathTokens(mathTokens, keyPrefix) {
   return children;
 }
 
-export function renderContent(content, userMap) {
+export function renderContent(content, userMap, currentUserId) {
   if (!content) return null;
   const mentionParts = content.split(MENTION_RE);
   const children = [];
@@ -181,7 +181,10 @@ export function renderContent(content, userMap) {
     const m = part.match(MENTION_MATCH);
     if (m) {
       const username = userMap[m[1]] || 'unknown';
-      children.push(<span key={`m${i}`} className="mention">@{username}</span>);
+      // 【本地改动 2026-09-03】自我提及高亮：@自己 附加 mention-self 样式
+      // （对齐 chatto FDR-006「self-mentions get additional styling」）。
+      const isSelf = currentUserId && m[1] === currentUserId;
+      children.push(<span key={`m${i}`} className={'mention' + (isSelf ? ' mention-self' : '')}>@{username}</span>);
       continue;
     }
 

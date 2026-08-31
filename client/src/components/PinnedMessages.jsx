@@ -143,7 +143,7 @@ export default function PinnedMessages({ chatId, open, onClose }) {
                   )}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {deleted ? <span className="msg-deleted">(message deleted)</span> : renderContent(m.content || '', {})}
+                  {deleted ? <span className="msg-deleted">(message deleted)</span> : renderContent(m.content || '', {}, user?.id)}
                 </div>
               </div>
             );

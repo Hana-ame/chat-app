@@ -491,3 +491,10 @@ button { cursor: pointer; border: none; }
   animation: msg-highlight 1.2s ease-out;
   border-radius: 6px;
 }
+
+/* 【本地改动 2026-09-03】自我提及高亮：@自己 用 accent 实底白字，比普通提及更醒目。
+   对齐 chatto FDR-006「self-mentions get additional styling」。 */
+.mention-self {
+  background: var(--accent);
+  color: #fff;
+}

@@ -206,3 +206,37 @@ describe('tokenizeImages — inline image 切分', () => {
     expect(tokenizeImages(123)).toEqual([]);
   });
 });
+
+// 【本地改动 2026-09-03】自我提及高亮渲染测试（FDR-006 self-mention styling）。
+// 用 react-dom/server 渲染 JSX，验证 @自己 带 mention-self 类、他人提及不带。
+import { renderToStaticMarkup } from 'react-dom/server';
+import { renderContent } from './renderContent.jsx';
+
+describe('renderContent — 自我提及高亮', () => {
+  const SELF = '11111111-1111-4111-8111-111111111111';
+  const OTHER = '22222222-2222-4222-8222-222222222222';
+  const userMap = { [SELF]: 'me', [OTHER]: 'bob' };
+
+  it('@自己 渲染 mention-self 类', () => {
+    const html = renderToStaticMarkup(renderContent(`hello <@${SELF}>`, userMap, SELF));
+    expect(html).toContain('mention-self');
+    expect(html).toContain('@me');
+  });
+
+  it('@他人 不渲染 mention-self 类', () => {
+    const html = renderToStaticMarkup(renderContent(`hello <@${OTHER}>`, userMap, SELF));
+    expect(html).not.toContain('mention-self');
+    expect(html).toContain('@bob');
+  });
+
+  it('不传 currentUserId 时不加 mention-self（保持旧行为）', () => {
+    const html = renderToStaticMarkup(renderContent(`hi <@${SELF}>`, userMap));
+    expect(html).not.toContain('mention-self');
+  });
+
+  it('消息中同时有自己与他人提及', () => {
+    const html = renderToStaticMarkup(renderContent(`<@${SELF}> and <@${OTHER}>`, userMap, SELF));
+    expect(html).toContain('mention-self');
+    expect((html.match(/mention-self/g) || []).length).toBe(1);
+  });
+});

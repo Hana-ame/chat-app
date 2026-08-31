@@ -377,7 +377,7 @@ export default function ChatView({ chatId, isNotification, onBack }) {
               ) : showNotice ? (
                 <div style={{flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
                   <strong style={{color:'var(--accent)',marginRight:6}}>📢 公告</strong>
-                  {renderContent(pinnedMessage[chatId]?.content, {})}
+                  {renderContent(pinnedMessage[chatId]?.content, {}, user?.id)}
                 </div>
               ) : null}
             </div>
