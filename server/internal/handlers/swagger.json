@@ -2800,6 +2800,144 @@
           }
         }
       }
+    },
+    "/api/chats/{chatID}/pins": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ChatID"
+        }
+      ],
+      "get": {
+        "summary": "列出聊天中的置顶消息",
+        "description": "【本地改动 2026-09-02】消息置顶（chatto FDR-037，多消息）。仅 member 可调用；DM 不支持。按 pinned_at DESC 倒序。",
+        "operationId": "listPinnedMessages",
+        "tags": [
+          "Pins"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "上一页最后一条的 pinned_at"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 100
+            },
+            "description": "每页条数"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/chats/{chatID}/pins/{messageID}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ChatID"
+        },
+        {
+          "name": "messageID",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "目标消息 ID"
+        }
+      ],
+      "post": {
+        "summary": "置顶某条消息",
+        "description": "【本地改动 2026-09-02】消息置顶（chatto FDR-037）。owner/admin 可 pin。幂等。",
+        "operationId": "pinMessage",
+        "tags": [
+          "Pins"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "summary": "取消置顶某条消息",
+        "description": "【本地改动 2026-09-02】消息置顶（chatto FDR-037）。owner/admin 可 unpin。幂等。",
+        "operationId": "unpinMessage",
+        "tags": [
+          "Pins"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3688,6 +3826,75 @@
           },
           "has_unread": {
             "type": "boolean"
+          }
+        }
+      },
+      "PinEntry": {
+        "type": "object",
+        "description": "【本地改动 2026-09-02】一条消息置顶记录（chatto FDR-037，区别于聊天公告）",
+        "properties": {
+          "chat_id": {
+            "type": "string"
+          },
+          "message_id": {
+            "type": "string"
+          },
+          "pinned_by": {
+            "type": "string",
+            "description": "置顶操作者 user_id"
+          },
+          "pinned_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "message": {
+            "$ref": "#/components/schemas/Message"
+          }
+        }
+      },
+      "PinResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "already": {
+            "type": "boolean",
+            "description": "pin 操作：是否原本已置顶"
+          },
+          "unpinned": {
+            "type": "boolean",
+            "description": "unpin 操作：是否原本已置顶"
+          },
+          "chat_id": {
+            "type": "string"
+          },
+          "message_id": {
+            "type": "string"
+          }
+        }
+      },
+      "PinListResponse": {
+        "type": "object",
+        "properties": {
+          "chat_id": {
+            "type": "string"
+          },
+          "pins": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PinEntry"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "has_more": {
+            "type": "boolean"
+          },
+          "next": {
+            "type": "string",
+            "description": "下一页 cursor (last pinned_at)"
           }
         }
       }

@@ -23,6 +23,16 @@ type PinnedContent struct {
 	PinnedAt time.Time `json:"pinned_at"`
 }
 
+// 【本地改动 2026-09-02】PinEntry = 一条聊天消息的置顶记录（区别于聊天公告 pinned_message）。
+// 由 chat_pins 表承载关联元数据，Message 字段为指向消息的投影（前端用于"跳转到消息"）。
+type PinEntry struct {
+	ChatID    string    `json:"chat_id"`
+	MessageID string    `json:"message_id"`
+	PinnedBy  string    `json:"pinned_by"`
+	PinnedAt  time.Time `json:"pinned_at"`
+	Message   Message   `json:"message"`
+}
+
 type Chat struct {
 	ID            string    `json:"id"`
 	Type          string    `json:"type"`

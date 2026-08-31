@@ -28,6 +28,9 @@ type Service struct {
 	// 【本地改动 2026-08-31】Web Push 服务（VAPID 订阅 + 离线投递 + 失效清理），
 	// push 机制；通知触发时离线用户经它收到推送。
 	Push *PushService
+	// 【本地改动 2026-09-02】消息置顶服务（chatto FDR-037）：多消息置顶（区别于
+	// 聊天公告 pinned_message）。DM 不支持；owner/admin 可 pin/unpin；member 可读列表。
+	Pin *PinService
 }
 
 func New(database *db.DB, hub *ws.Hub, cfg *config.Config) *Service {
@@ -43,6 +46,7 @@ func New(database *db.DB, hub *ws.Hub, cfg *config.Config) *Service {
 	}
 	s.Notification = &NotificationService{Service: s}
 	s.Push = &PushService{Service: s}
+	s.Pin = &PinService{Service: s}
 	return s
 }
 

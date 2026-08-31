@@ -614,6 +614,29 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
   `vite build` 正常（KaTeX 独立 chunk 261KB）。
 
 
+## 2026-09-02 feat: 消息置顶（多消息，chatto FDR-037）
+
+- 背景：chatto FDR-037 允许频道（非 DM）由 owner/admin 置顶多条消息，member 可读分页列表。
+  区别于现有 `chats.pinned_message`（单条自写文本公告）与用户侧 `pinned`（聊天侧栏置顶）。
+  按 AGPL 独立实现，所有本地改动带【本地改动 2026-09-02】标记。
+- 迁移：`server/internal/db/migrations/008__add_chat_pins.sql` — 新建 `chat_pins` 表
+  (`chat_id`/`message_id` FK CASCADE，UNIQUE(chat_id, message_id) 幂等，
+  `idx_chat_pins_chat_created` 倒序分页，`idx_chat_pins_message` 批量清理)。
+- 后端：`db/pins.go`（Pin/Unpin/List/HasPin/RemovePinsForChat/Message）；
+  `service/pins.go`（owner/admin 写、member 读、DM 拒绝）；
+  `handlers/pins.go` + router：`POST/DELETE /pins/{messageID}`、`GET /pins?before=&limit=`；
+  `models/models.go` 新增 `PinEntry` 结构。
+- 联动：`service/message.go` DeleteMessage 软删除时同步清理该消息所有 pin
+  （FK CASCADE 只对硬删除生效）。
+- 前端契约同步：`client/src/schemas.ts`（PinEntrySchema）；
+  `client/src/api/client.ts`（pinMessage/unpinMessage/listPinnedMessages）；
+  `client/src/api/mock.js`（pinsState + mock funcs）；
+  `server/internal/handlers/swagger.json`（+3 paths + 3 schemas）。
+- 文档：`docs/architecture/database.md`（008 迁移行 + chat_pins 章节）；
+  `docs/api/reference.md`（消息置顶章节）。
+- 验证：`go build` ✅；`npx vitest run` 99 ✅；`npx tsc --noEmit` ✅。
+
+
 ## 2026-09-02 feat: 消息正文内联图片（`![]()` → `<img>` + 代理，fork 分歧）
 
 - 背景：chatto fork 允许消息正文 `![alt](url)` 渲染为 `<img>`，且所有图片 src

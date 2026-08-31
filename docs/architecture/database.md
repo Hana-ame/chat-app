@@ -16,6 +16,7 @@ SQLite（WAL 模式、`foreign_keys=ON`、`synchronous=NORMAL`）。schema 由�
 | `005__add_notification_occurrences.sql` | 【本地改动 2026-08-31】持久化通知：`notification_occurrences` 表（每用户每事件唯一）+ 未读/过期索引 |
 | `006__add_push_subscriptions.sql` | 【本地改动 2026-08-31】Web Push：`push_subscriptions` 表（endpoint 全局唯一，p256dh/auth 加密密钥，FK 级联删用户） |
 | `007__add_threads.sql` | 【本地改动 2026-08-31】线程聚合：`messages.thread_root_message_id`（自引用 FK，顶层为空、StartThread 自指、回复继承祖先根）+ `thread_follows`（每用户每根唯一，关注通知 opt-in）+ `thread_read_state`（每用户每根的已读游标） |
+| `008__add_chat_pins.sql` | 【本地改动 2026-09-02】消息置顶（chatto FDR-037，多消息，区别于聊天公告）：`chat_pins` 表（chat↔message 关联，幂等唯一索引），FK CASCADE 清理 |
 
 另有运行时 `db_fixups.go` 动态补列（`ensureColumn`，幂等）：`chats.avatar_url / banner_url / background_url / banner_opacity / last_message_*`、`chat_members.notify_enabled / unread_count`、`messages.type`（与 001 重复定义，安全）、`users.notify_blocked`，以及 `last_visited_at → last_active_at` 改名。
 
@@ -134,6 +135,23 @@ SQLite（WAL 模式、`foreign_keys=ON`、`synchronous=NORMAL`）。schema 由�
 | last_seen_at | 游标消息的 created_at 快照，用于 has_unread 判定 |
 
 唯一约束 `(user_id, thread_root_message_id)`：POST `/api/threads/read` 原子推进游标（cursor = 线程内最新回复；无回复则 cursor = 根）。`has_unread` 判定用反向谓词 `last_seen_at < last_reply_at`（游标为空 = 从未打开 = 未读；游标存在但最新回复晚于游标 = 未读）。
+
+### chat_pins（【本地改动 2026-09-02】消息置顶，区别于聊天公告）
+
+| 列 | 说明 |
+|---|---|
+| id | 主键，`db.NewID()` |
+| chat_id | FK → chats ON DELETE CASCADE |
+| message_id | FK → messages ON DELETE CASCADE |
+| pinned_by | FK → users（置顶操作者） |
+| created_at | TEXT RFC3339Nano |
+
+唯一约束 `(chat_id, message_id)`：同一聊天同一消息最多一个 pin（前端/服务端幂等）。
+索引：`idx_chat_pins_chat_created (chat_id, created_at DESC)`（倒序分页）、`idx_chat_pins_message (message_id)`（批量清理）。
+
+**与聊天公告的边界**：`chats.pinned_message` JSON 列存储自写文本公告（单条、owner-only）；`chat_pins` 存储指向现有消息的多条置顶，owner/admin 可操作、member 可读列表；两者独立、不冲突。
+
+**消息软删除联动**：FK CASCADE 只对硬删除生效；消息软删除（DeleteMessage 仅置 deleted_at）时应用层同步调用 `RemovePinsForMessage` 清理关联 pin，避免列表中残留不可读消息。
 
 ### attachments / reactions / mentions
 

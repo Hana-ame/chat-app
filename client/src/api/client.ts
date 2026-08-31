@@ -8,6 +8,7 @@ import {
   mockMarkRead, mockAddReaction, mockRemoveReaction,
   mockUpload, mockUploadAvatar,
 	mockPinChat, mockUnpinChat, mockMarkAnnouncementRead, mockUpdateChatAvatar, mockUpdateChatBanner, mockUpdateChatBackground,
+	mockPinMessage, mockUnpinMessage, mockListPinnedMessages,
 	mockGetNotifyChat, mockNotificationsList, mockNotifySend, mockNotifyMarkRead, mockNotifyDelete,
 	mockOccurrenceList, mockOccurrenceUnreadCount, mockOccurrenceMarkRead, mockOccurrenceMarkAllRead, mockOccurrenceDelete,
 	mockPushGetVAPIDPublicKey, mockPushSubscribe, mockPushUnsubscribe,
@@ -18,7 +19,7 @@ import {
 import { useAuthStore } from '../store/auth';
 import { API_BASE, UPLOAD_BASE, validateEnv } from '../config';
 import { AuthResponseSchema, validate } from '../schemas';
-import type { User, Chat, Message, Attachment, NotificationOccurrence, PushSubscription, ThreadMeta, ThreadSummary } from '../schemas';
+import type { User, Chat, Message, Attachment, NotificationOccurrence, PushSubscription, ThreadMeta, ThreadSummary, PinEntry } from '../schemas';
 validateEnv();
 
 // buildUploadUrl 构建上传文件的可访问 URL:优先使用服务端返回的绝对 url;
@@ -192,6 +193,21 @@ const _apiMethods = {
   markAnnouncementRead: (token: string, chatId: string) =>
     request<ApiError>('POST', '/api/chats/' + chatId + '/announcement/read', token, {}),
 
+  // ── 【本地改动 2026-09-02】消息置顶（chatto FDR-037，多消息）────────────
+  // 区别于聊天公告（announcement）与用户侧 chat 置顶（pin/unpin）；
+  // 由 chat_pins 表承载，owner/admin 可 pin/unpin，member 可读列表；DM 不支持。
+  pinMessage: (token: string, chatId: string, messageId: string) =>
+    request<{ ok: boolean; already: boolean; chat_id: string; message_id: string }>(
+      'POST', '/api/chats/' + chatId + '/pins/' + messageId, token, {}),
+  unpinMessage: (token: string, chatId: string, messageId: string) =>
+    request<{ ok: boolean; unpinned: boolean; chat_id: string }>(
+      'DELETE', '/api/chats/' + chatId + '/pins/' + messageId, token),
+  listPinnedMessages: (token: string, chatId: string, before?: string, limit?: number) => {
+    let url = '/api/chats/' + chatId + '/pins?limit=' + (limit || 20);
+    if (before) url += '&before=' + encodeURIComponent(before);
+    return request<{ pins: PinEntry[]; total: number; has_more: boolean; next: string }>('GET', url, token);
+  },
+
   // ── Notifications ──
   getNotificationsChat: (token: string) =>
     request<Chat>('GET', '/api/chats/notify', token),
@@ -309,6 +325,7 @@ function buildMockProxy(target: typeof _apiMethods): ApiType {
     sendMessage: mockSendMessage, editMessage: mockEditMessage, deleteMessage: mockDeleteMessage,
     markRead: mockMarkRead, addReaction: mockAddReaction, removeReaction: mockRemoveReaction,
     pinChat: mockPinChat, unpinChat: mockUnpinChat,
+    pinMessage: mockPinMessage, unpinMessage: mockUnpinMessage, listPinnedMessages: mockListPinnedMessages,
     markAnnouncementRead: mockMarkAnnouncementRead,
     getNotificationsChat: mockGetNotifyChat,
     upload: mockUpload, uploadAvatar: mockUploadAvatar,

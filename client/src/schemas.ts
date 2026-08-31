@@ -123,6 +123,18 @@ export type User = z.infer<typeof UserSchema>;
 export type Reaction = z.infer<typeof ReactionSchema>;
 export type Attachment = z.infer<typeof AttachmentSchema>;
 export type PinnedContent = z.infer<typeof PinnedContentSchema>;
+
+// 【本地改动 2026-09-02】消息置顶条目（chatto FDR-037，区别于聊天公告 PinnedContent）。
+// 由 GET /api/chats/{chatID}/pins 返回。message 字段含完整原始消息。
+export const PinEntrySchema = z.object({
+  chat_id: z.string(),
+  message_id: z.string(),
+  pinned_by: z.string(),
+  pinned_at: z.string(),
+  message: MessageSchema,
+});
+export type PinEntry = z.infer<typeof PinEntrySchema>;
+
 export interface Message extends z.infer<typeof MessageSchema> {
   source?: () => void;
 }

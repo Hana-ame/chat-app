@@ -170,6 +170,13 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 					r.Post("/announcement/read", s.MarkPinnedRead)
 					r.Post("/pin", s.PinChatList)
 					r.Post("/unpin", s.UnpinChatList)
+					// 【本地改动 2026-09-02】消息置顶（多消息，区别于聊天公告与用户侧 chat 置顶）：
+					//   - POST /chats/{chatID}/pins/{messageID}  — pin message
+					//   - DELETE /chats/{chatID}/pins/{messageID} — unpin message
+					//   - GET /chats/{chatID}/pins[?before=<cursor>&limit=N] — list pinned messages
+					r.Post("/pins/{messageID}", s.PinMessage)
+					r.Delete("/pins/{messageID}", s.UnpinMessage)
+					r.Get("/pins", s.ListPinnedMessages)
 					r.Put("/avatar", s.UpdateChatAvatar)
 					r.Put("/banner", s.UpdateChatBanner)
 					r.Put("/background", s.UpdateChatBackground)

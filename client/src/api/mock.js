@@ -68,6 +68,11 @@ let threadFollows = new Map();
  * @type {Map<string, string>}  `${user_id}:${thread_root}` -> last-seen message id
  */
 let threadReadState = new Map();
+/**
+ * 【本地改动 2026-09-02】消息置顶 mock 状态（chatto FDR-037 多消息置顶）。
+ * @type {Map<string, Array<{chat_id:string,message_id:string,pinned_by:string,pinned_at:string}>>}
+ */
+let pinsState = new Map();
 /** @type {import('zustand').UseBoundStore<import('zustand').StoreApi<any>>|null} */
 let _store = null;
 import('../store/chat').then(m => { _store = m.useChatStore; }).catch(() => {});
@@ -97,6 +102,7 @@ export function resetMockData() {
   data = null;
   threadFollows.clear();
   threadReadState.clear();
+  pinsState.clear();
   ensureData();
 }
 
@@ -565,6 +571,60 @@ export function mockSetAnnouncement(_token, chatId, content) {
 export function mockClearAnnouncement(_token, chatId) {
   if (_store) _store.getState().onChatUpdate({ id: chatId, pinned_message: null, pinned_updated_at: null });
   return { ok: true };
+}
+
+/**
+ * 【本地改动 2026-09-02】消息置顶 mock（chatto FDR-037，多消息）。
+ * 幂等：重复 pin 返回 {already:true}，不重复插入。
+ */
+export function mockPinMessage(_token, chatId, messageId) {
+  const pins = pinsState.get(chatId) || [];
+  const existing = pins.find(p => p.message_id === messageId);
+  if (existing) return { ok: true, already: true, chat_id: chatId, message_id: messageId };
+  const entry = { chat_id: chatId, message_id: messageId, pinned_by: currentUser().id, pinned_at: new Date().toISOString() };
+  pins.unshift(entry);
+  pinsState.set(chatId, pins);
+  if (_store) _store.getState().onChatUpdate({ id: chatId });
+  return { ok: true, already: false, chat_id: chatId, message_id: messageId };
+}
+
+export function mockUnpinMessage(_token, chatId, messageId) {
+  const pins = pinsState.get(chatId) || [];
+  const before = pins.length;
+  const after = pins.filter(p => p.message_id !== messageId);
+  const removed = before !== after.length;
+  if (removed) {
+    pinsState.set(chatId, after);
+    if (_store) _store.getState().onChatUpdate({ id: chatId });
+  }
+  return { ok: true, unpinned: removed, chat_id: chatId };
+}
+
+export function mockListPinnedMessages(_token, chatId, before, limit) {
+  const limitN = Number(limit) || 20;
+  const pins = pinsState.get(chatId) || [];
+  // 按 pinned_at DESC 排序（保证幂等时顺序稳定）
+  pins.sort((a, b) => b.pinned_at.localeCompare(a.pinned_at));
+  let page = pins;
+  if (before) {
+    page = pins.filter(p => p.pinned_at < before);
+  }
+  const hasNext = page.length > limitN;
+  page = page.slice(0, limitN);
+  const next = page.length > 0 ? page[page.length - 1].pinned_at : '';
+
+  // 组装 message 投影（从 mock data 中取原消息；无则兜底空对象）
+  const d = ensureData();
+  const entries = page.map(p => {
+    const msg = d.messages.find(m => m.id === p.message_id) || {
+      id: p.message_id, chat_id: chatId, user_id: p.pinned_by,
+      content: '(message deleted)', deleted: true,
+      created_at: p.pinned_at,
+    };
+    return { chat_id: p.chat_id, message_id: p.message_id, pinned_by: p.pinned_by, pinned_at: p.pinned_at, message: msg };
+  });
+
+  return { chat_id: chatId, pins: entries, total: entries.length, has_more: hasNext, next };
 }
 
 /** @returns {{ ok: boolean }} */

@@ -167,6 +167,9 @@ func (s *MessageService) Delete(ctx context.Context, chatID, messageID, userID s
 	if err := s.db.DeleteMessage(ctx, messageID, userID, canDeleteAny); err != nil {
 		return err
 	}
+	// 【本地改动 2026-09-02】消息软删除时同步清理其所有置顶：FK CASCADE 只对硬删除生效，
+	// 软删除行仍存在，需应用层清理，避免列表中残留不可读消息。
+	_ = s.db.RemovePinsForMessage(ctx, messageID)
 	if s.hub != nil {
 		s.hub.BroadcastMessageDelete(chatID, messageID)
 	}

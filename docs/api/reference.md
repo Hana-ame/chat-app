@@ -76,6 +76,38 @@ Base URL：生产 `https://chat.moonchan.xyz`，本地 `http://localhost:8080`�
 
 消息列表 GET 支持 `?in_thread=<thread_root_message_id>` 过滤线程内消息（含根）。发送 POST 支持 `thread_root` 显式指定线程根、`start_thread` 让本消息成为根。
 
+## 消息置顶（【本地改动 2026-09-02】，chatto FDR-037）
+
+区别于聊天公告 `pinned_message` 与用户侧 chat 置顶 `pinned`：这是「把聊天中已有消息置顶」的多消息能力，由 `chat_pins` 表承载。DM 不支持置顶。owner/admin 可 pin/unpin；member 可读列表。操作幂等（重复 pin/unpin 返回 200，不报错）。
+
+| 方法 | 路径 | 认证 | 说明 |
+|---|---|---|---|
+| POST | `/api/chats/{chatID}/pins/{messageID}` | Bearer | 置顶某消息（返回 `{ok, already, chat_id, message_id}`） |
+| DELETE | `/api/chats/{chatID}/pins/{messageID}` | Bearer | 取消置顶（返回 `{ok, unpinned, chat_id}`） |
+| GET | `/api/chats/{chatID}/pins?before=&limit=20` | Bearer | 置顶列表（倒序；`before` = 上一页最后一条 `pinned_at`，`limit` 上限 100） |
+
+列表响应（cursor 分页）：
+
+```json
+{
+  "chat_id": "c123",
+  "pins": [
+    {
+      "chat_id": "c123",
+      "message_id": "m456",
+      "pinned_by": "u789",
+      "pinned_at": "2026-09-02T19:00:00Z",
+      "message": { /* 完整 Message 对象 */ }
+    }
+  ],
+  "total": 1,
+  "has_more": false,
+  "next": ""
+}
+```
+
+消息软删除时服务自动清理该消息所有 pin（避免列表中残留不可读消息）。
+
 ## 通知
 
 | 方法 | 路径 | 认证 | 说明 |
