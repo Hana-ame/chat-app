@@ -705,3 +705,25 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
     admin 判断恒 false → ChatView 拉成员时同步 members 到 store。
 - 文档：`docs/changelog.md` 本条。
 - 验证：`npx vitest run` 99 ✅；`npx tsc --noEmit` ✅；`npx vite build` ✅。
+
+
+## 2026-09-03 feat: 链接预览（轻量版，纯前端 OGP，fork 分歧）
+
+- 背景：chatto FDR-009 支持输入框对 URL 渲染 OGP 预览卡片。用户选定「轻量版」：
+  不走后端（无 SSRF 抓取 / 无 token / 无服务端缓存），浏览器直接 fetch 目标页读 OGP。
+  按用户选定方案独立实现（不承认派生），所有本地改动带【本地改动 2026-09-03】标记。
+- 实现：
+  - `client/src/utils/linkPreview.js`：`extractFirstUrl`（首 URL + 去尾标点 + 尖括号
+    包裹不触发）+ `parseOgpHtml`（og:/twitter:/<title> 回退、属性顺序兼容、实体解码）
+    + `fetchOgp`（mode:cors + AbortSignal，非 2xx/无 OGP → 降级 fail）。
+  - `client/src/components/LinkPreviewCard.jsx`：卡片（ok → 标题/描述/站点/缩略图；
+    fail → 域名 + URL 占位；右上 × 关闭）。
+  - `client/src/components/Composer.jsx`：文本含首个合法 http(s) URL 时自动抓取；
+    关闭后本会话记忆该 URL；发送后清空。
+- 与 chatto 的差异（用户选定，非 bug）：
+  - 无服务端 SSRF 抓取 / token / 缓存（轻量版取舍）。
+  - 预览不随消息持久化（发送的仍是纯 URL 文本，renderContent 渲染为链接）。
+  - 无 YouTube / 社交专卡。
+  - CORS 限制：多数站点读不到 OGP → 降级为域名占位卡（不打扰）。
+- 测试：`client/src/utils/linkPreview.test.js` 20 用例（extractFirstUrl 10 + parseOgpHtml 8 + fetchOgp 2）。
+- 验证：`npx vitest run` 119 ✅（+20）；`npx tsc --noEmit` ✅；`npx vite build` ✅。

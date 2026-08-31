@@ -4,6 +4,8 @@ import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 import { notify } from '../store/notification';
 import { streamAI } from '../utils/ai';
+import { extractFirstUrl, fetchOgp } from '../utils/linkPreview';
+import LinkPreviewCard from './LinkPreviewCard';
 
 const CONTEXT_LIMIT = 50;
 const STORAGE_KEY = 'ai_settings';
@@ -92,6 +94,35 @@ export default function Composer({ chatId, isNotification, replyTo, onCancelRepl
   const textRef = useRef(null);
   const [mentionQuery, setMentionQuery] = useState(null);
   const [mentionIdx, setMentionIdx] = useState(0);
+
+  // 【本地改动 2026-09-03】链接预览（轻量版，纯前端 OGP）。
+  // linkPreview = {status:'loading'|'ok'|'fail', url, meta}; dismissedUrls 记忆本会话关闭的 URL。
+  const [linkPreview, setLinkPreview] = useState(null);
+  const dismissedUrls = useRef(new Set());
+  const previewAbort = useRef(null);
+
+  // 检测文本中的首个 URL 并抓 OGP；URL 变化 / 已关闭时不重复抓。
+  useEffect(() => {
+    const url = extractFirstUrl(text);
+    if (!url || dismissedUrls.current.has(url)) {
+      setLinkPreview(null);
+      return;
+    }
+    if (previewAbort.current) previewAbort.current.abort();
+    const ac = new AbortController();
+    previewAbort.current = ac;
+    setLinkPreview({ status: 'loading', url, meta: null });
+    fetchOgp(url, { signal: ac.signal }).then(r => {
+      if (ac.signal.aborted) return;
+      setLinkPreview(r.ok ? { status: 'ok', url, meta: r } : { status: 'fail', url, meta: null });
+    });
+    return () => ac.abort();
+  }, [text]);
+
+  const handleDismissPreview = useCallback(() => {
+    if (linkPreview) dismissedUrls.current.add(linkPreview.url);
+    setLinkPreview(null);
+  }, [linkPreview]);
 
   const saved = useRef((() => {
     const s = loadSettings() || { ...defaultSettings };
@@ -310,6 +341,9 @@ export default function Composer({ chatId, isNotification, replyTo, onCancelRepl
       setText('');
       if (onCancelReply) onCancelReply();
       setAttachments([]);
+      // 【本地改动 2026-09-03】发送后清空链接预览（新合成会话）。
+      setLinkPreview(null);
+      dismissedUrls.current.clear();
       if (aiActive && content) {
         await doSendAI(content);
       }
@@ -415,6 +449,9 @@ export default function Composer({ chatId, isNotification, replyTo, onCancelRepl
       )}
       <div className="chat-input">
         <div style={{display:'flex',flexDirection:'column',gap:4,position:'relative'}}>
+          {linkPreview && (
+            <LinkPreviewCard url={linkPreview.url} status={linkPreview.status} meta={linkPreview.meta} onDismiss={handleDismissPreview} />
+          )}
           {aiActive && (
             <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:'4px 8px',alignItems:'center'}}>
               <span style={labelStyle}>Endpoint</span>
