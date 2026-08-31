@@ -98,25 +98,30 @@ Base URL：生产 `https://chat.moonchan.xyz`，本地 `http://localhost:8080`�
 
 ## 上传（无认证）
 
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| GET | `/api/upload` | 独立上传页（HTML） |
-| PUT / POST | `/api/upload` | 上传文件（raw body 或 multipart `file`；≤ `CHAT_MAX_UPLOAD`） |
-| GET | `/api/local/{path}` | 下载/预览文件 |
-| GET | `/api/local/{path}?delete=<hash>` | 删除文件（hash = 删除密钥，`sha256(path+salt)` 前 8 字节 hex；删除复用 GET 处理器，`?delete=` 缺省时返回文件本身） |
+| 方法 | 路径 | 认证 | 说明 |
+|---|---|---|---|
+| GET | `/api/upload` | 无 | 独立上传页（HTML） |
+| PUT / POST | `/api/upload` | 无 | 上传文件（raw body 或 multipart `file`；≤ `CHAT_MAX_UPLOAD`），响应返回公开稳定 URL |
+| GET | `/assets/files/{assetID}/{filename}` | 无 | 下载附件（【本地改动 2026-09-02】公开稳定 URL，assetID 即凭证，CDN 可 1 年 immutable 缓存） |
+| GET | `/assets/files/{assetID}` | 无 | 同上，文件名从磁盘推断 |
+| DELETE | `/api/files/{assetID}` | Bearer | 删除附件文件（Bearer 认证，替代旧 `?delete=hash` 路径凭据） |
+| GET | `/api/local/{path}` | 无 | 旧模式下载（向后兼容） |
+| GET | `/api/local/{path}?delete=<hash>` | 无 | 旧模式删除（hash = `sha256(path+salt)` 前 8 字节 hex） |
 
-上传响应 `200`：
+上传响应 `200`（【本地改动 2026-09-02】新格式）：
 
 ```json
 {
-  "id": "a1b2c3d4",
-  "path": "/2026/08/xx.png",
-  "url": "https://chat.moonchan.xyz/api/local/2026/08/xx.png",
-  "delete_url": "https://chat.moonchan.xyz/api/local/2026/08/xx.png?delete=a1b2c3d4"
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "filename": "photo.jpg",
+  "mime_type": "image/jpeg",
+  "size": 12345,
+  "url": "https://chat.moonchan.xyz/assets/files/a1b2c3d4-e5f6-7890-abcd-ef1234567890/photo.jpg",
+  "delete_url": "https://chat.moonchan.xyz/api/files/a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 }
 ```
 
-**`url`/`delete_url` 恒为绝对 URL**（`CHAT_BASE_URL` 优先，否则 `X-Forwarded-Proto` + `Host` 推导）——其他接口的 URL 字段可为相对路径，但上传接口必须绝对。
+**`url`/`delete_url` 恒为绝对 URL**（`CHAT_BASE_URL` 优先，否则 `X-Forwarded-Proto` + `Host` 推导）。`/assets/files/` 响应头：`Cache-Control: public, max-age=31536000, immutable`，`ETag: "{assetID}"`，`X-Content-Type-Options: nosniff`。
 
 ## 实时
 

@@ -51,7 +51,9 @@ func (s *MessageService) Send(ctx context.Context, chatID, userID, content strin
 		if a.URL == "" || a.Filename == "" {
 			return nil, ErrInvalidInput
 		}
-		if !strings.Contains(a.URL, "/api/local/") {
+		// 【本地改动 2026-09-02】URL 校验：接受旧 /api/local/ 与新 /assets/files/
+		// 两种模式（向后兼容 + 新公开 URL）。拒绝其他域/路径，防止外部 URL 注入。
+		if a.URL != "" && !strings.Contains(a.URL, "/api/local/") && !strings.Contains(a.URL, "/assets/files/") {
 			return nil, ErrInvalidInput
 		}
 		if a.MimeType == "" {

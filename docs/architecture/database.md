@@ -137,13 +137,33 @@ SQLite（WAL 模式、`foreign_keys=ON`、`synchronous=NORMAL`）。schema 由�
 
 ### attachments / reactions / mentions
 
-| 表 | 说明 |
+| 存储位置 | 说明 |
 |---|---|
-| attachments | 附件行（filename/mime_type/size/url），FK → messages |
-| reactions | 每行 = 一个用户对一条消息的一个 emoji，PK `(message_id, user_id, emoji)` |
-| mentions | 提及关系 PK `(message_id, user_id)` |
+| `messages.attachments`（JSON 缓存列） | 附件数组 `[{id, filename, mime_type, size, url}]`；无独立表（预聚合，读侧免 JOIN） |
+| `messages.reactions`（JSON 缓存列） | 反应数组 `[{emoji, count, user_ids, me}]`；与 `reactions` 表同步 |
+| `messages.mentions`（JSON 缓存列） | 提及用户 id 数组 |
+| `reactions` 表 | 每行 = 一个用户对一条消息的一个 emoji，PK `(message_id, user_id, emoji)` |
+| `mentions` 表 | 提及关系 PK `(message_id, user_id)` |
 
 `messages.reactions` JSON 缓存由 `AddReaction`/`RemoveReaction` 同步（`syncReactionsColumn`），保证与 `reactions` 表一致。
+
+### 附件 URL 模式（【本地改动 2026-09-02】fork 公开稳定 URL）
+
+新上传文件：
+
+- **URL**：`/assets/files/{assetID}/{fn.ext}`，`assetID` = UUIDv4，作为凭证（无 ticket、无成员校验）。
+- **缓存**：`Cache-Control: public, max-age=31536000, immutable`，`ETag: "{assetID}"`，CDN 可永久缓存。
+- **存盘**：`{UPLOAD_DIR}/uploads/{assetID}/{fn.ext}`（uuid 目录隔离）。
+- **安全头**：`X-Content-Type-Options: nosniff`；HTML/XML/SVG 加 `CSP: sandbox`。
+- **删除**：`DELETE /api/files/{assetID}`（Bearer 认证）；消息删除时级联清理。
+
+旧上传文件（向后兼容）：
+
+- **URL**：`/api/local/{ts}/{fn.ext}`，`?delete={hash}` 为路径凭据。
+- **缓存**：`Cache-Control: public, max-age=2592000`（30 天）。
+- **删除**：`GET /api/local/{ts}/{fn.ext}?delete={hash}`。
+
+两种 URL 模式共存，前端按响应字段获取即可；service 层 URL 校验接受两种前缀。
 
 ## 设计决策
 

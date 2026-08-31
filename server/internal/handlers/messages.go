@@ -340,6 +340,9 @@ func (s *Server) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, status, code, err.Error())
 		return
 	}
+	// 【本地改动 2026-09-02】消息删除后级联清理附件文件（磁盘），防止不可达文件膨胀。
+	// 失败不影响删除结果（软删除已提交），仅记日志。
+	s.cleanupAttachmentsOnDelete(r.Context(), messageID)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

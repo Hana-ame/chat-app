@@ -84,7 +84,12 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 			r.Put("/upload", s.AAPIUpload)
 			r.Put("/upload/*", s.AAPIUpload)
 			r.Post("/upload", s.AAPIUpload)
-			r.Get("/local/*", s.AAPILocalFile)
+			r.Get("/local/*", s.ServeAssetsFileLegacy)
+
+			// 【本地改动 2026-09-02】公开稳定附件 URL：无需认证，assetID 即凭证。
+			// 走 upload group（无 auth middleware），CDN 可直接命中。
+			r.Get("/assets/files/{assetID}", s.ServeAssetsFile)
+			r.Get("/assets/files/{assetID}/{filename}", s.ServeAssetsFile)
 		})
 
 		// All other API endpoints — 10s timeout, 120 req/min per IP
@@ -117,6 +122,10 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 					r.Post("/subscribe", s.SubscribePush)
 					r.Delete("/subscribe", s.UnsubscribePush)
 				})
+				// 【本地改动 2026-09-02】附件文件 DELETE：Bearer 认证后清理磁盘上的
+				// 附件文件；用于消息删除级联 + 管理员手动清理。assetID 是 URL 凭证，
+				// 但 DELETE 需登录，防止外部任意清理。
+				r.Delete("/files/{assetID}", s.DeleteAssetsFile)
 				r.Route("/notifications", func(r chi.Router) {
 					// 【本地改动 2026-08-31】持久化通知 occurrence 端点（移植
 					// ：列表/未读计数/单条已读/全部已读/删除。

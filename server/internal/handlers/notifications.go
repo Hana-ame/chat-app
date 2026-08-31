@@ -87,6 +87,8 @@ func (s *Server) DeleteNotification(w http.ResponseWriter, r *http.Request) {
 		writeError(w, status, code, err.Error())
 		return
 	}
+	// 【本地改动 2026-09-02】通知消息删除后级联清理附件文件。
+	s.cleanupAttachmentsOnDelete(r.Context(), messageID)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

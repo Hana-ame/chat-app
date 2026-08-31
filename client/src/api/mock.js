@@ -698,15 +698,19 @@ export function mockRenameChat(_token, _id, name) {
 
 /**
  * @param {File} file
- * @returns {{ filename: string, mime_type: string, size: number, url: string }}
+ * @returns {{ id: string, filename: string, mime_type: string, size: number, url: string, delete_url: string }}
+ * 注：mock 模式用浏览器 ObjectURL（blob://），不模拟 /assets/files/ 磁盘路径；
+ * 生产环境上传响应为 {id: uuid, url: /assets/files/{uuid}/{fn.ext}, delete_url: /api/files/{uuid}}。
  */
 export function mockUpload(file) {
   const ext = file?.name?.split('.').pop() || 'bin';
   return {
+    id: crypto.randomUUID(),
     filename: file?.name || 'file.' + ext,
     mime_type: file?.type || 'application/octet-stream',
     size: file?.size || 0,
     url: URL.createObjectURL(file),
+    delete_url: '',
   };
 }
 

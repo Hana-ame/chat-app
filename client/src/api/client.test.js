@@ -126,6 +126,21 @@ describe('upload', () => {
     expect(out.mime_type).toBe('image/png');
   });
 
+  it('公开稳定 URL（/assets/files/{uuid}，【本地改动 2026-09-02】fork 附件模式）', async () => {
+    stubFetch(jsonRes(200, {
+      id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+      filename: 'photo.jpg',
+      mime_type: 'image/jpeg',
+      size: 12345,
+      url: 'https://files.example.com/assets/files/a1b2c3d4-e5f6-7890-abcd-ef1234567890/photo.jpg',
+    }));
+    const file = new File(['x'], 'photo.jpg', { type: 'image/jpeg' });
+    const out = await api.upload(file, 'tok');
+    expect(out.url).toBe('https://files.example.com/assets/files/a1b2c3d4-e5f6-7890-abcd-ef1234567890/photo.jpg');
+    expect(out.filename).toBe('photo.jpg');
+    expect(out.mime_type).toBe('image/jpeg');
+  });
+
   it('无 url 字段时回退 UPLOAD_BASE + path(去除前导斜杠,不产生双斜杠)', async () => {
     stubFetch(jsonRes(200, { id: 'h1', path: '/2026/a.bin' }));
     const out = await api.upload(new File(['x'], 'a.bin', { type: 'application/octet-stream' }));

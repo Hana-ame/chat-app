@@ -2694,6 +2694,112 @@
           }
         }
       }
+    },
+    "/api/files/{assetID}": {
+      "delete": {
+        "summary": "Delete an attachment file",
+        "tags": [
+          "uploads"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "assetID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/assets/files/{assetID}/{filename}": {
+      "get": {
+        "summary": "Serve a stable attachment file",
+        "tags": [
+          "uploads"
+        ],
+        "parameters": [
+          {
+            "name": "assetID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File bytes; Cache-Control: public, max-age=31536000, immutable"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/assets/files/{assetID}": {
+      "get": {
+        "summary": "Serve a stable attachment file (UUID only, filename inferred)",
+        "tags": [
+          "uploads"
+        ],
+        "parameters": [
+          {
+            "name": "assetID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File bytes; Cache-Control: public, max-age=31536000, immutable"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3416,7 +3522,8 @@
           },
           "url": {
             "type": "string",
-            "format": "uri"
+            "format": "uri",
+            "description": "URL 路径；新文件为 /assets/files/{uuid}/{fn.ext}（公开稳定、CDN 可缓存，max-age=31536000, immutable），旧文件为 /api/local/{path}"
           }
         }
       },

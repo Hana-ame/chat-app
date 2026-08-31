@@ -568,3 +568,27 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
 - 验证：`go build ./...` + `go test ./... -race` + `npx tsc --noEmit` 全绿；
   提交 `badaacc`（refactor）+ `da2329d`（no-op 重跑）+ `1ebf075`（fix `TestWSPresence`/`TestWSTyping` -race 时序）；
   CI 后端+前端均绿。
+
+
+## 2026-09-02 feat: 附件公开稳定 URL（fork 模式）
+
+- 背景：chat-app 原上传模式（`/api/local/{ts}/{fn.ext}` + `?delete={hash}`）使用
+  路径凭据，URL 不透明且不可 CDN 缓存；fork 采用公开稳定 URL 模式
+  （`/assets/files/{assetID}/{fn.ext}`，assetID 即凭证），CDN 可 1 年 immutable 缓存。
+  所有本地改动带【本地改动 2026-09-02】标记。
+- 实现（独立实现，不承认派生）：
+  - 上传响应新字段：`{id: uuid, filename, mime_type, size, url: /assets/files/{uuid}/{fn.ext}, delete_url: /api/files/{uuid}}`。
+  - 存盘路径：`uploads/{uuid}/{fn.ext}`（uuid 目录隔离，文件名来自 Content-Type 推导）。
+  - 公开 GET `/assets/files/{assetID}/{filename}` 与 `/assets/files/{assetID}`
+    （无认证，assetID 即凭证；ETag = assetID；`Cache-Control: public, max-age=31536000, immutable`；
+    `Accept-Ranges: none`；`X-Content-Type-Options: nosniff`；HTML/XML/SVG 加 `CSP sandbox`）。
+  - 鉴权 DELETE `/api/files/{assetID}`（Bearer token），替代旧的 `?delete={hash}` 路径凭据。
+  - 消息删除级联清理附件文件（新 `/assets/files/` 和旧 `/api/local/` 两种 URL 模式都处理）。
+  - 旧 `/api/local/{path}` 仍可通过 legacy handler 访问 + 删除（向后兼容旧消息）。
+  - service/message.go URL 校验：接受 `/api/local/` 与 `/assets/files/` 两种模式。
+- 前端契约三方同步：
+  - `schemas.ts`：AttachmentSchema 无需变更（url 字段含义更新）。
+  - `client.ts`：`upload()` 响应解析无变更（`url` 字段优先）；新增 `delete_url` 字段透传。
+  - `client.test.js`：新增 `/assets/files/{uuid}` 测试用例（5 用例全绿）。
+  - `mock.js`：`mockUpload` 返回 `{id, filename, mime_type, size, url, delete_url}`。
+- 验证：`go build ./...` + `go test ./...` 全绿；前端 vitest client.test.js 13/13 通过。
