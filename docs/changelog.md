@@ -855,3 +855,14 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
     - `msg-group` 在 highlighted 时追加 `msg-highlight` 类。
   - `client/src/components/PinnedMessages.jsx`：handleJump 跳转后同样 dispatch 事件。
 - 验证：`npx vitest run` 148 ✅；`npx tsc --noEmit` ✅；`npx vite build` ✅。
+
+## 2026-09-03 feat: 消息复制（Copy message text）
+
+- 背景：消息 action 区有 React/Reply/Edit/Delete/Pin，但缺最常用的"复制文本"。
+  补上。纯前端，无后端改动，所有本地改动带【本地改动 2026-09-03】标记。
+- 实现：`client/src/components/MessageItem.jsx`
+  - `handleCopy`：优先 `navigator.clipboard.writeText`（HTTPS）；非安全上下文/
+    老浏览器回退 `document.execCommand('copy')`（textarea 选中 + execCommand）。
+  - action 区新增 Copy 按钮（Reply 后；无内容时禁用；title="复制文本"）。
+  - 成功/失败均 toast 提示（notify 支持 success 类型，Toast 已按 success 渲染绿色）。
+- 验证：`npx vitest run` 148 ✅；`npx tsc --noEmit` ✅；`npx vite build` ✅。

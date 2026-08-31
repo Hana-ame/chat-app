@@ -6,6 +6,7 @@ import { renderContent } from './renderContent';
 import MessageLinkCard from './MessageLinkCard';
 import UserAvatar from './UserAvatar';
 import UserProfileModal from './UserProfileModal';
+import { notify } from '../store/notification';
 
 function ThinkingContent({ content, streaming }) {
   const [open, setOpen] = useState(false);
@@ -150,6 +151,31 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId, onReply
     }
   };
 
+  // 【本地改动 2026-09-03】复制消息文本到剪贴板。
+  // 优先 navigator.clipboard（HTTPS 环境）；非安全上下文/老浏览器回退
+  // document.execCommand('copy')（textarea 选中 + execCommand）。
+  const handleCopy = async () => {
+    const text = msg.content || '';
+    if (!text) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      notify('已复制消息', 'success');
+    } catch (e) {
+      notify('复制失败: ' + (e.message || 'Unknown error'), 'error');
+    }
+  };
+
   const handleDelete = async () => {
     if (!confirm('Delete this message?')) return;
     setOpPending(true);
@@ -255,6 +281,7 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId, onReply
               <div className="msg-actions">
                 <button ref={emojiBtnRef} className="msg-btn" onClick={() => setShowEmoji(!showEmoji)} disabled={opPending}>😀</button>
                 <button className="msg-btn" onClick={() => onReply?.(msg)} disabled={opPending}>Reply</button>
+                <button className="msg-btn" onClick={handleCopy} disabled={opPending || !msg.content} title="复制文本">Copy</button>
                 {canPin && !msg.deleted && <button className="msg-btn" onClick={handlePinToggle} disabled={opPending}>{pinned ? 'Unpin' : 'Pin'}</button>}
                 {isMe && <button className="msg-btn" onClick={() => { setEditing(true); setEditText(msg.content); }} disabled={opPending}>Edit</button>}
                 {isMe && <button className="msg-btn" onClick={handleDelete} disabled={opPending}>Delete</button>}
