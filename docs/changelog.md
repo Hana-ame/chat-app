@@ -839,3 +839,19 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
   [state,setState] 元组 → 报元组不可赋值；解决：不给 useState 加注解，让 TS 从
   初始值推断，并把所有 setState 分支统一带 meta（fail 时 null）消除联合形状差异。
 - 验证：`npx vitest run` 148 ✅；`npx tsc --noEmit` ✅；`npx vite build` ✅。
+
+## 2026-09-03 feat: 引用消息点击高亮闪烁（reply jump highlight）
+
+- 背景：点击 reply 引用 / 置顶抽屉条目跳转到目标消息时，只有滚动没有视觉提示，
+  用户不知道滚到了哪条。补上目标消息的高亮闪烁。纯前端，无后端改动，所有本地
+  改动带【本地改动 2026-09-03】标记。
+- 实现：
+  - `client/src/styles/global.css`：`@keyframes msg-highlight`（1.2s 淡入淡出 accent
+    色底）+ `.msg-highlight` 类。
+  - `client/src/components/MessageItem.jsx`：
+    - 监听 `document` 上的 `chat:jump-to-message` 自定义事件；targetId 与本消息
+      id 匹配时闪烁（先复位再置位保证连续点击可重启动画，1.3s 后清除）。
+    - reply-indicator onClick 滚动后 dispatch 该事件。
+    - `msg-group` 在 highlighted 时追加 `msg-highlight` 类。
+  - `client/src/components/PinnedMessages.jsx`：handleJump 跳转后同样 dispatch 事件。
+- 验证：`npx vitest run` 148 ✅；`npx tsc --noEmit` ✅；`npx vite build` ✅。

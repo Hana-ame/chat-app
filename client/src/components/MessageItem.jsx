@@ -67,6 +67,9 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId, onReply
   const [editText, setEditText] = useState(msg.content);
   const [opPending, setOpPending] = useState(false);
   const [profileUser, setProfileUser] = useState(null);
+  // 【本地改动 2026-09-03】引用跳转高亮：本消息被引用点击时闪烁。
+  const [highlighted, setHighlighted] = useState(false);
+  const highlightTimer = useRef(null);
 
   const chat = useMemo(() => chats.find(c => c.id === chatId), [chats, chatId]);
   const author = useMemo(() => {
@@ -97,6 +100,23 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId, onReply
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showEmoji]);
+
+  // 【本地改动 2026-09-03】监听「引用跳转」事件：目标消息闪烁提示。
+  useEffect(() => {
+    const onJump = (e) => {
+      const targetId = e.detail?.messageId;
+      if (!targetId || targetId !== msg.id) return;
+      if (highlightTimer.current) clearTimeout(highlightTimer.current);
+      setHighlighted(false); // 先复位再置位，保证连续点击也能重启动画
+      requestAnimationFrame(() => setHighlighted(true));
+      highlightTimer.current = setTimeout(() => setHighlighted(false), 1300);
+    };
+    document.addEventListener('chat:jump-to-message', onJump);
+    return () => {
+      document.removeEventListener('chat:jump-to-message', onJump);
+      if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    };
+  }, [msg.id]);
 
   const userMap = useMemo(() => {
     const chat = chats.find(c => c.id === chatId);
@@ -167,7 +187,7 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId, onReply
   };
 
   return (
-    <div className="msg-group" id={'msg-' + msg.id}>
+    <div className={'msg-group' + (highlighted ? ' msg-highlight' : '')} id={'msg-' + msg.id}>
       <div className={'msg-row' + (sameAuthor ? ' msg-continuation' : '')}>
           {!sameAuthor && (
             <div onClick={() => setProfileUser(author)} style={{ cursor: 'pointer' }}>
@@ -199,7 +219,11 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId, onReply
                 <button className="btn-ghost" style={{fontSize:12}} onClick={()=>setEditing(false)}>Cancel</button>
               </div>
             ) : msg.replied_to ? (
-              <div className="reply-indicator" onClick={() => document.getElementById('msg-' + msg.replied_to.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+              <div className="reply-indicator" onClick={() => {
+                document.getElementById('msg-' + msg.replied_to.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // 【本地改动 2026-09-03】触发目标消息高亮闪烁。
+                document.dispatchEvent(new CustomEvent('chat:jump-to-message', { detail: { messageId: msg.replied_to.id } }));
+              }}
                 style={{display:'flex',alignItems:'center',gap:6,padding:'2px 8px',marginBottom:2,borderLeft:'3px solid var(--accent)',background:'var(--bg-secondary)',borderRadius:4,cursor:'pointer',fontSize:12}}>
                 <span style={{fontWeight:600,color:'var(--accent)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:120}}>
                   {msg.replied_to.author?.username || 'Unknown'}

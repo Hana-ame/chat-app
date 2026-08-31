@@ -86,6 +86,8 @@ export default function PinnedMessages({ chatId, open, onClose }) {
     setTimeout(() => {
       const el = document.getElementById('msg-' + messageId);
       el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // 【本地改动 2026-09-03】触发目标消息高亮闪烁（与 reply 引用跳转一致）。
+      document.dispatchEvent(new CustomEvent('chat:jump-to-message', { detail: { messageId } }));
     }, 150);
   };
 

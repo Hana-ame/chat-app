@@ -478,3 +478,16 @@ button { cursor: pointer; border: none; }
   .shell.mobile-list .main { display: none; }
   .shell.mobile-list .sidebar { display: flex; }
 }
+
+
+/* 【本地改动 2026-09-03】引用跳转高亮：点击 reply 引用跳转到目标消息时闪烁提示。
+   动画只触发一次；MessageItem 通过临时移除/重加类来重启动画。 */
+@keyframes msg-highlight {
+  0%   { background: transparent; }
+  30%  { background: rgba(88, 101, 242, 0.18); }
+  100% { background: transparent; }
+}
+.msg-highlight {
+  animation: msg-highlight 1.2s ease-out;
+  border-radius: 6px;
+}
