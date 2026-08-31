@@ -7,6 +7,7 @@ import { requestNotifyPermission } from '../utils/browserNotify';
 import MessageList from './MessageList';
 import Composer from './Composer';
 import { renderContent } from './renderContent';
+import SearchModal from './SearchModal';
 
 function getChatDisplayName(chat) {
   if (!chat) return 'Loading...';
@@ -29,6 +30,7 @@ export default function ChatView({ chatId, isNotification, onBack }) {
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [uploadingBg, setUploadingBg] = useState(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const headerMenuRef = useRef(null);
   const avatarInputRef = useRef(null);
   const bannerInputRef = useRef(null);
@@ -300,6 +302,9 @@ export default function ChatView({ chatId, isNotification, onBack }) {
               onClick={() => setShowHeaderMenu(v => !v)} title="More">⋮</button>
             {showHeaderMenu && (
               <div className="context-menu" style={{position:'absolute',right:0,top:'100%',zIndex:50}}>
+                <button className="context-menu-item" onClick={() => { setShowSearch(true); setShowHeaderMenu(false); }}>
+                  <span style={{marginRight:6}}>🔍</span> 搜索消息
+                </button>
                 <button className="context-menu-item" onClick={handlePinToggle}>
                   {chat?.pinned ? 'Unpin' : 'Pin'}
                 </button>
@@ -374,6 +379,7 @@ export default function ChatView({ chatId, isNotification, onBack }) {
           onReply={setReplyTo}
         />
       <Composer chatId={chatId} isNotification={isNotification} replyTo={replyTo} onCancelReply={() => setReplyTo(null)} />
+      <SearchModal open={showSearch} onClose={() => setShowSearch(false)} />
     </div>
   );
 }

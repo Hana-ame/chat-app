@@ -671,7 +671,7 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
   支持不完整（rowid 强制 INTEGER，与 UUID msg ID 冲突）→ 改用 msg_id UNINDEXED
   后 INSERT OR REPLACE 正常。
 - 后端：`db/messages.go` 新增 `upsertFTS`/`deleteFTS` 维护函数 + `SearchMessages`
-  查询函数（INNER JOIN messages_fts f ON f.rowid = m.id，MATCH ? 参数化）；
+  查询函数（INNER JOIN messages_fts f ON f.msg_id = m.id，MATCH ? 参数化）；
   在 `CreateMessage`/`UpdateMessage`/`DeleteMessage` 同步调用维护函数。
   `db/db.go` 启动后台 goroutine 调用 `BackfillFTS`（60s 超时），对老消息（已存
   但无 FTS 索引）逐条回填。
@@ -683,6 +683,9 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
   `*` 前缀通配、`AND` 逻辑运算。
 - 前端契约：`client/src/schemas.ts`（SearchMessagesResponse）；
   `client/src/api/client.ts`（searchMessages）；`client/src/api/mock.js`（mock 版子串匹配 + 简单 highlight）。
+- 前端 UI：`client/src/components/SearchModal.jsx`（搜索弹窗：输入框 debounce + Enter/Escape +
+  全部/聊天过滤 chips + 结果列表 + 加载更多 + 点击跳转到 /g/{chat_id}）；`ChatView.jsx`
+  header menu（⋮）新增「🔍 搜索消息」入口。
 - swagger：+`/api/search/messages` +`SearchMessagesResponse`。
 - 文档：`docs/architecture/database.md`（009 迁移行 + messages_fts 章节）；
   `docs/api/reference.md`（消息搜索章节 + 语法表）。
