@@ -3,7 +3,7 @@
 // 金额不应误识别、$$ 优先于 $、嵌套 $ 不匹配。
 
 import { describe, it, expect } from 'vitest';
-import { tokenizeMath } from './renderContent.jsx';
+import { tokenizeMath, proxyImageSource, tokenizeImages } from './renderContent.jsx';
 
 describe('tokenizeMath — LaTeX 公式检测', () => {
   it('无公式文本原样返回', () => {
@@ -76,5 +76,133 @@ describe('tokenizeMath — LaTeX 公式检测', () => {
       { type: 'math-inline', value: '+1' },
       { type: 'text', value: ' dollar' },
     ]);
+  });
+});
+
+
+describe('proxyImageSource — 图片代理 URL 重写', () => {
+  it('http(s) 源经代理重写，保留 path/query/fragment', () => {
+    const out = proxyImageSource('https://images.example.com/photos/cat.png?token=abc#section');
+    expect(out).toContain('https://proxy.moonchan.xyz/photos/cat.png');
+    expect(out).toContain('token=abc');
+    expect(out).toContain('proxy_host=images.example.com');
+    expect(out).toContain('proxy_scheme=https');
+    expect(out).toContain('#section');
+  });
+
+  it('http 源记录 proxy_scheme=http', () => {
+    const out = proxyImageSource('http://images.example.com/cat.png');
+    expect(out).toContain('proxy_scheme=http');
+  });
+
+  it('无原始 query 时附加 proxy_host/proxy_scheme', () => {
+    const out = proxyImageSource('https://images.example.com/cat.png');
+    expect(out).toContain('proxy_host=images.example.com');
+    expect(out).toContain('proxy_scheme=https');
+  });
+
+  it('fragment 位于 proxy 参数之后', () => {
+    const out = proxyImageSource('https://images.example.com/cat.png#section');
+    expect(out.indexOf('#section')).toBeGreaterThan(out.indexOf('proxy_scheme=https'));
+  });
+
+  it('指向 proxy.moonchan.xyz 自身的 URL 直通（避免二次代理环）', () => {
+    const src = 'https://proxy.moonchan.xyz/some/image.png';
+    expect(proxyImageSource(src)).toBe(src);
+  });
+
+  it('指向 proxy.moonchan.xyz 的任意 http 路径也直通（scheme 不校验）', () => {
+    const src = 'http://proxy.moonchan.xyz/a/b?c=d';
+    expect(proxyImageSource(src)).toBe(src);
+  });
+
+  it('相对路径降级为 #', () => {
+    expect(proxyImageSource('/relative/cat.png')).toBe('#');
+  });
+
+  it('javascript: 降级为 #', () => {
+    expect(proxyImageSource('javascript:alert(1)')).toBe('#');
+  });
+
+  it('data: 降级为 #', () => {
+    expect(proxyImageSource('data:image/png;base64,xyz')).toBe('#');
+  });
+
+  it('file: 降级为 #', () => {
+    expect(proxyImageSource('file:///etc/passwd')).toBe('#');
+  });
+
+  it('ftp: 降级为 #', () => {
+    expect(proxyImageSource('ftp://host/file')).toBe('#');
+  });
+
+  it('mailto: 降级为 #', () => {
+    expect(proxyImageSource('mailto:user@example.com')).toBe('#');
+  });
+
+  it('无法解析的 URL 降级为 #', () => {
+    expect(proxyImageSource('not-a-url')).toBe('#');
+  });
+
+  it('带端口的 host 正确传递 proxy_host', () => {
+    const out = proxyImageSource('https://images.example.com:8080/cat.png');
+    expect(out).toContain('proxy_host=images.example.com%3A8080');
+  });
+});
+
+describe('tokenizeImages — inline image 切分', () => {
+  it('无图片文本返回空数组', () => {
+    expect(tokenizeImages('hello world')).toEqual([{ type: 'text', value: 'hello world' }]);
+  });
+
+  it('纯图片返回单个 image token', () => {
+    const out = tokenizeImages('![cat](https://example.com/cat.png)');
+    expect(out).toEqual([{ type: 'image', alt: 'cat', src: 'https://example.com/cat.png' }]);
+  });
+
+  it('图片前后有文本', () => {
+    const out = tokenizeImages('hello ![cat](https://example.com/cat.png) world');
+    expect(out).toEqual([
+      { type: 'text', value: 'hello ' },
+      { type: 'image', alt: 'cat', src: 'https://example.com/cat.png' },
+      { type: 'text', value: ' world' },
+    ]);
+  });
+
+  it('多张图片连续出现', () => {
+    const out = tokenizeImages('![a](https://a.png) and ![b](https://b.png)');
+    expect(out).toEqual([
+      { type: 'image', alt: 'a', src: 'https://a.png' },
+      { type: 'text', value: ' and ' },
+      { type: 'image', alt: 'b', src: 'https://b.png' },
+    ]);
+  });
+
+  it('alt 可为空字符串', () => {
+    const out = tokenizeImages('![](https://example.com/cat.png)');
+    expect(out).toEqual([{ type: 'image', alt: '', src: 'https://example.com/cat.png' }]);
+  });
+
+  it('alt 不含 ] 字符时整体作为 text 保留（正则安全子集）', () => {
+    const out = tokenizeImages('![a]b](https://a.png)');
+    expect(out).toEqual([{ type: 'text', value: '![a]b](https://a.png)' }]);
+  });
+
+  it('javascript: 源被匹配但不影响切分（src 校验交给 proxyImageSource）', () => {
+    const out = tokenizeImages('![x](javascript:alert(1)');
+    // 正则 `[^)\s]+` 截断到 `)`，所以 src = `javascript:alert(1`
+    expect(out.length).toBe(1);
+    expect(out[0].type).toBe('image');
+    expect(out[0].src).toBe('javascript:alert(1');
+  });
+
+  it('空字符串返回空数组', () => {
+    expect(tokenizeImages('')).toEqual([]);
+  });
+
+  it('非字符串返回空数组', () => {
+    expect(tokenizeImages(null)).toEqual([]);
+    expect(tokenizeImages(undefined)).toEqual([]);
+    expect(tokenizeImages(123)).toEqual([]);
   });
 });

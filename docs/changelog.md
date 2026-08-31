@@ -612,3 +612,26 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
 - 测试：`renderContent.test.js` 10 用例（行内/独立行/金额不误识别/$$ 优先/多公式/
   换行中断/运算符首字符/转义），全绿；全套 vitest 76 通过；`tsc --noEmit` 通过；
   `vite build` 正常（KaTeX 独立 chunk 261KB）。
+
+
+## 2026-09-02 feat: 消息正文内联图片（`![]()` → `<img>` + 代理，fork 分歧）
+
+- 背景：chatto fork 允许消息正文 `![alt](url)` 渲染为 `<img>`，且所有图片 src
+  统一走 `https://proxy.moonchan.xyz` 代理（隐藏观看者 IP/Referer，防止外链
+  host 直接暴露观看者身份）。上游禁用该语法。移植 fork 行为，按 AGPL 独立实现。
+  所有本地改动带【本地改动 2026-09-02】标记。
+- 实现（独立实现，不承认派生）：
+  - `renderContent.jsx` 新增 `proxyImageSource(src)`：仅 http(s) → 代理 URL；
+    javascript:/data:/file:/相对路径/其他协议一律降级为 `#`；已指向
+    `proxy.moonchan.xyz` 的 URL 直通（避免二次代理环，2026-08-31 修复）。
+    `searchParams` 编码 `:` → `%3A`（代理端正常解码），`proxy_host` 含端口。
+  - `tokenizeImages(text)`：切分为 `[text, image]` 片段；正则
+    `!\[([^\]]*)\]\(([^)\s]+)\)`（安全子集，`alt` 不含 `]`）。
+  - `renderContent` 管线：mentions → images → math → URLs。
+  - `<img>` 属性加固：`loading=lazy`、`referrerPolicy=no-referrer`；
+    alt 为空时留空；src 经 proxyImageSource 重写（非法 → `#`）。
+  - 注意：聊天中 `![a]b](https://a.png)`（alt 含 `]`）不匹配正则，整体作为
+    纯文本保留（安全子集取舍）。
+- 前端契约：无（纯前端渲染）。
+- 测试：`renderContent.test.js` 新增 24 用例（proxyImageSource 14 + tokenizeImages 10）；
+  全套 vitest 99 通过；`tsc --noEmit` 通过；`vite build` 正常。

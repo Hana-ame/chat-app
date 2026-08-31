@@ -11,6 +11,47 @@ const MENTION_RE = /(<@[a-f0-9-]{36}>)/;
 const MENTION_MATCH = /^<@([a-f0-9-]{36})>$/;
 const URL_RE = /(https?:\/\/[^\s<>[\]{}|\\^`]+)/g;
 
+// 【本地改动 2026-09-02】图片代理 base URL：所有消息正文 ![]() 图片 src
+// 重写到该代理，隐藏观看者的 IP / Referer，避免原图 host 直接暴露。
+// 与 chatto 的 IMAGE_PROXY_BASE 同源，使用同一 proxy.moonchan.xyz 域名。
+const IMAGE_PROXY_BASE = 'https://proxy.moonchan.xyz';
+
+// 【本地改动 2026-09-02】把原始图片 src 重写为代理 URL。
+// 仅允许 http(s)；非 http(s)（含 javascript:/data:/file:/相对路径等）一律返回 '#'。
+// 已指向 proxy.moonchan.xyz 自身的 URL 直通（避免二次代理环，2026-08-31 修复踩坑）。
+// 思路：URL + searchParams 保留原始 path/query，追加 proxy_host / proxy_scheme，
+// fragment 留在最末尾（与用户约定一致）。
+// 边界：仅影响消息正文 inline image；附件（走 /assets/files/ 独立签名 URL）不受影响。
+export function proxyImageSource(src) {
+  let original;
+  try {
+    original = new URL(src);
+  } catch {
+    return '#';
+  }
+  if (original.protocol !== 'http:' && original.protocol !== 'https:') {
+    return '#';
+  }
+
+  const proxyHostname = new URL(IMAGE_PROXY_BASE).hostname;
+  if (original.hostname === proxyHostname) {
+    return src;
+  }
+
+  const proxy = new URL(IMAGE_PROXY_BASE);
+  proxy.pathname = original.pathname;
+  proxy.search = original.search;
+  proxy.searchParams.set('proxy_host', original.host);
+  proxy.searchParams.set('proxy_scheme', original.protocol === 'https:' ? 'https' : 'http');
+  proxy.hash = original.hash;
+  return proxy.toString();
+}
+
+// 【本地改动 2026-09-02】Markdown inline image 正则：![alt](src)。
+// alt 不含 `]`（CommonMark 安全子集）；src 不含 `)`、空格。
+// 注意：src 中的括号会被截断，由后续 URL 校验兜底（非法 src → '#'）。
+const IMAGE_RE = /!\[([^\]]*)\]\(([^)\s]+)\)/g;
+
 // 【本地改动 2026-09-02】LaTeX 公式正则。
 //
 // 行内（inline）：$...$
@@ -62,6 +103,25 @@ export function tokenizeMath(text) {
     }
   }
   return result;
+}
+
+// 【本地改动 2026-09-02】将文本切分为 [text, image] 片段。
+// 顺序：先匹配 ![]()，text 保留，image 携带 alt + src。
+export function tokenizeImages(text) {
+  if (typeof text !== 'string') return [];
+  const tokens = [];
+  let lastIndex = 0;
+  for (const m of text.matchAll(IMAGE_RE)) {
+    if (m.index > lastIndex) {
+      tokens.push({ type: 'text', value: text.slice(lastIndex, m.index) });
+    }
+    tokens.push({ type: 'image', alt: m[1], src: m[2] });
+    lastIndex = m.index + m[0].length;
+  }
+  if (lastIndex < text.length) {
+    tokens.push({ type: 'text', value: text.slice(lastIndex) });
+  }
+  return tokens.length > 0 ? tokens : [];
 }
 
 function renderMathTokens(mathTokens, keyPrefix) {
@@ -125,11 +185,30 @@ export function renderContent(content, userMap) {
       continue;
     }
 
-    // 【本地改动 2026-09-02】先将文本切分为 math/text 片段，再对 text 片段
-    // 做 URL 展开（URL 展开在 MathRender 外部完成）。
-    const mathTokens = tokenizeMath(part);
-    const rendered = renderMathTokens(mathTokens, `p${i}`);
-    children.push(...rendered);
+    // 【本地改动 2026-09-02】管线：images → math → URLs。
+    // 1) 切分为 [text, image] 片段；image 走 proxyImageSource 重写 src。
+    // 2) 对 text 片段再做 LaTeX 公式 tokenization。
+    // 3) 对 leaf text 片段展开 URL 链接。
+    // 处理顺序（images 优先）：markdown-it 的 image 规则在 link 之前注册，
+    // 这里保持一致：先切图片再处理数学公式，避免 URL 中的 ![]() 冲突。
+    const imageTokens = tokenizeImages(part);
+    for (const tok of imageTokens) {
+      if (tok.type === 'image') {
+        children.push(
+          <img
+            key={`i${i}_${children.length}`}
+            src={proxyImageSource(tok.src)}
+            alt={tok.alt || ''}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+          />
+        );
+      } else {
+        const mathTokens = tokenizeMath(tok.value);
+        const rendered = renderMathTokens(mathTokens, `p${i}`);
+        children.push(...rendered);
+      }
+    }
   }
 
   return children.length > 0 ? children : null;
