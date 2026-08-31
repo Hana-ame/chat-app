@@ -466,3 +466,14 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
 - `go build ./...` + `go vet ./...` 本地通过；全量测试以 GitHub Actions 为准
   （push 后 `gh run watch`）。Web Push（VAPID + service worker）与前端通知 UI
   属后续轮次。
+
+## 2026-08-31 chore: go 1.26.5 → 1.26.7（govulncheck@latest 标准库漏洞）
+
+- 背景：CI go-test 的 `go run golang.org/x/vuln/cmd/govulncheck@latest ./...`
+  在 1.26.5 上检出 2 类标准库漏洞（crypto/tls、text/template、net/url、
+  encoding/asn1、x/net idna punycode 等调用路径），全部位于既有代码
+  （main.go ListenAndServe / SSE / local_upload / testutil），与第 33 轮
+  功能改动无关；govulncheck@latest 的漏洞库是滚动更新的，8 月初添加该步骤
+  时（428ad0e/8ae7149 升到 1.26.5）尚无这些条目。
+- 修复：`server/go.mod` go 指令 1.26.5 → 1.26.7（当前最新 patch，本地
+  govulncheck 实测 0 漏洞）。
