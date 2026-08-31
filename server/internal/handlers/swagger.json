@@ -2456,6 +2456,244 @@
           }
         }
       }
+    },
+    "/api/threads": {
+      "get": {
+        "summary": "List threads the user is following",
+        "tags": [
+          "threads"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "threads": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ThreadSummary"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/threads/follow": {
+      "post": {
+        "summary": "Follow a thread",
+        "tags": [
+          "threads"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "thread_root_message_id"
+                ],
+                "properties": {
+                  "thread_root_message_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "following": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Unfollow a thread",
+        "tags": [
+          "threads"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "thread_root_message_id"
+                ],
+                "properties": {
+                  "thread_root_message_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "following": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/threads/read": {
+      "post": {
+        "summary": "Mark a thread as read",
+        "tags": [
+          "threads"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "thread_root_message_id"
+                ],
+                "properties": {
+                  "thread_root_message_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "thread_root_message_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chats/{chatID}/threads/{threadRootID}": {
+      "get": {
+        "summary": "Get a thread summary",
+        "tags": [
+          "threads"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chatID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "threadRootID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3097,6 +3335,12 @@
             "items": {
               "type": "string"
             }
+          },
+          "thread_root_message_id": {
+            "type": "string"
+          },
+          "reply_to": {
+            "type": "string"
           }
         }
       },
@@ -3218,7 +3462,8 @@
             "enum": [
               "mention",
               "reply",
-              "system"
+              "system",
+              "reply_in_thread"
             ]
           },
           "chat_id": {
@@ -3269,6 +3514,73 @@
           },
           "created_at": {
             "type": "string"
+          }
+        }
+      },
+      "ThreadMeta": {
+        "type": "object",
+        "required": [
+          "thread_root_message_id",
+          "chat_id",
+          "reply_count",
+          "is_following",
+          "has_unread"
+        ],
+        "properties": {
+          "thread_root_message_id": {
+            "type": "string"
+          },
+          "chat_id": {
+            "type": "string"
+          },
+          "reply_count": {
+            "type": "integer"
+          },
+          "last_reply_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "latest_reply_id": {
+            "type": "string"
+          },
+          "is_following": {
+            "type": "boolean"
+          },
+          "has_unread": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ThreadSummary": {
+        "type": "object",
+        "required": [
+          "root_message"
+        ],
+        "properties": {
+          "root_message": {
+            "$ref": "#/components/schemas/Message"
+          },
+          "thread_root_message_id": {
+            "type": "string"
+          },
+          "chat_id": {
+            "type": "string"
+          },
+          "reply_count": {
+            "type": "integer"
+          },
+          "last_reply_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "latest_reply_id": {
+            "type": "string"
+          },
+          "is_following": {
+            "type": "boolean"
+          },
+          "has_unread": {
+            "type": "boolean"
           }
         }
       }

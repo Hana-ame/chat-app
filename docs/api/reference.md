@@ -56,13 +56,25 @@ Base URL：生产 `https://chat.moonchan.xyz`，本地 `http://localhost:8080`�
 | 方法 | 路径 | 认证 | 说明 |
 |---|---|---|---|
 | GET | `/api/chats/{chatID}/messages` | Bearer | 消息列表（`before`/`limit`，含 attachments/reactions 冗余字段） |
-| POST | `/api/chats/{chatID}/messages` | Bearer | 发送 `{content, attachments?, reply_to?, type?, source?}`；`type=stream` 时 `source` 为 AI 源（`{endpoint, auth_key, body}`），响应含 `msg_id`，流式内容另取 |
+| POST | `/api/chats/{chatID}/messages` | Bearer | 发送 `{content, attachments?, reply_to?, thread_root?, start_thread?, type?, source?}`；`type=stream` 时 `source` 为 AI 源（`{endpoint, auth_key, body}`），响应含 `msg_id`，流式内容另取 |
 | PATCH | `/api/chats/{chatID}/messages/{messageID}` | Bearer | 编辑（本人） |
 | DELETE | `/api/chats/{chatID}/messages/{messageID}` | Bearer | 删除（本人；owner/admin 可删他人） |
 | GET | `/api/chats/{chatID}/messages/{messageID}/stream` | Bearer | 读取 AI 流式内容（SSE 行格式） |
 | PUT | `/api/chats/{chatID}/messages/{messageID}/reactions/{emoji}` | Bearer | 添加反应（emoji URL 编码） |
 | DELETE | `/api/chats/{chatID}/messages/{messageID}/reactions/{emoji}` | Bearer | 移除反应 |
 | GET | `/api/chats/{chatID}/messages/{messageID}/reactions` | Bearer | 反应列表 |
+
+## 线程（【本地改动 2026-08-31】）
+
+| 方法 | 路径 | 认证 | 说明 |
+|---|---|---|---|
+| GET | `/api/threads?before=&limit=` | Bearer | 当前用户关注的线程列表（含 `ThreadMeta` + `root_message`） |
+| POST | `/api/threads/follow` | Bearer | 关注线程 `{thread_root_message_id}`，幂等 |
+| DELETE | `/api/threads/follow` | Bearer | 取关线程 `{thread_root_message_id}`，幂等 |
+| POST | `/api/threads/read` | Bearer | 标记已读 `{thread_root_message_id}`；游标自动推进到最新回复 |
+| GET | `/api/chats/{chatID}/threads/{threadRootID}` | Bearer | 单线程详情（root_message + ThreadMeta，含 `is_following`/`has_unread`） |
+
+消息列表 GET 支持 `?in_thread=<thread_root_message_id>` 过滤线程内消息（含根）。发送 POST 支持 `thread_root` 显式指定线程根、`start_thread` 让本消息成为根。
 
 ## 通知
 
@@ -135,6 +147,14 @@ Base URL：生产 `https://chat.moonchan.xyz`，本地 `http://localhost:8080`�
 
 // Message
 { id, chat_id, user_id, content, created_at, edited_at, deleted, type,
-  thinking, reply_to, attachments: [], reactions: [],
+  thinking, reply_to, thread_root_message_id, attachments: [], reactions: [],
   author?: User, mention_count, reaction_count }
+
+// ThreadMeta（【本地改动 2026-08-31】）
+{ thread_root_message_id, chat_id, reply_count, last_reply_at, latest_reply_id,
+  is_following, has_unread }
+
+// ThreadSummary（【本地改动 2026-08-31】，ThreadMeta + root_message 展平）
+{ root_message: Message, thread_root_message_id, chat_id, reply_count,
+  last_reply_at, latest_reply_id, is_following, has_unread }
 ```

@@ -528,3 +528,43 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
 - 测试：push_test.go 4 例（未配置拒绝、endpoint 幂等覆盖+退订、410 清订阅全链路、
   未配置静默跳过），用 webpush.GenerateVAPIDKeys 生成真实密钥、httptest 造 410。
 - 验证：go build / go vet / go test（service+handlers+db）全绿；tsc --noEmit 通过。
+
+
+## 2026-09-01 feat: 线程聚合（thread_root_message_id / thread_follows / reply_in_thread 通知）
+
+- 背景：chat-app 原本只有扁平的 `reply_to_message_id`（单跳引用），没有把多条回复聚合到同一主题的机制；移植 chatto 的线程模型补上。
+  所有本地改动带【本地改动 2026-08-31】标记。
+- 设计（独立实现，不承认派生）：
+  - `messages.thread_root_message_id` 自引用 FK：顶层消息为空、StartThread 消息自引用 `id`、回复自动继承祖先根。
+  - 通知种别用 `reply_in_thread`（区别于 chatto 的 `thread_reply`）。
+  - 响应展平为 `ThreadSummary{ThreadMeta, RootMessage}`（区别于 chatto `FollowedThread{room+root+meta}` 嵌套）。
+  - 未读判定用相反方向的谓词 `last_seen_at < last_reply_at`（非 chatto 的 `LastReplyAt.After(lastOpened)`）。
+- 实现（新增全部带【本地改动】注释，注释已去除所有"移植 chatto"措辞）：
+  - 迁移 `007__add_threads.sql`：`messages.thread_root_message_id`（自引用 FK）+ `thread_follows` + `thread_read_state`。
+  - db `threads.go`：FollowThread / UnfollowThread / IsFollowingThread / ThreadFollowers /
+    ThreadReplyCount / SetThreadRead / GetThreadReadCursor / ListThreadSummarys（按 last_reply_at DESC） /
+    GetThreadSummary / LatestReplyIDForThread / ThreadReplies。
+  - 模型 `models.go`：`Message.ThreadRootMessageID`、`ThreadSummary{ThreadMeta, RootMessage}`、
+    `ThreadMeta{ThreadRootMessageID, ChatID, ReplyCount, LastReplyAt, LatestReplyID, IsFollowing, HasUnread}`。
+  - db `messages.go`：`CreateMessage` 改为 `CreateMessageOpt` + `WithReplyTo/WithThreadRoot`；
+    `messageColumns` 加 `COALESCE(m.thread_root_message_id,'')`；StartThread 自引用 UPDATE。
+  - service `message.go`：`Send` 新签名（replyTo + explicitThreadRoot + startThread），
+    计算最终 threadRoot（StartThread → 自引用；显式 threadRoot；replyTo → 继承父根；顶层 → 空）；
+    `notifyThreadFollowers` 遍历关注者触发 `reply_in_thread` 通知（除作者）。
+  - handlers `messages.go`：GET 加 `?in_thread=` 过滤、POST 收 `thread_root`/`start_thread`。
+  - handlers `threads.go`（新文件）：GET `/api/threads`（followed list + before 分页）、
+    POST/DELETE `/api/threads/follow`、POST `/api/threads/read`、
+    GET `/api/chats/{chatID}/threads/{threadRootID}`（单线程摘要）。
+  - router `router.go`：注册线程路由组；handler.go 暴露 `Server.DB` 供直连。
+- 前端契约三方同步：
+  - `schemas.ts`：`MessageSchema` 加 `reply_to`/`thread_root_message_id`；`ThreadMetaSchema`/`ThreadSummarySchema`（展平）。
+  - `client.ts`：`sendMessage` 加 `threadRoot/startThread` 参数、`listMessages` 加 `inThread` 参数；
+    新 `api.threads` 命名空间（`listFollowed/follow/unfollow/getSummary/markRead`）；mock proxy 接入。
+  - `mock.js`：`threadFollows` / `threadReadState` 状态 + `mockThreadsListFollowed`/`mockThreadGetSummary`/
+    `mockThreadFollow`/`mockThreadUnfollow`/`mockThreadMarkRead`。
+- 测试：`threads_test.go` 10 用例（startThread 自引用、顶层空根、回复继承根、嵌套继承根、
+  显式 threadRoot、`in_thread` 过滤、Follow/Unfollow 幂等、List 排序、MarkRead 游标推进、
+  关注者收到 reply_in_thread 而作者不收到）。
+- 验证：`go build ./...` + `go test ./... -race` + `npx tsc --noEmit` 全绿；
+  提交 `badaacc`（refactor）+ `da2329d`（no-op 重跑）+ `1ebf075`（fix `TestWSPresence`/`TestWSTyping` -race 时序）；
+  CI 后端+前端均绿。

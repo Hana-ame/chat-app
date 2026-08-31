@@ -15,6 +15,7 @@ SQLite（WAL 模式、`foreign_keys=ON`、`synchronous=NORMAL`）。schema 由�
 | `004__add_reply_to_message.sql` | `messages.reply_to_message_id` + 索引 |
 | `005__add_notification_occurrences.sql` | 【本地改动 2026-08-31】持久化通知：`notification_occurrences` 表（每用户每事件唯一）+ 未读/过期索引 |
 | `006__add_push_subscriptions.sql` | 【本地改动 2026-08-31】Web Push：`push_subscriptions` 表（endpoint 全局唯一，p256dh/auth 加密密钥，FK 级联删用户） |
+| `007__add_threads.sql` | 【本地改动 2026-08-31】线程聚合：`messages.thread_root_message_id`（自引用 FK，顶层为空、StartThread 自指、回复继承祖先根）+ `thread_follows`（每用户每根唯一，关注通知 opt-in）+ `thread_read_state`（每用户每根的已读游标） |
 
 另有运行时 `db_fixups.go` 动态补列（`ensureColumn`，幂等）：`chats.avatar_url / banner_url / background_url / banner_opacity / last_message_*`、`chat_members.notify_enabled / unread_count`、`messages.type`（与 001 重复定义，安全）、`users.notify_blocked`，以及 `last_visited_at → last_active_at` 改名。
 
@@ -74,19 +75,19 @@ SQLite（WAL 模式、`foreign_keys=ON`、`synchronous=NORMAL`）。schema 由�
 | id / chat_id / user_id | FK（chat/user ON DELETE CASCADE） |
 | content | 消息正文 |
 | created_at / edited_at / deleted_at | 时间戳（软删除标记） |
-| type / thinking / reply_to_message_id | AI 流式与回复（001/002/004 迁移） |
+| type / thinking / reply_to_message_id / thread_root_message_id | AI 流式与回复（001/002/004 迁移） + 【本地改动 2026-08-31】线程归属根 ID（自引用 FK，顶层消息为空、StartThread 自指、回复继承祖先根） |
 | attachment_count / mention_count / reaction_count | 冗余计数（读侧免聚合） |
 | reactions / attachments / mentions | **预聚合 JSON 缓存列**（`reactions` 表 + `attachments`/`mentions` 表的镜像） |
 
-索引：`(chat_id, id)`、`(chat_id, created_at DESC)`、`(chat_id, created_at DESC, id DESC)`、`(reply_to_message_id)`。
+索引：`(chat_id, id)`、`(chat_id, created_at DESC)`、`(chat_id, created_at DESC, id DESC)`、`(reply_to_message_id)`、【本地改动 2026-08-31】`(thread_root_message_id, chat_id, created_at DESC)`。
 
-### notification_occurrences（【本地改动 2026-08-31】移植 chatto 持久化通知）
+### notification_occurrences（【本地改动 2026-08-31】持久化通知）
 
 | 列 | 说明 |
 |---|---|
 | id | UUID (TEXT) PK |
 | user_id | FK → users ON DELETE CASCADE（收件人） |
-| kind | `mention` / `reply` / `system` |
+| kind | `mention` / `reply` / `reply_in_thread` / `system` |
 | chat_id / message_id | 触发通知的聊天与源消息 |
 | actor_id | 触发者（发送/回复消息的人） |
 | title / body | 通知展示内容（body 截断 120 字符） |
@@ -98,7 +99,7 @@ SQLite（WAL 模式、`foreign_keys=ON`、`synchronous=NORMAL`）。schema 由�
 （与 notify chat 的「锁 + 唯一索引」同思路，但这里是单一 INSERT，锁不必要）。
 索引：`(user_id, read, created_at DESC)`（列表/未读）、`(expires_at)`（清理）。
 
-### push_subscriptions（【本地改动 2026-08-31】移植 chatto Web Push）
+### push_subscriptions（【本地改动 2026-08-31】Web Push）
 
 | 列 | 类型 | 说明 |
 |---|---|---|
@@ -111,7 +112,28 @@ SQLite（WAL 模式、`foreign_keys=ON`、`synchronous=NORMAL`）。schema 由�
 
 索引：idx_push_subscriptions_user (user_id)。
 
-生命周期：订阅无 TTL；失效由发送时的 404/410 响应即时删除（PushService.sendOne），用户注销由 FK CASCADE 清空。VAPID 三件套未配置（env 缺 key）时 IsConfigured()==false，订阅端点 503、发送静默跳过（Web Push 整体 opt-in 默认关闭，与 chatto PushConfig 同语义）。
+生命周期：订阅无 TTL；失效由发送时的 404/410 响应即时删除（PushService.sendOne），用户注销由 FK CASCADE 清空。VAPID 三件套未配置（env 缺 key）时 IsConfigured()==false，订阅端点 503、发送静默跳过（Web Push 整体 opt-in 默认关闭）。
+
+### thread_follows（【本地改动 2026-08-31】线程关注 opt-in）
+
+| 列 | 说明 |
+|---|---|
+| user_id | FK → users ON DELETE CASCADE（关注者） |
+| thread_root_message_id | FK → messages ON DELETE CASCADE（线程根） |
+| created_at | 关注时间（RFC3339Nano） |
+
+唯一约束 `(user_id, thread_root_message_id)`：每用户对每线程关注幂等，重复 POST 不报错、不重插行。关注无 TTL；根消息删除时级联清空，用户注销时级联清空。关注是 opt-in，触发 `reply_in_thread` 通知的前提。
+
+### thread_read_state（【本地改动 2026-08-31】线程已读游标）
+
+| 列 | 说明 |
+|---|---|
+| user_id | FK → users ON DELETE CASCADE |
+| thread_root_message_id | FK → messages ON DELETE CASCADE |
+| cursor_message_id | FK → messages ON DELETE CASCADE（最后已读消息 id，无回复时为根） |
+| last_seen_at | 游标消息的 created_at 快照，用于 has_unread 判定 |
+
+唯一约束 `(user_id, thread_root_message_id)`：POST `/api/threads/read` 原子推进游标（cursor = 线程内最新回复；无回复则 cursor = 根）。`has_unread` 判定用反向谓词 `last_seen_at < last_reply_at`（游标为空 = 从未打开 = 未读；游标存在但最新回复晚于游标 = 未读）。
 
 ### attachments / reactions / mentions
 

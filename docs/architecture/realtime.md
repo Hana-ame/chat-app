@@ -16,11 +16,11 @@
 | `chat_remove` | 被移出聊天 | `{chat_id}` |
 | `user_update` | 用户资料变化 | User 对象（**email 已脱敏为空**） |
 | `presence_update` | 上线/下线 | `{user_id, status}` |
-| `notification` | 持久化通知（【本地改动 2026-08-31】移植 chatto 通知机制） | 完整 NotificationOccurrence 对象；只推给收件人本人（在线时实时投递，离线靠下次拉取/Web Push 阶段） |
+| `notification` | 持久化通知（【本地改动 2026-08-31】持久化通知机制，含 `mention`/`reply`/`reply_in_thread`/`system` 四种 kind） | 完整 NotificationOccurrence 对象；只推给收件人本人（在线时实时投递，离线靠下次拉取/Web Push 阶段） |
 | `ping` / `pong` | WS 心跳 | 空 |
 | `error` | 错误 | `{message}` |
 
-Message 对象关键字段：`id`、`chat_id`、`user_id`、`content`、`created_at`、`edited_at`、`deleted`、`attachments`（数组）、`reactions`（数组）、`type`、`reply_to_message_id`。
+Message 对象关键字段：`id`、`chat_id`、`user_id`、`content`、`created_at`、`edited_at`、`deleted`、`attachments`（数组）、`reactions`（数组）、`type`、`reply_to_message_id`、【本地改动 2026-08-31】`thread_root_message_id`（顶层为空、StartThread 自指、回复继承祖先根）。
 
 ## WebSocket（/ws）
 
@@ -66,3 +66,5 @@ data: {"op":"message_create","payload":{...}}
 - 发送操作（消息/反应/已读）走普通 HTTP；事件流只负责"别人改了"的同步，本端操作后通常依赖服务端回推保持一致
 
 > Web Push（【本地改动 2026-08-31】）：用户离线（无 WS 连接）时，通知不再只落库，还会经 push_subscriptions 走 VAPID Web Push；在线用户仍走实时广播，二选一不重复。端点见 /api/push/*。
+>
+> 线程（【本地改动 2026-08-31】）：线程消息（含根与回复）与顶层消息共用 `message_create` op，由 `thread_root_message_id` 字段区分；线程关注状态变更不推实时事件（跨 tab 靠轮询 `/api/threads` 或重连时重新取）。`reply_in_thread` 通知复用 `notification` op 投递给已关注的线程关注者（除作者）。
