@@ -816,3 +816,26 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
 - 测试：`opHandlers.test.js` +1（typing 分发）、`chat.test.js` +4（onTyping/pruneTyping/
   typing 事件分发），全套 vitest 148 ✅。
 - 验证：`npx vitest run` 148 ✅；`npx tsc --noEmit` ✅；`npx vite build` ✅。
+
+## 2026-09-03 feat: 消息内链接卡片（Link card in message，补全 FDR-009）
+
+- 背景：Round 15 已做 Composer 侧链接预览（轻量版）；chatto FDR-009 的"已发送消息
+  带预览"还缺消息正文里的富卡片。本组件把消息首 URL 渲染成卡片（标题/描述/站点/
+  缩略图）。纯前端，与 Composer 预览同源，无后端改动，所有本地改动带【本地改动
+  2026-09-03】标记。
+- 实现：
+  - `client/src/hooks/useLinkCard.js`：消息首 URL 预览 hook，带**模块级共享缓存**
+    （Map，成功 TTL 24h / 失败 TTL 1h + 简单 LRU 兜底）。消息列表反复重渲染/滚动
+    加载同一批消息时避免重复打爆第三方站点；失败页也缓存防反复重试 CORS。
+  - `client/src/components/MessageLinkCard.jsx`：消息内链接卡片。
+    - loading：浅占位「正在获取链接预览…」。
+    - ok：标题 + 描述 + 站点名 + 右侧缩略图（84×84，referrerPolicy=no-referrer，
+      加载失败隐藏图）。
+    - fail（CORS/无 OGP）：降级为「域名 + URL」浅卡片。
+    - 整卡可点击，在新标签打开原 URL。
+  - `client/src/components/MessageItem.jsx`：非删除/非编辑/非流式时在正文下方渲染
+    MessageLinkCard。
+- 踩坑：checkJs 下给 useState 加 @type 注解会导致 TS 把「注解类型」误当成整个
+  [state,setState] 元组 → 报元组不可赋值；解决：不给 useState 加注解，让 TS 从
+  初始值推断，并把所有 setState 分支统一带 meta（fail 时 null）消除联合形状差异。
+- 验证：`npx vitest run` 148 ✅；`npx tsc --noEmit` ✅；`npx vite build` ✅。

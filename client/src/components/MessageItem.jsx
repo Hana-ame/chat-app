@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/auth';
 import { useChatStore } from '../store/chat';
 import { api } from '../api/client';
 import { renderContent } from './renderContent';
+import MessageLinkCard from './MessageLinkCard';
 import UserAvatar from './UserAvatar';
 import UserProfileModal from './UserProfileModal';
 
@@ -222,6 +223,9 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId, onReply
                   </div>
                 )}
               </>
+            )}
+            {!msg.deleted && !editing && !msg.streaming && (
+              <MessageLinkCard content={msg.content} />
             )}
             {!msg.deleted && (
               <div className="msg-actions">
