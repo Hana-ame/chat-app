@@ -761,3 +761,25 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
   - notifications 是特殊视图，不覆盖记忆。
 - 测试：`client/src/utils/lastRoom.test.js` 6 用例（读写/空 id/清除/key/隐私模式降级）。
 - 验证：`npx vitest run` 125 ✅（+6）；`npx tsc --noEmit` ✅；`npx vite build` ✅。
+
+## 2026-09-03 feat: Cmd-K 快速切换器（Quick Switcher，对齐 chatto FDR-015）
+
+- 背景：chatto FDR-015 提供键盘驱动的导航面板（Cmd+K / Ctrl+K），模糊匹配聊天/
+  DM/通知。chat-app 此前只能鼠标点侧栏。纯前端实现，无后端改动，所有本地改动
+  带【本地改动 2026-09-03】标记。
+- 实现：
+  - `client/src/utils/fuzzyMatch.js`：子序列模糊匹配（fuzzy），连续匹配高权重
+    （pow 放大），combinedScore 对 label 加权（×3），label 匹配 > detail。
+  - `client/src/components/QuickSwitcher.jsx`：Cmd-K 面板。
+    - 空查询：Recent（最近 15 个，localStorage）+ Rooms / DMs / Notifications 分组。
+    - 输入过滤：label + detail 模糊匹配，label 分数优先。
+    - 键盘：↑↓ 移动、Enter 选择、Escape 关闭、点击外部关闭；hover 即选中。
+    - 选择后写入 recent 并 onNavigate。
+  - `client/src/routes/ChatPage.jsx`：全局 keydown 监听 Cmd/Ctrl+K（toggle），
+    handleQuickNavigate 跳转 /g/{id} 或 /g/notifications。
+- 与 chatto 的差异（chat-app 单服务器，已收敛）：
+  - 无多服务器目录；无 `?` 消息搜索（FTS 搜索已有独立入口 SearchModal）；
+    无成员目录搜索（chat-app 后端无成员目录 API，未来有则扩展）。
+- 测试：`client/src/utils/fuzzyMatch.test.js` 10 用例（空/完全/子串/非连续子序列/
+  大小写/乱序拒绝/连续优先/label 加权）。
+- 验证：`npx vitest run` 135 ✅（+10）；`npx tsc --noEmit` ✅；`npx vite build` ✅。

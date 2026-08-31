@@ -8,6 +8,7 @@ import ChatView from '../components/ChatView';
 import MemberPanel from '../components/MemberPanel';
 import WelcomeView from '../components/WelcomeView';
 import { getLastRoom, setLastRoom, clearLastRoom } from '../utils/lastRoom';
+import QuickSwitcher from '../components/QuickSwitcher';
 
 export default function ChatPage() {
   const loc = useLocation();
@@ -95,6 +96,33 @@ export default function ChatPage() {
     }
   }, [urlChatId, chats, notifyChatId, isNotification, accessToken, navigate]);
 
+  // 【本地改动 2026-09-03】Cmd-K 快速切换（FDR-015）。
+  const [qsOpen, setQsOpen] = useState(false);
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setQsOpen(v => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const handleQuickNavigate = (chatId) => {
+    setQsOpen(false);
+    if (chatId === 'notifications') {
+      navigate('/g/notifications', { replace: true });
+    } else {
+      navigate('/g/' + chatId, { replace: true });
+      useChatStore.setState(s => ({
+        activeChatId: chatId,
+        chats: s.chats.map(c => c.id === chatId ? { ...c, unread_count: 0 } : c),
+      }));
+      if (isMobile) setMobileView('chat');
+    }
+  };
+
   const handleSelectChat = (id) => {
     useChatStore.setState(s => ({
       activeChatId: id,
@@ -127,6 +155,13 @@ export default function ChatPage() {
          />
        ) : isMobile ? null : <WelcomeView />}
        {!isMobile && urlChatId && !isNotification && <MemberPanel chatId={urlChatId} />}
+      <QuickSwitcher
+        open={qsOpen}
+        onClose={() => setQsOpen(false)}
+        chats={chats}
+        currentUserId={user?.id}
+        onNavigate={handleQuickNavigate}
+      />
     </div>
   );
 }
