@@ -477,3 +477,22 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
   时（428ad0e/8ae7149 升到 1.26.5）尚无这些条目。
 - 修复：`server/go.mod` go 指令 1.26.5 → 1.26.7（当前最新 patch，本地
   govulncheck 实测 0 漏洞）。
+
+## 2026-08-31 fix: TestRealAIEndpoint 改用 sensenova 免费模型 + 实现"未配置自动跳过"
+
+- 背景：CI go-test 的 `TestRealAIEndpoint`（真实端点冒烟）在 08-31 两次运行中
+  一次通过一次红，红的原因是测试里硬编码的外部 AI 网关端点及其免费模型名
+  在网关侧不可用（返回 model unavailable，属外部依赖漂移，与功能改动无关）。
+  且该测试头注释声称"未配置自动跳过"，但代码从未实现跳过——每次 CI 都会
+  无脑打真实外部端点，天然 flaky。
+- 修复（按用户指示：仓库只允许 sensenova 的免费模型，其他 AI 供应商的
+  端点/模型名不允许出现在仓库任何文件里，包括文档）：
+  - 鉴权从环境变量读取：`SENSENOVA_API_KEY` 未配置时 `t.Skip`（CI 无 key，
+    天然跳过 → go-test 不再依赖外部可达性）。
+  - 默认端点固定 sensenova 的 OpenAI 兼容地址、默认模型固定为免费模型
+    `sensenova-6.8-flash-lite`（实测 streaming 200 OK；与 DSH
+    `~/.dsh/settings.yaml` 的 sensenova provider 同款配置）。
+  - 清除了仓库中所有其他 AI 供应商的端点/模型名痕迹（含此前硬编码的
+    外部网关地址与非 sensenova 模型名）。
+- 验证：`go build ./...` + `go vet ./internal/testutil/` 通过；
+  `go test ./internal/testutil/` 本地全绿（真实端点测试无 key 自动跳过）。

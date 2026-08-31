@@ -2,7 +2,9 @@
 // 清理后/不存在/非成员)、上游错误、reasoning、慢 AI、真实端点冒烟测试。
 //
 // 运行方式: cd server && go test ./internal/testutil/
-// 说明:TestRealAIEndpoint 需要 CHAT_AI_BASE_URL 等环境变量,未配置自动跳过。
+// 说明:TestRealAIEndpoint 需要 SENSENOVA_API_KEY 环境变量(免费模型
+// sensenova-6.8-flash-lite,配置见 DSH ~/.dsh/settings.yaml 的 sensenova
+// provider),未配置自动跳过;仓库中只允许出现 sensenova 的免费模型。
 package testutil_test
 
 import (
@@ -13,6 +15,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -254,7 +257,8 @@ func TestSendStreamMessage_NonMember(t *testing.T) {
 }
 
 func TestSendStreamMessage_EndpointConfig(t *testing.T) {
-	// Verify that the given endpoint/auth_key are used as-is (for openai.ai/zen/v1/chat/completions)
+	// Verify that the given endpoint/auth_key are used as-is (不会改写上游地址,
+	// 仓库中只允许 sensenova 的免费模型/端点出现)
 	f := testutil.New(t)
 	alice := f.Register(t, "stream7@test.dev", "StreamGrace", "password123")
 
@@ -270,7 +274,7 @@ func TestSendStreamMessage_EndpointConfig(t *testing.T) {
 	json.NewDecoder(res.Body).Decode(&chat)
 	res.Body.Close()
 
-	// Send with openai.ai endpoint and public key (should hit mockAI in test)
+	// 发送到 mock 端点(仓库中不允许出现其他 AI 供应商的端点名,这里用本地 mock)
 	sendRes := f.Do(t, "POST", "/api/chats/"+chat.ID+"/messages", alice.AccessToken, map[string]any{
 		"type": "stream",
 		"source": map[string]any{
@@ -985,10 +989,18 @@ func TestSendStreamMessage_SlowAI(t *testing.T) {
 // TestRealAIEndpoint 用真实 AI endpoint 验证生产场景的 SSE 完整性。
 // 运行: go test -run TestRealAIEndpoint -v -timeout 3m ./internal/testutil/
 // 需要网络连接。
+// 端点固定为 sensenova 的 OpenAI 兼容地址,模型固定为免费的
+// sensenova-6.8-flash-lite;仓库中不允许出现其他 AI 供应商的端点/模型名。
+// SENSENOVA_API_KEY 从环境变量读取,未配置时自动跳过(CI 无 key,天然跳过)。
 func TestRealAIEndpoint(t *testing.T) {
-	endpoint := "https://bwh.moonchan.xyz:8443/zen/v1/chat/completions"
-	authKey := "public"
-	model := "deepseek-v4-flash-free"
+	apiKey := os.Getenv("SENSENOVA_API_KEY")
+	if apiKey == "" {
+		t.Skip("SENSENOVA_API_KEY 未配置,跳过真实端点冒烟测试(CI 无 key 自动跳过)")
+	}
+	// 固定 sensenova:免费模型 sensenova-6.8-flash-lite(token.sensenova.cn 实测返回 SSE)。
+	endpoint := "https://token.sensenova.cn/v1/chat/completions"
+	authKey := apiKey
+	model := "sensenova-6.8-flash-lite"
 
 	f := testutil.New(t)
 	alice := f.Register(t, "realai@test.dev", "RealAI", "password123")
