@@ -18,6 +18,9 @@ export default defineConfig({
       '/api': 'http://localhost:8080',
       '/ws': { target: 'ws://localhost:8080', ws: true },
       '/uploads': 'http://localhost:8080',
+      // 【本地改动 2026-09-02】公开附件 URL 也走代理（本地开发时 /assets/files/
+      // 不会命中 Vite 的静态资源，需要转到后端）。
+      '/assets': 'http://localhost:8080',
     },
   },
 })

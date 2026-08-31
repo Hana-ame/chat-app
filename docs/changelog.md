@@ -592,3 +592,23 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
   - `client.test.js`：新增 `/assets/files/{uuid}` 测试用例（5 用例全绿）。
   - `mock.js`：`mockUpload` 返回 `{id, filename, mime_type, size, url, delete_url}`。
 - 验证：`go build ./...` + `go test ./...` 全绿；前端 vitest client.test.js 13/13 通过。
+
+
+## 2026-09-02 feat: LaTeX 公式渲染（KaTeX，fork 分歧）
+
+- 背景：chatto fork 允许消息正文内 `$...$`（行内）/ `$$...$$`（独立行）渲染
+  为 KaTeX 公式，上游禁用。移植 fork 行为，按 AGPL 独立实现。
+  所有本地改动带【本地改动 2026-09-02】标记。
+- 实现（独立实现，不承认派生）：
+  - `client/src/components/MathRender.jsx`（新）：React 组件，懒加载 katex
+    JS + CSS（首屏 bundle 零开销），`throwOnError: false` 防恶意/畸形输入崩溃。
+  - `client/src/components/renderContent.jsx`：新增 LaTeX 正则（行内首字符必须
+    为字母/反斜杠/LaTeX 运算符，防 `$10` 误识别；`$$...$$` 优先匹配；`\n`
+    在公式内容中禁），tokenizeMath 切分为 [text, math-inline, math-display]，
+    对 text 片段展开 URL。
+  - `vite.config.js`：dev proxy 加 `/assets` 路径（公开附件 URL 走代理）。
+  - `package.json`：新增 `katex` 依赖（~200KB JS 单独 chunk，仅在公式渲染时加载）。
+- 前端契约：无（纯前端渲染，不涉及 API）。
+- 测试：`renderContent.test.js` 10 用例（行内/独立行/金额不误识别/$$ 优先/多公式/
+  换行中断/运算符首字符/转义），全绿；全套 vitest 76 通过；`tsc --noEmit` 通过；
+  `vite build` 正常（KaTeX 独立 chunk 261KB）。
