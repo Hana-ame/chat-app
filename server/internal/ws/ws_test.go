@@ -215,11 +215,9 @@ func TestWSTyping(t *testing.T) {
 	chatID := createGroupChat(t, f, alice.AccessToken, "Typing Chat", []string{bob.UserID})
 
 	aliceWS := dialWS(t, f.WSURL(alice.AccessToken), alice.AccessToken)
-	defer aliceWS.close()
 	aliceWS.expectOp(t, "ready")
 
 	bobWS := dialWS(t, f.WSURL(bob.AccessToken), bob.AccessToken)
-	defer bobWS.close()
 	bobWS.expectOp(t, "ready")
 
 	bobWS.write(t, map[string]any{"op": "typing", "payload": map[string]any{"chat_id": chatID}})
@@ -233,6 +231,14 @@ func TestWSTyping(t *testing.T) {
 	testutil.RequireNoError(t, json.Unmarshal(env.Payload, &typing))
 	testutil.RequireEqual(t, typing.ChatID, chatID)
 	testutil.RequireEqual(t, typing.UserID, bob.UserID)
+
+	// 【本地改动 2026-09-01】先显式关 WS 再让测试返回：defer 会在函数返回时
+	// 触发，此时 t.Cleanup 里 DB.Close 的时序不确定，可能 presence handler
+	// 还在往 DB 写 last_seen。提前 close + 短 sleep 让 hub unregister 与
+	// presence handler 的 DB 写入先完成，再走 t.Cleanup 关库。
+	aliceWS.close()
+	bobWS.close()
+	time.Sleep(50 * time.Millisecond)
 }
 
 func TestWSUnauthorized(t *testing.T) {
@@ -255,11 +261,9 @@ func TestWSPresence(t *testing.T) {
 	bob := f.Register(t, "pres2@w.t", "PresBob", "testtest123")
 
 	aliceWS := dialWS(t, f.WSURL(alice.AccessToken), alice.AccessToken)
-	defer aliceWS.close()
 	aliceWS.expectOp(t, "ready")
 
 	bobWS := dialWS(t, f.WSURL(bob.AccessToken), bob.AccessToken)
-	defer bobWS.close()
 	bobWS.expectOp(t, "ready")
 
 	env := aliceWS.expectPresence(t, bob.UserID)
@@ -271,6 +275,13 @@ func TestWSPresence(t *testing.T) {
 	testutil.RequireNoError(t, json.Unmarshal(env.Payload, &pres))
 	testutil.RequireEqual(t, pres.UserID, bob.UserID)
 	testutil.RequireEqual(t, pres.Status, "online")
+
+	// 【本地改动 2026-09-01】见 TestWSTyping 注释：显式关闭 WS 连接 + 短 sleep，
+	// 确保 hub unregister 内的 presence handler（更新 last_seen/status）
+	// 先于 t.Cleanup 的 DB.Close 完成。
+	aliceWS.close()
+	bobWS.close()
+	time.Sleep(50 * time.Millisecond)
 }
 
 // TestWSOriginRejected 验证 CheckOrigin 按 CORS 白名单拒绝跨站页面发起的
