@@ -5,6 +5,7 @@
  * @typedef {import('../schemas').Reaction} Reaction
  * @typedef {import('../schemas').Attachment} Attachment
  * @typedef {import('../schemas').PinnedContent} PinnedContent
+ * @typedef {import('../schemas').NotificationOccurrence} NotificationOccurrence
  */
 
 import { generateDummyData } from '../dev/dummy';
@@ -54,7 +55,7 @@ const AI_RESPONSES = [
 ];
 
 /**
- * @type {{ chats: Chat[], messages: Message[], onlineUserIds: string[] }|null}
+ * @type {{ chats: Chat[], messages: Message[], onlineUserIds: string[], notificationOccurrences: NotificationOccurrence[] }|null}
  */
 let data = null;
 /** @type {import('zustand').UseBoundStore<import('zustand').StoreApi<any>>|null} */
@@ -72,11 +73,11 @@ const MOCK_USERS = [
   { id: 'ai', username: 'AI Bot', avatar_color: '#10a37f', email: '', role: '', last_seen: new Date().toISOString() },
 ];
 
-/** @returns {{ chats: Chat[], messages: Message[] }} */
+/** @returns {{ chats: Chat[], messages: Message[], notificationOccurrences: NotificationOccurrence[] }} */
 function ensureData() {
   if (!data) {
     const gen = generateDummyData({ chatCount: 10, msgPerChat: 150 });
-    data = /** @type {any} */ ({ chats: gen.chats, messages: [...(gen.messages || [])], onlineUserIds: gen.onlineUserIds || [] });
+    data = /** @type {any} */ ({ chats: gen.chats, messages: [...(gen.messages || [])], onlineUserIds: gen.onlineUserIds || [], notificationOccurrences: [] });
     if (_store) _store.setState({ onlineUserIds: data.onlineUserIds });
   }
   return data;
@@ -858,5 +859,55 @@ export function mockNotifyMarkRead() {
 
 /** @returns {{ ok: boolean }} */
 export function mockNotifyDelete(_token, _msgId) {
+  return { ok: true };
+}
+
+// ── 持久化通知 occurrence mock（【本地改动 2026-08-31】移植 chatto 通知机制）──
+// 与后端 handlers/notification_occurrences.go 新端点一一对应。mock 数据保存在
+// mock 全局 state 的 notificationOccurrences 数组里（见 mockOccurrenceAdd 的
+// 写入），列表/未读/已读/删除都在内存里生效，方便前端单测与 mock E2E 断言。
+
+/**
+ * 追加一条 occurrence 到 mock 全局 state（供 mock 发送路径调用）。
+ * @param {NotificationOccurrence} occ
+ */
+export function mockOccurrenceAdd(occ) {
+  const d = ensureData();
+  d.notificationOccurrences = d.notificationOccurrences || [];
+  d.notificationOccurrences.unshift(occ);
+}
+
+/** @returns {{ occurrences: NotificationOccurrence[] }} */
+export function mockOccurrenceList(_token, _before, limit) {
+  const d = ensureData();
+  const all = d.notificationOccurrences || [];
+  return { occurrences: all.slice(0, limit || 50) };
+}
+
+/** @returns {{ count: number }} */
+export function mockOccurrenceUnreadCount(_token) {
+  const d = ensureData();
+  return { count: (d.notificationOccurrences || []).filter(o => !o.read).length };
+}
+
+/** @returns {{ ok: boolean }} */
+export function mockOccurrenceMarkRead(_token, id) {
+  const d = ensureData();
+  const occ = (d.notificationOccurrences || []).find(o => o.id === id);
+  if (occ) occ.read = true;
+  return { ok: !!occ };
+}
+
+/** @returns {{ ok: boolean }} */
+export function mockOccurrenceMarkAllRead(_token) {
+  const d = ensureData();
+  for (const o of (d.notificationOccurrences || [])) o.read = true;
+  return { ok: true };
+}
+
+/** @returns {{ ok: boolean }} */
+export function mockOccurrenceDelete(_token, id) {
+  const d = ensureData();
+  d.notificationOccurrences = (d.notificationOccurrences || []).filter(o => o.id !== id);
   return { ok: true };
 }

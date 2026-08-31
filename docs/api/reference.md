@@ -72,6 +72,11 @@ Base URL：生产 `https://chat.moonchan.xyz`，本地 `http://localhost:8080`�
 | POST | `/api/notifications/messages` | Bearer | 发送通知 `{content, attachments?}`（存 notify 聊天） |
 | DELETE | `/api/notifications/messages/{messageID}` | Bearer | 删除通知 |
 | POST | `/api/notifications/read` | Bearer | 全部标记已读 |
+| GET | `/api/notifications` | Bearer | 持久化通知列表（【本地改动 2026-08-31】移植 chatto；`limit`/`before` 分页） |
+| GET | `/api/notifications/unread-count` | Bearer | 未读持久化通知计数 |
+| POST | `/api/notifications/read-all` | Bearer | 全部持久化通知标记已读 |
+| POST | `/api/notifications/{id}/read` | Bearer | 单条持久化通知标记已读 |
+| DELETE | `/api/notifications/{id}` | Bearer | 删除单条持久化通知 |
 
 ## 用户
 

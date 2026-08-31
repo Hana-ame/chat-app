@@ -9,13 +9,14 @@ import {
   mockUpload, mockUploadAvatar,
 	mockPinChat, mockUnpinChat, mockMarkAnnouncementRead, mockUpdateChatAvatar, mockUpdateChatBanner, mockUpdateChatBackground,
 	mockGetNotifyChat, mockNotificationsList, mockNotifySend, mockNotifyMarkRead, mockNotifyDelete,
+	mockOccurrenceList, mockOccurrenceUnreadCount, mockOccurrenceMarkRead, mockOccurrenceMarkAllRead, mockOccurrenceDelete,
 	mockEmitStreamPlaceholder,
 	resetMockData,
 } from './mock';
 import { useAuthStore } from '../store/auth';
 import { API_BASE, UPLOAD_BASE, validateEnv } from '../config';
 import { AuthResponseSchema, validate } from '../schemas';
-import type { User, Chat, Message, Attachment } from '../schemas';
+import type { User, Chat, Message, Attachment, NotificationOccurrence } from '../schemas';
 validateEnv();
 
 // buildUploadUrl 构建上传文件的可访问 URL:优先使用服务端返回的绝对 url;
@@ -193,6 +194,21 @@ const _apiMethods = {
       request<ApiError>('DELETE', '/api/notifications/messages/' + msgId, token),
     markRead: (token: string) =>
       request<ApiError>('POST', '/api/notifications/read', token, {}),
+    // 【本地改动 2026-08-31】持久化通知 occurrence 端点（移植 chatto
+    // FDR-012；后端 handlers/notification_occurrences.go）。
+    listOccurrences: (token: string, before?: string, limit?: number) => {
+      let url = '/api/notifications?limit=' + (limit || 50);
+      if (before) url += '&before=' + before;
+      return request<{ occurrences: NotificationOccurrence[] }>('GET', url, token);
+    },
+    unreadCount: (token: string) =>
+      request<{ count: number }>('GET', '/api/notifications/unread-count', token),
+    markReadOccurrence: (token: string, id: string) =>
+      request<ApiError>('POST', '/api/notifications/' + id + '/read', token, {}),
+    markAllReadOccurrences: (token: string) =>
+      request<ApiError>('POST', '/api/notifications/read-all', token, {}),
+    deleteOccurrence: (token: string, id: string) =>
+      request<ApiError>('DELETE', '/api/notifications/' + id, token),
   },
 
   // ── Uploads ──
@@ -262,6 +278,12 @@ function buildMockProxy(target: typeof _apiMethods): ApiType {
           sendMessage: (token: string, content: string, attachments?: Attachment[]) => Promise.resolve(mockNotifySend(token, content, attachments)),
           deleteMessage: (token: string, msgId: string) => Promise.resolve(mockNotifyDelete(token, msgId)),
           markRead: () => Promise.resolve(mockNotifyMarkRead()),
+          // 【本地改动 2026-08-31】持久化通知 mock（与后端新端点对应）。
+          listOccurrences: (token: string, before?: string, limit?: number) => Promise.resolve(mockOccurrenceList(token, before, limit)),
+          unreadCount: (token: string) => Promise.resolve(mockOccurrenceUnreadCount(token)),
+          markReadOccurrence: (token: string, id: string) => Promise.resolve(mockOccurrenceMarkRead(token, id)),
+          markAllReadOccurrences: (token: string) => Promise.resolve(mockOccurrenceMarkAllRead(token)),
+          deleteOccurrence: (token: string, id: string) => Promise.resolve(mockOccurrenceDelete(token, id)),
         };
       }
       if (mockEnabled && prop === 'sendStreamMessage') {

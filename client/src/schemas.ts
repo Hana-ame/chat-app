@@ -104,6 +104,24 @@ export interface StreamSource {
   url?: string;
 }
 
+// 【本地改动 2026-08-31】持久化通知 occurrence（后端 models.NotificationOccurrence
+// 的镜像；移植 chatto FDR-012 通知机制到前端契约）。与后端 JSON 字段一一对应。
+export const NotificationOccurrenceSchema = z.object({
+  id: z.string(),
+  user_id: z.string(),
+  kind: z.string(),
+  chat_id: z.string(),
+  message_id: z.string(),
+  actor_id: z.string(),
+  title: z.string(),
+  body: z.string(),
+  read: z.boolean(),
+  created_at: z.string(),
+  expires_at: z.string(),
+});
+
+export type NotificationOccurrence = z.infer<typeof NotificationOccurrenceSchema>;
+
 export function validate<T>(schema: z.ZodType<T>, data: unknown, label: string): T {
   const result = schema.safeParse(data);
   if (!result.success) {

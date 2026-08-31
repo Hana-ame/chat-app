@@ -110,6 +110,13 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 				r.Post("/dms", s.CreateOrGetDM)
 				r.Get("/chats/notify", s.GetNotificationsChat)
 				r.Route("/notifications", func(r chi.Router) {
+					// 【本地改动 2026-08-31】持久化通知 occurrence 端点（移植
+					// chatto FDR-012/013）：列表/未读计数/单条已读/全部已读/删除。
+					r.Get("/", s.ListNotificationOccurrences)
+					r.Get("/unread-count", s.NotificationUnreadCount)
+					r.Post("/read-all", s.MarkAllNotificationsRead)
+					r.Post("/{id}/read", s.MarkNotificationRead)
+					r.Delete("/{id}", s.DeleteNotificationOccurrence)
 					r.Get("/messages", s.ListNotifications)
 					r.Post("/messages", s.SendNotification)
 					r.Delete("/messages/{messageID}", s.DeleteNotification)

@@ -16,6 +16,7 @@
 | `chat_remove` | 被移出聊天 | `{chat_id}` |
 | `user_update` | 用户资料变化 | User 对象（**email 已脱敏为空**） |
 | `presence_update` | 上线/下线 | `{user_id, status}` |
+| `notification` | 持久化通知（【本地改动 2026-08-31】移植 chatto 通知机制） | 完整 NotificationOccurrence 对象；只推给收件人本人（在线时实时投递，离线靠下次拉取/Web Push 阶段） |
 | `ping` / `pong` | WS 心跳 | 空 |
 | `error` | 错误 | `{message}` |
 

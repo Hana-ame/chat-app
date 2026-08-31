@@ -60,6 +60,12 @@ func main() {
 				if _, err := database.PurgeExpiredTokens(context.Background()); err != nil {
 					logutil.Warn("purge tokens: %v", err)
 				}
+				// 【本地改动 2026-08-31】清理过期通知 occurrence（移植
+				// chatto 通知机制的 TTL 生命周期）：与 token 清理同一循环，
+				// 每小时一次。
+				if _, err := database.PruneExpiredNotificationOccurrences(context.Background(), time.Now()); err != nil {
+					logutil.Warn("purge notification occurrences: %v", err)
+				}
 			case <-purgeCtx.Done():
 				return
 			}

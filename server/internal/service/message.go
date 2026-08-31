@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/Hana-ame/chat-app/server/internal/models"
 )
 
@@ -62,6 +63,13 @@ func (s *MessageService) Send(ctx context.Context, chatID, userID, content strin
 	}
 	if s.hub != nil {
 		s.hub.BroadcastMessageCreate(msg)
+	}
+	// 【本地改动 2026-08-31】持久化通知触发：提及 + 回复。尽力而为，
+	// 失败只记日志，绝不拖垮消息发送。
+	if s.Notification != nil {
+		if err := s.Notification.CreateForMessage(ctx, chatID, userID, mentions, replyTo, msg); err != nil {
+			logutil.Warn("notification trigger: %v", err)
+		}
 	}
 	return msg, nil
 }

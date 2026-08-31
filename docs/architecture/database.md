@@ -13,6 +13,7 @@ SQLite（WAL 模式、`foreign_keys=ON`、`synchronous=NORMAL`）。schema 由�
 | `002__add_thinking_column.sql` | `messages.thinking`（AI 推理块） |
 | `003__add_message_index.sql` | `(chat_id, created_at DESC, id DESC)` 复合索引 |
 | `004__add_reply_to_message.sql` | `messages.reply_to_message_id` + 索引 |
+| `005__add_notification_occurrences.sql` | 【本地改动 2026-08-31】持久化通知：`notification_occurrences` 表（每用户每事件唯一）+ 未读/过期索引 |
 
 另有运行时 `db_fixups.go` 动态补列（`ensureColumn`，幂等）：`chats.avatar_url / banner_url / background_url / banner_opacity / last_message_*`、`chat_members.notify_enabled / unread_count`、`messages.type`（与 001 重复定义，安全）、`users.notify_blocked`，以及 `last_visited_at → last_active_at` 改名。
 
@@ -77,6 +78,24 @@ SQLite（WAL 模式、`foreign_keys=ON`、`synchronous=NORMAL`）。schema 由�
 | reactions / attachments / mentions | **预聚合 JSON 缓存列**（`reactions` 表 + `attachments`/`mentions` 表的镜像） |
 
 索引：`(chat_id, id)`、`(chat_id, created_at DESC)`、`(chat_id, created_at DESC, id DESC)`、`(reply_to_message_id)`。
+
+### notification_occurrences（【本地改动 2026-08-31】移植 chatto 持久化通知）
+
+| 列 | 说明 |
+|---|---|
+| id | UUID (TEXT) PK |
+| user_id | FK → users ON DELETE CASCADE（收件人） |
+| kind | `mention` / `reply` / `system` |
+| chat_id / message_id | 触发通知的聊天与源消息 |
+| actor_id | 触发者（发送/回复消息的人） |
+| title / body | 通知展示内容（body 截断 120 字符） |
+| read | 是否已读 |
+| created_at / expires_at | 创建时间 / TTL（默认 90 天，清理 worker 删除过期行） |
+
+唯一约束 `UNIQUE(user_id, kind, chat_id, message_id)`：每用户每事件唯一，重复触发
+（同一条源消息被重复投递）不重复插行、不重置已读——数据层兜底，无需应用锁
+（与 notify chat 的「锁 + 唯一索引」同思路，但这里是单一 INSERT，锁不必要）。
+索引：`(user_id, read, created_at DESC)`（列表/未读）、`(expires_at)`（清理）。
 
 ### attachments / reactions / mentions
 

@@ -108,3 +108,21 @@ type RefreshToken struct {
 	ExpiresAt time.Time `json:"expires_at"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+// NotificationOccurrence 是持久化通知的一条记录（移植 chatto FDR-012 的
+// occurrence 语义）。行身份由 (user_id, kind, chat_id, message_id) 唯一，
+// 同源事件重复触发不重复插行；read 标记已读；expires_at 为 TTL 由清理
+// worker 删除。
+type NotificationOccurrence struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	Kind      string    `json:"kind"`
+	ChatID    string    `json:"chat_id"`
+	MessageID string    `json:"message_id"`
+	ActorID   string    `json:"actor_id"`
+	Title     string    `json:"title"`
+	Body      string    `json:"body"`
+	Read      bool      `json:"read"`
+	CreatedAt time.Time `json:"created_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+}

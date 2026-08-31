@@ -22,6 +22,9 @@ type Service struct {
 	Member   *MemberService
 	Reaction *ReactionService
 	Stream   *StreamService
+	// 【本地改动 2026-08-31】持久化通知服务（occurrence 存储 + 触发 + 清理），
+	// 移植 chatto 的通知机制；Message 发送后经它触发提及/回复通知。
+	Notification *NotificationService
 }
 
 func New(database *db.DB, hub *ws.Hub, cfg *config.Config) *Service {
@@ -35,6 +38,7 @@ func New(database *db.DB, hub *ws.Hub, cfg *config.Config) *Service {
 		Service: s,
 		live:    map[string]*liveStream{},
 	}
+	s.Notification = &NotificationService{Service: s}
 	return s
 }
 

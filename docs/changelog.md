@@ -420,3 +420,49 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
     count 连续两次相同再取值
 - 验证:Frontend CI ✅(unit-test + mock-test 32 用例 + full-e2e 10 用例);
   CI workflow ✅(go-test + frontend-build);提交 fc8a949/7b59020/7fe348a
+
+## 2026-08-31 feat: 持久化通知 occurrence（移植 chatto 通知机制，第 33 轮）
+
+### 背景
+- chat-app 原有通知只有两条路：notify 聊天（系统消息型）与客户端 `browserNotify`
+  （页面打开才弹）。没有服务端持久化的每用户通知存储、TTL 生命周期、过期清理，
+  也没有实时 `notification` 事件。本改动移植 chatto FDR-012 的「每用户每事件
+  唯一 + TTL + 已读」机制（SQLite 栈重实现，不引入事件溯源）。
+
+### 变更
+- `server/internal/db/migrations/005__add_notification_occurrences.sql`：新表
+  `notification_occurrences`（id/user_id/kind/chat_id/message_id/actor_id/
+  title/body/read/created_at/expires_at），唯一约束
+  `(user_id, kind, chat_id, message_id)`（每用户每事件唯一，数据层兜底），
+  索引 `(user_id, read, created_at DESC)` 与 `(expires_at)`。
+- `server/internal/db/notification_occurrences.go`：CRUD + `isUniqueViolation`
+  （唯一冲突 → created=false，重复触发不插行不重置已读）+ 过期 DELETE。
+- `server/internal/models/models.go`：`NotificationOccurrence` 模型（JSON 契约）。
+- `server/internal/service/notification.go`：`NotificationService`，消息发送后
+  按「提及 + 回复」触发（排除发送者、排除非成员；单项失败只记日志不拖垮发送）；
+  创建成功且收件人在线时经 hub 广播。
+- `server/internal/service/message.go`：`Send` 末尾接入 `CreateForMessage`。
+- `server/internal/service/service.go`：挂载 `Notification` 子服务。
+- `server/internal/ws/hub.go`：新增 op `notification` + `BroadcastNotification`
+  （只推本人）。
+- `server/internal/handlers/notification_occurrences.go` + `router.go`：
+  GET `/api/notifications`、GET `/api/notifications/unread-count`、
+  POST `/api/notifications/read-all`、POST `/api/notifications/{id}/read`、
+  DELETE `/api/notifications/{id}`（原 `/notifications/messages` 系列保留）。
+- `server/cmd/chatd/main.go`：清理循环每小时补一次 `PruneExpiredNotificationOccurrences`
+  （TTL 默认 90 天，与 token 清理并轨）。
+- 前端契约三方同步（`schemas.ts` / `client.ts` / `mock.js`）：
+  `NotificationOccurrenceSchema`、`api.notifications.listOccurrences/
+  unreadCount/markReadOccurrence/markAllReadOccurrences/deleteOccurrence`、
+  `mockOccurrence*` 处理器。
+- 文档：`docs/architecture/database.md`、`realtime.md`、`api/reference.md` 同步；
+  `swagger.json` 补 5 端点 + schema。
+
+### 测试（service/notification_test.go，6 例）
+- 提及只通知收件人（不通知发送者）、同源事件重复触发唯一、回复通知被回复作者、
+  单条已读/全部已读/删除生命周期、过期清理。断言统一用 `testutil.Require*`。
+
+### 验证
+- `go build ./...` + `go vet ./...` 本地通过；全量测试以 GitHub Actions 为准
+  （push 后 `gh run watch`）。Web Push（VAPID + service worker）与前端通知 UI
+  属后续轮次。

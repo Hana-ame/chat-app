@@ -26,13 +26,17 @@ const (
 	OpUserUpdate     Op = "user_update"
 	OpPresenceUpdate Op = "presence_update"
 	OpTyping         Op = "typing"
-	OpPing           Op = "ping"
-	OpPong           Op = "pong"
-	OpSubscribe      Op = "subscribe"
-	OpUnsubscribe    Op = "unsubscribe"
-	OpListMembers    Op = "list_members"
-	OpMembersList    Op = "members_list"
-	OpError          Op = "error"
+	// 【本地改动 2026-08-31】OpNotification 承载持久化通知 occurrence 的实时投递
+	// （移植 chatto FDR-012/013 的通知机制）。payload 为完整
+	// models.NotificationOccurrence。仅推给该用户自己的在线连接，不走聊天广播。
+	OpNotification Op = "notification"
+	OpPing         Op = "ping"
+	OpPong         Op = "pong"
+	OpSubscribe    Op = "subscribe"
+	OpUnsubscribe  Op = "unsubscribe"
+	OpListMembers  Op = "list_members"
+	OpMembersList  Op = "members_list"
+	OpError        Op = "error"
 )
 
 type Envelope struct {
@@ -313,6 +317,13 @@ func (h *Hub) NotifyUserNewChat(userID string, c *models.Chat) {
 
 func (h *Hub) NotifyUserLeftChat(userID, chatID string) {
 	h.sendToUser(userID, envelope(OpChatRemove, map[string]string{"chat_id": chatID}))
+}
+
+// BroadcastNotification 把一条通知 occurrence 推给该用户自己的在线连接
+// （WS/SSE）。只发给本人；离线用户不做补偿（持久化行由客户端下次拉取，
+// 离线推送由 Web Push 阶段处理）。
+func (h *Hub) BroadcastNotification(userID string, occ *models.NotificationOccurrence) {
+	h.sendToUser(userID, envelope(OpNotification, occ))
 }
 
 func (h *Hub) BroadcastUserUpdate(u *models.User) {
