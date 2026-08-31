@@ -8,6 +8,7 @@ import MessageList from './MessageList';
 import Composer from './Composer';
 import { renderContent } from './renderContent';
 import SearchModal from './SearchModal';
+import { useTypingUsers } from '../hooks/useTypingUsers';
 import PinnedMessages from './PinnedMessages';
 
 function getChatDisplayName(chat) {
@@ -39,6 +40,13 @@ export default function ChatView({ chatId, isNotification, onBack }) {
   const bgInputRef = useRef(null);
 
   const chat = useMemo(() => chats.find(c => c.id === chatId), [chats, chatId]);
+  // 【本地改动 2026-09-03】打字指示器：header 副标题显示"X 正在输入…"。
+  const typingIds = useTypingUsers(chatId);
+  const typingNames = useMemo(() => {
+    if (!typingIds.length || !chat) return [];
+    const byId = new Map((chat.members || []).map(m => [m.id, m.username]));
+    return typingIds.map(id => byId.get(id) || '...');
+  }, [typingIds, chat]);
 
   const sortedMessages = useMemo(() =>
     messages.filter(m => m.chat_id === chatId).sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at)),
@@ -255,7 +263,9 @@ export default function ChatView({ chatId, isNotification, onBack }) {
         <div style={{flex:1}}>
             <div style={{fontWeight:600}}>{name}</div>
             <div style={{fontSize:12,color:'var(--text-muted)'}}>
-              {isNotification ? '' : memberCount + ' member' + (memberCount !== 1 ? 's' : '')}
+              {typingNames.length > 0
+                ? <span style={{color:'var(--accent)'}}>{typingNames.join(', ')} 正在输入…</span>
+                : (isNotification ? '' : memberCount + ' member' + (memberCount !== 1 ? 's' : ''))}
             </div>
           </div>
           {chat.type === 'notify' ? null : (

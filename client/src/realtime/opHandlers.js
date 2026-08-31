@@ -30,6 +30,8 @@ export function createOpHandlers(bridge) {
       case 'chat_create': case 'chat_update': a.onChatUpdate(payload); break;
       case 'chat_delete': a.onChatDelete(payload); break;
       case 'chat_remove': a.onChatRemove(payload); break;
+      // 【本地改动 2026-09-03】打字指示器：转发到 store 记录"正在输入"。
+      case 'typing': a.onTyping(payload?.chat_id, payload?.user_id); break;
       case 'presence_update': {
         set(s => {
           const ids = new Set(s.onlineUserIds);

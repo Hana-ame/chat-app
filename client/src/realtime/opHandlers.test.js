@@ -23,6 +23,8 @@ function makeBridge() {
     onChatUpdate: vi.fn(),
     onChatDelete: vi.fn(),
     onChatRemove: vi.fn(),
+    // 【本地改动 2026-09-03】打字指示器分发目标
+    onTyping: vi.fn(),
     _normalize: normalize,
   };
   const handlers = createOpHandlers({ set, get, actions: () => actions });
@@ -102,6 +104,11 @@ describe('createOpHandlers', () => {
 
   it('getActiveChatId 返回当前聊天', () => {
     expect(b.handlers.getActiveChatId()).toBe('c1');
+  });
+
+  it('typing 事件转发到 onTyping', () => {
+    b.handlers.onEvent('typing', { chat_id: 'c1', user_id: 'u2' });
+    expect(b.actions.onTyping).toHaveBeenCalledWith('c1', 'u2');
   });
 
   it('未知 op 静默不抛错', () => {

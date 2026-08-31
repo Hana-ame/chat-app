@@ -798,3 +798,21 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
   踩坑：CI 与本地时区可能非 UTC，用 UTC 字符串断言会因时区漂移失败 → 测试全部用
   「本地时间 Date 组件」构造（new Date(y,m,d)），与时区无关。
 - 验证：`npx vitest run` 143 ✅（+8）；`npx tsc --noEmit` ✅；`npx vite build` ✅。
+
+## 2026-09-03 feat: 打字指示器（Typing indicator，对齐 chatto FDR-010）
+
+- 背景：后端 ws/hub.go 已 BroadcastTyping（每 2s 心跳），Composer 已发 typing 事件，
+  但前端无 UI 消费（opHandlers 一直静默忽略 typing）。补上展示层。纯前端，
+  无后端改动，所有本地改动带【本地改动 2026-09-03】标记。
+- 实现：
+  - `client/src/store/chat.js`：新增 `typingByChat`（chatId -> {userId: 过期时间戳}）、
+    `onTyping(chatId, userId)`（TTL 3s，composer 心跳 2s 兜底防闪烁）、
+    `pruneTyping(now)`（清理过期条目）；reset/disconnect 清空。
+  - `client/src/realtime/opHandlers.js`：`typing` op 转发到 `onTyping`。
+  - `client/src/hooks/useTypingUsers.js`：每秒 interval 驱动过期判定 + 清理，
+    返回当前聊天"正在输入"的 userId 列表（过滤自己，防御 SSE/poll 回显）。
+  - `client/src/components/ChatView.jsx`：header 副标题显示「X, Y 正在输入…」（accent 色）。
+- 边界：服务端 sendToChat 已排除发送者本人；hook 再滤当前用户（SSE/poll 兜底）。
+- 测试：`opHandlers.test.js` +1（typing 分发）、`chat.test.js` +4（onTyping/pruneTyping/
+  typing 事件分发），全套 vitest 148 ✅。
+- 验证：`npx vitest run` 148 ✅；`npx tsc --noEmit` ✅；`npx vite build` ✅。

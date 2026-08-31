@@ -50,6 +50,8 @@ export const useChatStore = create((set, get) => ({
   pinnedMessage: {},
   onlineUserIds: [],
   notifyEnabled: {},
+  // 【本地改动 2026-09-03】打字指示器状态：chatId -> { userId: 过期时间戳 }
+  typingByChat: {},
   _localStreaming: {},
   _optimisticIds: new Set(),
   pendingReply: null,
@@ -343,10 +345,38 @@ export const useChatStore = create((set, get) => ({
     });
   },
 
+  // 【本地改动 2026-09-03】打字指示器：记录/清理聊天内的"正在输入"用户。
+  // 过期时间戳 = now + 3s（composer 每 2s 发一次 typing 心跳，3s 兜底防闪烁）。
+  onTyping(chatId, userId) {
+    if (!chatId || !userId) return;
+    const now = Date.now();
+    set(s => {
+      const cur = { ...(s.typingByChat[chatId] || {}) };
+      cur[userId] = now + 3000;
+      return { typingByChat: { ...s.typingByChat, [chatId]: cur } };
+    });
+  },
+
+  // 清理已过期条目（chatId 为空则全量）。
+  pruneTyping(now) {
+    const t = now || Date.now();
+    set(s => {
+      const next = {};
+      for (const [cid, users] of Object.entries(s.typingByChat || {})) {
+        const alive = {};
+        for (const [uid, exp] of Object.entries(users)) {
+          if (exp > t) alive[uid] = exp;
+        }
+        if (Object.keys(alive).length) next[cid] = alive;
+      }
+      return { typingByChat: next };
+    });
+  },
+
   reset() {
     set({
       chats: [], activeChatId: null, messages: [], pinnedMessage: {},
-      onlineUserIds: [], notifyEnabled: {}, _localStreaming: {},
+      onlineUserIds: [], notifyEnabled: {}, typingByChat: {}, _localStreaming: {},
       _optimisticIds: new Set(), pendingReply: null,
       wsReady: false, sseReady: false,
     });

@@ -355,3 +355,39 @@ describe('coordinator 事件分发', () => {
     expect(useChatStore.getState().chats[0].members[0].username).toBe('new');
   });
 });
+
+describe('打字指示器（onTyping / pruneTyping）', () => {
+  it('onTyping 记录用户为"正在输入"', () => {
+    useChatStore.getState().onTyping('c1', 'u7');
+    const map = useChatStore.getState().typingByChat['c1'];
+    expect(map).toBeDefined();
+    expect(map['u7']).toBeGreaterThan(Date.now());
+  });
+
+  it('pruneTyping 清理已过期条目', () => {
+    const now = Date.now();
+    // 注入一个已过期 + 一个未过期的
+    useChatStore.setState(s => ({
+      typingByChat: { c1: { u7: now - 1000, u8: now + 3000 } },
+    }));
+    useChatStore.getState().pruneTyping(now);
+    const map = useChatStore.getState().typingByChat['c1'];
+    expect(map['u7']).toBeUndefined();
+    expect(map['u8']).toBe(now + 3000);
+  });
+
+  it('pruneTyping 全空后移除该聊天条目', () => {
+    useChatStore.getState().onTyping('c1', 'u7');
+    const t = Date.now() + 100000; // 使现有条目全部过期
+    useChatStore.getState().pruneTyping(t);
+    expect(useChatStore.getState().typingByChat['c1']).toBeUndefined();
+  });
+});
+
+describe('coordinator 事件分发 — typing', () => {
+  it('typing 事件更新 typingByChat', () => {
+    coordHandlers.onEvent('typing', { chat_id: 'c1', user_id: 'u7' });
+    const map = useChatStore.getState().typingByChat['c1'];
+    expect(map['u7']).toBeGreaterThan(0);
+  });
+});
