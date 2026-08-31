@@ -1,5 +1,6 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import MessageItem from './MessageItem';
+import { dateKey, formatDateDivider } from '../utils/messageDates';
 
 // 【本地改动 2026-09-03】Jump to present（对齐 chatto FDR-014 行为）：
 // - 用户接近底部（<300px）时，新消息自动滚动到底（保留原逻辑）。
@@ -85,6 +86,20 @@ export default function MessageList({ messages, hasMore, loading, onLoadMore, ch
     }
   }, [chatId, messages, loading]);
 
+  // 【本地改动 2026-09-03】日期分隔：相邻消息跨日时插入 Today/Yesterday/日期分隔线。
+  // 用 flatMap 展平为 [divider?, item, divider?, item, ...]；分隔线不占 MessageItem 语义。
+  const dateDividers = useMemo(() => {
+    const keys = messages.map(m => dateKey(m.created_at));
+    const divs = [];
+    let prevKey = null;
+    for (let i = 0; i < messages.length; i++) {
+      const k = keys[i];
+      if (k && k !== prevKey) divs.push(i);
+      prevKey = k || prevKey;
+    }
+    return divs;
+  }, [messages]);
+
   const handleJumpToPresent = () => {
     if (bodyRef.current) {
       bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
@@ -108,10 +123,20 @@ export default function MessageList({ messages, hasMore, loading, onLoadMore, ch
             <div>No messages yet. Start the conversation!</div>
           </div>
         )}
-        {messages.map((msg, i) => {
+        {messages.flatMap((msg, i) => {
           const prev = i > 0 ? messages[i - 1] : null;
           const sameAuthor = prev && prev.user_id === msg.user_id && !prev.deleted && !msg.deleted;
-          return <MessageItem key={msg.id || `msg-${i}`} msg={msg} sameAuthor={sameAuthor} chatId={chatId} onReply={onReply} />;
+          const divider = dateDividers.includes(i) ? (
+            <div key={`div-${i}`} style={{ textAlign: 'center', padding: '10px 0 4px', fontSize: 11, color: 'var(--text-muted)', userSelect: 'none' }}>
+              <span style={{ background: 'var(--bg-secondary)', padding: '3px 10px', borderRadius: 999 }}>
+                {formatDateDivider(msg.created_at)}
+              </span>
+            </div>
+          ) : null;
+          return [
+            divider,
+            <MessageItem key={msg.id || `msg-${i}`} msg={msg} sameAuthor={sameAuthor} chatId={chatId} onReply={onReply} />,
+          ];
         })}
       </div>
       {jumpCount > 0 && (

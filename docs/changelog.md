@@ -783,3 +783,18 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
 - 测试：`client/src/utils/fuzzyMatch.test.js` 10 用例（空/完全/子串/非连续子序列/
   大小写/乱序拒绝/连续优先/label 加权）。
 - 验证：`npx vitest run` 135 ✅（+10）；`npx tsc --noEmit` ✅；`npx vite build` ✅。
+
+## 2026-09-03 feat: 消息日期分隔线（Today / Yesterday / 日期）
+
+- 背景：翻历史时没有日期分隔，跨天连续阅读体验差。标准聊天做法在日期变化处插入
+  「Today / Yesterday / 具体日期」的居中分隔。纯前端，无后端改动，所有本地改动
+  带【本地改动 2026-09-03】标记。
+- 实现：
+  - `client/src/utils/messageDates.js`：`dateKey`（本地日粒度 yyyy-MM-dd，判定相邻
+    消息是否同一天）+ `formatDateDivider`（今天/昨天/本地化日期）。
+  - `client/src/components/MessageList.jsx`：messages.flatMap 展平，跨日时在消息前
+    插入居中分隔线（胶囊样式），不占 MessageItem 语义。
+- 测试：`client/src/utils/messageDates.test.js` 8 用例。
+  踩坑：CI 与本地时区可能非 UTC，用 UTC 字符串断言会因时区漂移失败 → 测试全部用
+  「本地时间 Date 组件」构造（new Date(y,m,d)），与时区无关。
+- 验证：`npx vitest run` 143 ✅（+8）；`npx tsc --noEmit` ✅；`npx vite build` ✅。
