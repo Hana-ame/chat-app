@@ -8,6 +8,7 @@ import MessageList from './MessageList';
 import Composer from './Composer';
 import { renderContent } from './renderContent';
 import SearchModal from './SearchModal';
+import PinnedMessages from './PinnedMessages';
 
 function getChatDisplayName(chat) {
   if (!chat) return 'Loading...';
@@ -31,6 +32,7 @@ export default function ChatView({ chatId, isNotification, onBack }) {
   const [uploadingBg, setUploadingBg] = useState(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [showPins, setShowPins] = useState(false);
   const headerMenuRef = useRef(null);
   const avatarInputRef = useRef(null);
   const bannerInputRef = useRef(null);
@@ -45,7 +47,14 @@ export default function ChatView({ chatId, isNotification, onBack }) {
 
   useEffect(() => {
     if (!chatId || !accessToken || isNotification) return;
-    api.listMembers(accessToken, chatId).then(d => setMemberCount(d.members?.length || 0)).catch(e => notify('Failed to load members: ' + (e.message || e.error || 'Unknown error'), 'error'));
+    api.listMembers(accessToken, chatId).then(d => {
+      setMemberCount(d.members?.length || 0);
+      // 【本地改动 2026-09-02】同步 members 到 store：MessageItem 的 Pin/Unpin 权限判断
+      // （owner/admin）依赖 chat.members role，MemberPanel 仅在桌面挂载，这里主动补齐。
+      useChatStore.setState(s => ({
+        chats: s.chats.map(x => x.id === chatId ? { ...x, members: d.members || x.members } : x),
+      }));
+    }).catch(e => notify('Failed to load members: ' + (e.message || e.error || 'Unknown error'), 'error'));
   }, [chatId, accessToken, isNotification]);
 
   useEffect(() => {
@@ -274,6 +283,14 @@ export default function ChatView({ chatId, isNotification, onBack }) {
               )}
             </button>
           )}
+          {chat.type === 'notify' ? null : (
+            <button className="btn-ghost" style={{padding:'6px 8px',lineHeight:0,borderRadius:4,opacity:0.85}} title="Pinned messages"
+              onClick={() => setShowPins(true)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+              </svg>
+            </button>
+          )}
           {chat.type === 'notify' || chat?.owner_id !== user.id ? null : (
             <button className="btn-ghost" style={{padding:'6px 8px',lineHeight:0,borderRadius:4}} title="Set announcement"
               onClick={() => {
@@ -380,6 +397,7 @@ export default function ChatView({ chatId, isNotification, onBack }) {
         />
       <Composer chatId={chatId} isNotification={isNotification} replyTo={replyTo} onCancelReply={() => setReplyTo(null)} />
       <SearchModal open={showSearch} onClose={() => setShowSearch(false)} />
+      <PinnedMessages chatId={chatId} open={showPins} onClose={() => setShowPins(false)} />
     </div>
   );
 }

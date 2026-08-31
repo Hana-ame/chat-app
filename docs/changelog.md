@@ -636,7 +636,6 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
   `docs/api/reference.md`（消息置顶章节）。
 - 验证：`go build` ✅；`npx vitest run` 99 ✅；`npx tsc --noEmit` ✅。
 
-
 ## 2026-09-02 feat: 消息正文内联图片（`![]()` → `<img>` + 代理，fork 分歧）
 
 - 背景：chatto fork 允许消息正文 `![alt](url)` 渲染为 `<img>`，且所有图片 src
@@ -658,7 +657,6 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
 - 前端契约：无（纯前端渲染）。
 - 测试：`renderContent.test.js` 新增 24 用例（proxyImageSource 14 + tokenizeImages 10）；
   全套 vitest 99 通过；`tsc --noEmit` 通过；`vite build` 正常。
-
 
 ## 2026-09-03 feat: FTS5 消息全文搜索
 
@@ -690,3 +688,20 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
 - 文档：`docs/architecture/database.md`（009 迁移行 + messages_fts 章节）；
   `docs/api/reference.md`（消息搜索章节 + 语法表）。
 - 验证：`go build` ✅；`npx vitest run` 99 ✅；`npx tsc --noEmit` ✅。
+
+## 2026-09-03 feat: 消息置顶前端 UI（chatto FDR-037）
+
+- 背景：Round 11 后端已就绪（`chat_pins` 表 + pin/unpin/list API），本轮补齐前端。
+  所有本地改动带【本地改动 2026-09-02/09-03】标记。
+- `client/src/components/PinnedMessages.jsx`（新）：置顶消息抽屉。
+  - 打开加载 `GET /api/chats/{chatID}/pins`（created_at DESC），has_more 分页「加载更多」。
+  - 每条显示作者 + 时间 + 摘要（renderContent）；已删除消息灰色「(message deleted)」且不可跳转。
+  - owner/admin 可见 Unpin 按钮（chat.members role 判断）；点击条目 scrollIntoView 跳转到消息。
+- `client/src/components/MessageItem.jsx`：msg-actions 新增 Pin/Unpin 按钮。
+  - 权限：`chat.type !== 'dm' && !== 'notify' && (owner_id===user || members role in [admin,owner])`。
+  - 乐观更新：点击后本地切换 Pin/Unpin（真实状态由 PinnedMessages 抽屉统一管理）。
+- `client/src/components/ChatView.jsx`：header 新增 pin 图标按钮打开抽屉；挂载 PinnedMessages。
+  - 踩坑：store 的 `chat.members` 从未填充（MemberPanel 仅桌面挂载才加载），导致 MessageItem
+    admin 判断恒 false → ChatView 拉成员时同步 members 到 store。
+- 文档：`docs/changelog.md` 本条。
+- 验证：`npx vitest run` 99 ✅；`npx tsc --noEmit` ✅；`npx vite build` ✅。

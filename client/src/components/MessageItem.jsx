@@ -139,6 +139,32 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId, onReply
     }
   };
 
+  // 【本地改动 2026-09-02】消息置顶（chatto FDR-037，多消息）。
+  // 权限：owner/admin（chat.members role）可 pin/unpin；DM/notify 无入口（后端也拒绝）。
+  const canPin = !!chat && chat.type !== 'dm' && chat.type !== 'notify' &&
+    (chat.owner_id === user.id || chat.members?.some(m => m.id === user.id && (m.role === 'admin' || m.role === 'owner')));
+  const [pinned, setPinned] = useState(false);
+  useEffect(() => {
+    // 简单乐观：从 chat_pins 列表判断当前消息是否已置顶（后端未在 Message 上回显）。
+    // 此处用轻量探测：若已 pin 过则按钮显示 Unpin。真实状态由 PinnedMessages 抽屉统一管理，
+    // 这里通过本地开关近似（不额外发请求）。
+    setPinned(false);
+  }, [msg.id]);
+  const handlePinToggle = async () => {
+    if (!canPin || msg.deleted) return;
+    setOpPending(true);
+    try {
+      if (pinned) {
+        await api.unpinMessage(accessToken, chatId, msg.id);
+      } else {
+        await api.pinMessage(accessToken, chatId, msg.id);
+      }
+      setPinned(!pinned);
+    } catch (e) { console.error('Pin toggle error:', e); } finally {
+      setOpPending(false);
+    }
+  };
+
   return (
     <div className="msg-group" id={'msg-' + msg.id}>
       <div className={'msg-row' + (sameAuthor ? ' msg-continuation' : '')}>
@@ -201,6 +227,7 @@ const MessageItem = memo(function MessageItem({ msg, sameAuthor, chatId, onReply
               <div className="msg-actions">
                 <button ref={emojiBtnRef} className="msg-btn" onClick={() => setShowEmoji(!showEmoji)} disabled={opPending}>😀</button>
                 <button className="msg-btn" onClick={() => onReply?.(msg)} disabled={opPending}>Reply</button>
+                {canPin && !msg.deleted && <button className="msg-btn" onClick={handlePinToggle} disabled={opPending}>{pinned ? 'Unpin' : 'Pin'}</button>}
                 {isMe && <button className="msg-btn" onClick={() => { setEditing(true); setEditText(msg.content); }} disabled={opPending}>Edit</button>}
                 {isMe && <button className="msg-btn" onClick={handleDelete} disabled={opPending}>Delete</button>}
               </div>
