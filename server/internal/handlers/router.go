@@ -108,6 +108,9 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 				r.Get("/users/me", s.Me)
 				r.Patch("/users/me", s.UpdateMe)
 				r.With(rateLimitByUser(30, 1*time.Minute)).Get("/users", s.SearchUsers)
+				// 【本地改动 2026-09-03】FTS5 消息搜索（限流 60/min，防暴力穷举）。
+				// GET /api/search/messages?query=&chat_id=&user_id=&before=&limit=
+				r.With(rateLimitByUser(60, 1*time.Minute)).Get("/search/messages", s.SearchMessages)
 
 				r.Get("/chats/my", s.ListChats)
 				r.Get("/chats/public", s.ListPublicChats)

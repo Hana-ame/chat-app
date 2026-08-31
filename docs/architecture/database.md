@@ -17,6 +17,7 @@ SQLite（WAL 模式、`foreign_keys=ON`、`synchronous=NORMAL`）。schema 由�
 | `006__add_push_subscriptions.sql` | 【本地改动 2026-08-31】Web Push：`push_subscriptions` 表（endpoint 全局唯一，p256dh/auth 加密密钥，FK 级联删用户） |
 | `007__add_threads.sql` | 【本地改动 2026-08-31】线程聚合：`messages.thread_root_message_id`（自引用 FK，顶层为空、StartThread 自指、回复继承祖先根）+ `thread_follows`（每用户每根唯一，关注通知 opt-in）+ `thread_read_state`（每用户每根的已读游标） |
 | `008__add_chat_pins.sql` | 【本地改动 2026-09-02】消息置顶（chatto FDR-037，多消息，区别于聊天公告）：`chat_pins` 表（chat↔message 关联，幂等唯一索引），FK CASCADE 清理 |
+| `009__add_messages_fts.sql` | 【本地改动 2026-09-03】消息全文搜索：`messages_fts` FTS5 虚拟表（内联 tokenize='unicode61'），应用层在 Create/Update/Delete Message 时同步维护；启动后台 BackfillFTS 对老消息回填 |
 
 另有运行时 `db_fixups.go` 动态补列（`ensureColumn`，幂等）：`chats.avatar_url / banner_url / background_url / banner_opacity / last_message_*`、`chat_members.notify_enabled / unread_count`、`messages.type`（与 001 重复定义，安全）、`users.notify_blocked`，以及 `last_visited_at → last_active_at` 改名。
 
@@ -152,6 +153,16 @@ SQLite（WAL 模式、`foreign_keys=ON`、`synchronous=NORMAL`）。schema 由�
 **与聊天公告的边界**：`chats.pinned_message` JSON 列存储自写文本公告（单条、owner-only）；`chat_pins` 存储指向现有消息的多条置顶，owner/admin 可操作、member 可读列表；两者独立、不冲突。
 
 **消息软删除联动**：FK CASCADE 只对硬删除生效；消息软删除（DeleteMessage 仅置 deleted_at）时应用层同步调用 `RemovePinsForMessage` 清理关联 pin，避免列表中残留不可读消息。
+
+### messages_fts（【本地改动 2026-09-03】FTS5 全文搜索）
+
+- SQLite FTS5 虚拟表（内联），tokenize='unicode61'
+- 字段：`content` TEXT（可搜索）、`msg_id` UNINDEXED（关联 messages.id，UNINDEXED 确保不进搜索索引）
+- 索引维护：`CreateMessage`/`CreateAIMessage`/`UpdateMessage` → `INSERT OR REPLACE INTO messages_fts(content, msg_id)`；`DeleteMessage` → `DELETE FROM messages_fts WHERE msg_id = ?`
+- 踩坑：最初用 FTS5 external content + rebuild 控制命令，但 modernc.org/sqlite 对 FTS5 external content 支持不完整（rowid 强制 INTEGER，与 UUID msg ID 冲突）；改用 UNINDEXED 辅助列后 INSERT OR REPLACE 正常
+- 启动回填：`BackfillFTS` 后台 goroutine（60s 超时），对老消息（content 非空但 FTS 表无对应行）逐条插入
+- 搜索 SQL：`SELECT ... FROM messages m INNER JOIN messages_fts f ON f.msg_id = m.id WHERE f.content MATCH ? AND m.deleted_at IS NULL`
+- 访问控制：`ChatID` 非空 → `Authz.MustBeMember`；为空 → 附加 `EXISTS (SELECT 1 FROM chat_members WHERE chat_id = m.chat_id AND user_id = ?)` 子查询
 
 ### attachments / reactions / mentions
 

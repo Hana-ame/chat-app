@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"sort"
+	"time"
 
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	_ "modernc.org/sqlite"
@@ -164,6 +165,21 @@ func (d *DB) Migrate() error {
 	if err := d.ensureSchemaColumns(ctx); err != nil {
 		return fmt.Errorf("ensure schema columns: %w", err)
 	}
+
+	// 【本地改动 2026-09-03】后台回填 FTS5 索引：对老消息（创建时未同步）做一次性索引。
+	// 后台 goroutine，避免阻塞启动；若库大则可能耗时，但不会阻止服务就绪。
+	go func() {
+		bCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		indexed, skipped, err := d.BackfillFTS(bCtx)
+		if err != nil {
+			logutil.Error("BackfillFTS failed: %v", err)
+			return
+		}
+		if indexed > 0 || skipped > 0 {
+			logutil.Info("BackfillFTS done: indexed=%d skipped=%d", indexed, skipped)
+		}
+	}()
 
 	return nil
 }

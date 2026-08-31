@@ -70,6 +70,27 @@ const messageColumns = `m.id, m.chat_id, m.user_id, m.type, m.content, m.created
 const messageJoins = ` FROM messages m JOIN users u ON u.id = m.user_id
 		 LEFT JOIN chat_members cm ON cm.chat_id = m.chat_id AND cm.user_id = m.user_id`
 
+// 【本地改动 2026-09-03】FTS5 索引维护：与 messages 表同步。
+// upsertFTS 用 INSERT OR REPLACE（FTS5 对 msg_id UNINDEXED 列隐式 UNIQUE，重复写入自动替换）。
+// deleteFTS 显式删行。注意：不用 FTS5 rebuild 控制命令，modernc.org/sqlite 对
+// FTS5 external content 支持不完整（rowid 强制 INTEGER，与 UUID msg ID 冲突）。
+func upsertFTS(tx dbTx, ctx context.Context, msgID, content string) error {
+	_, err := tx.ExecContext(ctx,
+		`INSERT OR REPLACE INTO messages_fts(content, msg_id) VALUES(?, ?)`,
+		content, msgID,
+	)
+	return err
+}
+func deleteFTS(tx dbTx, ctx context.Context, msgID string) error {
+	_, err := tx.ExecContext(ctx, `DELETE FROM messages_fts WHERE msg_id = ?`, msgID)
+	return err
+}
+
+type dbTx interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+
 func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, mentions []string, attachments []models.Attachment, opts ...CreateMessageOpt) (*models.Message, error) {
 	o := &struct {
 		replyTo    string
@@ -119,6 +140,10 @@ func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, 
 		id, chatID, userID, content, now, len(attachments), len(dedupe(mentions)), string(attJSON), string(mentJSON), replyToID, threadRootID,
 	)
 	if err != nil {
+		return nil, err
+	}
+	// 【本地改动 2026-09-03】同步 FTS5 索引。
+	if err := upsertFTS(tx, ctx, id, content); err != nil {
 		return nil, err
 	}
 	// 【本地改动 2026-08-31】线程根自引用：StartThread 时 threadRootID=="__SELF__"，
@@ -405,6 +430,10 @@ func (d *DB) UpdateMessage(ctx context.Context, id, userID, content string) (*mo
 	if n == 0 {
 		return nil, ErrNotFound
 	}
+	// 【本地改动 2026-09-03】同步 FTS5 索引（重新插入以覆盖旧内容）。
+	if err := upsertFTS(d, ctx, id, content); err != nil {
+		return nil, err
+	}
 	logutil.Debug("updated message %s by user %s", id, userID)
 	return d.GetMessage(ctx, id)
 }
@@ -428,6 +457,8 @@ func (d *DB) DeleteMessage(ctx context.Context, id, userID string, allowAny bool
 	if n == 0 {
 		return ErrNotFound
 	}
+	// 【本地改动 2026-09-03】消息软删除时同步清理 FTS 索引（否则搜索仍会命中已删除消息）。
+	_ = deleteFTS(d, ctx, id)
 	logutil.Debug("deleted message %s by user %s", id, userID)
 	return nil
 }
@@ -442,3 +473,113 @@ func truncate(s string, n int) string {
 }
 
 
+
+// ── 【本地改动 2026-09-03】FTS5 消息搜索 ──────────────────────────────
+
+// SearchMessagesInput 是 SearchMessages 的查询参数。
+type SearchMessagesInput struct {
+	Query   string // FTS5 MATCH 表达式（空格分词，多词 OR；"" 强制精确短语；foo AND bar 要求同时出现）
+	ChatID  string // 可选：限定在某聊天内
+	UserID  string // 可选：限定某用户
+	ActorID string // 可选：当 ChatID 为空时，用 chat_members 子查询强制访问控制
+	Before  string // 可选：created_at 游标（严格小于）
+	Limit   int    // 默认 50，最大 100
+}
+
+// SearchResult 是 SearchMessages 的返回（含 has_more 分页提示）。
+type SearchResult struct {
+	Messages []models.Message
+	HasMore  bool
+	Total    int // 本次返回条数
+}
+
+// SearchMessages 用 FTS5 MATCH 搜索消息。
+// 已删除消息（deleted_at != null）不返回；content 列空的消息也不返回。
+// 返回按 created_at DESC 排序（+1 多取一条判 has_more）。
+func (d *DB) SearchMessages(ctx context.Context, in SearchMessagesInput) (*SearchResult, error) {
+	if in.Query == "" {
+		return &SearchResult{}, nil
+	}
+	if in.Limit <= 0 || in.Limit > 100 {
+		in.Limit = 50
+	}
+
+	// 构造 WHERE + args。FTS5 MATCH 放在最前，配合索引。
+	q := `SELECT ` + messageColumns + messageJoins + `
+		INNER JOIN messages_fts f ON f.msg_id = m.id
+		WHERE f.content MATCH ?
+		  AND m.deleted_at IS NULL`
+	args := []any{in.Query}
+	if in.ChatID != "" {
+		q += ` AND m.chat_id = ?`
+		args = append(args, in.ChatID)
+	} else if in.ActorID != "" {
+		// 【本地改动 2026-09-03】ChatID 为空时（全局搜索）：用 chat_members 子查询强制访问控制，
+		// 防止用户搜到非成员聊天的消息。踩坑：若此处不强制，用户可越权搜索任意消息。
+		q += ` AND EXISTS (SELECT 1 FROM chat_members WHERE chat_id = m.chat_id AND user_id = ?)`
+		args = append(args, in.ActorID)
+	}
+	if in.UserID != "" {
+		q += ` AND m.user_id = ?`
+		args = append(args, in.UserID)
+	}
+	if in.Before != "" {
+		q += ` AND m.created_at < ?`
+		args = append(args, in.Before)
+	}
+	q += ` ORDER BY m.created_at DESC, m.id DESC LIMIT ?`
+	args = append(args, in.Limit+1)
+
+	rows, err := d.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []models.Message
+	for rows.Next() {
+		m, err := d.scanMessage(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	hasMore := len(out) > in.Limit
+	if hasMore {
+		out = out[:in.Limit]
+	}
+	return &SearchResult{Messages: out, HasMore: hasMore, Total: len(out)}, nil
+}
+
+// 【本地改动 2026-09-03】BackfillFTS 对未索引的消息做 FTS 回填。
+// 启动时调用一次：扫描 messages 中无对应 FTS 行且有 content 的消息，逐条插入。
+// 避免对大库做批量 INSERT OR REPLACE（可能导致 FTS 表瞬间膨胀）。
+// 返回 (indexedCount, skippedCount)。
+func (d *DB) BackfillFTS(ctx context.Context) (indexed int, skipped int, err error) {
+	// 找所有 content 非空但 FTS 表未索引的消息
+	rows, err := d.QueryContext(ctx,
+		`SELECT id, content FROM messages WHERE content != '' AND content IS NOT NULL
+		   AND id NOT IN (SELECT msg_id FROM messages_fts)`,
+	)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id, content string
+		if err := rows.Scan(&id, &content); err != nil {
+			return indexed, skipped, err
+		}
+		if err := upsertFTS(d, ctx, id, content); err != nil {
+			skipped++
+			continue
+		}
+		indexed++
+	}
+	return indexed, skipped, rows.Err()
+}

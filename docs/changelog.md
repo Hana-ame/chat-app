@@ -658,3 +658,32 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
 - 前端契约：无（纯前端渲染）。
 - 测试：`renderContent.test.js` 新增 24 用例（proxyImageSource 14 + tokenizeImages 10）；
   全套 vitest 99 通过；`tsc --noEmit` 通过；`vite build` 正常。
+
+
+## 2026-09-03 feat: FTS5 消息全文搜索
+
+- 背景：chatto 提供聊天消息全文搜索（基于搜索后端）；chat-app 此前无此能力。
+  用 SQLite 原生 FTS5 虚拟表实现（无外部依赖），所有本地改动带【本地改动 2026-09-03】标记。
+- 迁移：`server/internal/db/migrations/009__add_messages_fts.sql` — 新建
+  `messages_fts` FTS5 虚拟表（内联，`tokenize='unicode61'`，`msg_id UNINDEXED`
+  辅助列关联 messages.id）。采用 UNINDEXED 辅助列方案：一开始用 FTS5 rebuild
+  控制命令 + external content，但 modernc.org/sqlite 对 FTS5 external content
+  支持不完整（rowid 强制 INTEGER，与 UUID msg ID 冲突）→ 改用 msg_id UNINDEXED
+  后 INSERT OR REPLACE 正常。
+- 后端：`db/messages.go` 新增 `upsertFTS`/`deleteFTS` 维护函数 + `SearchMessages`
+  查询函数（INNER JOIN messages_fts f ON f.rowid = m.id，MATCH ? 参数化）；
+  在 `CreateMessage`/`UpdateMessage`/`DeleteMessage` 同步调用维护函数。
+  `db/db.go` 启动后台 goroutine 调用 `BackfillFTS`（60s 超时），对老消息（已存
+  但无 FTS 索引）逐条回填。
+  `service/search.go`：`SearchService`（ChatID 非空 → Authz.MustBeMember；
+  为空 → DB 层通过 chat_members 子查询强制访问控制，防越权）。
+  `handlers/search.go` + router：`GET /api/search/messages?query=&chat_id=&user_id=&before=&limit=50`
+  （限流 60 req/min/user）。
+- 搜索语义：FTS5 MATCH 原样透传：空格分词（多词 OR）、`""` 精确短语、
+  `*` 前缀通配、`AND` 逻辑运算。
+- 前端契约：`client/src/schemas.ts`（SearchMessagesResponse）；
+  `client/src/api/client.ts`（searchMessages）；`client/src/api/mock.js`（mock 版子串匹配 + 简单 highlight）。
+- swagger：+`/api/search/messages` +`SearchMessagesResponse`。
+- 文档：`docs/architecture/database.md`（009 迁移行 + messages_fts 章节）；
+  `docs/api/reference.md`（消息搜索章节 + 语法表）。
+- 验证：`go build` ✅；`npx vitest run` 99 ✅；`npx tsc --noEmit` ✅。

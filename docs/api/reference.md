@@ -108,6 +108,45 @@ Base URL：生产 `https://chat.moonchan.xyz`，本地 `http://localhost:8080`�
 
 消息软删除时服务自动清理该消息所有 pin（避免列表中残留不可读消息）。
 
+## 消息搜索（【本地改动 2026-09-03】FTS5 全文检索）
+
+基于 SQLite FTS5 虚拟表 `messages_fts` 的消息全文搜索。`query` 直接透传 FTS5 MATCH，天然支持：
+
+| 语法 | 示例 | 语义 |
+|---|---|---|
+| 空格分词 | `hello world` | 多词 OR（任一命中） |
+| 精确短语 | `"hello world"` | 完全匹配该短语 |
+| 前缀通配 | `proj*` | 匹配 `project`、`projet` 等 |
+| 逻辑运算 | `foo AND bar` | 两词同时命中 |
+
+已删除消息不返回。`chat_id` 非空时校验当前用户为该聊天成员；为空时用 chat_members 子查询限制为当前用户所有可访问聊天。限流 60 req/min/user。
+
+| 方法 | 路径 | 认证 | 说明 |
+|---|---|---|---|
+| GET | `/api/search/messages?query=&chat_id=&user_id=&before=&limit=50` | Bearer | 消息全文搜索 |
+
+响应示例：
+
+```json
+{
+  "messages": [
+    {
+      "message": {
+        "id": "m123",
+        "chat_id": "c1",
+        "content": "... hello world ...",
+        "created_at": "2026-09-03T01:00:00Z",
+        ...
+      },
+      "highlight": "... ... **hello** world ... ..."
+    }
+  ],
+  "has_more": false,
+  "next": "",
+  "total": 1
+}
+```
+
 ## 通知
 
 | 方法 | 路径 | 认证 | 说明 |

@@ -9,6 +9,7 @@ import {
   mockUpload, mockUploadAvatar,
 	mockPinChat, mockUnpinChat, mockMarkAnnouncementRead, mockUpdateChatAvatar, mockUpdateChatBanner, mockUpdateChatBackground,
 	mockPinMessage, mockUnpinMessage, mockListPinnedMessages,
+	mockSearchMessages,
 	mockGetNotifyChat, mockNotificationsList, mockNotifySend, mockNotifyMarkRead, mockNotifyDelete,
 	mockOccurrenceList, mockOccurrenceUnreadCount, mockOccurrenceMarkRead, mockOccurrenceMarkAllRead, mockOccurrenceDelete,
 	mockPushGetVAPIDPublicKey, mockPushSubscribe, mockPushUnsubscribe,
@@ -208,6 +209,19 @@ const _apiMethods = {
     return request<{ pins: PinEntry[]; total: number; has_more: boolean; next: string }>('GET', url, token);
   },
 
+  // ── 【本地改动 2026-09-03】FTS5 消息搜索 ──
+  // GET /api/search/messages?query=&chat_id=&user_id=&before=&limit=
+  // query 直接透传到 FTS5 MATCH（支持 "" 短语、* 前缀、AND 运算符）；
+  // chat_id 非空时 Authz.MustBeMember 校验；为空时用 chat_members 子查询限制。
+  searchMessages: (token: string, query: string, chatId?: string, userId?: string, before?: string, limit?: number) => {
+    const params: string[] = ['query=' + encodeURIComponent(query)];
+    if (chatId) params.push('chat_id=' + encodeURIComponent(chatId));
+    if (userId) params.push('user_id=' + encodeURIComponent(userId));
+    if (before) params.push('before=' + encodeURIComponent(before));
+    params.push('limit=' + (limit || 50));
+    return request<import('../schemas').SearchMessagesResponse>('GET', '/api/search/messages?' + params.join('&'), token);
+  },
+
   // ── Notifications ──
   getNotificationsChat: (token: string) =>
     request<Chat>('GET', '/api/chats/notify', token),
@@ -326,6 +340,7 @@ function buildMockProxy(target: typeof _apiMethods): ApiType {
     markRead: mockMarkRead, addReaction: mockAddReaction, removeReaction: mockRemoveReaction,
     pinChat: mockPinChat, unpinChat: mockUnpinChat,
     pinMessage: mockPinMessage, unpinMessage: mockUnpinMessage, listPinnedMessages: mockListPinnedMessages,
+    searchMessages: mockSearchMessages,
     markAnnouncementRead: mockMarkAnnouncementRead,
     getNotificationsChat: mockGetNotifyChat,
     upload: mockUpload, uploadAvatar: mockUploadAvatar,

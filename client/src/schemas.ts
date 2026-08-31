@@ -135,6 +135,22 @@ export const PinEntrySchema = z.object({
 });
 export type PinEntry = z.infer<typeof PinEntrySchema>;
 
+// 【本地改动 2026-09-03】FTS5 消息搜索结果项 + 完整响应契约。
+// search_messages API 返回 messages 数组，每项是带 highlight（可选）的消息。
+export const SearchMessageResultSchema = z.object({
+  message: MessageSchema,
+  highlight: z.string().optional(), // 命中片段预览（前端可扩展）
+});
+export type SearchMessageResult = z.infer<typeof SearchMessageResultSchema>;
+
+export const SearchMessagesResponseSchema = z.object({
+  messages: z.array(SearchMessageResultSchema),
+  has_more: z.boolean(),
+  next: z.string().optional(),
+  total: z.number(),
+});
+export type SearchMessagesResponse = z.infer<typeof SearchMessagesResponseSchema>;
+
 export interface Message extends z.infer<typeof MessageSchema> {
   source?: () => void;
 }

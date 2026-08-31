@@ -31,6 +31,9 @@ type Service struct {
 	// 【本地改动 2026-09-02】消息置顶服务（chatto FDR-037）：多消息置顶（区别于
 	// 聊天公告 pinned_message）。DM 不支持；owner/admin 可 pin/unpin；member 可读列表。
 	Pin *PinService
+	// 【本地改动 2026-09-03】FTS5 消息搜索：基于 messages_fts 虚拟表，
+	// 支持空格分词/短语/前缀/逻辑运算符；ChatID 为空时用 chat_members 子查询强制访问控制。
+	Search *SearchService
 }
 
 func New(database *db.DB, hub *ws.Hub, cfg *config.Config) *Service {
@@ -47,6 +50,7 @@ func New(database *db.DB, hub *ws.Hub, cfg *config.Config) *Service {
 	s.Notification = &NotificationService{Service: s}
 	s.Push = &PushService{Service: s}
 	s.Pin = &PinService{Service: s}
+	s.Search = &SearchService{Service: s}
 	return s
 }
 

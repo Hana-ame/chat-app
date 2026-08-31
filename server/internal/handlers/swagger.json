@@ -2938,6 +2938,90 @@
           }
         }
       }
+    },
+    "/api/search/messages": {
+      "get": {
+        "summary": "FTS5 消息全文搜索",
+        "description": "【本地改动 2026-09-03】基于 SQLite FTS5 虚拟表 messages_fts 的消息搜索。query 直接透传 FTS5 MATCH：空格分词（多词 OR）、\"\" 精确短语、* 前缀、AND 逻辑运算符。chat_id 非空时 Authz.MustBeMember；为空时 DB 层用 chat_members 子查询限制。已删除消息不返回。",
+        "operationId": "searchMessages",
+        "tags": [
+          "Search"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "FTS5 MATCH 表达式"
+          },
+          {
+            "name": "chat_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "限定聊天"
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "限定用户"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "created_at 游标"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 100
+            },
+            "description": "每页条数"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchMessagesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3895,6 +3979,27 @@
           "next": {
             "type": "string",
             "description": "下一页 cursor (last pinned_at)"
+          }
+        }
+      },
+      "SearchMessagesResponse": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          },
+          "has_more": {
+            "type": "boolean"
+          },
+          "next": {
+            "type": "string",
+            "description": "下一页 cursor"
+          },
+          "total": {
+            "type": "integer"
           }
         }
       }

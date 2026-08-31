@@ -627,6 +627,60 @@ export function mockListPinnedMessages(_token, chatId, before, limit) {
   return { chat_id: chatId, pins: entries, total: entries.length, has_more: hasNext, next };
 }
 
+/**
+ * 【本地改动 2026-09-03】FTS5 消息搜索 mock（对齐后端行为）。
+ * 在 mock data 中对 message.content 做简单大小写不敏感子串匹配：
+ *   - 空格分词 → 任一 token 出现在 content 中即命中（OR 语义）
+ *   - 保留 "..." 精确短语（含引号时按整个短语匹配）
+ * @param {string} _token
+ * @param {string} query
+ * @param {string|undefined} chatId
+ * @param {string|undefined} userId
+ * @param {string|undefined} before
+ * @param {number|undefined} limit
+ * @returns {{ messages: Array<{message,highlight?}>, has_more: boolean, next: string, total: number }}
+ */
+export function mockSearchMessages(_token, query, chatId, userId, before, limit) {
+  const d = ensureData();
+  let terms = [];
+  if (query.startsWith('"') && query.endsWith('"') && query.length >= 2) {
+    terms = [query.slice(1, -1).toLowerCase()]; // 精确短语
+  } else {
+    // 拆分 AND（简单）：foo AND bar → 两词都必须命中
+    const parts = query.split(/\s+AND\s+/i);
+    terms = parts.map(p => p.trim().toLowerCase()).filter(Boolean);
+    if (terms.length === 0) terms = [query.toLowerCase()];
+  }
+  const phrase = terms.length === 1 && terms[0].includes(' ') ? terms[0] : null;
+
+  const limitN = Number(limit) || 50;
+  let candidates = d.messages.filter(m => {
+    if (m.deleted_at) return false;
+    if (!m.content) return false;
+    if (chatId && m.chat_id !== chatId) return false;
+    if (userId && m.user_id !== userId) return false;
+    if (before && m.created_at >= before) return false;
+    const lc = m.content.toLowerCase();
+    if (phrase) {
+      return lc.includes(phrase);
+    }
+    // 多词：任一 token 命中（OR）
+    return terms.some(t => lc.includes(t));
+  });
+
+  candidates.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const hasNext = candidates.length > limitN;
+  candidates = candidates.slice(0, limitN);
+  const next = hasNext && candidates.length > 0 ? candidates[candidates.length - 1].created_at : '';
+
+  const results = candidates.map(m => ({
+    message: m,
+    highlight: terms.length === 1 ? ('…' + m.content.substring(Math.max(0, m.content.toLowerCase().indexOf(terms[0])) - 20, m.content.toLowerCase().indexOf(terms[0]) + terms[0].length + 40).replace(terms[0], '**' + terms[0] + '**') + '…') : undefined,
+  }));
+
+  return { messages: results, has_more: hasNext, next, total: results.length };
+}
+
 /** @returns {{ ok: boolean }} */
 export function mockMarkRead() {
   return { ok: true };
