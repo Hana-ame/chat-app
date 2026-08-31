@@ -404,6 +404,7 @@ export default function ChatView({ chatId, isNotification, onBack }) {
           } : undefined}
           hasBackground={!!chat?.background_url}
           onReply={setReplyTo}
+          unreadSince={chat?.last_active_at}
         />
       <Composer chatId={chatId} isNotification={isNotification} replyTo={replyTo} onCancelReply={() => setReplyTo(null)} />
       <SearchModal open={showSearch} onClose={() => setShowSearch(false)} />

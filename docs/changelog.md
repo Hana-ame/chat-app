@@ -880,3 +880,20 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
 - 测试：`client/src/utils/mentionRank.test.js` 8 用例（打分/次数/新鲜度/脏数据/排序/
   字母序/空列表/不可变）。
 - 验证：`npx vitest run` 156 ✅（+8）；`npx tsc --noEmit` ✅；`npx vite build` ✅。
+
+## 2026-09-03 feat: 未读分隔线（Unread divider）
+
+- 背景：进入有历史未读消息的聊天时，无法一眼看出"从哪条开始是新的"。在第一条
+  未读消息上方插入「未读消息」分隔线。语义与后端 UnreadCount 完全一致
+  （created_at > chat.last_active_at），纯前端、无后端改动，所有本地改动带
+  【本地改动 2026-09-03】标记。
+- 实现：
+  - `client/src/utils/unreadBoundary.js`：`computeUnreadIndex(messages, unreadSince)`
+    —— 第一条 strictly 晚于 last_active_at 且未删除的消息索引（时间升序）。
+  - `client/src/components/MessageList.jsx`：在 unreadIdx 位置插入
+    「─ 未读消息 ─」分隔线（accent 色），与日期分隔/跳转最新胶囊共存。
+  - `client/src/components/ChatView.jsx`：传 `unreadSince={chat?.last_active_at}`
+    （该字段已在 ChatSchema 与 mock 中存在）。
+- 测试：`client/src/utils/unreadBoundary.test.js` 7 用例（无依据/空消息/严格大于/
+  全已读/等于不算未读/跳过已删除/非法输入）。
+- 验证：`npx vitest run` 163 ✅（+7）；`npx tsc --noEmit` ✅；`npx vite build` ✅。

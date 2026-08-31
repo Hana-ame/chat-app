@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import MessageItem from './MessageItem';
 import { dateKey, formatDateDivider } from '../utils/messageDates';
+import { computeUnreadIndex } from '../utils/unreadBoundary';
 
 // 【本地改动 2026-09-03】Jump to present（对齐 chatto FDR-014 行为）：
 // - 用户接近底部（<300px）时，新消息自动滚动到底（保留原逻辑）。
@@ -11,7 +12,7 @@ import { dateKey, formatDateDivider } from '../utils/messageDates';
 
 const NEAR_BOTTOM_PX = 300;
 
-export default function MessageList({ messages, hasMore, loading, onLoadMore, chatId, backgroundStyle, hasBackground, onReply }) {
+export default function MessageList({ messages, hasMore, loading, onLoadMore, chatId, backgroundStyle, hasBackground, onReply, unreadSince }) {
   const bodyRef = useRef(null);
   const snapshotRef = useRef(null);
   const loadingMoreRef = useRef(false);
@@ -100,6 +101,11 @@ export default function MessageList({ messages, hasMore, loading, onLoadMore, ch
     return divs;
   }, [messages]);
 
+  // 【本地改动 2026-09-03】未读分隔线：在"最后活跃时间"后的第一条消息上方插入
+  // 「未读消息」标记。语义与后端 UnreadCount 完全一致（created_at > last_active_at）。
+  // 只读计算，不改变消息数组。排序要求 messages 为时间升序（store 保证）。
+  const unreadIdx = useMemo(() => computeUnreadIndex(messages, unreadSince), [messages, unreadSince]);
+
   const handleJumpToPresent = () => {
     if (bodyRef.current) {
       bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
@@ -126,6 +132,13 @@ export default function MessageList({ messages, hasMore, loading, onLoadMore, ch
         {messages.flatMap((msg, i) => {
           const prev = i > 0 ? messages[i - 1] : null;
           const sameAuthor = prev && prev.user_id === msg.user_id && !prev.deleted && !msg.deleted;
+          const unreadDivider = i === unreadIdx ? (
+            <div key={`unread-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', userSelect: 'none' }}>
+              <div style={{ flex: 1, height: 1, background: 'var(--accent)', opacity: 0.4 }} />
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)' }}>未读消息</span>
+              <div style={{ flex: 1, height: 1, background: 'var(--accent)', opacity: 0.4 }} />
+            </div>
+          ) : null;
           const divider = dateDividers.includes(i) ? (
             <div key={`div-${i}`} style={{ textAlign: 'center', padding: '10px 0 4px', fontSize: 11, color: 'var(--text-muted)', userSelect: 'none' }}>
               <span style={{ background: 'var(--bg-secondary)', padding: '3px 10px', borderRadius: 999 }}>
@@ -134,6 +147,7 @@ export default function MessageList({ messages, hasMore, loading, onLoadMore, ch
             </div>
           ) : null;
           return [
+            unreadDivider,
             divider,
             <MessageItem key={msg.id || `msg-${i}`} msg={msg} sameAuthor={sameAuthor} chatId={chatId} onReply={onReply} />,
           ];
