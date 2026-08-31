@@ -33,6 +33,7 @@ type Server struct {
 	Auth            *auth.Service
 	Version         string
 	Services        *service.Service
+	DB              *db.DB // 【本地改动 2026-08-31】线程 API 需要直连 DB（绕开 service 层聚合）。
 	aapiLocalDriver *localfs.Driver
 	aapiLocalOnce   sync.Once
 	refreshMu       sync.Mutex
@@ -43,6 +44,7 @@ func New(cfg *config.Config, database *db.DB, authSvc *auth.Service, hub *ws.Hub
 		Cfg:      cfg,
 		Auth:     authSvc,
 		Services: service.New(database, hub, cfg),
+		DB:       database,
 	}
 }
 

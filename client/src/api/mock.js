@@ -59,6 +59,15 @@ const AI_RESPONSES = [
  * @type {{ chats: Chat[], messages: Message[], onlineUserIds: string[], notificationOccurrences: NotificationOccurrence[], pushSubscriptions: PushSubscription[] }|null}
  */
 let data = null;
+/**
+ * 【本地改动 2026-08-31】线程 mock 状态（移植 chatto 线程 API）。
+ * @type {Map<string, Set<string>>}  thread_root_message_id -> Set(user_id)
+ */
+let threadFollows = new Map();
+/**
+ * @type {Map<string, string>}  `${user_id}:${thread_root}` -> last-seen message id
+ */
+let threadReadState = new Map();
 /** @type {import('zustand').UseBoundStore<import('zustand').StoreApi<any>>|null} */
 let _store = null;
 import('../store/chat').then(m => { _store = m.useChatStore; }).catch(() => {});
@@ -86,6 +95,8 @@ function ensureData() {
 
 export function resetMockData() {
   data = null;
+  threadFollows.clear();
+  threadReadState.clear();
   ensureData();
 }
 
@@ -130,8 +141,8 @@ export function mockListChats() {
  * @param {number} [limit]
  * @returns {{ messages: Message[] }}
  */
-export function mockListMessages(_token, chatId, before, limit) {
-  const all = messagesFor(chatId);
+export function mockListMessages(_token, chatId, before = undefined, limit = 50, inThread = undefined) {
+  const all = inThread ? messagesFor(chatId).filter(m => m.thread_root_message_id === inThread) : messagesFor(chatId);
   const cu = currentUser();
   const mapped = all.map(msg => ({
     ...msg,
@@ -361,9 +372,21 @@ export function mockEmitStreamPlaceholder(chatId, msgId) {
  * @param {Attachment[]} [attachments]
  * @returns {Message}
  */
-export function mockSendMessage(_token, chatId, content, attachments = undefined, _replyTo = undefined) {
+export function mockSendMessage(_token, chatId, content, attachments = undefined, _replyTo = undefined, _threadRoot = undefined, _startThread = false) {
   const d = ensureData();
   const now = new Date().toISOString();
+
+  // 【本地改动 2026-08-31】线程字段：startThread=true → 自引用为根；
+  // 显式 threadRoot → 加入既有线程；给 replyTo 但没 threadRoot → 尝试继承父消息的根。
+  let threadRootMessageId = '';
+  if (_startThread) {
+    // 先写消息占位，回填自引用在下方。
+  } else if (_threadRoot) {
+    threadRootMessageId = _threadRoot;
+  } else if (_replyTo) {
+    const parent = d.messages.find(m => m.id === _replyTo);
+    if (parent) threadRootMessageId = parent.thread_root_message_id || '';
+  }
 
   const userMsg = {
     id: randid(),
@@ -376,7 +399,10 @@ export function mockSendMessage(_token, chatId, content, attachments = undefined
     deleted: false,
     attachments: attachments || [],
     reactions: [],
+    reply_to: _replyTo || '',
+    thread_root_message_id: threadRootMessageId || '',
   };
+  if (_startThread) userMsg.thread_root_message_id = userMsg.id;
   d.messages.push(userMsg);
   if (_store) _store.getState().onMessageCreate(userMsg);
 
@@ -956,4 +982,111 @@ export function mockPushUnsubscribe(_token, endpoint) {
   const d = ensureData();
   d.pushSubscriptions = (d.pushSubscriptions || []).filter(s => s.endpoint !== endpoint);
   return { unsubscribed: true };
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// 【本地改动 2026-08-31】线程 mock（移植 chatto 线程 / ThreadFollow）。
+// 状态：threadFollows  (threadRootID -> Set<userID>)、threadReadState (userID:rootID -> last-seen id)
+// ──────────────────────────────────────────────────────────────────────
+
+/**
+ * @param {string} threadRootID
+ * @returns {Set<string>}
+ */
+function followSetFor(threadRootID) {
+  if (!threadFollows.has(threadRootID)) threadFollows.set(threadRootID, new Set());
+  return threadFollows.get(threadRootID);
+}
+
+/**
+ * 获取线程摘要：root_message + meta。
+ * @param {string} _token
+ * @param {string} chatId
+ * @param {string} threadRootID
+ * @returns {{ root_message: Message, meta: { thread_root_message_id: string, chat_id: string, reply_count: number, last_reply_at: string, latest_reply_id: string, is_following: boolean, has_unread: boolean } }}
+ */
+export function mockThreadGetSummary(_token, chatId, threadRootID) {
+  const d = ensureData();
+  const msgs = d.messages.filter(m => m.chat_id === chatId && (m.thread_root_message_id === threadRootID || m.id === threadRootID));
+  const root = msgs.find(m => m.id === threadRootID);
+  if (!root) return /** @type {any} */ ({ error: 'not_found' });
+  const replies = msgs.filter(m => m.id !== threadRootID);
+  const latest = replies.length ? replies[replies.length - 1] : null;
+  const user = currentUser();
+  const isFollowing = followSetFor(threadRootID).has(user.id);
+  const lastSeen = threadReadState.get(`${user.id}:${threadRootID}`);
+  const hasUnread = lastSeen
+    ? latest && latest.id !== root.id && latest.created_at > lastSeen
+    : replies.length > 0;
+  return {
+    root_message: root,
+    meta: {
+      thread_root_message_id: threadRootID,
+      chat_id: chatId,
+      reply_count: replies.length,
+      last_reply_at: latest?.created_at || '',
+      latest_reply_id: latest?.id || '',
+      is_following: isFollowing,
+      has_unread: hasUnread,
+    },
+  };
+}
+
+/**
+ * @param {string} _token
+ * @param {string} [before]
+ * @param {number} [limit]
+ * @returns {{ threads: Array<{ root_message: Message, meta: any }> }}
+ */
+export function mockThreadsListFollowed(_token, before, limit) {
+  const user = currentUser();
+  const summary = [];
+  for (const [rootID, followers] of threadFollows.entries()) {
+    if (!followers.has(user.id)) continue;
+    const d = ensureData();
+    const msgs = d.messages.filter(m => m.thread_root_message_id === rootID || m.id === rootID);
+    const root = msgs.find(m => m.id === rootID);
+    if (!root) continue;
+    summary.push(mockThreadGetSummary(_token, root.chat_id, rootID));
+  }
+  summary.sort((a, b) => b.meta.last_reply_at.localeCompare(a.meta.last_reply_at));
+  if (before) {
+    const idx = summary.findIndex(s => s.meta.thread_root_message_id === before);
+    if (idx > 0) summary.splice(0, idx);
+  }
+  const limitNum = limit || 50;
+  return { threads: summary.slice(0, limitNum) };
+}
+
+/**
+ * @param {string} _token
+ * @param {{ thread_root_message_id: string }} body
+ * @returns {{ following: boolean }}
+ */
+export function mockThreadFollow(_token, body) {
+  followSetFor(body.thread_root_message_id).add(currentUser().id);
+  return { following: true };
+}
+
+/**
+ * @param {string} _token
+ * @param {{ thread_root_message_id: string }} body
+ * @returns {{ following: boolean }}
+ */
+export function mockThreadUnfollow(_token, body) {
+  followSetFor(body.thread_root_message_id).delete(currentUser().id);
+  return { following: false };
+}
+
+/**
+ * @param {string} _token
+ * @param {{ thread_root_message_id: string }} body
+ * @returns {{ thread_root_message_id: string }}
+ */
+export function mockThreadMarkRead(_token, body) {
+  const d = ensureData();
+  const msgs = d.messages.filter(m => m.thread_root_message_id === body.thread_root_message_id || m.id === body.thread_root_message_id);
+  const latest = msgs[msgs.length - 1];
+  if (latest) threadReadState.set(`${currentUser().id}:${body.thread_root_message_id}`, latest.created_at);
+  return { thread_root_message_id: body.thread_root_message_id };
 }

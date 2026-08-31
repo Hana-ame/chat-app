@@ -21,7 +21,7 @@ func TestNotificationService_MentionCreatesOccurrenceForRecipientOnly(t *testing
 	b := createTestUser(t, f, "b@x.test", "Bob")
 	chat := createTestChat(t, f, "Team", a, []string{a, b})
 
-	_, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, b, "<@"+a+"> hello from Bob", nil)
+	_, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, b, "<@"+a+"> hello from Bob", nil, "", "", false)
 	testutil.RequireNoError(t, err)
 
 	occA, err := f.Server.Services.Notification.List(f.Ctx(), a, "", 50)
@@ -95,10 +95,10 @@ func TestNotificationService_ReplyNotifiesRepliedAuthor(t *testing.T) {
 	b := createTestUser(t, f, "b3@x.test", "Bob3")
 	chat := createTestChat(t, f, "Team3", a, []string{a, b})
 
-	original, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, "question?", nil)
+	original, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, "question?", nil, "", "", false)
 	testutil.RequireNoError(t, err)
 
-	_, err = f.Server.Services.Message.Send(f.Ctx(), chat.ID, b, "answer!", nil, original.ID)
+	_, err = f.Server.Services.Message.Send(f.Ctx(), chat.ID, b, "answer!", nil, original.ID, "", false)
 	testutil.RequireNoError(t, err)
 
 	occA, err := f.Server.Services.Notification.List(f.Ctx(), a, "", 50)
@@ -117,7 +117,7 @@ func TestNotificationService_ReadAllAndDeleteLifecycle(t *testing.T) {
 	b := createTestUser(t, f, "b4@x.test", "Bob4")
 	chat := createTestChat(t, f, "Team4", a, []string{a, b})
 
-	_, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, b, "<@"+a+"> hi", nil)
+	_, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, b, "<@"+a+"> hi", nil, "", "", false)
 	testutil.RequireNoError(t, err)
 
 	occ, err := f.Server.Services.Notification.List(f.Ctx(), a, "", 50)
@@ -149,9 +149,9 @@ func TestNotificationService_MarkAllRead(t *testing.T) {
 	b := createTestUser(t, f, "b5@x.test", "Bob5")
 	chat := createTestChat(t, f, "Team5", a, []string{a, b})
 
-	_, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, b, "<@"+a+"> one", nil)
+	_, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, b, "<@"+a+"> one", nil, "", "", false)
 	testutil.RequireNoError(t, err)
-	_, err = f.Server.Services.Message.Send(f.Ctx(), chat.ID, b, "<@"+a+"> two", nil)
+	_, err = f.Server.Services.Message.Send(f.Ctx(), chat.ID, b, "<@"+a+"> two", nil, "", "", false)
 	testutil.RequireNoError(t, err)
 
 	if err := f.Server.Services.Notification.MarkAllRead(f.Ctx(), a); err != nil {

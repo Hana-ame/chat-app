@@ -43,7 +43,7 @@ func TestMessageService_Send(t *testing.T) {
 	a := createTestUser(t, f, "msg_snd@x.com", "MsgSnd")
 	chat := createTestChat(t, f, "MsgSend", a, []string{a})
 
-	msg, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, "Hello, world!", nil)
+	msg, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, "Hello, world!", nil, "", "", false)
 	testutil.RequireNoError(t, err)
 	testutil.RequireEqual(t, msg.Content, "Hello, world!")
 	testutil.RequireEqual(t, msg.UserID, a)
@@ -56,7 +56,7 @@ func TestMessageService_Send_NotMember(t *testing.T) {
 	b := createTestUser(t, f, "msg_snd3@x.com", "MsgSnd3")
 	chat := createTestChat(t, f, "MsgSend2", a, []string{a})
 
-	_, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, b, "test", nil)
+	_, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, b, "test", nil, "", "", false)
 	testutil.RequireEqual(t, err, service.ErrForbidden)
 }
 
@@ -65,7 +65,7 @@ func TestMessageService_Send_EmptyContent(t *testing.T) {
 	a := createTestUser(t, f, "msg_snd4@x.com", "MsgSnd4")
 	chat := createTestChat(t, f, "MsgSend3", a, []string{a})
 
-	_, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, "", nil)
+	_, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, "", nil, "", "", false)
 	testutil.RequireEqual(t, err, service.ErrInvalidInput)
 }
 
@@ -74,7 +74,7 @@ func TestMessageService_Send_WhitespaceContent(t *testing.T) {
 	a := createTestUser(t, f, "msg_snd5@x.com", "MsgSnd5")
 	chat := createTestChat(t, f, "MsgSend4", a, []string{a})
 
-	_, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, "  ", nil)
+	_, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, "  ", nil, "", "", false)
 	testutil.RequireEqual(t, err, service.ErrInvalidInput)
 }
 
@@ -86,7 +86,7 @@ func TestMessageService_Send_AttachmentOnly(t *testing.T) {
 	atts := []models.Attachment{
 		{Filename: "file.pdf", MimeType: "application/pdf", Size: 100, URL: "http://localhost:8080/api/local/1234567890/file.pdf"},
 	}
-	msg, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, "", atts)
+	msg, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, "", atts, "", "", false)
 	testutil.RequireNoError(t, err)
 	testutil.RequireEqual(t, msg.AttachmentCount, 1)
 }
@@ -99,7 +99,7 @@ func TestMessageService_Send_InvalidAttachmentURL(t *testing.T) {
 	atts := []models.Attachment{
 		{Filename: "file.pdf", URL: "https://evil.com/file.pdf"},
 	}
-	_, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, "test", atts)
+	_, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, "test", atts, "", "", false)
 	testutil.RequireEqual(t, err, service.ErrInvalidInput)
 }
 
@@ -111,7 +111,7 @@ func TestMessageService_Send_AttachmentNoURL(t *testing.T) {
 	atts := []models.Attachment{
 		{Filename: "", URL: ""},
 	}
-	_, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, "test", atts)
+	_, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, "test", atts, "", "", false)
 	testutil.RequireEqual(t, err, service.ErrInvalidInput)
 }
 
@@ -123,7 +123,7 @@ func TestMessageService_Send_DefaultMimeType(t *testing.T) {
 	atts := []models.Attachment{
 		{Filename: "file.bin", URL: "http://localhost:8080/api/local/1234567890/file.bin"},
 	}
-	msg, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, "test", atts)
+	msg, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, "test", atts, "", "", false)
 	testutil.RequireNoError(t, err)
 	testutil.RequireEqual(t, msg.AttachmentCount, 1)
 }
@@ -135,7 +135,7 @@ func TestMessageService_Send_Mentions(t *testing.T) {
 	chat := createTestChat(t, f, "MsgMentions", a, []string{a, b})
 
 	content := "Hey <@" + b + "> check this out!"
-	msg, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, content, nil)
+	msg, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, content, nil, "", "", false)
 	testutil.RequireNoError(t, err)
 	testutil.RequireEqual(t, msg.MentionCount, 1)
 }
@@ -149,7 +149,7 @@ func TestMessageService_Send_ContentTooLong(t *testing.T) {
 	for i := range buf {
 		buf[i] = 'a'
 	}
-	_, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, string(buf), nil)
+	_, err := f.Server.Services.Message.Send(f.Ctx(), chat.ID, a, string(buf), nil, "", "", false)
 	testutil.RequireEqual(t, err, service.ErrContentTooLong)
 }
 
@@ -247,7 +247,7 @@ func TestMessageService_Send_CanceledContext(t *testing.T) {
 	a := createTestUser(t, f, "sndc@x.com", "SndC")
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := f.Server.Services.Message.Send(ctx, "chatid", a, "test", nil)
+	_, err := f.Server.Services.Message.Send(ctx, "chatid", a, "test", nil, "", "", false)
 	testutil.RequireError(t, err)
 }
 
@@ -342,6 +342,6 @@ func TestMessageService_Send_CreateMessageError(t *testing.T) {
 	chat := createTestChat(t, f, "MsgCMETest", a, []string{a})
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := f.Server.Services.Message.Send(ctx, chat.ID, a, "test", nil)
+	_, err := f.Server.Services.Message.Send(ctx, chat.ID, a, "test", nil, "", "", false)
 	testutil.RequireError(t, err)
 }

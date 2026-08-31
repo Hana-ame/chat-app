@@ -11,13 +11,14 @@ import {
 	mockGetNotifyChat, mockNotificationsList, mockNotifySend, mockNotifyMarkRead, mockNotifyDelete,
 	mockOccurrenceList, mockOccurrenceUnreadCount, mockOccurrenceMarkRead, mockOccurrenceMarkAllRead, mockOccurrenceDelete,
 	mockPushGetVAPIDPublicKey, mockPushSubscribe, mockPushUnsubscribe,
+	mockThreadGetSummary, mockThreadsListFollowed, mockThreadFollow, mockThreadUnfollow, mockThreadMarkRead,
 	mockEmitStreamPlaceholder,
 	resetMockData,
 } from './mock';
 import { useAuthStore } from '../store/auth';
 import { API_BASE, UPLOAD_BASE, validateEnv } from '../config';
 import { AuthResponseSchema, validate } from '../schemas';
-import type { User, Chat, Message, Attachment, NotificationOccurrence, PushSubscription } from '../schemas';
+import type { User, Chat, Message, Attachment, NotificationOccurrence, PushSubscription, ThreadMeta, ThreadSummary } from '../schemas';
 validateEnv();
 
 // buildUploadUrl 构建上传文件的可访问 URL:优先使用服务端返回的绝对 url;
@@ -152,13 +153,24 @@ const _apiMethods = {
     request<ApiError>('DELETE', '/api/chats/' + chatId + '/members/' + userId, token),
 
   // ── Messages ──
-  listMessages: (token: string, chatId: string, before?: string, limit?: number) => {
+  // 【本地改动 2026-08-31】inThread 参数（移植 chatto 线程语义）：过滤返回
+  // 属于该线程的消息（含根）。
+  listMessages: (token: string, chatId: string, before?: string, limit?: number, inThread?: string) => {
     let url = '/api/chats/' + chatId + '/messages?limit=' + (limit || 50);
     if (before) url += '&before=' + before;
+    if (inThread) url += '&in_thread=' + encodeURIComponent(inThread);
     return request<{ messages: Message[] }>('GET', url, token);
   },
-  sendMessage: (token: string, chatId: string, content: string, attachments?: Attachment[], replyTo?: string) =>
-    request<Message>('POST', '/api/chats/' + chatId + '/messages', token, { content, attachments: (attachments || []).map(({ ...a }) => a), reply_to: replyTo || '' }),
+  // 【本地改动 2026-08-31】startThread / threadRoot 参数：startThread=true 让
+  // 本消息成为线程根（自引用）；显式 threadRoot 让本消息加入既有线程。
+  sendMessage: (token: string, chatId: string, content: string, attachments?: Attachment[], replyTo?: string, threadRoot?: string, startThread?: boolean) =>
+    request<Message>('POST', '/api/chats/' + chatId + '/messages', token, {
+      content,
+      attachments: (attachments || []).map(({ ...a }) => a),
+      reply_to: replyTo || '',
+      thread_root: threadRoot || '',
+      start_thread: !!startThread,
+    }),
   editMessage: (token: string, chatId: string, msgId: string, content: string) =>
     request<Message>('PATCH', '/api/chats/' + chatId + '/messages/' + msgId, token, { content }),
   deleteMessage: (token: string, chatId: string, msgId: string) =>
@@ -210,6 +222,25 @@ const _apiMethods = {
       request<ApiError>('POST', '/api/notifications/read-all', token, {}),
     deleteOccurrence: (token: string, id: string) =>
       request<ApiError>('DELETE', '/api/notifications/' + id, token),
+  },
+
+  // ── Threads ──
+  // 【本地改动 2026-08-31】线程 API（移植 chatto 线程 / ThreadFollow）：
+  // 关注列表、关注/取关、单线程详情、标记已读。
+  threads: {
+    listFollowed: (token: string, before?: string, limit?: number) => {
+      let url = '/api/threads?limit=' + (limit || 50);
+      if (before) url += '&before=' + before;
+      return request<{ threads: ThreadSummary[] }>('GET', url, token);
+    },
+    follow: (token: string, threadRootMessageId: string) =>
+      request<{ following: boolean }>('POST', '/api/threads/follow', token, { thread_root_message_id: threadRootMessageId }),
+    unfollow: (token: string, threadRootMessageId: string) =>
+      request<{ following: boolean }>('DELETE', '/api/threads/follow', token, { thread_root_message_id: threadRootMessageId }),
+    getSummary: (token: string, chatId: string, threadRootMessageId: string) =>
+      request<ThreadSummary>('GET', '/api/chats/' + chatId + '/threads/' + threadRootMessageId, token),
+    markRead: (token: string, threadRootMessageId: string) =>
+      request<{ thread_root_message_id: string }>('POST', '/api/threads/read', token, { thread_root_message_id: threadRootMessageId }),
   },
 
   // ── Web Push ──
@@ -307,6 +338,21 @@ function buildMockProxy(target: typeof _apiMethods): ApiType {
           subscribe: (token: string, sub: { endpoint: string; p256dh: string; auth: string }) =>
             Promise.resolve(mockPushSubscribe(token, sub)),
           unsubscribe: (token: string, endpoint: string) => Promise.resolve(mockPushUnsubscribe(token, endpoint)),
+        };
+      }
+      if (mockEnabled && prop === 'threads') {
+        // 【本地改动 2026-08-31】线程 mock（移植 chatto 线程 API）。
+        return {
+          listFollowed: (token: string, before?: string, limit?: number) =>
+            Promise.resolve(mockThreadsListFollowed(token, before, limit)),
+          follow: (token: string, threadRootMessageId: string) =>
+            Promise.resolve(mockThreadFollow(token, { thread_root_message_id: threadRootMessageId })),
+          unfollow: (token: string, threadRootMessageId: string) =>
+            Promise.resolve(mockThreadUnfollow(token, { thread_root_message_id: threadRootMessageId })),
+          getSummary: (token: string, chatId: string, threadRootMessageId: string) =>
+            Promise.resolve(mockThreadGetSummary(token, chatId, threadRootMessageId)),
+          markRead: (token: string, threadRootMessageId: string) =>
+            Promise.resolve(mockThreadMarkRead(token, { thread_root_message_id: threadRootMessageId })),
         };
       }
       if (mockEnabled && prop === 'sendStreamMessage') {

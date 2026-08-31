@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/Hana-ame/chat-app/server/internal/db"
 	"github.com/Hana-ame/chat-app/server/internal/logutil"
 	"github.com/Hana-ame/chat-app/server/internal/models"
 )
@@ -13,11 +14,15 @@ type MessageService struct {
 	*Service
 }
 
-func (s *MessageService) List(ctx context.Context, chatID, userID string, before string, limit int) ([]models.Message, error) {
+func (s *MessageService) List(ctx context.Context, chatID, userID string, before string, limit int, inThread ...string) ([]models.Message, error) {
 	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return nil, err
 	}
-	return s.db.GetMessages(ctx, chatID, before, limit)
+	tf := ""
+	if len(inThread) > 0 {
+		tf = inThread[0]
+	}
+	return s.db.GetMessages(ctx, chatID, before, limit, tf)
 }
 
 func (s *MessageService) SendAI(ctx context.Context, chatID, userID, content, thinking, msgID string, author *models.User) (*models.Message, error) {
@@ -35,7 +40,7 @@ func (s *MessageService) SendAI(ctx context.Context, chatID, userID, content, th
 	return msg, nil
 }
 
-func (s *MessageService) Send(ctx context.Context, chatID, userID, content string, attachments []models.Attachment, replyTo ...string) (*models.Message, error) {
+func (s *MessageService) Send(ctx context.Context, chatID, userID, content string, attachments []models.Attachment, replyTo, explicitThreadRoot string, startThread bool) (*models.Message, error) {
 	if err := s.Authz.MustBeMember(ctx, chatID, userID); err != nil {
 		return nil, err
 	}
@@ -54,7 +59,29 @@ func (s *MessageService) Send(ctx context.Context, chatID, userID, content strin
 		}
 	}
 	mentions := extractMentions(content)
-	msg, err := s.db.CreateMessage(ctx, chatID, userID, content, mentions, attachments, replyTo...)
+
+	// 【本地改动 2026-08-31】线程根计算（移植 chatto ThreadRootEventID 语义）：
+	// startThread → 该消息自身为根；显式 thread_root → 使用给定值；reply_to
+	// 给定 → 继承父消息的 thread_root；父无根 → 该消息成新根。根 = 消息 ID
+	// 自身（自引用）；非根线程回复指向根消息。
+	threadRoot := explicitThreadRoot
+	if startThread {
+		threadRoot = "__SELF__"
+	} else if replyTo != "" {
+		if threadRoot == "" {
+			parent, err := s.db.GetMessage(ctx, replyTo)
+			if err == nil && parent.ThreadRootMessageID != "" {
+				threadRoot = parent.ThreadRootMessageID
+			} else {
+				// 父消息不在任何线程内 → 本消息成为新线程根
+				threadRoot = "__SELF__"
+			}
+		}
+	}
+	msg, err := s.db.CreateMessage(ctx, chatID, userID, content, mentions, attachments,
+		db.WithReplyTo(replyTo),
+		db.WithThreadRoot(threadRoot),
+	)
 	if err != nil {
 		if isContentTooLong(err) {
 			return nil, ErrContentTooLong
@@ -67,8 +94,20 @@ func (s *MessageService) Send(ctx context.Context, chatID, userID, content strin
 	// 【本地改动 2026-08-31】持久化通知触发：提及 + 回复。尽力而为，
 	// 失败只记日志，绝不拖垮消息发送。
 	if s.Notification != nil {
-		if err := s.Notification.CreateForMessage(ctx, chatID, userID, mentions, replyTo, msg); err != nil {
+		replyToSlice := []string{}
+		if replyTo != "" {
+			replyToSlice = []string{replyTo}
+		}
+		if err := s.Notification.CreateForMessage(ctx, chatID, userID, mentions, replyToSlice, msg); err != nil {
 			logutil.Warn("notification trigger: %v", err)
+		}
+		// 【本地改动 2026-08-31】线程回复通知：向该线程的所有关注者（除作者本人）
+		// 发 thread_reply 通知。与 chatto 的 ThreadFollowChangedEvent +
+		// thread notifications 语义对齐。尽力而为。
+		if msg.ThreadRootMessageID != "" {
+			if err := s.notifyThreadFollowers(ctx, chatID, userID, msg); err != nil {
+				logutil.Warn("thread follow notification: %v", err)
+			}
 		}
 	}
 	return msg, nil
@@ -148,4 +187,42 @@ func extractMentions(content string) []string {
 		out = append(out, m[1])
 	}
 	return out
+}
+
+// 【本地改动 2026-08-31】线程回复通知触发：遍历线程关注者，除作者外每人触发一条
+// thread_reply 通知（含 Web Push 落库/离线投递，见 notification.trigger）。
+func (s *MessageService) notifyThreadFollowers(ctx context.Context, chatID, authorID string, msg *models.Message) error {
+	if s.db == nil || s.Notification == nil {
+		return nil
+	}
+	followers, err := s.db.ThreadFollowers(ctx, msg.ThreadRootMessageID)
+	if err != nil {
+		return err
+	}
+	if len(followers) == 0 {
+		return nil
+	}
+	root, err := s.db.GetMessage(ctx, msg.ThreadRootMessageID)
+	if err != nil {
+		return err
+	}
+	for _, followerID := range followers {
+		if followerID == authorID {
+			continue
+		}
+		// 标题：「{作者} 在 {根内容前 30 字}」；正文：本回复内容截断。
+		rootSnippet := truncateString(root.Content, 30)
+		title := truncateString(msg.Content, 80)
+		body := "在 " + rootSnippet
+		s.Notification.trigger(ctx, followerID, "thread_reply", chatID, msg.ID, authorID, title, body)
+	}
+	return nil
+}
+
+func truncateString(s string, n int) string {
+	runes := []rune(s)
+	if len(runes) <= n {
+		return s
+	}
+	return string(runes[:n]) + "…"
 }

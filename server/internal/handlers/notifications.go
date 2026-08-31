@@ -56,7 +56,7 @@ func (s *Server) SendNotification(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
-	msg, err := s.Services.Message.Send(r.Context(), chat.ID, u.ID, req.Content, req.Attachments, req.ReplyTo)
+	msg, err := s.Services.Message.Send(r.Context(), chat.ID, u.ID, req.Content, req.Attachments, req.ReplyTo, "", false)
 	if err != nil {
 		status, code := mapServiceError(err)
 		writeError(w, status, code, err.Error())

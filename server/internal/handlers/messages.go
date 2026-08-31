@@ -17,12 +17,16 @@ import (
 )
 
 type sendMsgReq struct {
-	Content     string              `json:"content"`
-	Attachments []models.Attachment `json:"attachments"`
-	Type        string              `json:"type"`
-	Source      *ai.Source          `json:"source"`
-	MsgID       string              `json:"msg_id"`
-	ReplyTo     string              `json:"reply_to"`
+	Content          string              `json:"content"`
+	Attachments      []models.Attachment `json:"attachments"`
+	Type             string              `json:"type"`
+	Source           *ai.Source          `json:"source"`
+	MsgID            string              `json:"msg_id"`
+	ReplyTo          string              `json:"reply_to"`
+	// 【本地改动 2026-08-31】移植 chatto 线程：thread_root 显式指定根；
+	// start_thread=true 时该消息成为新线程根（自引用 thread_root_message_id）。
+	ThreadRoot string `json:"thread_root"`
+	StartThread bool `json:"start_thread"`
 }
 
 type editMsgReq struct {
@@ -34,18 +38,20 @@ type editMsgReq struct {
 // @Description  Get paginated messages for a chat the user is a member of
 // @Tags         messages
 // @Security     BearerAuth
-// @Param        chatID  path  string  true  "Chat ID"
-// @Param        limit   query int     false "Max messages (default 50)"
-// @Param        before  query string  false "Message ID to paginate before"
-// @Success      200  {object}  map[string]any
-// @Failure      403  {object}  map[string]any
+// @Param        chatID    path    string  true  "Chat ID"
+// @Param        limit     query   int     false "Max messages (default 50)"
+// @Param        before    query   string  false "Message ID to paginate before"
+// @Param        in_thread query   string  false "Only replies in this thread (thread_root_message_id filter)"
+// @Success      200       {object} map[string]any
+// @Failure      403       {object} map[string]any
 // @Router       /api/chats/{chatID}/messages [get]
 func (s *Server) ListMessages(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r.Context())
 	id := chi.URLParam(r, "chatID")
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	before := r.URL.Query().Get("before")
-	msgs, err := s.Services.Message.List(r.Context(), id, u.ID, before, limit)
+	inThread := r.URL.Query().Get("in_thread")
+	msgs, err := s.Services.Message.List(r.Context(), id, u.ID, before, limit, inThread)
 	if err != nil {
 		status, code := mapServiceError(err)
 		writeError(w, status, code, err.Error())
@@ -78,7 +84,7 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msg, err := s.Services.Message.Send(r.Context(), id, u.ID, req.Content, req.Attachments, req.ReplyTo)
+	msg, err := s.Services.Message.Send(r.Context(), id, u.ID, req.Content, req.Attachments, req.ReplyTo, req.ThreadRoot, req.StartThread)
 	if err != nil {
 		status, code := mapServiceError(err)
 		writeError(w, status, code, err.Error())

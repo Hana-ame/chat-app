@@ -654,7 +654,7 @@ func TestStreamService_GetMessage(t *testing.T) {
 	chat := createTestChat(t, f, "StrmGet", a, []string{a})
 
 	// Create a message via the service, then retrieve via GetMessage
-	msg, err := f.Server.Services.Message.Send(context.Background(), chat.ID, a, "stored content", nil)
+	msg, err := f.Server.Services.Message.Send(context.Background(), chat.ID, a, "stored content", nil, "", "", false)
 	testutil.RequireNoError(t, err)
 
 	got, err := f.Server.Services.Stream.GetMessage(context.Background(), msg.ID)

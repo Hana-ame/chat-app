@@ -64,13 +64,21 @@ func (d *DB) CreateAIMessage(ctx context.Context, chatID, userID, msgID, content
 
 const messageColumns = `m.id, m.chat_id, m.user_id, m.type, m.content, m.created_at, m.edited_at, m.deleted_at,
 		        m.thinking, m.attachment_count, m.mention_count, m.reaction_count, m.reactions, m.attachments, m.mentions,
-		        COALESCE(m.reply_to_message_id,''),
+		        COALESCE(m.reply_to_message_id,''), COALESCE(m.thread_root_message_id,''),
 		        u.id, u.username, u.avatar_color, u.avatar_url, u.status, u.last_seen, COALESCE(cm.role,'')`
 
 const messageJoins = ` FROM messages m JOIN users u ON u.id = m.user_id
 		 LEFT JOIN chat_members cm ON cm.chat_id = m.chat_id AND cm.user_id = m.user_id`
 
-func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, mentions []string, attachments []models.Attachment, replyTo ...string) (*models.Message, error) {
+func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, mentions []string, attachments []models.Attachment, opts ...CreateMessageOpt) (*models.Message, error) {
+	o := &struct {
+		replyTo    string
+		threadRoot string
+	}{}
+	for _, f := range opts {
+		f(o)
+	}
+
 	content = strings.TrimRight(content, " \n\t")
 	if len(content) > d.maxContentLength {
 		return nil, ErrContentTooLong
@@ -104,16 +112,25 @@ func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, 
 	if err != nil {
 		mentJSON = []byte("[]")
 	}
-	replyToID := ""
-	if len(replyTo) > 0 {
-		replyToID = replyTo[0]
-	}
+	replyToID := o.replyTo
+	threadRootID := o.threadRoot
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO messages (id, chat_id, user_id, content, created_at, attachment_count, mention_count, attachments, mentions, reply_to_message_id) VALUES (?,?,?,?,?,?,?,?,?,?)`,
-		id, chatID, userID, content, now, len(attachments), len(dedupe(mentions)), string(attJSON), string(mentJSON), replyToID,
+		`INSERT INTO messages (id, chat_id, user_id, content, created_at, attachment_count, mention_count, attachments, mentions, reply_to_message_id, thread_root_message_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+		id, chatID, userID, content, now, len(attachments), len(dedupe(mentions)), string(attJSON), string(mentJSON), replyToID, threadRootID,
 	)
 	if err != nil {
 		return nil, err
+	}
+	// 【本地改动 2026-08-31】线程根自引用：StartThread 时 threadRootID=="__SELF__"，
+	// 插入后回写为本消息 id（自引用），从而把该消息标记为线程根。
+	if threadRootID == "__SELF__" {
+		_, err = tx.ExecContext(ctx,
+			`UPDATE messages SET thread_root_message_id = ? WHERE id = ?`,
+			id, id,
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 	_, err = tx.ExecContext(ctx,
 		`UPDATE chats SET last_message_at = ?, last_message_id = ?, last_message_user_id = ?, last_message_content = ?, last_message_created_at = ? WHERE id = ?`,
@@ -149,6 +166,20 @@ func (d *DB) CreateMessage(ctx context.Context, chatID, userID, content string, 
 	}
 	logutil.Debug("created message in chat %s by user %s (len=%d, att=%d)", chatID, userID, len(content), len(attachments))
 	return d.GetMessage(ctx, id)
+}
+
+// 【本地改动 2026-08-31】线程：err_invalid_input 是 CreateMessage 的输入错误。
+var errInvalidInput = errors.New("invalid input")
+
+// CreateMessageOpt 是 CreateMessage 的可选参数（【本地改动 2026-08-31】线程：
+// 传 reply_to 和 thread_root 分别对应 chatto 的 InReplyTo 与 ThreadRootEventID）。
+type CreateMessageOpt func(*struct { replyTo, threadRoot string })
+
+func WithReplyTo(replyTo string) CreateMessageOpt {
+	return func(o *struct { replyTo, threadRoot string }) { o.replyTo = replyTo }
+}
+func WithThreadRoot(threadRoot string) CreateMessageOpt {
+	return func(o *struct { replyTo, threadRoot string }) { o.threadRoot = threadRoot }
 }
 
 func dedupe(in []string) []string {
@@ -207,7 +238,7 @@ func (d *DB) scanMessage(s scanner) (*models.Message, error) {
 		&m.ID, &m.ChatID, &m.UserID, &m.Type, &m.Content, &created, &edited, &deletedAt,
 		&thinking,
 		&attCnt, &mentCnt, &rxnCnt, &rxnJSON, &attJSON, &mentJSON,
-		&m.ReplyTo,
+		&m.ReplyTo, &m.ThreadRootMessageID,
 		&author.ID, &author.Username, &author.AvatarColor, &author.AvatarURL, &author.Status, &lastSeen, &role,
 	)
 	if err != nil {
@@ -261,7 +292,11 @@ func (d *DB) fetchMessageRow(ctx context.Context, q, id string) (*models.Message
 // (m.attachments, m.mentions, m.reactions) in the main SELECT query.
 // The legacy attachExtras hook that fetched them via N+1 subqueries
 // has been removed — all data is now in the row.
-func (d *DB) GetMessages(ctx context.Context, chatID, before string, limit int) ([]models.Message, error) {
+func (d *DB) GetMessages(ctx context.Context, chatID, before string, limit int, inThread ...string) ([]models.Message, error) {
+	threadFilter := ""
+	if len(inThread) > 0 && inThread[0] != "" {
+		threadFilter = " AND m.thread_root_message_id = ?"
+	}
 	if limit <= 0 || limit > 100 {
 		limit = 100
 	}
@@ -270,19 +305,37 @@ func (d *DB) GetMessages(ctx context.Context, chatID, before string, limit int) 
 		err  error
 	)
 	if before == "" {
-		rows, err = d.QueryContext(ctx,
-			`SELECT `+messageColumns+messageJoins+` WHERE m.chat_id = ?
-			 ORDER BY m.created_at DESC, m.id DESC LIMIT ?`,
-			chatID, limit,
-		)
+		if threadFilter != "" {
+			rows, err = d.QueryContext(ctx,
+				`SELECT `+messageColumns+messageJoins+` WHERE m.chat_id = ?`+threadFilter+`
+				 ORDER BY m.created_at DESC, m.id DESC LIMIT ?`,
+				chatID, inThread[0], limit,
+			)
+		} else {
+			rows, err = d.QueryContext(ctx,
+				`SELECT `+messageColumns+messageJoins+` WHERE m.chat_id = ?
+				 ORDER BY m.created_at DESC, m.id DESC LIMIT ?`,
+				chatID, limit,
+			)
+		}
 	} else {
-		rows, err = d.QueryContext(ctx,
-			`SELECT `+messageColumns+messageJoins+` WHERE m.chat_id = ? AND (m.created_at, m.id) < (
-			    SELECT created_at, id FROM messages WHERE id = ?
-			 )
-			 ORDER BY m.created_at DESC, m.id DESC LIMIT ?`,
-			chatID, before, limit,
-		)
+		if threadFilter != "" {
+			rows, err = d.QueryContext(ctx,
+				`SELECT `+messageColumns+messageJoins+` WHERE m.chat_id = ?`+threadFilter+` AND (m.created_at, m.id) < (
+				    SELECT created_at, id FROM messages WHERE id = ?
+				 )
+				 ORDER BY m.created_at DESC, m.id DESC LIMIT ?`,
+				chatID, inThread[0], before, limit,
+			)
+		} else {
+			rows, err = d.QueryContext(ctx,
+				`SELECT `+messageColumns+messageJoins+` WHERE m.chat_id = ? AND (m.created_at, m.id) < (
+				    SELECT created_at, id FROM messages WHERE id = ?
+				 )
+				 ORDER BY m.created_at DESC, m.id DESC LIMIT ?`,
+				chatID, before, limit,
+			)
+		}
 	}
 	if err != nil {
 		return nil, err

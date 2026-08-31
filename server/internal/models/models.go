@@ -81,8 +81,13 @@ type Message struct {
 	Attachments     json.RawMessage `json:"attachments,omitempty"`
 	Reactions       json.RawMessage `json:"reactions,omitempty"`
 	Mentions        json.RawMessage `json:"mentions,omitempty"`
-	ReplyTo         string          `json:"reply_to,omitempty"`
-	RepliedTo       *Message        `json:"replied_to,omitempty"`
+	ReplyTo               string          `json:"reply_to,omitempty"`
+	RepliedTo             *Message        `json:"replied_to,omitempty"`
+	// 【本地改动 2026-08-31】移植 chatto ThreadRootEventID/InReplyTo：
+	// thread_root_message_id 是自引用外键。空串 = 顶层消息；== id = 该消息
+	// 即线程根（start_thread=true 时写入）；其他非空 = 回复在该根下。
+	// reply_to_message_id 语义不变（父消息，用于线程内的嵌套回复）。
+	ThreadRootMessageID string `json:"thread_root_message_id,omitempty"`
 }
 
 type Attachment struct {
@@ -139,4 +144,22 @@ type PushSubscription struct {
 	P256DH    string    `json:"p256dh"`
 	Auth      string    `json:"auth"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+// 【本地改动 2026-08-31】移植 chatto ThreadSummary 的紧凑模型。
+// RootMessage 是线程根消息（thread_root_message_id == id），
+// Meta 是该线程的聚合元数据（回复数、最新回复时间、关注者状态、未读标记）。
+type ThreadSummary struct {
+	RootMessage *Message `json:"root_message,omitempty"`
+	Meta        ThreadMeta `json:"meta"`
+}
+
+type ThreadMeta struct {
+	ThreadRootMessageID string    `json:"thread_root_message_id"`
+	ChatID              string    `json:"chat_id"`
+	ReplyCount          int       `json:"reply_count"`
+	LastReplyAt         time.Time `json:"last_reply_at"`
+	LatestReplyID       string    `json:"latest_reply_id,omitempty"`
+	IsFollowing         bool      `json:"is_following"`
+	HasUnread           bool      `json:"has_unread"`
 }

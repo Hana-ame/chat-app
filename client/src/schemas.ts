@@ -53,8 +53,33 @@ export const MessageSchema = z.object({
   thinking: z.string().optional(),
   stream_url: z.string().optional(),
   streaming: z.boolean().optional(),
+  // 【本地改动 2026-08-31】线程（移植 chatto ThreadRootEventID/InReplyTo）：
+  // reply_to 为父消息 ID（可为空），thread_root_message_id 在 threaded 消息上
+  // 指向线程根（自引用或祖先根），顶层消息（既非根也非回复）为空字符串。
+  reply_to: z.string().optional(),
+  thread_root_message_id: z.string().optional(),
   source: z.function().optional(),
 });
+
+// 【本地改动 2026-08-31】线程元数据（后端 models.ThreadMeta 的镜像）。
+// 由 /api/chats/{chatID}/threads/{threadRootID} 和 /api/threads 端点返回。
+export const ThreadMetaSchema = z.object({
+  thread_root_message_id: z.string(),
+  chat_id: z.string(),
+  reply_count: z.number(),
+  last_reply_at: z.string().optional(),
+  latest_reply_id: z.string().optional(),
+  is_following: z.boolean(),
+  has_unread: z.boolean(),
+});
+
+export const ThreadSummarySchema = z.object({
+  root_message: MessageSchema,
+  meta: ThreadMetaSchema,
+});
+
+export type ThreadMeta = z.infer<typeof ThreadMetaSchema>;
+export type ThreadSummary = z.infer<typeof ThreadSummarySchema>;
 
 export const ChatSchema = z.object({
   id: z.string(),

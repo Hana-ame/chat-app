@@ -130,6 +130,15 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 					r.Delete("/messages/{messageID}", s.DeleteNotification)
 					r.Post("/read", s.MarkNotificationsRead)
 				})
+				r.Route("/threads", func(r chi.Router) {
+					// 【本地改动 2026-08-31】移植 chatto 线程 API：关注列表、
+					// 关注/取关、已读游标。线程内消息列表沿用 /chats/{id}/messages
+					// 的 in_thread 查询参数。
+					r.Get("/", s.ListFollowedThreads)
+					r.Post("/follow", s.FollowThread)
+					r.Delete("/follow", s.UnfollowThread)
+					r.Post("/read", s.MarkThreadRead)
+				})
 				r.Route("/chats/{chatID}", func(r chi.Router) {
 					r.Use(s.trackLastActive)
 					r.Get("/", s.GetChat)
@@ -156,6 +165,7 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 					r.Put("/banner", s.UpdateChatBanner)
 					r.Put("/background", s.UpdateChatBackground)
 					r.Put("/notify", s.UpdateChatNotify)
+					r.Get("/threads/{threadRootID}", s.GetThreadSummary)
 				})
 			}) // end auth group
 		})
