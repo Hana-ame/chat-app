@@ -7,6 +7,7 @@ import ChatList from '../components/ChatList';
 import ChatView from '../components/ChatView';
 import MemberPanel from '../components/MemberPanel';
 import WelcomeView from '../components/WelcomeView';
+import { getLastRoom, setLastRoom, clearLastRoom } from '../utils/lastRoom';
 
 export default function ChatPage() {
   const loc = useLocation();
@@ -27,6 +28,14 @@ export default function ChatPage() {
   useEffect(() => {
     useChatStore.getState().setActiveChatId(urlChatId || null);
   }, [urlChatId, accessToken]);
+
+  // 【本地改动 2026-09-03】最近聊天记忆（FDR-026）：进入真实聊天时记录。
+  // notifications 是特殊视图，不覆盖记忆。
+  useEffect(() => {
+    if (urlChatId && !isNotification && urlChatId !== notifyChatId) {
+      setLastRoom(urlChatId);
+    }
+  }, [urlChatId, isNotification, notifyChatId]);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768);
@@ -64,9 +73,27 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!urlChatId && notifyChatId && accessToken && !isMobile) {
-      navigate('/g/notifications', { replace: true });
+      const last = getLastRoom();
+      const stillAccessible = last && chats.some(c => c.id === last && c.id !== notifyChatId);
+      if (stillAccessible) {
+        navigate('/g/' + last, { replace: true });
+      } else {
+        if (last) clearLastRoom();
+        navigate('/g/notifications', { replace: true });
+      }
     }
-  }, [urlChatId, notifyChatId, accessToken, isMobile, navigate]);
+  }, [urlChatId, notifyChatId, chats, accessToken, isMobile, navigate]);
+
+  // 【本地改动 2026-09-03】聊天不可达（被删/失去访问）时清除记忆并回根路径，
+  // 避免 FDR-026 描述的「根 → 记忆聊天 → 403 → 根」死循环。
+  useEffect(() => {
+    if (!accessToken) return;
+    if (urlChatId && !isNotification && urlChatId !== notifyChatId
+        && chats.length > 0 && !chats.some(c => c.id === urlChatId)) {
+      clearLastRoom();
+      navigate('/', { replace: true });
+    }
+  }, [urlChatId, chats, notifyChatId, isNotification, accessToken, navigate]);
 
   const handleSelectChat = (id) => {
     useChatStore.setState(s => ({
@@ -90,7 +117,8 @@ export default function ChatPage() {
 
   return (
     <div className={appClass}>
-      <ChatList onSelectChat={handleSelectChat} activeId={urlChatId} onLogout={logout} />
+      <ChatList onSelectChat={handleSelectChat} activeId={urlChatId}
+        onLogout={() => { clearLastRoom(); logout(); }} />
        {urlChatId ? (
          <ChatView
            chatId={urlChatId}

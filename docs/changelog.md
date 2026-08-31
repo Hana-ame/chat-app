@@ -742,3 +742,22 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
     用户自行滚回底部（scroll 事件）也清零。
   - 换聊天 / 加载更早消息（loadMore）不计入新消息数。
 - 验证：`npx vitest run` 119 ✅；`npx tsc --noEmit` ✅；`npx vite build` ✅。
+
+## 2026-09-03 feat: 最近聊天记忆（Last room memory，对齐 chatto FDR-026）
+
+- 背景：chatto FDR-026 让前端记住每个服务器用户最后所在的聊天，登录/刷新后自动回到
+  该聊天，而不是落到中间页/通知页。chat-app 此前固定落到 /g/notifications。纯前端
+  localStorage 实现，无后端改动，所有本地改动带【本地改动 2026-09-03】标记。
+- 实现：
+  - `client/src/utils/lastRoom.js`：getLastRoom / setLastRoom / clearLastRoom，key
+    `chatapp:lastRoom`；localStorage 不可用（隐私模式）时 try/catch 静默降级。
+  - `client/src/routes/ChatPage.jsx`：
+    - 进入真实聊天（非 notifications）时 setLastRoom。
+    - 根路径无 urlChatId 时：若有记忆且仍可访问（chats 中存在）→ 回到该聊天；
+      否则清除记忆并落到 /g/notifications。
+    - 聊天不可达（被删/失去访问，urlChatId 不在 chats）→ 清除记忆并回根路径，
+      避免「根 → 记忆聊天 → 403 → 根」死循环。
+    - 登出时清除记忆。
+  - notifications 是特殊视图，不覆盖记忆。
+- 测试：`client/src/utils/lastRoom.test.js` 6 用例（读写/空 id/清除/key/隐私模式降级）。
+- 验证：`npx vitest run` 125 ✅（+6）；`npx tsc --noEmit` ✅；`npx vite build` ✅。
