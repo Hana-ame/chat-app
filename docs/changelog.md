@@ -496,3 +496,35 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
     外部网关地址与非 sensenova 模型名）。
 - 验证：`go build ./...` + `go vet ./internal/testutil/` 通过；
   `go test ./internal/testutil/` 本地全绿（真实端点测试无 key 自动跳过）。
+
+
+## 2026-08-31 feat: Web Push（VAPID + push_subscriptions + 离线补推，移植 chatto push 机制）
+
+- 背景：chat-app 的持久化通知（第 33 轮）只覆盖「在线实时广播 + 离线落库待拉取」，
+  离线用户没有任何主动提醒；移植 chatto 的 push 机制补上离线投递通道。
+- 实现（全部对齐 chat-app 既有风格，新增全部带【本地改动】注释）：
+  - 迁移 `006__add_push_subscriptions.sql`：`push_subscriptions` 表
+    （endpoint 全局唯一，p256dh/auth 为 RFC 8291 密钥，FK 级联删用户）。
+  - db 层 `push_subscriptions.go`：SavePushSubscription（两步写：DO NOTHING
+    区分新插/覆盖，再 UPDATE，规避 SQLite UPSERT 的 RowsAffected 歧义）、
+    ListByUser / DeleteByEndpoint / DeleteByUserAndEndpoint / DeleteAllByUser /
+    Count。
+  - config：`CHAT_PUSH_VAPID_PUBLIC_KEY` / `CHAT_PUSH_VAPID_PRIVATE_KEY` /
+    `CHAT_PUSH_VAPID_SUBJECT` 三 env（未配置 = push 整体关闭）。
+  - service `push.go`：PushService（IsConfigured / VAPIDPublicKey / Subscribe /
+    Unsubscribe / PushForOfflineUser / sendOne）。410/404 即时删订阅，其余错误
+    只记日志；TTL 1h。
+  - 触发分流（notification.go trigger）：在线 → 实时广播；离线 → Web Push
+    （Push 未配置时自动跳过，不影响在线广播）。
+  - handlers `push.go` + 路由：GET /api/push/vapid-public-key、
+    POST/DELETE /api/push/subscribe（未配置时 503 push_not_configured）。
+  - 前端契约三方同步：schemas.ts（PushSubscriptionSchema /
+    VAPIDPublicKeyResponseSchema）、client.ts（api.push.getVAPIDPublicKey /
+    subscribe / unsubscribe + mock 分支）、mock.js（mockPush* 三函数 +
+    pushSubscriptions 全局 state）。
+  - swagger.json：+3 push 路径 + PushSubscription schema（python round-trip
+    字节一致）。
+  - 文档：database.md / realtime.md / changelog。
+- 测试：push_test.go 4 例（未配置拒绝、endpoint 幂等覆盖+退订、410 清订阅全链路、
+  未配置静默跳过），用 webpush.GenerateVAPIDKeys 生成真实密钥、httptest 造 410。
+- 验证：go build / go vet / go test（service+handlers+db）全绿；tsc --noEmit 通过。

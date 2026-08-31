@@ -64,3 +64,5 @@ data: {"op":"message_create","payload":{...}}
 - 传输统一接口见 [frontend.md](frontend.md#实时协调器realtimecoordinatorjs)
 - 事件分发：`coord.setHandlers({ onMessageCreate, onMessageUpdate, ... })`，store 内实现
 - 发送操作（消息/反应/已读）走普通 HTTP；事件流只负责"别人改了"的同步，本端操作后通常依赖服务端回推保持一致
+
+> Web Push（【本地改动 2026-08-31】）：用户离线（无 WS 连接）时，通知不再只落库，还会经 push_subscriptions 走 VAPID Web Push；在线用户仍走实时广播，二选一不重复。端点见 /api/push/*。

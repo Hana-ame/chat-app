@@ -122,6 +122,27 @@ export const NotificationOccurrenceSchema = z.object({
 
 export type NotificationOccurrence = z.infer<typeof NotificationOccurrenceSchema>;
 
+// 【本地改动 2026-08-31】Web Push 订阅（后端 models.PushSubscription 的镜像；
+// 移植 chatto 的 push 机制到前端契约）。endpoint/p256dh/auth 与浏览器
+// PushSubscription.toJSON() 字段一一对应；created_at 为后端注册时间。
+export const PushSubscriptionSchema = z.object({
+  id: z.string(),
+  user_id: z.string(),
+  endpoint: z.string(),
+  p256dh: z.string(),
+  auth: z.string(),
+  created_at: z.string(),
+});
+
+export type PushSubscription = z.infer<typeof PushSubscriptionSchema>;
+
+// VAPIDPublicKeyResponse 是 /api/push/vapid-public-key 的响应契约（未配置
+// 时后端返回 503，调用方捕获后静默跳过推送注册）。
+export const VAPIDPublicKeyResponseSchema = z.object({
+  vapid_public_key: z.string(),
+});
+export type VAPIDPublicKeyResponse = z.infer<typeof VAPIDPublicKeyResponseSchema>;
+
 export function validate<T>(schema: z.ZodType<T>, data: unknown, label: string): T {
   const result = schema.safeParse(data);
   if (!result.success) {

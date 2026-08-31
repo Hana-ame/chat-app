@@ -10,13 +10,14 @@ import {
 	mockPinChat, mockUnpinChat, mockMarkAnnouncementRead, mockUpdateChatAvatar, mockUpdateChatBanner, mockUpdateChatBackground,
 	mockGetNotifyChat, mockNotificationsList, mockNotifySend, mockNotifyMarkRead, mockNotifyDelete,
 	mockOccurrenceList, mockOccurrenceUnreadCount, mockOccurrenceMarkRead, mockOccurrenceMarkAllRead, mockOccurrenceDelete,
+	mockPushGetVAPIDPublicKey, mockPushSubscribe, mockPushUnsubscribe,
 	mockEmitStreamPlaceholder,
 	resetMockData,
 } from './mock';
 import { useAuthStore } from '../store/auth';
 import { API_BASE, UPLOAD_BASE, validateEnv } from '../config';
 import { AuthResponseSchema, validate } from '../schemas';
-import type { User, Chat, Message, Attachment, NotificationOccurrence } from '../schemas';
+import type { User, Chat, Message, Attachment, NotificationOccurrence, PushSubscription } from '../schemas';
 validateEnv();
 
 // buildUploadUrl 构建上传文件的可访问 URL:优先使用服务端返回的绝对 url;
@@ -211,6 +212,19 @@ const _apiMethods = {
       request<ApiError>('DELETE', '/api/notifications/' + id, token),
   },
 
+  // ── Web Push ──
+  push: {
+    // 【本地改动 2026-08-31】Web Push VAPID（移植 chatto push 机制；后端
+    // handlers/push.go）。getVAPIDPublicKey 在未配置时返回 503 → 调用方
+    // （SW 注册流程）捕获后静默跳过推送注册。
+    getVAPIDPublicKey: (token: string) =>
+      request<{ vapid_public_key: string }>('GET', '/api/push/vapid-public-key', token),
+    subscribe: (token: string, sub: { endpoint: string; p256dh: string; auth: string }) =>
+      request<{ subscribed: boolean; created: boolean }>('POST', '/api/push/subscribe', token, sub),
+    unsubscribe: (token: string, endpoint: string) =>
+      request<{ unsubscribed: boolean }>('DELETE', '/api/push/subscribe', token, { endpoint }),
+  },
+
   // ── Uploads ──
   upload: async (file: File, token?: string) => {
     const headers: Record<string, string> = {};
@@ -284,6 +298,15 @@ function buildMockProxy(target: typeof _apiMethods): ApiType {
           markReadOccurrence: (token: string, id: string) => Promise.resolve(mockOccurrenceMarkRead(token, id)),
           markAllReadOccurrences: (token: string) => Promise.resolve(mockOccurrenceMarkAllRead(token)),
           deleteOccurrence: (token: string, id: string) => Promise.resolve(mockOccurrenceDelete(token, id)),
+        };
+      }
+      if (mockEnabled && prop === 'push') {
+        // 【本地改动 2026-08-31】Web Push mock（与后端 handlers/push.go 对应）。
+        return {
+          getVAPIDPublicKey: (token: string) => Promise.resolve(mockPushGetVAPIDPublicKey(token)),
+          subscribe: (token: string, sub: { endpoint: string; p256dh: string; auth: string }) =>
+            Promise.resolve(mockPushSubscribe(token, sub)),
+          unsubscribe: (token: string, endpoint: string) => Promise.resolve(mockPushUnsubscribe(token, endpoint)),
         };
       }
       if (mockEnabled && prop === 'sendStreamMessage') {

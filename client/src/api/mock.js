@@ -6,6 +6,7 @@
  * @typedef {import('../schemas').Attachment} Attachment
  * @typedef {import('../schemas').PinnedContent} PinnedContent
  * @typedef {import('../schemas').NotificationOccurrence} NotificationOccurrence
+ * @typedef {import('../schemas').PushSubscription} PushSubscription
  */
 
 import { generateDummyData } from '../dev/dummy';
@@ -55,7 +56,7 @@ const AI_RESPONSES = [
 ];
 
 /**
- * @type {{ chats: Chat[], messages: Message[], onlineUserIds: string[], notificationOccurrences: NotificationOccurrence[] }|null}
+ * @type {{ chats: Chat[], messages: Message[], onlineUserIds: string[], notificationOccurrences: NotificationOccurrence[], pushSubscriptions: PushSubscription[] }|null}
  */
 let data = null;
 /** @type {import('zustand').UseBoundStore<import('zustand').StoreApi<any>>|null} */
@@ -73,11 +74,11 @@ const MOCK_USERS = [
   { id: 'ai', username: 'AI Bot', avatar_color: '#10a37f', email: '', role: '', last_seen: new Date().toISOString() },
 ];
 
-/** @returns {{ chats: Chat[], messages: Message[], notificationOccurrences: NotificationOccurrence[] }} */
+/** @returns {{ chats: Chat[], messages: Message[], notificationOccurrences: NotificationOccurrence[], pushSubscriptions: PushSubscription[] }} */
 function ensureData() {
   if (!data) {
     const gen = generateDummyData({ chatCount: 10, msgPerChat: 150 });
-    data = /** @type {any} */ ({ chats: gen.chats, messages: [...(gen.messages || [])], onlineUserIds: gen.onlineUserIds || [], notificationOccurrences: [] });
+    data = /** @type {any} */ ({ chats: gen.chats, messages: [...(gen.messages || [])], onlineUserIds: gen.onlineUserIds || [], notificationOccurrences: [], pushSubscriptions: [] });
     if (_store) _store.setState({ onlineUserIds: data.onlineUserIds });
   }
   return data;
@@ -910,4 +911,49 @@ export function mockOccurrenceDelete(_token, id) {
   const d = ensureData();
   d.notificationOccurrences = (d.notificationOccurrences || []).filter(o => o.id !== id);
   return { ok: true };
+}
+
+// ── Web Push mock（【本地改动 2026-08-31】移植 chatto push 机制）──
+// 与后端 handlers/push.go 三端点一一对应。mock 状态下：
+//   - VAPID 公钥固定返回（未配置语义无法在纯前端 mock，固定给一把测试公钥，
+//     与后端 503 语义由调用方在真实端区分；mock 里都返回 200 便于单测）；
+//   - 订阅写入 pushSubscriptions 数组（endpoint 唯一，重复注册覆盖）。
+
+/**
+ * 返回 VAPID 公钥。mock 固定给一把合法的测试公钥（base64url），
+ * 前端注册流程用它与真实端一致。
+ * @returns {{ vapid_public_key: string }}
+ */
+export function mockPushGetVAPIDPublicKey(_token) {
+  return { vapid_public_key: 'BMockVAPIDPublicKey0000000000000000000000000000000000000000' };
+}
+
+/**
+ * 保存一条推送订阅（endpoint 唯一→覆盖；返回 created 表示新插入）。
+ * @param {string} _token
+ * @param {{ endpoint: string, p256dh: string, auth: string }} sub
+ * @returns {{ subscribed: boolean, created: boolean }}
+ */
+export function mockPushSubscribe(_token, sub) {
+  const d = ensureData();
+  d.pushSubscriptions = d.pushSubscriptions || [];
+  const existing = d.pushSubscriptions.find(s => s.endpoint === sub.endpoint);
+  if (existing) {
+    Object.assign(existing, sub);
+    return { subscribed: true, created: false };
+  }
+  d.pushSubscriptions.push({ id: randid(), user_id: '', created_at: new Date().toISOString(), ...sub });
+  return { subscribed: true, created: true };
+}
+
+/**
+ * 删除一条推送订阅（幂等：不存在也返回成功）。
+ * @param {string} _token
+ * @param {string} endpoint
+ * @returns {{ unsubscribed: boolean }}
+ */
+export function mockPushUnsubscribe(_token, endpoint) {
+  const d = ensureData();
+  d.pushSubscriptions = (d.pushSubscriptions || []).filter(s => s.endpoint !== endpoint);
+  return { unsubscribed: true };
 }

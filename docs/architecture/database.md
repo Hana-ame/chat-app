@@ -14,6 +14,7 @@ SQLite（WAL 模式、`foreign_keys=ON`、`synchronous=NORMAL`）。schema 由�
 | `003__add_message_index.sql` | `(chat_id, created_at DESC, id DESC)` 复合索引 |
 | `004__add_reply_to_message.sql` | `messages.reply_to_message_id` + 索引 |
 | `005__add_notification_occurrences.sql` | 【本地改动 2026-08-31】持久化通知：`notification_occurrences` 表（每用户每事件唯一）+ 未读/过期索引 |
+| `006__add_push_subscriptions.sql` | 【本地改动 2026-08-31】Web Push：`push_subscriptions` 表（endpoint 全局唯一，p256dh/auth 加密密钥，FK 级联删用户） |
 
 另有运行时 `db_fixups.go` 动态补列（`ensureColumn`，幂等）：`chats.avatar_url / banner_url / background_url / banner_opacity / last_message_*`、`chat_members.notify_enabled / unread_count`、`messages.type`（与 001 重复定义，安全）、`users.notify_blocked`，以及 `last_visited_at → last_active_at` 改名。
 
@@ -96,6 +97,21 @@ SQLite（WAL 模式、`foreign_keys=ON`、`synchronous=NORMAL`）。schema 由�
 （同一条源消息被重复投递）不重复插行、不重置已读——数据层兜底，无需应用锁
 （与 notify chat 的「锁 + 唯一索引」同思路，但这里是单一 INSERT，锁不必要）。
 索引：`(user_id, read, created_at DESC)`（列表/未读）、`(expires_at)`（清理）。
+
+### push_subscriptions（【本地改动 2026-08-31】移植 chatto Web Push）
+
+| 列 | 类型 | 说明 |
+|---|---|---|
+| id | TEXT PK | 订阅 id（db.NewID） |
+| user_id | TEXT NOT NULL FK→users ON DELETE CASCADE | 订阅归属；删用户自动清空 |
+| endpoint | TEXT NOT NULL UNIQUE | 浏览器 PushManager 签发端点，全局唯一；重复注册覆盖归属（SavePushSubscription 两步写法：先 DO NOTHING 区分新插/覆盖，再 UPDATE） |
+| p256dh | TEXT NOT NULL | RFC 8291 加密公钥（浏览器订阅密钥） |
+| auth | TEXT NOT NULL | RFC 8291 加密 auth 密钥 |
+| created_at | TEXT NOT NULL | 注册时间（RFC3339Nano） |
+
+索引：idx_push_subscriptions_user (user_id)。
+
+生命周期：订阅无 TTL；失效由发送时的 404/410 响应即时删除（PushService.sendOne），用户注销由 FK CASCADE 清空。VAPID 三件套未配置（env 缺 key）时 IsConfigured()==false，订阅端点 503、发送静默跳过（Web Push 整体 opt-in 默认关闭，与 chatto PushConfig 同语义）。
 
 ### attachments / reactions / mentions
 

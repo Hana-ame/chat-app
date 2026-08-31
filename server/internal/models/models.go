@@ -126,3 +126,17 @@ type NotificationOccurrence struct {
 	CreatedAt time.Time `json:"created_at"`
 	ExpiresAt time.Time `json:"expires_at"`
 }
+
+// PushSubscription 是 Web Push 的一条浏览器订阅（移植 chatto 的 push
+// subscription 语义）。endpoint 由浏览器的 PushManager 签发、全局唯一；
+// P256DH/Auth 为 RFC 8291 的订阅加密密钥，发送时用于加密 payload。订阅
+// 不设 TTL：失效由发送时的 404/410 响应即时清除，用户注销由 FK CASCADE
+// 清空。
+type PushSubscription struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	Endpoint  string    `json:"endpoint"`
+	P256DH    string    `json:"p256dh"`
+	Auth      string    `json:"auth"`
+	CreatedAt time.Time `json:"created_at"`
+}

@@ -141,6 +141,15 @@ func (h *Hub) ClientCount() int {
 	return n
 }
 
+// IsOnline 判断指定 user 当前是否有活跃 WS 连接。服务层用它决定「离线才
+// 需要 Web Push」：在线走实时广播，离线且有订阅才发推送（见
+// server/internal/service/push.go 的 PushForOfflineUser）。
+func (h *Hub) IsOnline(userID string) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return len(h.clients[userID]) > 0
+}
+
 func (h *Hub) OnlineUserIDs() []string {
 	h.mu.RLock()
 	defer h.mu.RUnlock()

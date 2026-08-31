@@ -38,6 +38,15 @@ type Config struct {
 	// loopback, or link-local addresses (e.g. a local ollama). Off by default
 	// to prevent SSRF from a public deployment.
 	AIAllowPrivateIPs bool
+
+	// 【本地改动 2026-08-31】Web Push（VAPID）三件套：公钥/私钥/subject。
+	// 移植 chatto 的 PushConfig 语义（未配置 = Web Push 整体关闭，服务层
+	// IsConfigured() 为 false，订阅端点返回 503，发送直接跳过）。私钥绝不
+	// 外传；subject 为运维联系邮箱（mailto:）或 URL。生成命令见 chatto
+	// 文档：openssl ecparam -genkey -name prime256v1 等。
+	PushVAPIDPublicKey  string
+	PushVAPIDPrivateKey string
+	PushVAPIDSubject    string
 }
 
 func getenv(key, def string) string {
@@ -160,6 +169,11 @@ func Load() *Config {
 		ReadHeaderTimeout:       getenvDuration("CHAT_READ_HEADER_TIMEOUT", 10*time.Second),
 
 		AIAllowPrivateIPs: getenvBool("CHAT_AI_ALLOW_PRIVATE", false),
+
+		// 【本地改动 2026-08-31】Web Push VAPID 三件套 env（未配置 = 推送关闭）。
+		PushVAPIDPublicKey:  getenv("CHAT_PUSH_VAPID_PUBLIC_KEY", ""),
+		PushVAPIDPrivateKey: getenv("CHAT_PUSH_VAPID_PRIVATE_KEY", ""),
+		PushVAPIDSubject:    getenv("CHAT_PUSH_VAPID_SUBJECT", ""),
 	}
 	logutil.Info("config loaded: addr=%s db=%s upload_dir=%s static_dir=%s base_url=%s",
 		cfg.Addr, cfg.DBPath, cfg.UploadDir, cfg.StaticDir, cfg.BaseURL)

@@ -2277,6 +2277,185 @@
           }
         }
       }
+    },
+    "/api/push/vapid-public-key": {
+      "get": {
+        "summary": "获取 VAPID 公钥(Web Push 订阅用)",
+        "operationId": "getVAPIDPublicKey",
+        "tags": [
+          "push"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "vapid_public_key": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "VAPID 未配置时返回 503 push_not_configured。"
+      }
+    },
+    "/api/push/subscribe": {
+      "post": {
+        "summary": "注册浏览器 Push 订阅(保存 endpoint+p256dh+auth)",
+        "operationId": "subscribePush",
+        "tags": [
+          "push"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subscribed": {
+                      "type": "boolean"
+                    },
+                    "created": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "endpoint 全局唯一,重复注册覆盖;VAPID 未配置时 503。",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "endpoint",
+                  "p256dh",
+                  "auth"
+                ],
+                "properties": {
+                  "endpoint": {
+                    "type": "string"
+                  },
+                  "p256dh": {
+                    "type": "string"
+                  },
+                  "auth": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "退订(按 endpoint)",
+        "operationId": "unsubscribePush",
+        "tags": [
+          "push"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "unsubscribed": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "description": "只允许删除本人的订阅;不存在时幂等成功。",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "endpoint"
+                ],
+                "properties": {
+                  "endpoint": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3067,6 +3246,29 @@
           "expires_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "PushSubscription": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "p256dh": {
+            "type": "string"
+          },
+          "auth": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
           }
         }
       }

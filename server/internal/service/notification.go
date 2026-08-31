@@ -87,11 +87,18 @@ func (s *NotificationService) trigger(ctx context.Context, recipientID, kind, ch
 	if !created {
 		return // 同源事件已存在，不重复插行、不重置已读
 	}
-	if s.hub != nil {
+	// 投递分流：在线 → 实时广播；离线 → Web Push（有订阅才发）。
+	// 移植 chatto 的「在线实时 / 离线推送」双通道语义；Push 未配置时
+	// PushForOfflineUser 内部直接跳过，不影响在线广播。
+	if s.hub != nil && s.hub.IsOnline(recipientID) {
 		occ, err := s.db.GetNotificationOccurrenceByKey(ctx, recipientID, kind, chatID, messageID)
 		if err == nil && occ != nil {
 			s.hub.BroadcastNotification(recipientID, occ)
 		}
+		return
+	}
+	if s.Push != nil {
+		s.Push.PushForOfflineUser(ctx, recipientID, title, body)
 	}
 }
 

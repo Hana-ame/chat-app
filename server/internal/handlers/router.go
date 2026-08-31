@@ -109,6 +109,14 @@ func (s *Server) Router(gateway *ws.Gateway) http.Handler {
 				r.Post("/chats", s.CreateChat)
 				r.Post("/dms", s.CreateOrGetDM)
 				r.Get("/chats/notify", s.GetNotificationsChat)
+				r.Route("/push", func(r chi.Router) {
+					// Web Push（VAPID）：公钥下发 / 订阅注册 / 退订。未配置 VAPID
+					// 时公钥与订阅端点返回 503，前端静默跳过（推送整体不可用但
+					// 不影响其他功能）。
+					r.Get("/vapid-public-key", s.VAPIDPublicKey)
+					r.Post("/subscribe", s.SubscribePush)
+					r.Delete("/subscribe", s.UnsubscribePush)
+				})
 				r.Route("/notifications", func(r chi.Router) {
 					// 【本地改动 2026-08-31】持久化通知 occurrence 端点（移植
 					// chatto FDR-012/013）：列表/未读计数/单条已读/全部已读/删除。
