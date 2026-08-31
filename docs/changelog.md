@@ -727,3 +727,18 @@ vite,连不上时整轮作废;且 e2e 用户池每轮重新注册 4 个用户,�
   - CORS 限制：多数站点读不到 OGP → 降级为域名占位卡（不打扰）。
 - 测试：`client/src/utils/linkPreview.test.js` 20 用例（extractFirstUrl 10 + parseOgpHtml 8 + fetchOgp 2）。
 - 验证：`npx vitest run` 119 ✅（+20）；`npx tsc --noEmit` ✅；`npx vite build` ✅。
+
+
+## 2026-09-03 feat: 跳转到最新消息（Jump to present，对齐 chatto FDR-014）
+
+- 背景：chatto FDR-014 让用户离开底部后新消息到达时，底部浮出「跳转到最新」胶囊，
+  点击回到最新；用户回到底部则自动消失。chat-app 原有「接近底部自动滚动」但缺此胶囊。
+  纯前端增强，无后端改动，所有本地改动带【本地改动 2026-09-03】标记。
+- 实现：`client/src/components/MessageList.jsx`
+  - `nearBottomRef` 跟踪最近一次滚动是否在底部阈值（300px）内（scroll 监听）。
+  - messages 更新时：在底部 → 自动滚动到底；离开底部且来了新消息（newestId 变化）
+    → 不滚动，`jumpCount` +1，浮出胶囊。
+  - 胶囊：`position: sticky; bottom:12px`，「↓ N 条新消息」，点击回到底部并清零；
+    用户自行滚回底部（scroll 事件）也清零。
+  - 换聊天 / 加载更早消息（loadMore）不计入新消息数。
+- 验证：`npx vitest run` 119 ✅；`npx tsc --noEmit` ✅；`npx vite build` ✅。
